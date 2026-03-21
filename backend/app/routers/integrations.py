@@ -5,8 +5,11 @@ from app.database import get_db
 from app.models import Integration
 from app.schemas import IntegrationCreate, IntegrationUpdate, IntegrationOut
 from app.services.notifier import fire_test_notification
+from app.services.email_sender import is_configured as smtp_configured
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
+
+SMTP_WARNING = "SMTP is not configured. Emails will not be sent until SMTP_HOST and SMTP_FROM environment variables are set."
 
 
 @router.get("", response_model=list[IntegrationOut])
@@ -20,7 +23,10 @@ def create_integration(body: IntegrationCreate, db: Session = Depends(get_db)):
     db.add(integration)
     db.commit()
     db.refresh(integration)
-    return integration
+    result = IntegrationOut.model_validate(integration)
+    if integration.type == "email" and not smtp_configured():
+        result.smtp_warning = SMTP_WARNING
+    return result
 
 
 @router.patch("/{integration_id}", response_model=IntegrationOut)
@@ -32,7 +38,10 @@ def update_integration(integration_id: str, body: IntegrationUpdate, db: Session
         setattr(integration, field, value)
     db.commit()
     db.refresh(integration)
-    return integration
+    result = IntegrationOut.model_validate(integration)
+    if integration.type == "email" and not smtp_configured():
+        result.smtp_warning = SMTP_WARNING
+    return result
 
 
 @router.delete("/{integration_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getIntegrations, createIntegration, updateIntegration, deleteIntegration, testIntegration } from '../api/client'
+import { globalAddToast } from '../context/ToastContext'
 
-const TYPE_ICONS = { jenkins: '⚙️', drone: '🚁', generic: '🔗' }
+const TYPE_ICONS = { jenkins: '⚙️', drone: '🚁', generic: '🔗', email: '📧' }
 const ALL_EVENTS = ['task.done', 'task.failed', 'task.in_progress', 'project.complete']
 
 function IntegrationModal({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
-    name: '', type: 'generic', url: '', secret: '', project_id: '', events: ['task.done', 'task.failed', 'project.complete'], active: true
+    name: '', type: 'generic', url: '', secret: '', project_id: '', events: ['task.done', 'task.failed', 'project.complete'], active: true,
+    email_to: '', email_subject_prefix: '[TODO Platform]',
   })
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
@@ -28,16 +30,32 @@ function IntegrationModal({ initial, onSave, onClose }) {
               <option value="jenkins">Jenkins</option>
               <option value="drone">Drone</option>
               <option value="generic">Generic Webhook</option>
+              <option value="email">Email</option>
             </select>
           </label>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Webhook URL *
-            <input value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://your-server/notify"
-              style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }} />
-          </label>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Secret (Bearer token, optional)
-            <input value={form.secret} onChange={e => set('secret', e.target.value)} placeholder="token..."
-              style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }} />
-          </label>
+          {form.type === 'email' ? (
+            <>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Recipients (comma-separated) *
+                <input value={form.email_to} onChange={e => set('email_to', e.target.value)} placeholder="user@example.com, admin@example.com"
+                  style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }} />
+              </label>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Subject prefix
+                <input value={form.email_subject_prefix} onChange={e => set('email_subject_prefix', e.target.value)} placeholder="[TODO Platform]"
+                  style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }} />
+              </label>
+            </>
+          ) : (
+            <>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Webhook URL *
+                <input value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://your-server/notify"
+                  style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }} />
+              </label>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Secret (Bearer token, optional)
+                <input value={form.secret} onChange={e => set('secret', e.target.value)} placeholder="token..."
+                  style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }} />
+              </label>
+            </>
+          )}
           <label style={{ fontSize: 13, fontWeight: 600 }}>Project ID (leave blank for global)
             <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder="(all projects)"
               style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }} />
@@ -58,7 +76,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
           </label>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-          <button onClick={() => onSave(form)} disabled={!form.name || !form.url}
+          <button onClick={() => onSave(form)} disabled={!form.name || (form.type !== 'email' && !form.url) || (form.type === 'email' && !form.email_to)}
             style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
           <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: '8px 20px', cursor: 'pointer' }}>Cancel</button>
         </div>
@@ -75,14 +93,18 @@ export default function Integrations() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['integrations'] })
 
+  const _checkSmtpWarning = (data) => {
+    if (data?.smtp_warning) globalAddToast(data.smtp_warning, 'warning')
+  }
+
   const createMut = useMutation({
     mutationFn: createIntegration,
-    onSuccess: () => { invalidate(); setModal(null) }
+    onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data) }
   })
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => updateIntegration(id, data),
-    onSuccess: () => { invalidate(); setModal(null) }
+    onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data) }
   })
 
   const deleteMut = useMutation({
@@ -96,7 +118,14 @@ export default function Integrations() {
   })
 
   const handleSave = (form) => {
-    const data = { ...form, project_id: form.project_id || null, secret: form.secret || null }
+    const data = {
+      ...form,
+      project_id: form.project_id || null,
+      secret: form.secret || null,
+      email_to: form.email_to || null,
+      email_subject_prefix: form.email_subject_prefix || '[TODO Platform]',
+    }
+    if (form.type === 'email' && !data.url) data.url = ''
     if (modal.mode === 'edit') updateMut.mutate({ id: modal.data.id, data })
     else createMut.mutate(data)
   }
@@ -119,7 +148,7 @@ export default function Integrations() {
       {integrations.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>
           <p style={{ fontSize: 18 }}>No integrations yet</p>
-          <p style={{ marginTop: 8 }}>Add a Jenkins, Drone, or generic webhook to get notified on task updates</p>
+          <p style={{ marginTop: 8 }}>Add a Jenkins, Drone, generic webhook, or email integration to get notified on task updates</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -136,7 +165,10 @@ export default function Integrations() {
                     }}>{intg.active ? 'active' : 'inactive'}</span>
                     <span style={{ background: '#ede9fe', color: '#4f46e5', borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{intg.type}</span>
                   </div>
-                  <p style={{ color: '#6b7280', fontSize: 13, marginTop: 4, fontFamily: 'monospace' }}>{intg.url}</p>
+                  {intg.type === 'email'
+                    ? <p style={{ color: '#6b7280', fontSize: 13, marginTop: 4 }}>To: {intg.email_to}</p>
+                    : <p style={{ color: '#6b7280', fontSize: 13, marginTop: 4, fontFamily: 'monospace' }}>{intg.url}</p>
+                  }
                   {intg.project_id && <p style={{ color: '#9ca3af', fontSize: 12, marginTop: 2 }}>Project: {intg.project_id}</p>}
                   <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                     {intg.events.map(ev => (
@@ -149,7 +181,7 @@ export default function Integrations() {
                     style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
                     {testMut.isPending ? 'Testing...' : 'Test'}
                   </button>
-                  <button onClick={() => setModal({ mode: 'edit', data: { ...intg, secret: intg.secret || '', project_id: intg.project_id || '' } })}
+                  <button onClick={() => setModal({ mode: 'edit', data: { ...intg, secret: intg.secret || '', project_id: intg.project_id || '', email_to: intg.email_to || '', email_subject_prefix: intg.email_subject_prefix || '[TODO Platform]' } })}
                     style={{ background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>Edit</button>
                   <button onClick={() => deleteMut.mutate(intg.id)}
                     style={{ background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>Delete</button>

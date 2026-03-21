@@ -5,6 +5,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.models import Task, Project, Integration
+from app.services.email_sender import send_email, build_notification_email, is_configured as smtp_configured
 
 logger = logging.getLogger(__name__)
 
@@ -64,17 +65,32 @@ async def fire_notifications(db: Session, task: Task, event: str) -> None:
     if not matching:
         return
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        for integration in matching:
-            try:
-                resp = await client.post(
-                    integration.url,
-                    json=payload,
-                    headers=_build_headers(integration),
-                )
-                logger.info("Notified %s [%s] → %s", integration.name, integration.type, resp.status_code)
-            except Exception as exc:
-                logger.warning("Failed to notify %s: %s", integration.name, exc)
+    email_integrations = [i for i in matching if i.type == "email"]
+    webhook_integrations = [i for i in matching if i.type != "email"]
+
+    # Send email notifications
+    for integration in email_integrations:
+        if not integration.email_to:
+            logger.warning("Email integration %s has no recipients", integration.name)
+            continue
+        recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
+        prefix = integration.email_subject_prefix or "[TODO Platform]"
+        subject, html = build_notification_email(event, payload, prefix)
+        send_email(recipients, subject, html)
+
+    # Send webhook notifications
+    if webhook_integrations:
+        async with httpx.AsyncClient(timeout=10) as client:
+            for integration in webhook_integrations:
+                try:
+                    resp = await client.post(
+                        integration.url,
+                        json=payload,
+                        headers=_build_headers(integration),
+                    )
+                    logger.info("Notified %s [%s] → %s", integration.name, integration.type, resp.status_code)
+                except Exception as exc:
+                    logger.warning("Failed to notify %s: %s", integration.name, exc)
 
 
 async def fire_test_notification(integration: Integration) -> dict:
@@ -82,7 +98,22 @@ async def fire_test_notification(integration: Integration) -> dict:
         "event": "test",
         "message": "This is a test notification from the TODO platform.",
         "integration": {"id": integration.id, "name": integration.name, "type": integration.type},
+        "project": {"name": "Test Project", "progress": 75.0, "total_tasks": 4, "done_tasks": 3},
+        "task": {"title": "Test Task", "status": "done", "priority": "high"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+    if integration.type == "email":
+        if not integration.email_to:
+            return {"success": False, "error": "No recipients configured"}
+        if not smtp_configured():
+            return {"success": False, "error": "SMTP not configured (set SMTP_HOST and SMTP_FROM env vars)"}
+        recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
+        prefix = integration.email_subject_prefix or "[TODO Platform]"
+        subject, html = build_notification_email("test", payload, prefix)
+        ok = send_email(recipients, subject, html)
+        return {"success": ok, "recipients": recipients} if ok else {"success": False, "error": "SMTP send failed"}
+
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(

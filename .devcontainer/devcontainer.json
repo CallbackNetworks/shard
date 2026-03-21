@@ -1,5 +1,0 @@
-{
-  "//": "This devcontainer is not used — the project runs via docker-compose. See docker-compose.yml at the repo root.",
-  "name": "TODO Platform (use docker-compose instead)",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu"
-}

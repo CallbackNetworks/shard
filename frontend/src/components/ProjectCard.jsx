@@ -11,7 +11,7 @@ export default function ProjectCard({ project, onDelete }) {
   const navigate = useNavigate()
   return (
     <div
-      onClick={() => navigate(`/projects/${project.id}`)}
+      onClick={() => navigate(`/app/projects/${project.id}`)}
       style={{
         background: '#fff', borderRadius: 12, padding: 20, cursor: 'pointer',
         border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,.06)',

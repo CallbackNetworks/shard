@@ -10,7 +10,14 @@ export default defineConfig({
       '/projects': backendUrl,
       '/webhook': backendUrl,
       '/integrations': backendUrl,
+      '/identities': backendUrl,
+      '/activity': backendUrl,
+      '/api-keys': backendUrl,
+      '/api/v1': backendUrl,
       '/health': backendUrl,
+      '/docs': backendUrl,
+      '/openapi.json': backendUrl,
+      '/redoc': backendUrl,
     }
   }
 })
