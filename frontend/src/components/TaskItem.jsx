@@ -1,9 +1,27 @@
 import { useState } from 'react'
 
-const STATUS_COLORS = { todo: '#e5e7eb', in_progress: '#fef3c7', done: '#d1fae5', failed: '#fee2e2' }
-const STATUS_TEXT = { todo: '#6b7280', in_progress: '#92400e', done: '#065f46', failed: '#991b1b' }
-const PRIORITY_COLORS = { low: '#dbeafe', medium: '#fef9c3', high: '#fee2e2' }
-const PRIORITY_TEXT = { low: '#1d4ed8', medium: '#854d0e', high: '#991b1b' }
+const STATUS_COLORS = {
+  todo: 'rgba(255,255,255,0.08)',
+  in_progress: 'rgba(83,157,245,0.15)',
+  done: 'rgba(30,215,96,0.12)',
+  failed: 'rgba(243,114,127,0.12)',
+}
+const STATUS_TEXT = {
+  todo: 'rgba(255,255,255,0.5)',
+  in_progress: '#539df5',
+  done: '#1ed760',
+  failed: '#f3727f',
+}
+const PRIORITY_COLORS = {
+  low: 'rgba(179,179,179,0.12)',
+  medium: 'rgba(255,164,43,0.12)',
+  high: 'rgba(243,114,127,0.12)',
+}
+const PRIORITY_TEXT = {
+  low: '#b3b3b3',
+  medium: '#ffa42b',
+  high: '#f3727f',
+}
 
 export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
   const [copied, setCopied] = useState(false)
@@ -17,18 +35,23 @@ export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
   }
 
   const badge = (text, bg, color) => (
-    <span style={{ background: bg, color, borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{text}</span>
+    <span style={{
+      background: bg, color, borderRadius: 9999,
+      padding: '2px 10px', fontSize: 11, fontWeight: 700,
+      textTransform: 'capitalize', letterSpacing: '0.05em',
+    }}>{text}</span>
   )
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 10, padding: '14px 16px', border: '1px solid #e5e7eb',
-      display: 'flex', flexDirection: 'column', gap: 8
+      background: '#181818', borderRadius: 8, padding: '14px 16px',
+      boxShadow: 'rgba(0,0,0,0.3) 0px 4px 8px',
+      display: 'flex', flexDirection: 'column', gap: 10
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1 }}>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>{task.title}</span>
-          {task.description && <p style={{ color: '#6b7280', fontSize: 13, marginTop: 2 }}>{task.description}</p>}
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#ffffff' }}>{task.title}</span>
+          {task.description && <p style={{ color: '#b3b3b3', fontSize: 13, marginTop: 4, marginBottom: 0 }}>{task.description}</p>}
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {badge(task.priority, PRIORITY_COLORS[task.priority], PRIORITY_TEXT[task.priority])}
@@ -41,7 +64,11 @@ export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
           value={task.status}
           onChange={e => onUpdate(task.id, { status: e.target.value })}
           onClick={e => e.stopPropagation()}
-          style={{ fontSize: 13, borderRadius: 6, border: '1px solid #d1d5db', padding: '3px 8px', cursor: 'pointer' }}
+          style={{
+            fontSize: 13, fontWeight: 600, borderRadius: 9999,
+            border: '1px solid rgba(255,255,255,0.15)', padding: '4px 12px',
+            cursor: 'pointer', background: '#1f1f1f', color: '#ffffff',
+          }}
         >
           <option value="todo">todo</option>
           <option value="in_progress">in progress</option>
@@ -51,16 +78,29 @@ export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
 
         <button
           onClick={copyToken}
-          style={{ fontSize: 12, background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', color: '#374151' }}
-        >{copied ? 'Copied!' : 'Copy webhook URL'}</button>
+          style={{
+            fontSize: 12, fontWeight: 700,
+            background: '#1f1f1f', border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 9999, padding: '4px 14px', cursor: 'pointer', color: '#ffffff',
+            textTransform: 'uppercase', letterSpacing: '1px',
+          }}
+        >{copied ? 'Copied!' : 'Copy Webhook'}</button>
 
         <button
           onClick={e => { e.stopPropagation(); onDelete(task.id) }}
-          style={{ fontSize: 12, background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', color: '#ef4444', marginLeft: 'auto' }}
+          style={{
+            fontSize: 12, fontWeight: 700, background: 'none',
+            border: '1px solid rgba(243,114,127,0.4)', borderRadius: 9999,
+            padding: '4px 14px', cursor: 'pointer', color: '#f3727f', marginLeft: 'auto',
+            textTransform: 'uppercase', letterSpacing: '1px',
+          }}
         >Delete</button>
       </div>
 
-      <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'monospace', background: '#f9fafb', borderRadius: 6, padding: '4px 8px', wordBreak: 'break-all' }}>
+      <div style={{
+        fontSize: 11, color: '#b3b3b3', fontFamily: 'monospace',
+        background: '#1f1f1f', borderRadius: 4, padding: '6px 10px', wordBreak: 'break-all',
+      }}>
         POST /webhook/callback/{task.callback_token}
       </div>
     </div>

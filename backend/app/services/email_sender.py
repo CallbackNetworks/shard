@@ -59,6 +59,8 @@ def build_notification_email(event: str, payload: dict, subject_prefix: str = "[
         "task.done": "Task Completed",
         "task.failed": "Task Failed",
         "task.in_progress": "Task In Progress",
+        "task.due_soon": "Task Due Soon",
+        "task.overdue": "Task Overdue",
         "project.complete": "Project Completed",
         "test": "Test Notification",
     }

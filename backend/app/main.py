@@ -1,3 +1,4 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -7,9 +8,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.database import engine
 from app.models import Base
-from app.routers import projects, tasks, webhooks, integrations, labels, cycles, api_keys, external_api, activity, identities
+from app.routers import projects, tasks, webhooks, integrations, labels, cycles, api_keys, external_api, activity, identities, share
+from app.routers import comments, search, recurring, webhook_logs, analytics, workflow_rules, assistant, templates, attachments
+from app.routers import ws as ws_router
 from app.routers.labels import task_label_router
 from app.routers.auth import router as auth_router, verify_token
+from app.services.scheduler import due_date_reminder_loop
 
 
 @asynccontextmanager
@@ -32,8 +36,34 @@ async def lifespan(app: FastAPI):
             conn.execute(text("ALTER TABLE integrations ADD COLUMN email_to TEXT"))
         if "email_subject_prefix" not in intg_cols:
             conn.execute(text("ALTER TABLE integrations ADD COLUMN email_subject_prefix VARCHAR(255) DEFAULT '[TODO Platform]'"))
+        # Migrate identity share_token
+        import uuid as _uuid
+        identity_cols = {c["name"] for c in inspect(engine).get_columns("identities")}
+        if "share_token" not in identity_cols:
+            conn.execute(text("ALTER TABLE identities ADD COLUMN share_token VARCHAR(36)"))
+            rows = conn.execute(text("SELECT id FROM identities")).fetchall()
+            for (row_id,) in rows:
+                conn.execute(text("UPDATE identities SET share_token = :t WHERE id = :id"),
+                             {"t": str(_uuid.uuid4()), "id": row_id})
+        # Migrate identity share PIN and expiry
+        if "share_pin_hash" not in identity_cols:
+            conn.execute(text("ALTER TABLE identities ADD COLUMN share_pin_hash VARCHAR(128)"))
+        if "share_expires_at" not in identity_cols:
+            conn.execute(text("ALTER TABLE identities ADD COLUMN share_expires_at DATETIME"))
+        # Migrate task reminder_sent_at
+        if "reminder_sent_at" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN reminder_sent_at DATETIME"))
+        # Migrate time tracking fields
+        if "time_estimate" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN time_estimate INTEGER"))
+        if "time_spent" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN time_spent INTEGER"))
         conn.commit()
+
+    # Start background scheduler for due date reminders
+    _scheduler_task = asyncio.create_task(due_date_reminder_loop())
     yield
+    _scheduler_task.cancel()
 
 
 API_DESCRIPTION = """
@@ -83,9 +113,11 @@ _AUTH_BYPASS = (
     "/auth/",
     "/health",
     "/webhook/",
+    "/share/",
     "/docs",
     "/openapi.json",
     "/redoc",
+    "/ws",
 )
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -131,6 +163,17 @@ app.include_router(api_keys.router)
 app.include_router(external_api.router)
 app.include_router(activity.router)
 app.include_router(identities.router)
+app.include_router(share.router)
+app.include_router(comments.router)
+app.include_router(search.router)
+app.include_router(recurring.router)
+app.include_router(webhook_logs.router)
+app.include_router(analytics.router)
+app.include_router(workflow_rules.router)
+app.include_router(assistant.router)
+app.include_router(templates.router)
+app.include_router(attachments.router)
+app.include_router(ws_router.router)
 
 
 @app.get("/health")

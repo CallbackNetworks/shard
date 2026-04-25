@@ -1,9 +1,95 @@
-import { useState } from 'react'
-import { Plus, X } from 'lucide-react'
-import { BRAND, STATUS_MAP } from '../constants/theme'
+import { useState, useEffect } from 'react'
+import { Plus, X, BarChart3, Copy, GitCompareArrows } from 'lucide-react'
+import { BRAND, STATUS_MAP, BTN_SM } from '../constants/theme'
+import { duplicateCycle, compareCycles } from '../api/client'
+import axios from 'axios'
 
-function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask }) {
+function BurndownChart({ cycleId }) {
+  const [data, setData] = useState(null)
+  useEffect(() => {
+    if (!cycleId) return
+    axios.get(`/analytics/cycle-burndown?cycle_id=${cycleId}`)
+      .then(r => setData(r.data))
+      .catch(() => setData([]))
+  }, [cycleId])
+
+  if (!data) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '12px 0' }}>Loading chart…</div>
+  if (data.length === 0) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '12px 0' }}>No burndown data available.</div>
+
+  const W = 320, H = 120, PX = 30, PY = 10
+  const maxVal = Math.max(...data.map(d => d.total), 1)
+  const toX = i => PX + (i / Math.max(data.length - 1, 1)) * (W - PX - 10)
+  const toY = v => PY + (1 - v / maxVal) * (H - PY - 20)
+
+  const remainingLine = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(d.remaining).toFixed(1)}`).join(' ')
+  const idealLine = data.filter(d => d.ideal != null).map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(d.ideal).toFixed(1)}`).join(' ')
+
+  const labelEvery = Math.max(1, Math.floor(data.length / 5))
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block' }}>
+      {/* Y axis labels */}
+      <text x={PX - 4} y={toY(maxVal) + 3} textAnchor="end" fill="rgba(255,255,255,0.25)" fontSize="8">{maxVal}</text>
+      <text x={PX - 4} y={toY(0) + 3} textAnchor="end" fill="rgba(255,255,255,0.25)" fontSize="8">0</text>
+      {/* Grid lines */}
+      <line x1={PX} y1={toY(maxVal)} x2={W - 10} y2={toY(maxVal)} stroke="rgba(255,255,255,0.06)" />
+      <line x1={PX} y1={toY(0)} x2={W - 10} y2={toY(0)} stroke="rgba(255,255,255,0.06)" />
+      {/* Ideal line */}
+      {idealLine && <path d={idealLine} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="4 3" />}
+      {/* Remaining line */}
+      <path d={remainingLine} fill="none" stroke={BRAND} strokeWidth="1.5" />
+      {/* Dots on remaining */}
+      {data.map((d, i) => (
+        <circle key={i} cx={toX(i)} cy={toY(d.remaining)} r="2" fill={BRAND} />
+      ))}
+      {/* X axis date labels */}
+      {data.map((d, i) => i % labelEvery === 0 || i === data.length - 1 ? (
+        <text key={i} x={toX(i)} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="7">
+          {d.date.slice(5)}
+        </text>
+      ) : null)}
+    </svg>
+  )
+}
+
+function CompareView({ data }) {
+  if (!data) return null
+  const { cycle_a: a, cycle_b: b } = data
+  const row = (label, va, vb, fmt) => {
+    const fa = fmt ? fmt(va) : va
+    const fb = fmt ? fmt(vb) : vb
+    return (
+      <div key={label} style={{ display: 'flex', gap: 4, fontSize: 11, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <span style={{ flex: 1, color: 'rgba(255,255,255,0.4)', textAlign: 'right', paddingRight: 8 }}>{label}</span>
+        <span style={{ width: 80, textAlign: 'center', color: '#fff', fontWeight: 600 }}>{fa}</span>
+        <span style={{ width: 80, textAlign: 'center', color: '#fff', fontWeight: 600 }}>{fb}</span>
+      </div>
+    )
+  }
+  return (
+    <div style={{ marginTop: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 10 }}>
+      <div style={{ display: 'flex', gap: 4, fontSize: 10, marginBottom: 6, color: 'rgba(255,255,255,0.3)' }}>
+        <span style={{ flex: 1 }} />
+        <span style={{ width: 80, textAlign: 'center', fontWeight: 700 }}>{a.name}</span>
+        <span style={{ width: 80, textAlign: 'center', fontWeight: 700 }}>{b.name}</span>
+      </div>
+      {row('Total tasks', a.total_tasks, b.total_tasks)}
+      {row('Completed', a.done, b.done)}
+      {row('Rate', a.completion_rate, b.completion_rate, v => `${v}%`)}
+      {row('Duration', a.duration_days, b.duration_days, v => v != null ? `${v}d` : '—')}
+      {row('Est. (min)', a.total_estimate_min, b.total_estimate_min)}
+      {row('Spent (min)', a.total_spent_min, b.total_spent_min)}
+    </div>
+  )
+}
+
+function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, onDuplicate, allCycles, projectId }) {
   const [showTaskPicker, setShowTaskPicker] = useState(false)
+  const [showBurndown, setShowBurndown] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
+  const [compareTarget, setCompareTarget] = useState('')
+  const [compareData, setCompareData] = useState(null)
+  const [duplicating, setDuplicating] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editData, setEditData] = useState({
     name: cycle.name,
@@ -33,33 +119,33 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask }
 
   return (
     <div style={{
-      border: cycle.status === 'active' ? `2px solid ${BRAND}` : '1px solid #e5e7eb',
-      borderRadius: 10, padding: 16, background: '#fff',
-      boxShadow: cycle.status === 'active' ? '0 0 0 4px #5e6ad222' : 'none',
+      border: cycle.status === 'active' ? `2px solid ${BRAND}` : '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 10, padding: 16, background: 'rgba(255,255,255,0.03)',
+      boxShadow: cycle.status === 'active' ? '0 0 0 4px rgba(30,215,96,0.1)' : 'none',
     }}>
       {editing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input value={editData.name} onChange={e => setEditData(p => ({ ...p, name: e.target.value }))}
-              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }} />
+              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
             <select value={editData.status} onChange={e => setEditData(p => ({ ...p, status: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }}>
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }}>
               <option value="draft">Draft</option>
               <option value="active">Active</option>
               <option value="completed">Completed</option>
             </select>
             <input type="date" value={editData.start_date} onChange={e => setEditData(p => ({ ...p, start_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }} />
-            <span style={{ color: '#9ca3af', alignSelf: 'center' }}>→</span>
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
+            <span style={{ color: 'rgba(255,255,255,0.25)', alignSelf: 'center' }}>→</span>
             <input type="date" value={editData.end_date} onChange={e => setEditData(p => ({ ...p, end_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }} />
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
           </div>
           <input value={editData.description} onChange={e => setEditData(p => ({ ...p, description: e.target.value }))}
             placeholder="Description (optional)"
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }} />
+            style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={saveEdit} style={{ padding: '5px 12px', border: 'none', borderRadius: 6, background: BRAND, color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Save</button>
-            <button onClick={() => setEditing(false)} style={{ padding: '5px 10px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={saveEdit} style={{ ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700 }}>Save</button>
+            <button onClick={() => setEditing(false)} style={BTN_SM}>Cancel</button>
           </div>
         </div>
       ) : (
@@ -67,7 +153,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask }
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{cycle.name}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff' }}>{cycle.name}</span>
                 <span style={{
                   fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
                   background: sColor + '22', color: sColor, border: `1px solid ${sColor}44`,
@@ -75,9 +161,9 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask }
                   {cycle.status.charAt(0).toUpperCase() + cycle.status.slice(1)}
                 </span>
               </div>
-              {cycle.description && <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>{cycle.description}</p>}
+              {cycle.description && <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{cycle.description}</p>}
               {(cycle.start_date || cycle.end_date) && (
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 3 }}>
                   {cycle.start_date && new Date(cycle.start_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                   {cycle.start_date && cycle.end_date && ' → '}
                   {cycle.end_date && new Date(cycle.end_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
@@ -85,34 +171,116 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask }
               )}
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setEditing(true)} style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', color: '#6b7280', padding: '4px 10px', fontSize: 11 }}>Edit</button>
+              <button onClick={() => setEditing(true)} title="Edit" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px 10px', fontSize: 11 }}>Edit</button>
+              <button
+                disabled={duplicating}
+                onClick={async () => {
+                  setDuplicating(true)
+                  try { await onDuplicate(cycle.id) } finally { setDuplicating(false) }
+                }}
+                title="Duplicate as template"
+                style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px 8px', fontSize: 11, display: 'flex', alignItems: 'center' }}
+              >
+                <Copy size={11} />
+              </button>
               <button onClick={() => { if (confirm(`Delete cycle "${cycle.name}"?`)) onDelete(cycle.id) }}
-                style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', color: '#ef4444', padding: '4px 10px', fontSize: 11 }}>
+                style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, cursor: 'pointer', color: '#f87171', padding: '4px 10px', fontSize: 11 }}>
                 Delete
               </button>
             </div>
           </div>
 
           <div style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>
               <span>{cycle.done_tasks}/{cycle.total_tasks} done</span>
               <span>{progress}%</span>
             </div>
-            <div style={{ height: 5, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${progress}%`, background: BRAND, borderRadius: 3, transition: 'width 0.3s' }} />
             </div>
           </div>
 
+          {/* Burndown & Compare toggles */}
+          {cycle.total_tasks > 0 && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowBurndown(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontSize: 11, color: showBurndown ? BRAND : 'rgba(255,255,255,0.35)',
+                  background: showBurndown ? 'rgba(30,215,96,0.1)' : 'none',
+                  border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
+                  padding: '3px 10px', cursor: 'pointer', fontWeight: 500,
+                }}
+              >
+                <BarChart3 size={11} /> Burndown
+              </button>
+              {allCycles.length > 1 && (
+                <button
+                  onClick={() => { setShowCompare(v => !v); setCompareData(null) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 11, color: showCompare ? '#539df5' : 'rgba(255,255,255,0.35)',
+                    background: showCompare ? 'rgba(83,157,245,0.1)' : 'none',
+                    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
+                    padding: '3px 10px', cursor: 'pointer', fontWeight: 500,
+                  }}
+                >
+                  <GitCompareArrows size={11} /> Compare
+                </button>
+              )}
+            </div>
+          )}
+          {showBurndown && cycle.total_tasks > 0 && (
+            <div style={{ marginBottom: 10, background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '10px 8px' }}>
+              <BurndownChart cycleId={cycle.id} />
+            </div>
+          )}
+          {showCompare && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select
+                  value={compareTarget}
+                  onChange={e => { setCompareTarget(e.target.value); setCompareData(null) }}
+                  style={{ padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 11, background: '#181818', color: '#fff' }}
+                >
+                  <option value="">Select cycle…</option>
+                  {allCycles.filter(c => c.id !== cycle.id).map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <button
+                  disabled={!compareTarget}
+                  onClick={async () => {
+                    try {
+                      const data = await compareCycles(projectId, cycle.id, compareTarget)
+                      setCompareData(data)
+                    } catch {}
+                  }}
+                  style={{
+                    padding: '4px 12px', border: 'none', borderRadius: 6,
+                    background: compareTarget ? '#539df5' : 'rgba(255,255,255,0.06)',
+                    color: compareTarget ? '#000' : 'rgba(255,255,255,0.3)',
+                    fontSize: 11, fontWeight: 600, cursor: compareTarget ? 'pointer' : 'default',
+                  }}
+                >
+                  Compare
+                </button>
+              </div>
+              <CompareView data={compareData} />
+            </div>
+          )}
+
           {cycleTasks.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
               {cycleTasks.map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 6 }}>
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
                   <span style={{ fontSize: 11, color: STATUS_MAP[t.status]?.color || '#94a3b8', fontWeight: 500, minWidth: 70 }}>
                     {STATUS_MAP[t.status]?.label || t.status}
                   </span>
-                  <span style={{ flex: 1, fontSize: 12, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                  <span style={{ flex: 1, fontSize: 12, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                   <button onClick={() => onRemoveTask(cycle.id, t.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '1px 3px' }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', padding: '1px 3px' }}>
                     <X size={11} />
                   </button>
                 </div>
@@ -122,18 +290,18 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask }
 
           <button
             onClick={() => setShowTaskPicker(v => !v)}
-            style={{ fontSize: 11, color: BRAND, background: '#eef0ff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500 }}
+            style={{ fontSize: 11, color: BRAND, background: 'rgba(30,215,96,0.1)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500 }}
           >
             <Plus size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} />
             Add issues
           </button>
           {showTaskPicker && (
-            <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', maxHeight: 180, overflowY: 'auto' }}>
+            <div style={{ marginTop: 8, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, background: '#181818', maxHeight: 180, overflowY: 'auto' }}>
               {availableTasks.length === 0
-                ? <div style={{ padding: '10px 12px', fontSize: 12, color: '#9ca3af' }}>All issues are already in this cycle.</div>
+                ? <div style={{ padding: '10px 12px', fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>All issues are already in this cycle.</div>
                 : availableTasks.map(t => (
                   <button key={t.id} onClick={() => { onAddTask(cycle.id, t.id); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', background: 'none', border: 'none', borderBottom: '1px solid #f3f4f6', fontSize: 12, color: '#374151', cursor: 'pointer' }}>
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, color: '#ffffff', cursor: 'pointer' }}>
                     {t.title}
                   </button>
                 ))
@@ -150,19 +318,24 @@ export default function CyclePanel({
   cycles, tasks, projectId,
   showCycleForm, setShowCycleForm, newCycle, setNewCycle,
   createCycleMut, onUpdateCycle, onDeleteCycle, onAddTask, onRemoveTask,
+  onCyclesMutated,
 }) {
+  const handleDuplicate = async (cycleId) => {
+    await duplicateCycle(projectId, cycleId)
+    onCyclesMutated && onCyclesMutated()
+  }
+
   return (
     <div style={{ padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#ffffff' }}>
           Cycles / Sprints
         </h2>
         <button
           onClick={() => setShowCycleForm(v => !v)}
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            padding: '6px 14px', borderRadius: 6, border: 'none',
-            background: BRAND, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700,
           }}
         >
           <Plus size={13} /> New Cycle
@@ -170,36 +343,36 @@ export default function CyclePanel({
       </div>
 
       {showCycleForm && (
-        <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
             <input
               autoFocus
               value={newCycle.name}
               onChange={e => setNewCycle(p => ({ ...p, name: e.target.value }))}
               placeholder="Cycle name *"
-              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }}
+              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
             />
             <select value={newCycle.status} onChange={e => setNewCycle(p => ({ ...p, status: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }}>
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }}>
               <option value="draft">Draft</option>
               <option value="active">Active</option>
               <option value="completed">Completed</option>
             </select>
             <input type="date" value={newCycle.start_date} onChange={e => setNewCycle(p => ({ ...p, start_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }} />
-            <span style={{ color: '#9ca3af', fontSize: 12 }}>→</span>
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
+            <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>→</span>
             <input type="date" value={newCycle.end_date} onChange={e => setNewCycle(p => ({ ...p, end_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }} />
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={newCycle.description}
               onChange={e => setNewCycle(p => ({ ...p, description: e.target.value }))}
               placeholder="Description (optional)"
-              style={{ flex: 1, padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }}
+              style={{ flex: 1, padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
             />
             <button onClick={() => setShowCycleForm(false)}
-              style={{ padding: '6px 12px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', fontSize: 12, cursor: 'pointer' }}>
+              style={{ padding: '6px 12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: '#ffffff', fontSize: 12, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
@@ -214,8 +387,7 @@ export default function CyclePanel({
                 createCycleMut.mutate(data)
               }}
               style={{
-                padding: '6px 14px', border: 'none', borderRadius: 6,
-                background: BRAND, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700,
                 opacity: !newCycle.name ? 0.5 : 1,
               }}
             >
@@ -226,7 +398,7 @@ export default function CyclePanel({
       )}
 
       {cycles.length === 0 ? (
-        <div style={{ padding: 48, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+        <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
           No cycles yet. Click "+ New Cycle" to create your first sprint.
         </div>
       ) : (
@@ -240,6 +412,9 @@ export default function CyclePanel({
               onDelete={onDeleteCycle}
               onAddTask={onAddTask}
               onRemoveTask={onRemoveTask}
+              onDuplicate={handleDuplicate}
+              allCycles={cycles}
+              projectId={projectId}
             />
           ))}
         </div>

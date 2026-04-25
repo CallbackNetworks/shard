@@ -30,19 +30,19 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate }
   }
 
   const SortIcon = ({ k }) => {
-    if (sortKey !== k) return <span style={{ color: '#d1d5db', fontSize: 10 }}>↕</span>
+    if (sortKey !== k) return <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>↕</span>
     return <span style={{ color: BRAND, fontSize: 10 }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
   const thStyle = () => ({
-    padding: '6px 10px', fontSize: 11, fontWeight: 600, color: '#6b7280',
-    background: '#f8fafc', borderBottom: '1px solid #e5e7eb',
+    padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)',
+    background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)',
     cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'left',
   })
 
   const tdStyle = {
-    padding: '5px 10px', fontSize: 12, color: '#374151',
-    borderBottom: '1px solid #f3f4f6', verticalAlign: 'middle',
+    padding: '5px 10px', fontSize: 12, color: '#ffffff',
+    borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'middle',
   }
 
   return (
@@ -67,6 +67,9 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate }
             <th style={thStyle()} onClick={() => toggleSort('due_date')}>
               Due Date <SortIcon k="due_date" />
             </th>
+            <th style={thStyle()} onClick={() => toggleSort('time_spent')}>
+              Time <SortIcon k="time_spent" />
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -74,14 +77,14 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate }
             const cycle = cycleByTask[task.id]
             const taskLabels = task.labels || []
             return (
-              <tr key={task.id} style={{ background: '#fff' }}>
+              <tr key={task.id} style={{ background: 'transparent' }}>
                 <td style={tdStyle}>
                   <select
                     value={task.status}
                     onChange={e => onUpdate(task.id, { status: e.target.value })}
                     style={{
-                      fontSize: 11, border: '1px solid #e5e7eb', borderRadius: 4,
-                      padding: '2px 6px', background: '#fff', color: STATUS_MAP[task.status]?.color || '#374151',
+                      fontSize: 11, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+                      padding: '2px 6px', background: '#181818', color: STATUS_MAP[task.status]?.color || '#ffffff',
                     }}
                   >
                     <option value="todo">Todo</option>
@@ -95,9 +98,9 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate }
                     value={task.priority}
                     onChange={e => onUpdate(task.id, { priority: e.target.value })}
                     style={{
-                      fontSize: 11, border: '1px solid #e5e7eb', borderRadius: 4,
-                      padding: '2px 6px', background: '#fff',
-                      color: PRIORITY[task.priority]?.color || '#374151',
+                      fontSize: 11, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+                      padding: '2px 6px', background: '#181818',
+                      color: PRIORITY[task.priority]?.color || '#ffffff',
                     }}
                   >
                     <option value="high">High</option>
@@ -108,7 +111,7 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate }
                 <td style={{ ...tdStyle, maxWidth: 320 }}>
                   <span style={{
                     textDecoration: task.status === 'done' ? 'line-through' : 'none',
-                    color: task.status === 'done' ? '#9ca3af' : '#0f172a',
+                    color: task.status === 'done' ? 'rgba(255,255,255,0.25)' : '#ffffff',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
                   }}>
                     {task.title}
@@ -122,9 +125,9 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate }
                     style={{
                       width: 80, fontSize: 11, border: '1px solid transparent', borderRadius: 4,
                       padding: '2px 6px', background: 'transparent', outline: 'none',
-                      color: task.assignee ? '#374151' : '#d1d5db',
+                      color: task.assignee ? '#ffffff' : 'rgba(255,255,255,0.15)',
                     }}
-                    onFocus={e => { e.target.style.borderColor = '#d1d5db'; e.target.style.background = '#fff' }}
+                    onFocus={e => { e.target.style.borderColor = 'rgba(255,255,255,0.15)'; e.target.style.background = 'rgba(255,255,255,0.05)' }}
                     onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent' }}
                   />
                 </td>
@@ -141,27 +144,35 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate }
                 <td style={tdStyle}>
                   {cycle ? (
                     <span style={{
-                      fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#eef0ff', color: BRAND,
+                      fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(30,215,96,0.12)', color: BRAND,
                       fontWeight: 500, whiteSpace: 'nowrap',
                     }}>
                       {cycle.name}
                     </span>
-                  ) : <span style={{ color: '#d1d5db' }}>—</span>}
+                  ) : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>}
                 </td>
                 <td style={tdStyle}>
                   {task.due_date
-                    ? <span style={{ whiteSpace: 'nowrap', color: '#374151' }}>
+                    ? <span style={{ whiteSpace: 'nowrap', color: '#ffffff' }}>
                         {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
-                    : <span style={{ color: '#d1d5db' }}>—</span>
+                    : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
                   }
+                </td>
+                <td style={tdStyle}>
+                  {(task.time_spent || task.time_estimate) ? (
+                    <span style={{ fontSize: 11, whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.5)' }}>
+                      {task.time_spent ? `${Math.floor(task.time_spent / 60)}h${task.time_spent % 60 ? `${task.time_spent % 60}m` : ''}` : '\u2014'}
+                      {task.time_estimate ? ` / ${Math.floor(task.time_estimate / 60)}h${task.time_estimate % 60 ? `${task.time_estimate % 60}m` : ''}` : ''}
+                    </span>
+                  ) : <span style={{ color: 'rgba(255,255,255,0.15)' }}>{'\u2014'}</span>}
                 </td>
               </tr>
             )
           })}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: '#9ca3af', padding: 40 }}>
+              <td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: 'rgba(255,255,255,0.25)', padding: 40 }}>
                 No issues yet.
               </td>
             </tr>

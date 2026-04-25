@@ -1,23 +1,144 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Link, useLocation, Routes, Route, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge } from 'lucide-react'
 import { getProjects, getIdentities } from './api/client'
+import CommandPalette from './components/CommandPalette'
+import AssistantPanel from './components/AssistantPanel'
 import Dashboard from './pages/Dashboard'
 import ProjectDetail from './pages/ProjectDetail'
 import Integrations from './pages/Integrations'
 import ApiKeys from './pages/ApiKeys'
 import Identities from './pages/Identities'
+import Analytics from './pages/Analytics'
+import WorkflowRules from './pages/WorkflowRules'
 import Overview from './pages/Overview'
+import ShareView from './pages/ShareView'
 import Login from './pages/Login'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { BRAND } from './constants/theme'
-const SB_BG = '#161618'
-const SB_TEXT = '#8b8b9a'
-const SB_ACTIVE = '#252531'
-const SB_BORDER = '#2a2a35'
+import { BRAND, INSET_SHADOW } from './constants/theme'
+import useRealtimeSync from './hooks/useRealtimeSync'
 
-function Sidebar() {
+const GLOBAL_CSS = `
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: #121212; font-family: 'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif; }
+  ::selection { background: rgba(30,215,96,0.3); color: #ffffff; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+  input, select, button, textarea { font-family: inherit; }
+
+  @keyframes fadeUpIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes shimmerSlide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(500%); }
+  }
+  @keyframes auroraFloat1 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    33%     { transform: translate(40px,-25px) scale(1.06); }
+    66%     { transform: translate(-20px,12px) scale(0.96); }
+  }
+  @keyframes auroraFloat2 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    40%     { transform: translate(-30px,20px) scale(1.08); }
+    70%     { transform: translate(18px,-12px) scale(0.94); }
+  }
+  @keyframes auroraFloat3 {
+    0%,100% { transform: translate(-50%,-50%) scale(1); }
+    50%     { transform: translate(-50%,-50%) scale(1.18); }
+  }
+  @keyframes pulseRing {
+    0%   { box-shadow: 0 0 0 0 rgba(243,114,127,0.4); }
+    70%  { box-shadow: 0 0 0 8px rgba(243,114,127,0); }
+    100% { box-shadow: 0 0 0 0 rgba(243,114,127,0); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Share page animations */
+  @keyframes shareReveal {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes statPulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+  }
+  @keyframes barShimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-16px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes refreshPulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50%      { opacity: 1; transform: scale(1.4); }
+  }
+
+  .card-hover {
+    transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: rgba(0,0,0,0.5) 0px 8px 24px;
+    background: #252525 !important;
+  }
+  .sb-link {
+    transition: background 0.12s, color 0.12s;
+  }
+  .sb-link:hover {
+    background: rgba(255,255,255,0.08) !important;
+    color: #ffffff !important;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .layout-sidebar {
+      position: fixed !important;
+      left: -240px;
+      top: 0;
+      bottom: 0;
+      z-index: 200;
+      transition: left 0.25s ease;
+      box-shadow: none;
+    }
+    .layout-sidebar.open {
+      left: 0 !important;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.6);
+    }
+    .layout-main {
+      margin-left: 0 !important;
+    }
+    .mobile-overlay {
+      display: block !important;
+    }
+    .mobile-menu-btn {
+      display: flex !important;
+    }
+  }
+  @media (min-width: 769px) {
+    .mobile-overlay { display: none !important; }
+    .mobile-menu-btn { display: none !important; }
+  }
+`
+
+const SB_BG     = '#121212'
+const SB_TEXT   = '#b3b3b3'
+const SB_ACTIVE = '#1f1f1f'
+const SB_BORDER = 'rgba(255,255,255,0.08)'
+
+function Sidebar({ onOpenPalette }) {
   const location = useLocation()
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [identitiesOpen, setIdentitiesOpen] = useState(true)
@@ -37,7 +158,6 @@ function Sidebar() {
   const active = projects.filter(p => p.status === 'active')
   const archived = projects.filter(p => p.status === 'archived')
 
-  // Group projects by identity
   const projectsByIdentity = {}
   const projectsWithIdentity = new Set()
   for (const p of projects) {
@@ -49,29 +169,35 @@ function Sidebar() {
   }
   const untaggedProjects = active.filter(p => !projectsWithIdentity.has(p.id))
 
+  const isActive = (path) =>
+    location.pathname === path || location.pathname.startsWith(path + '/')
+
   const navLinkStyle = (path) => ({
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '5px 10px', borderRadius: 6, textDecoration: 'none',
-    fontSize: 13, fontWeight: 500,
-    color: location.pathname === path || location.pathname.startsWith(path + '/') ? '#fff' : SB_TEXT,
-    background: location.pathname === path || location.pathname.startsWith(path + '/') ? SB_ACTIVE : 'transparent',
-    margin: '1px 6px', transition: 'background 0.1s, color 0.1s',
+    padding: '6px 12px', borderRadius: 4, textDecoration: 'none',
+    fontSize: 14, fontWeight: isActive(path) ? 700 : 400, margin: '1px 6px',
+    color: isActive(path) ? '#ffffff' : SB_TEXT,
+    background: isActive(path) ? SB_ACTIVE : 'transparent',
   })
 
-  const projectLinkStyle = (id) => ({
-    display: 'flex', alignItems: 'center', gap: 8,
-    padding: '4px 10px 4px 32px', borderRadius: 6, textDecoration: 'none',
-    fontSize: 13,
-    color: location.pathname === `/app/projects/${id}` ? '#fff' : SB_TEXT,
-    background: location.pathname === `/app/projects/${id}` ? SB_ACTIVE : 'transparent',
-    margin: '1px 6px', overflow: 'hidden', transition: 'background 0.1s',
-  })
+  const projectLinkStyle = (id) => {
+    const on = location.pathname === `/app/projects/${id}`
+    return {
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '4px 12px 4px 28px', borderRadius: 4, textDecoration: 'none',
+      fontSize: 14, fontWeight: on ? 700 : 400, margin: '1px 6px', overflow: 'hidden',
+      color: on ? '#ffffff' : SB_TEXT,
+      background: on ? SB_ACTIVE : 'transparent',
+      transition: 'background 0.12s, color 0.12s',
+    }
+  }
 
-  const projectDot = (color) => (
-    <div style={{
-      width: 6, height: 6, borderRadius: '50%', background: color || BRAND, flexShrink: 0,
-    }} />
-  )
+  const sectionHeader = {
+    display: 'flex', alignItems: 'center', gap: 4,
+    padding: '3px 12px', width: '100%', background: 'none', border: 'none',
+    cursor: 'pointer', color: 'rgba(255,255,255,0.25)', fontSize: 10, fontWeight: 700,
+    textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2,
+  }
 
   return (
     <div style={{
@@ -79,58 +205,74 @@ function Sidebar() {
       display: 'flex', flexDirection: 'column', borderRight: `1px solid ${SB_BORDER}`,
       overflow: 'hidden', userSelect: 'none',
     }}>
+      {/* Brand */}
       <div style={{
-        padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10,
+        padding: '20px 16px', display: 'flex', alignItems: 'center', gap: 10,
         borderBottom: `1px solid ${SB_BORDER}`,
       }}>
         <div style={{
-          width: 26, height: 26, background: BRAND, borderRadius: 7,
+          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+          background: BRAND,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, fontWeight: 800, color: '#fff',
+          fontSize: 13, fontWeight: 900, color: '#000',
+          boxShadow: `0 0 16px rgba(30,215,96,0.4)`,
         }}>T</div>
-        <span style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>TODO Platform</span>
+        <span style={{ color: '#ffffff', fontWeight: 700, fontSize: 14, letterSpacing: '0.01em' }}>
+          TODO Platform
+        </span>
       </div>
 
+      {/* ⌘K search button */}
+      <button
+        onClick={onOpenPalette}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          margin: '10px 12px', padding: '8px 14px', borderRadius: 9999,
+          background: '#1f1f1f', border: 'none',
+          cursor: 'pointer', width: 'calc(100% - 24px)',
+          color: '#b3b3b3', fontSize: 13,
+          transition: 'background 0.12s',
+          boxShadow: INSET_SHADOW,
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = '#282828'}
+        onMouseLeave={e => e.currentTarget.style.background = '#1f1f1f'}
+      >
+        <Search size={12} />
+        <span style={{ flex: 1, textAlign: 'left' }}>Search...</span>
+        <kbd style={{
+          padding: '1px 6px', borderRadius: 3, fontSize: 10,
+          background: 'rgba(255,255,255,0.1)', color: '#b3b3b3',
+        }}>⌘K</kbd>
+      </button>
+
+      {/* Nav links */}
       <div style={{ padding: '8px 0', borderBottom: `1px solid ${SB_BORDER}` }}>
-        <Link to="/app" style={navLinkStyle('/app')}>
-          <LayoutGrid size={14} />
-          My Issues
-        </Link>
-        <Link to="/app/identities" style={navLinkStyle('/app/identities')}>
-          <Users size={14} />
-          Identities
-        </Link>
-        <Link to="/app/integrations" style={navLinkStyle('/app/integrations')}>
-          <Zap size={14} />
-          Integrations
-        </Link>
-        <Link to="/app/api-keys" style={navLinkStyle('/app/api-keys')}>
-          <Key size={14} />
-          API Keys
-        </Link>
-        <a href="/" target="_blank" rel="noreferrer" style={{ ...navLinkStyle('/'), gap: 8 }}>
-          <ExternalLink size={14} />
-          Status Page
+        {[
+          { to: '/app', icon: <LayoutGrid size={13} />, label: 'My Issues' },
+          { to: '/app/identities', icon: <Users size={13} />, label: 'Identities' },
+          { to: '/app/integrations', icon: <Zap size={13} />, label: 'Integrations' },
+          { to: '/app/api-keys', icon: <Key size={13} />, label: 'API Keys' },
+          { to: '/app/analytics', icon: <BarChart2 size={13} />, label: 'Analytics' },
+          { to: '/app/workflow-rules', icon: <GitMerge size={13} />, label: 'Workflow Rules' },
+        ].map(({ to, icon, label }) => (
+          <Link key={to} to={to} className="sb-link" style={navLinkStyle(to)}>
+            {icon}{label}
+          </Link>
+        ))}
+        <a href="/" target="_blank" rel="noreferrer" className="sb-link"
+          style={{ ...navLinkStyle('/status-noop'), color: SB_TEXT, borderLeft: '2px solid transparent' }}>
+          <ExternalLink size={13} />Status Page
         </a>
       </div>
 
+      {/* Project tree */}
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
-        {/* Identity-grouped projects */}
         {identities.length > 0 && (
           <>
-            <button
-              onClick={() => setIdentitiesOpen(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                padding: '3px 12px', width: '100%', background: 'none', border: 'none',
-                cursor: 'pointer', color: '#555566', fontSize: 11, fontWeight: 600,
-                textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2,
-              }}
-            >
-              {identitiesOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+            <button onClick={() => setIdentitiesOpen(v => !v)} style={sectionHeader}>
+              {identitiesOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
               By Identity
             </button>
-
             {identitiesOpen && identities.map(ident => {
               const group = projectsByIdentity[ident.id]
               if (!group || group.projects.length === 0) return null
@@ -138,26 +280,32 @@ function Sidebar() {
                 <div key={ident.id}>
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '4px 18px 2px', fontSize: 11, fontWeight: 600,
-                    color: ident.color,
+                    padding: '4px 18px 2px', fontSize: 10, fontWeight: 700,
+                    color: ident.color, letterSpacing: '0.06em', textTransform: 'uppercase',
                   }}>
                     <span style={{
-                      width: 14, height: 14, borderRadius: 4, background: ident.color,
+                      width: 13, height: 13, borderRadius: 4, background: ident.color,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 8, color: '#fff', fontWeight: 700, flexShrink: 0,
+                      fontSize: 7, color: '#fff', fontWeight: 900, flexShrink: 0,
+                      boxShadow: `0 0 8px ${ident.color}66`,
                     }}>
                       {ident.avatar || ident.name.charAt(0).toUpperCase()}
                     </span>
                     {ident.name}
                   </div>
                   {group.projects.map(p => (
-                    <Link key={p.id} to={`/app/projects/${p.id}`} style={projectLinkStyle(p.id)}>
-                      {projectDot(ident.color)}
+                    <Link key={p.id} to={`/app/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
+                      <div style={{
+                        width: 5, height: 5, borderRadius: '50%', background: ident.color,
+                        flexShrink: 0, boxShadow: `0 0 5px ${ident.color}88`,
+                      }} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                         {p.name}
                       </span>
                       {p.total_tasks > 0 && (
-                        <span style={{ fontSize: 10, color: '#555566', flexShrink: 0 }}>{p.total_tasks}</span>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', flexShrink: 0 }}>
+                          {p.total_tasks}
+                        </span>
                       )}
                     </Link>
                   ))}
@@ -167,18 +315,10 @@ function Sidebar() {
           </>
         )}
 
-        {/* All projects section */}
-        <button
-          onClick={() => setProjectsOpen(v => !v)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 12px', width: '100%', background: 'none', border: 'none',
-            cursor: 'pointer', color: '#555566', fontSize: 11, fontWeight: 600,
-            textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2,
-            marginTop: identities.length > 0 ? 8 : 0,
-          }}
-        >
-          {projectsOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        <button onClick={() => setProjectsOpen(v => !v)} style={{
+          ...sectionHeader, marginTop: identities.length > 0 ? 8 : 0,
+        }}>
+          {projectsOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
           {identities.length > 0 ? 'All Projects' : 'Projects'}
           <span style={{ marginLeft: 'auto', fontWeight: 400, fontSize: 10 }}>{active.length}</span>
         </button>
@@ -186,31 +326,33 @@ function Sidebar() {
         {projectsOpen && (
           <>
             {active.map(p => (
-              <Link key={p.id} to={`/app/projects/${p.id}`} style={projectLinkStyle(p.id)}>
-                {projectDot(p.identities?.[0]?.color)}
+              <Link key={p.id} to={`/app/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
+                <div style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: p.identities?.[0]?.color || BRAND, flexShrink: 0,
+                }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                   {p.name}
                 </span>
                 {p.total_tasks > 0 && (
-                  <span style={{ fontSize: 10, color: '#555566', flexShrink: 0 }}>{p.total_tasks}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', flexShrink: 0 }}>{p.total_tasks}</span>
                 )}
               </Link>
             ))}
             {archived.length > 0 && (
-              <div style={{ padding: '6px 18px 2px', fontSize: 10, color: '#444455', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              <div style={{ padding: '6px 18px 2px', fontSize: 9, color: 'rgba(255,255,255,0.12)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                 Archived
               </div>
             )}
             {archived.map(p => (
-              <Link key={p.id} to={`/app/projects/${p.id}`} style={{ ...projectLinkStyle(p.id), opacity: 0.6 }}>
-                {projectDot(p.identities?.[0]?.color)}
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                  {p.name}
-                </span>
+              <Link key={p.id} to={`/app/projects/${p.id}`} className="sb-link"
+                style={{ ...projectLinkStyle(p.id), opacity: 0.45 }}>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>
               </Link>
             ))}
             {projects.length === 0 && (
-              <div style={{ padding: '4px 24px', fontSize: 12, color: '#444455' }}>No projects yet</div>
+              <div style={{ padding: '4px 24px', fontSize: 12, color: 'rgba(255,255,255,0.12)' }}>No projects yet</div>
             )}
           </>
         )}
@@ -221,6 +363,27 @@ function Sidebar() {
 
 function Layout() {
   const { isAuthenticated, authRequired, isLoading } = useAuth()
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  useRealtimeSync()
+
+  const openPalette = useCallback(() => setPaletteOpen(true), [])
+  const closePalette = useCallback(() => setPaletteOpen(false), [])
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setPaletteOpen(v => !v)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
+
+  // Close sidebar on route change (mobile)
+  const location = useLocation()
+  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
   if (isLoading) return null
 
@@ -230,17 +393,51 @@ function Layout() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif', fontSize: 14 }}>
-      <Sidebar />
-      <main style={{ flex: 1, overflow: 'auto', background: '#fff' }}>
+    <div style={{
+      display: 'flex', height: '100vh',
+      fontFamily: "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif",
+      fontSize: 14, background: '#121212',
+    }}>
+      {/* Mobile hamburger */}
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setSidebarOpen(v => !v)}
+        style={{
+          display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 210,
+          width: 36, height: 36, borderRadius: 8, border: 'none',
+          background: 'rgba(255,255,255,0.1)', color: '#ffffff', cursor: 'pointer',
+          alignItems: 'center', justifyContent: 'center', fontSize: 18,
+        }}
+      >
+        {sidebarOpen ? '\u2715' : '\u2630'}
+      </button>
+      {/* Mobile overlay */}
+      <div
+        className="mobile-overlay"
+        onClick={() => setSidebarOpen(false)}
+        style={{
+          display: 'none', position: 'fixed', inset: 0, zIndex: 190,
+          background: sidebarOpen ? 'rgba(0,0,0,0.5)' : 'transparent',
+          pointerEvents: sidebarOpen ? 'auto' : 'none',
+          transition: 'background 0.25s',
+        }}
+      />
+      <div className={`layout-sidebar${sidebarOpen ? ' open' : ''}`}>
+        <Sidebar onOpenPalette={openPalette} />
+      </div>
+      <main className="layout-main" style={{ flex: 1, overflow: 'auto', background: '#121212' }}>
         <Routes>
           <Route index element={<Dashboard />} />
           <Route path="projects/:id" element={<ProjectDetail />} />
           <Route path="integrations" element={<Integrations />} />
           <Route path="api-keys" element={<ApiKeys />} />
           <Route path="identities" element={<Identities />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="workflow-rules" element={<WorkflowRules />} />
         </Routes>
       </main>
+      <CommandPalette open={paletteOpen} onClose={closePalette} />
+      <AssistantPanel />
     </div>
   )
 }
@@ -248,9 +445,11 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
+      <style>{GLOBAL_CSS}</style>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Overview />} />
+          <Route path="/share/:token" element={<ShareView />} />
           <Route path="/login" element={<Login />} />
           <Route path="/app/*" element={<Layout />} />
         </Routes>

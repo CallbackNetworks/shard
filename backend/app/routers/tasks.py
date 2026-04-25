@@ -1,25 +1,36 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Task
+from app.models import Project, Task, TaskDependency
 from app.schemas import TaskCreate, TaskUpdate, TaskOut
 from app.services.activity import log_activity
+from app.services.rules_engine import run_rules
+from app.services.ws_manager import ws_manager
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["tasks"])
 
 
 @router.get("", response_model=list[TaskOut])
-def list_tasks(project_id: str, db: Session = Depends(get_db)):
+def list_tasks(
+    project_id: str,
+    status_filter: str | None = Query(None, alias="status"),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
     _get_project_or_404(project_id, db)
-    return db.query(Task).filter(Task.project_id == project_id).order_by(Task.created_at.asc()).all()
+    q = db.query(Task).filter(Task.project_id == project_id)
+    if status_filter:
+        q = q.filter(Task.status == status_filter)
+    return q.order_by(Task.created_at.asc()).offset(offset).limit(limit).all()
 
 
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
-def create_task(project_id: str, body: TaskCreate, db: Session = Depends(get_db)):
+async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(get_db)):
     project = _get_project_or_404(project_id, db)
     task = Task(project_id=project_id, **body.model_dump())
     db.add(task)
@@ -33,11 +44,15 @@ def create_task(project_id: str, body: TaskCreate, db: Session = Depends(get_db)
     )
     db.commit()
     db.refresh(task)
+    await run_rules(db, "task.created", task, {})
+    db.commit()
+    db.refresh(task)
+    await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
     return task
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
-def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = Depends(get_db)):
+async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
     task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
     if not task:
@@ -45,10 +60,13 @@ def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = D
 
     changes = body.model_dump(exclude_none=True)
     old_status = task.status
+    old_priority = task.priority
     old_assignee = task.assignee
 
     for field, value in changes.items():
         setattr(task, field, value)
+
+    triggered_rules = []
 
     # Log status change
     if "status" in changes and changes["status"] != old_status:
@@ -59,6 +77,11 @@ def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = D
             detail=f'Task "{task.title}" changed from {old_status} to {changes["status"]}',
             meta={"old_status": old_status, "new_status": changes["status"]},
         )
+        triggered_rules.append(("task.status_changed", {"old_status": old_status}))
+
+    # Log priority change
+    if "priority" in changes and changes["priority"] != old_priority:
+        triggered_rules.append(("task.priority_changed", {"old_priority": old_priority}))
 
     # Log assignee change
     if "assignee" in changes and changes["assignee"] != old_assignee:
@@ -72,11 +95,19 @@ def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = D
 
     db.commit()
     db.refresh(task)
+
+    for trigger, ctx in triggered_rules:
+        await run_rules(db, trigger, task, {"_rule_depth": 1, **ctx})
+    if triggered_rules:
+        db.commit()
+        db.refresh(task)
+
+    await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task_id})
     return task
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(project_id: str, task_id: str, db: Session = Depends(get_db)):
+async def delete_task(project_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
     task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
     if not task:
@@ -88,7 +119,47 @@ def delete_task(project_id: str, task_id: str, db: Session = Depends(get_db)):
         detail=f'Task "{task.title}" deleted',
         meta={"title": task.title},
     )
+    title = task.title
     db.delete(task)
+    db.commit()
+    await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": task_id})
+
+
+@router.post("/{task_id}/dependencies/{depends_on_id}", status_code=status.HTTP_201_CREATED)
+def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
+    """Mark task_id as blocked by depends_on_id (depends_on must complete first)."""
+    _get_project_or_404(project_id, db)
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    blocker = db.query(Task).filter(Task.id == depends_on_id, Task.project_id == project_id).first()
+    if not blocker:
+        raise HTTPException(status_code=404, detail="Blocker task not found")
+    if task_id == depends_on_id:
+        raise HTTPException(status_code=400, detail="A task cannot depend on itself")
+    existing = db.query(TaskDependency).filter(
+        TaskDependency.task_id == task_id,
+        TaskDependency.depends_on_id == depends_on_id,
+    ).first()
+    if existing:
+        return {"task_id": task_id, "depends_on_id": depends_on_id}
+    dep = TaskDependency(task_id=task_id, depends_on_id=depends_on_id)
+    db.add(dep)
+    db.commit()
+    return {"task_id": task_id, "depends_on_id": depends_on_id}
+
+
+@router.delete("/{task_id}/dependencies/{depends_on_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
+    """Remove the blocked-by dependency between task_id and depends_on_id."""
+    _get_project_or_404(project_id, db)
+    dep = db.query(TaskDependency).filter(
+        TaskDependency.task_id == task_id,
+        TaskDependency.depends_on_id == depends_on_id,
+    ).first()
+    if not dep:
+        raise HTTPException(status_code=404, detail="Dependency not found")
+    db.delete(dep)
     db.commit()
 
 

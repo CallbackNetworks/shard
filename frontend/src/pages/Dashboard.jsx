@@ -1,93 +1,147 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, FolderOpen, Archive, CheckCircle, Circle, Loader, XCircle, Clock, User, Activity } from 'lucide-react'
+import { Plus, FolderOpen, Archive, Clock, User, Activity } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity } from '../api/client'
-import { BRAND, STATUS_MAP, PRIORITY } from '../constants/theme'
+import { BRAND, STATUS_MAP, PRIORITY, DARK, SHADOW_SM, INSET_SHADOW } from '../constants/theme'
 
-function StatusBar({ done, inProgress, total, failed }) {
-  const todo = total - done - inProgress - failed
-  if (total === 0) return <div style={{ height: 4, background: '#f3f4f6', borderRadius: 2 }} />
+/* ── Shimmer progress bar ─────────────────────────────────────────── */
+function GlowBar({ done, inProgress, failed, total }) {
+  if (total === 0) return (
+    <div style={{ height: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 2 }} />
+  )
+  const pDone = (done / total) * 100
+  const pProg = (inProgress / total) * 100
+  const pFail = (failed / total) * 100
   return (
-    <div style={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', gap: 1 }}>
-      {done > 0 && <div style={{ flex: done, background: '#22c55e' }} />}
-      {inProgress > 0 && <div style={{ flex: inProgress, background: '#3b82f6' }} />}
-      {failed > 0 && <div style={{ flex: failed, background: '#ef4444' }} />}
-      {todo > 0 && <div style={{ flex: todo, background: '#e5e7eb' }} />}
+    <div style={{ height: 3, borderRadius: 2, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', position: 'relative' }}>
+      <div style={{ display: 'flex', height: '100%', position: 'absolute', inset: 0 }}>
+        {pDone > 0 && (
+          <div style={{
+            width: `${pDone}%`, height: '100%',
+            background: STATUS_MAP.done.color,
+            position: 'relative', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
+              animation: 'shimmerSlide 2.4s ease infinite',
+            }} />
+          </div>
+        )}
+        {pProg > 0 && <div style={{ width: `${pProg}%`, height: '100%', background: STATUS_MAP.in_progress.color, opacity: 0.8 }} />}
+        {pFail > 0 && <div style={{ width: `${pFail}%`, height: '100%', background: STATUS_MAP.failed.color, opacity: 0.8 }} />}
+      </div>
     </div>
   )
 }
 
-function ProjectCard({ project, onDelete }) {
+/* ── Project card ─────────────────────────────────────────────────── */
+function ProjectCard({ project, onDelete, index }) {
   const navigate = useNavigate()
   const [hovered, setHovered] = useState(false)
-  const inProgress = Math.round((project.total_tasks - project.done_tasks) * (project.progress / 100))
+  const tasks = project.tasks || []
+  const inProgress = tasks.filter(t => t.status === 'in_progress').length
+  const failed = tasks.filter(t => t.status === 'failed').length
+  const pct = Math.round(project.progress || 0)
+  const identColor = project.identities?.[0]?.color || BRAND
 
   return (
     <div
+      className="card-hover"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => navigate(`/app/projects/${project.id}`)}
       style={{
-        background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
-        padding: '16px 18px', cursor: 'pointer',
-        boxShadow: hovered ? '0 4px 16px rgba(0,0,0,0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
-        transition: 'box-shadow 0.15s, border-color 0.15s',
-        borderColor: hovered ? '#d1d5db' : '#e5e7eb',
+        background: DARK.surface,
+        borderRadius: 8,
+        padding: '18px 20px',
+        cursor: 'pointer',
+        position: 'relative',
+        overflow: 'hidden',
+        animation: `fadeUpIn 0.35s ease forwards`,
+        animationDelay: `${index * 0.055}s`,
+        opacity: 0,
+        boxShadow: SHADOW_SM,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
+      {/* Subtle gradient top accent */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+        background: `linear-gradient(90deg, transparent, ${identColor}66, transparent)`,
+      }} />
+
+      {/* Card header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
         <div style={{
-          width: 32, height: 32, borderRadius: 8, background: BRAND, flexShrink: 0,
+          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+          background: `linear-gradient(135deg, ${identColor}cc, ${identColor}66)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 700, fontSize: 14,
+          color: '#fff', fontWeight: 800, fontSize: 14,
+          boxShadow: `0 0 12px ${identColor}44`,
         }}>
           {project.name.charAt(0).toUpperCase()}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{
+            fontSize: 14, fontWeight: 600, color: DARK.text, marginBottom: 3,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
             {project.name}
           </div>
           {project.description && (
-            <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{
+              fontSize: 12, color: DARK.textMid,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
               {project.description}
             </div>
           )}
         </div>
         <span style={{
-          fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600, flexShrink: 0,
-          background: project.status === 'archived' ? '#f3f4f6' : '#f0fdf4',
-          color: project.status === 'archived' ? '#6b7280' : '#16a34a',
+          fontSize: 10, padding: '2px 9px', borderRadius: 9999, fontWeight: 600, flexShrink: 0,
+          background: project.status === 'archived'
+            ? 'rgba(255,255,255,0.06)'
+            : 'rgba(30,215,96,0.1)',
+          color: project.status === 'archived' ? DARK.textMid : '#1ed760',
+          border: `1px solid ${project.status === 'archived' ? 'rgba(255,255,255,0.08)' : 'rgba(30,215,96,0.3)'}`,
+          textTransform: 'capitalize', letterSpacing: '0.05em',
         }}>
           {project.status === 'archived' ? 'Archived' : 'Active'}
         </span>
       </div>
 
-      <StatusBar
-        total={project.total_tasks}
-        done={project.done_tasks}
-        inProgress={inProgress}
-        failed={0}
-      />
+      {/* Progress bar */}
+      <GlowBar total={project.total_tasks} done={project.done_tasks} inProgress={inProgress} failed={failed} />
 
-      <div style={{ display: 'flex', alignItems: 'center', marginTop: 10, gap: 16 }}>
-        <div style={{ display: 'flex', gap: 10, flex: 1 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6b7280' }}>
-            <CheckCircle size={11} color="#22c55e" />
-            {project.done_tasks}
+      {/* Stats row */}
+      <div style={{ display: 'flex', alignItems: 'center', marginTop: 12, gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, flex: 1 }}>
+          <span style={{ fontSize: 11, color: '#1ed760', fontWeight: 500 }}>
+            ✓ {project.done_tasks}
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6b7280' }}>
-            <Circle size={11} color="#94a3b8" />
-            {project.total_tasks - project.done_tasks}
+          <span style={{ fontSize: 11, color: DARK.textMid }}>
+            ○ {project.total_tasks - project.done_tasks} left
           </span>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: Math.round(project.progress) === 100 ? '#22c55e' : '#6b7280' }}>
-          {Math.round(project.progress)}%
+        <span style={{
+          fontSize: 13, fontWeight: 700,
+          color: pct === 100 ? '#1ed760' : '#b3b3b3',
+        }}>
+          {pct}%
         </span>
         {hovered && (
           <button
-            onClick={e => { e.stopPropagation(); if (confirm(`Delete "${project.name}"?`)) onDelete(project.id) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 11, padding: '2px 4px' }}
+            onClick={e => {
+              e.stopPropagation()
+              if (confirm(`Delete "${project.name}"?`)) onDelete(project.id)
+            }}
+            style={{
+              background: 'none', border: '1px solid rgba(248,113,113,0.3)',
+              cursor: 'pointer', color: '#f87171', fontSize: 11,
+              padding: '2px 8px', borderRadius: 5,
+              transition: 'background 0.15s',
+            }}
           >
             Delete
           </button>
@@ -97,57 +151,57 @@ function ProjectCard({ project, onDelete }) {
   )
 }
 
-const ACTION_ICONS = {
-  'task.created': { color: '#3b82f6', label: 'Created' },
-  'task.status_changed': { color: '#f59e0b', label: 'Updated' },
-  'task.assigned': { color: '#8b5cf6', label: 'Assigned' },
-  'task.deleted': { color: '#ef4444', label: 'Deleted' },
-  'project.created': { color: '#22c55e', label: 'New Project' },
-  'project.archived': { color: '#6b7280', label: 'Archived' },
-  'project.deleted': { color: '#ef4444', label: 'Deleted' },
+/* ── Activity feed ────────────────────────────────────────────────── */
+const ACTION_COLORS = {
+  'task.created':        '#1ed760',
+  'task.status_changed': '#ffa42b',
+  'task.assigned':       '#539df5',
+  'task.deleted':        '#f3727f',
+  'project.created':     '#1ed760',
+  'project.archived':    '#b3b3b3',
+  'project.deleted':     '#f3727f',
 }
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const secs = Math.floor(diff / 1000)
-  if (secs < 60) return `${secs}s ago`
+  if (secs < 60) return `${secs}s`
   const mins = Math.floor(secs / 60)
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 60) return `${mins}m`
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  return `${days}d ago`
+  if (hrs < 24) return `${hrs}h`
+  return `${Math.floor(hrs / 24)}d`
 }
 
 function ActivityFeed({ activities }) {
   if (!activities || activities.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '24px 0', color: '#9ca3af', fontSize: 13 }}>
+      <div style={{ textAlign: 'center', padding: '28px 0', color: DARK.textDim, fontSize: 12 }}>
         No activity yet
       </div>
     )
   }
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <div>
       {activities.map((a, i) => {
-        const info = ACTION_ICONS[a.action] || { color: '#6b7280', label: a.action }
+        const color = ACTION_COLORS[a.action] || DARK.textMid
         return (
           <div key={a.id || i} style={{
             display: 'flex', gap: 10, padding: '8px 0',
-            borderBottom: i < activities.length - 1 ? '1px solid #f3f4f6' : 'none',
+            borderBottom: i < activities.length - 1 ? `1px solid ${DARK.border}` : 'none',
+            animation: `fadeIn 0.3s ease forwards`,
+            animationDelay: `${i * 0.04}s`,
+            opacity: 0,
           }}>
             <div style={{
-              width: 6, height: 6, borderRadius: '50%', background: info.color,
-              marginTop: 6, flexShrink: 0,
+              width: 5, height: 5, borderRadius: '50%', background: color,
+              marginTop: 7, flexShrink: 0, boxShadow: `0 0 6px ${color}88`,
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.4 }}>
-                {a.detail}
-              </div>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, display: 'flex', gap: 8 }}>
+              <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5 }}>{a.detail}</div>
+              <div style={{ fontSize: 10, color: DARK.textDim, marginTop: 2, display: 'flex', gap: 8 }}>
                 {a.actor && <span>{a.actor}</span>}
-                <span>{timeAgo(a.created_at)}</span>
+                <span>{timeAgo(a.created_at)} ago</span>
               </div>
             </div>
           </div>
@@ -157,37 +211,45 @@ function ActivityFeed({ activities }) {
   )
 }
 
-function TaskRow({ t, i, total, onClick, statusColors, priorityColors, priorityIcons }) {
+/* ── My Work ──────────────────────────────────────────────────────── */
+function TaskRow({ t, i, total, onClick }) {
+  const [hov, setHov] = useState(false)
+  const sc = STATUS_MAP[t.status]?.color || DARK.textMid
+  const pc = PRIORITY[t.priority]?.color || DARK.textMid
+  const overdue = t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()
   return (
     <div
       onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
-        borderBottom: i < total - 1 ? '1px solid #f3f4f6' : 'none',
-        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
+        background: hov ? 'rgba(255,255,255,0.05)' : 'transparent',
+        borderBottom: i < total - 1 ? `1px solid ${DARK.border}` : 'none',
+        transition: 'background 0.12s',
       }}
     >
-      <div style={{
-        width: 8, height: 8, borderRadius: '50%',
-        background: statusColors[t.status] || '#9ca3af', flexShrink: 0,
-      }} />
-      <span style={{ fontSize: 12, color: priorityColors[t.priority], flexShrink: 0 }}>
-        {priorityIcons[t.priority]}
+      <div style={{ width: 7, height: 7, borderRadius: '50%', background: sc, flexShrink: 0, boxShadow: `0 0 5px ${sc}66` }} />
+      <span style={{ fontSize: 11, color: pc, flexShrink: 0, width: 10 }}>
+        {PRIORITY[t.priority]?.icon}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{
+          fontSize: 12, color: t.status === 'done' ? DARK.textDim : DARK.textMid,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          textDecoration: t.status === 'done' ? 'line-through' : 'none',
+        }}>
           {t.title}
         </div>
       </div>
-      <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>
-        {t.projectName}
-      </span>
+      <span style={{ fontSize: 10, color: DARK.textDim, flexShrink: 0 }}>{t.projectName}</span>
       {t.due_date && (
         <span style={{
-          fontSize: 11, color: new Date(t.due_date) < new Date() && t.status !== 'done' ? '#ef4444' : '#6b7280',
+          fontSize: 10, color: overdue ? '#f87171' : DARK.textDim,
           flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3,
         }}>
-          <Clock size={10} />
+          <Clock size={9} />
           {new Date(t.due_date).toLocaleDateString()}
         </span>
       )}
@@ -197,24 +259,17 @@ function TaskRow({ t, i, total, onClick, statusColors, priorityColors, priorityI
 
 function MyWorkSection({ projects }) {
   const navigate = useNavigate()
-
-  const statusColors = Object.fromEntries(Object.entries(STATUS_MAP).map(([k, v]) => [k, v.color]))
-  const priorityIcons = Object.fromEntries(Object.entries(PRIORITY).map(([k, v]) => [k, v.icon]))
-  const priorityColors = Object.fromEntries(Object.entries(PRIORITY).map(([k, v]) => [k, v.color]))
   const priorityOrder = { high: 0, medium: 1, low: 2 }
 
-  // Group tasks by identity
-  const groups = {} // identityId -> { identity, tasks }
+  const groups = {}
   const ungroupedTasks = []
 
   for (const p of projects) {
     if (!p.tasks) continue
-    const pIdentities = p.identities || []
-
     for (const t of p.tasks) {
-      if (t.status === 'done') continue  // skip completed
+      if (t.status === 'done') continue
       const taskData = { ...t, projectName: p.name, projectId: p.id }
-
+      const pIdentities = p.identities || []
       if (pIdentities.length > 0) {
         for (const ident of pIdentities) {
           if (!groups[ident.id]) groups[ident.id] = { identity: ident, tasks: [] }
@@ -226,65 +281,57 @@ function MyWorkSection({ projects }) {
     }
   }
 
-  // Sort tasks within each group
-  const sortTasks = (tasks) => {
-    tasks.sort((a, b) => {
-      if (a.status === 'in_progress' && b.status !== 'in_progress') return -1
-      if (b.status === 'in_progress' && a.status !== 'in_progress') return 1
-      return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
-    })
-    return tasks
-  }
+  const sortTasks = (tasks) => tasks.sort((a, b) => {
+    if (a.status === 'in_progress' && b.status !== 'in_progress') return -1
+    if (b.status === 'in_progress' && a.status !== 'in_progress') return 1
+    return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
+  })
 
   const identityGroups = Object.values(groups).map(g => ({ ...g, tasks: sortTasks(g.tasks) }))
   sortTasks(ungroupedTasks)
 
   if (identityGroups.length === 0 && ungroupedTasks.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '20px 0', color: '#9ca3af', fontSize: 13 }}>
-        No active tasks. Create tasks and assign them to start tracking work.
+      <div style={{ textAlign: 'center', padding: '20px 0', color: DARK.textDim, fontSize: 12 }}>
+        No active tasks. Create tasks to start tracking work.
       </div>
     )
   }
 
-  // If no identities defined at all, show flat list
   const hasIdentities = identityGroups.length > 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {identityGroups.map(({ identity: ident, tasks }) => (
         <div key={ident.id}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <div style={{
-              width: 20, height: 20, borderRadius: 5, background: ident.color,
+              width: 18, height: 18, borderRadius: 5, background: ident.color, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, color: '#fff', fontWeight: 700,
+              fontSize: 9, color: '#fff', fontWeight: 800,
+              boxShadow: `0 0 8px ${ident.color}66`,
             }}>
-              {ident.avatar || ident.name.charAt(0).toUpperCase()}
+              {ident.avatar || ident.name.charAt(0)}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{ident.name}</span>
-            <span style={{ fontSize: 11, color: '#9ca3af' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: ident.color }}>{ident.name}</span>
+            <span style={{ fontSize: 10, color: DARK.textDim }}>
               {tasks.filter(t => t.status !== 'done').length} open
             </span>
           </div>
           {tasks.slice(0, 8).map((t, i) => (
             <TaskRow key={t.id + ident.id} t={t} i={i} total={Math.min(tasks.length, 8)}
-              onClick={() => navigate(`/app/projects/${t.projectId}`)}
-              statusColors={statusColors} priorityColors={priorityColors} priorityIcons={priorityIcons} />
+              onClick={() => navigate(`/app/projects/${t.projectId}`)} />
           ))}
         </div>
       ))}
       {ungroupedTasks.length > 0 && (
         <div>
           {hasIdentities && (
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af', marginBottom: 8 }}>
-              Other
-            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: DARK.textDim, marginBottom: 8 }}>Other</div>
           )}
           {ungroupedTasks.slice(0, 8).map((t, i) => (
             <TaskRow key={t.id} t={t} i={i} total={Math.min(ungroupedTasks.length, 8)}
-              onClick={() => navigate(`/app/projects/${t.projectId}`)}
-              statusColors={statusColors} priorityColors={priorityColors} priorityIcons={priorityIcons} />
+              onClick={() => navigate(`/app/projects/${t.projectId}`)} />
           ))}
         </div>
       )}
@@ -292,6 +339,19 @@ function MyWorkSection({ projects }) {
   )
 }
 
+/* ── Input style helper ───────────────────────────────────────────── */
+const inputStyle = {
+  background: '#1f1f1f',
+  border: 'none',
+  borderRadius: 4,
+  padding: '10px 14px',
+  fontSize: 14,
+  color: '#ffffff',
+  outline: 'none',
+  boxShadow: INSET_SHADOW,
+}
+
+/* ── Dashboard ────────────────────────────────────────────────────── */
 export default function Dashboard() {
   const qc = useQueryClient()
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
@@ -304,7 +364,7 @@ export default function Dashboard() {
   const [desc, setDesc] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [filter, setFilter] = useState('active')
-  const [tab, setTab] = useState('projects') // 'projects' | 'mywork'
+  const [tab, setTab] = useState('projects')
 
   const createMut = useMutation({
     mutationFn: () => createProject({ name: name.trim(), description: desc.trim() || undefined }),
@@ -320,23 +380,54 @@ export default function Dashboard() {
   const archived = projects.filter(p => p.status === 'archived')
   const displayed = filter === 'all' ? projects : filter === 'archived' ? archived : active
 
+  const tabStyle = (key) => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '10px 16px', border: 'none', background: 'none',
+    cursor: 'pointer', fontSize: 14, fontWeight: tab === key ? 700 : 400,
+    color: tab === key ? '#ffffff' : DARK.textMid,
+    borderBottom: tab === key ? `2px solid ${BRAND}` : '2px solid transparent',
+    marginBottom: -1, transition: 'color 0.15s',
+  })
+
+  const filterBtn = (key, label, icon, count) => ({
+    btn: {
+      display: 'flex', alignItems: 'center', gap: 5,
+      padding: '6px 16px', borderRadius: 9999, cursor: 'pointer', fontSize: 13, fontWeight: filter === key ? 700 : 400,
+      background: filter === key ? '#1f1f1f' : 'transparent',
+      border: filter === key ? 'none' : '1px solid rgba(255,255,255,0.15)',
+      color: filter === key ? '#ffffff' : DARK.textMid,
+      transition: 'all 0.15s',
+    },
+  })
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: DARK.bg, color: DARK.text }}>
       {/* Header */}
-      <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{
+        padding: '18px 24px', borderBottom: `1px solid ${DARK.border}`,
+        display: 'flex', alignItems: 'center', gap: 16,
+        background: 'rgba(255,255,255,0.015)',
+      }}>
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>My Issues</h1>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-            {active.length} active · {archived.length} archived
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#ffffff' }}>My Issues</h1>
+          <div style={{ fontSize: 12, color: DARK.textDim, marginTop: 2 }}>
+            <span style={{ color: '#1ed760', fontWeight: 600 }}>{active.length}</span> active ·{' '}
+            <span style={{ color: DARK.textMid }}>{archived.length}</span> archived
           </div>
         </div>
         <button
           onClick={() => setShowForm(v => !v)}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '7px 14px', borderRadius: 6, border: 'none',
-            background: BRAND, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            padding: '10px 24px', borderRadius: 9999, border: 'none',
+            background: BRAND,
+            color: '#000', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            textTransform: 'uppercase', letterSpacing: '1.4px',
+            boxShadow: 'rgba(0,0,0,0.3) 0px 4px 8px',
+            transition: 'transform 0.1s, background 0.1s',
           }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#1fdf64' }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
         >
           <Plus size={14} /> New Project
         </button>
@@ -344,55 +435,44 @@ export default function Dashboard() {
 
       {/* Create form */}
       {showForm && (
-        <div style={{ padding: '12px 24px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{
+          padding: '12px 24px',
+          background: 'rgba(255,255,255,0.025)',
+          borderBottom: `1px solid ${DARK.border}`,
+          animation: 'fadeUpIn 0.2s ease forwards',
+        }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input
-              autoFocus
-              placeholder="Project name *"
-              value={name}
+            <input autoFocus placeholder="Project name *" value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && name.trim() && createMut.mutate()}
-              style={{ flex: '1 1 200px', padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, outline: 'none' }}
-            />
-            <input
-              placeholder="Description (optional)"
-              value={desc}
+              style={{ ...inputStyle, flex: '1 1 200px' }} />
+            <input placeholder="Description (optional)" value={desc}
               onChange={e => setDesc(e.target.value)}
-              style={{ flex: '2 1 280px', padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, outline: 'none' }}
-            />
-            <button
-              onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', fontSize: 13, cursor: 'pointer' }}
-            >Cancel</button>
-            <button
-              disabled={!name.trim() || createMut.isPending}
-              onClick={() => createMut.mutate()}
-              style={{
-                padding: '7px 16px', border: 'none', borderRadius: 6,
-                background: BRAND, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                opacity: !name.trim() ? 0.5 : 1,
-              }}
-            >
-              {createMut.isPending ? 'Creating...' : 'Create'}
+              style={{ ...inputStyle, flex: '2 1 280px' }} />
+            <button onClick={() => setShowForm(false)} style={{
+              padding: '8px 20px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999,
+              background: 'transparent', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#ffffff',
+              textTransform: 'uppercase', letterSpacing: '1.4px',
+            }}>Cancel</button>
+            <button disabled={!name.trim() || createMut.isPending} onClick={() => createMut.mutate()} style={{
+              padding: '8px 22px', border: 'none', borderRadius: 9999,
+              background: BRAND, color: '#000', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              opacity: !name.trim() ? 0.45 : 1, transition: 'opacity 0.15s',
+              textTransform: 'uppercase', letterSpacing: '1.4px',
+            }}>
+              {createMut.isPending ? 'Creating…' : 'Create'}
             </button>
           </div>
         </div>
       )}
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 0, padding: '0 24px', borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ display: 'flex', gap: 0, padding: '0 24px', borderBottom: `1px solid ${DARK.border}` }}>
         {[
           { key: 'projects', label: 'Projects', icon: <FolderOpen size={13} /> },
-          { key: 'mywork', label: 'My Work', icon: <User size={13} /> },
+          { key: 'mywork',   label: 'My Work',  icon: <User size={13} /> },
         ].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '10px 16px', border: 'none', background: 'none',
-            cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
-            color: tab === t.key ? BRAND : '#6b7280',
-            borderBottom: tab === t.key ? `2px solid ${BRAND}` : '2px solid transparent',
-            marginBottom: -1,
-          }}>
+          <button key={t.key} onClick={() => setTab(t.key)} style={tabStyle(t.key)}>
             {t.icon}{t.label}
           </button>
         ))}
@@ -401,64 +481,57 @@ export default function Dashboard() {
       {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
         {isLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9ca3af' }}>
-            <Loader size={18} style={{ marginRight: 8 }} /> Loading...
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: DARK.textMid }}>
+            <div style={{ width: 18, height: 18, border: `2px solid ${BRAND}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 10, flexShrink: 0 }} />
+            Loading…
           </div>
         ) : tab === 'mywork' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'start' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <User size={15} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Active Work</h2>
+                <User size={14} color={BRAND} />
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>Active Work</h2>
               </div>
-              <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px' }}>
+              <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
                 <MyWorkSection projects={projects} />
               </div>
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <Activity size={15} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Recent Activity</h2>
+                <Activity size={14} color={BRAND} />
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>Recent Activity</h2>
               </div>
-              <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px' }}>
+              <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
                 <ActivityFeed activities={activities} />
               </div>
             </div>
           </div>
         ) : (
           <>
-            {/* Filter tabs */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+            {/* Filter buttons */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
               {[
-                { key: 'active', label: 'Active', icon: <FolderOpen size={12} />, count: active.length },
-                { key: 'archived', label: 'Archived', icon: <Archive size={12} />, count: archived.length },
-                { key: 'all', label: 'All', count: projects.length },
+                { key: 'active',   label: 'Active',   icon: <FolderOpen size={11} />, count: active.length },
+                { key: 'archived', label: 'Archived', icon: <Archive size={11} />,    count: archived.length },
+                { key: 'all',      label: 'All',      icon: null,                     count: projects.length },
               ].map(f => (
-                <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 10px', borderRadius: 20,
-                  border: filter === f.key ? `1px solid ${BRAND}` : '1px solid #e5e7eb',
-                  background: filter === f.key ? '#eef0ff' : '#fff',
-                  color: filter === f.key ? BRAND : '#6b7280',
-                  fontSize: 12, cursor: 'pointer', fontWeight: filter === f.key ? 600 : 400,
-                }}>
-                  {f.icon}
-                  {f.label}
-                  <span style={{ fontSize: 11 }}>{f.count}</span>
+                <button key={f.key} onClick={() => setFilter(f.key)} style={filterBtn(f.key).btn}>
+                  {f.icon}{f.label}
+                  <span style={{ fontSize: 10, opacity: 0.7 }}>{f.count}</span>
                 </button>
               ))}
             </div>
 
             {displayed.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>
-                <FolderOpen size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-                <p style={{ fontSize: 15, fontWeight: 500 }}>No projects yet</p>
+              <div style={{ textAlign: 'center', padding: 60, color: DARK.textDim, animation: 'fadeIn 0.4s ease' }}>
+                <FolderOpen size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: BRAND }} />
+                <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>No projects yet</p>
                 <p style={{ marginTop: 6, fontSize: 13 }}>Create your first project to get started</p>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-                {displayed.map(p => (
-                  <ProjectCard key={p.id} project={p} onDelete={id => deleteMut.mutate(id)} />
+                {displayed.map((p, i) => (
+                  <ProjectCard key={p.id} project={p} index={i} onDelete={id => deleteMut.mutate(id)} />
                 ))}
               </div>
             )}

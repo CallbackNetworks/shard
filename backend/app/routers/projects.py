@@ -2,21 +2,28 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Label, Cycle
-from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut, TaskOut, LabelOut, CycleOut, IdentityOut
+from app.models import Project, Label, Cycle, RecurrenceRule
+from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut, TaskOut, LabelOut, CycleOut, IdentityOut, RecurrenceRuleOut
 from app.services.activity import log_activity
+from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-def _enrich_task(task) -> TaskOut:
+def _enrich_task(task, db=None) -> TaskOut:
     out = TaskOut.model_validate(task)
     out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
     out.subtask_count = len(task.subtasks)
+    out.comment_count = len(task.comments)
+    out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
+    out.blocking = [d.task_id for d in task.blocking_deps]
+    if db is not None:
+        rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task.id).first()
+        out.recurrence = RecurrenceRuleOut.model_validate(rule) if rule else None
     return out
 
 
-def _enrich(project: Project) -> ProjectOut:
+def _enrich(project: Project, db=None) -> ProjectOut:
     # Only top-level tasks (no parent) for progress counting
     top_tasks = [t for t in project.tasks if t.parent_id is None]
     total = len(top_tasks)
@@ -26,7 +33,7 @@ def _enrich(project: Project) -> ProjectOut:
     out.total_tasks = total
     out.done_tasks = done
     out.progress = progress
-    out.tasks = [_enrich_task(t) for t in project.tasks]
+    out.tasks = [_enrich_task(t, db) for t in project.tasks]
     out.labels = [LabelOut.model_validate(lb) for lb in project.labels]
 
     # Enrich cycles
@@ -64,11 +71,11 @@ def _enrich(project: Project) -> ProjectOut:
 @router.get("", response_model=list[ProjectOut])
 def list_projects(db: Session = Depends(get_db)):
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
-    return [_enrich(p) for p in projects]
+    return [_enrich(p, db) for p in projects]
 
 
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
-def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
+async def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
     project = Project(**body.model_dump())
     db.add(project)
     db.flush()
@@ -79,7 +86,8 @@ def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
     )
     db.commit()
     db.refresh(project)
-    return _enrich(project)
+    await ws_manager.broadcast("project.created", {"project_id": project.id})
+    return _enrich(project, db)
 
 
 @router.get("/{project_id}", response_model=ProjectOut)
@@ -87,11 +95,11 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return _enrich(project)
+    return _enrich(project, db)
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
-def update_project(project_id: str, body: ProjectUpdate, db: Session = Depends(get_db)):
+async def update_project(project_id: str, body: ProjectUpdate, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -108,11 +116,12 @@ def update_project(project_id: str, body: ProjectUpdate, db: Session = Depends(g
         )
     db.commit()
     db.refresh(project)
-    return _enrich(project)
+    await ws_manager.broadcast("project.updated", {"project_id": project_id})
+    return _enrich(project, db)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(project_id: str, db: Session = Depends(get_db)):
+async def delete_project(project_id: str, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -123,3 +132,4 @@ def delete_project(project_id: str, db: Session = Depends(get_db)):
     )
     db.delete(project)
     db.commit()
+    await ws_manager.broadcast("project.deleted", {"project_id": project_id})

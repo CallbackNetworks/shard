@@ -27,6 +27,9 @@ class IdentityOut(BaseModel):
     color: str
     description: str | None
     avatar: str | None
+    share_token: str | None = None
+    share_pin_set: bool = False
+    share_expires_at: datetime | None = None
     created_at: datetime
     project_count: int = 0
 
@@ -89,6 +92,8 @@ class TaskCreate(BaseModel):
     start_date: datetime | None = Field(None, description="Task start date (ISO 8601)")
     due_date: datetime | None = Field(None, description="Task due date (ISO 8601)")
     parent_id: str | None = Field(None, description="Parent task ID for subtasks")
+    time_estimate: int | None = Field(None, ge=0, description="Estimated time in minutes")
+    time_spent: int | None = Field(None, ge=0, description="Time spent in minutes")
 
 
 class TaskUpdate(BaseModel):
@@ -100,6 +105,8 @@ class TaskUpdate(BaseModel):
     start_date: datetime | None = Field(None, description="Task start date (ISO 8601)")
     due_date: datetime | None = Field(None, description="Task due date (ISO 8601)")
     parent_id: str | None = Field(None, description="Parent task ID for subtasks")
+    time_estimate: int | None = Field(None, ge=0, description="Estimated time in minutes")
+    time_spent: int | None = Field(None, ge=0, description="Time spent in minutes")
 
 
 class TaskOut(BaseModel):
@@ -116,10 +123,16 @@ class TaskOut(BaseModel):
     callback_token: str
     start_date: datetime | None
     due_date: datetime | None
+    time_estimate: int | None = None
+    time_spent: int | None = None
     created_at: datetime
     updated_at: datetime
     labels: list[LabelOut] = []
     subtask_count: int = 0
+    comment_count: int = 0
+    blocked_by: list[str] = []   # task IDs this task depends on (must complete first)
+    blocking: list[str] = []     # task IDs that depend on this task
+    recurrence: "RecurrenceRuleOut | None" = None
 
 
 # --- Cycle ---
@@ -168,7 +181,7 @@ class WebhookCallback(BaseModel):
 
 class IntegrationCreate(BaseModel):
     name: str
-    type: Literal["jenkins", "drone", "generic", "email"]
+    type: Literal["jenkins", "drone", "generic", "email", "webhook"]
     url: str = ""
     secret: str | None = None
     project_id: str | None = None
@@ -180,7 +193,7 @@ class IntegrationCreate(BaseModel):
 
 class IntegrationUpdate(BaseModel):
     name: str | None = None
-    type: Literal["jenkins", "drone", "generic", "email"] | None = None
+    type: Literal["jenkins", "drone", "generic", "email", "webhook"] | None = None
     url: str | None = None
     secret: str | None = None
     project_id: str | None = None
@@ -205,6 +218,67 @@ class IntegrationOut(BaseModel):
     email_to: str | None = None
     email_subject_prefix: str | None = None
     smtp_warning: str | None = None
+
+
+# --- Comment ---
+
+class CommentCreate(BaseModel):
+    author: str | None = Field(None, description="Author name (optional)")
+    body: str = Field(description="Comment body (supports Markdown)")
+
+
+class CommentUpdate(BaseModel):
+    body: str = Field(description="Updated comment body")
+
+
+class CommentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    task_id: str
+    project_id: str | None
+    author: str | None
+    body: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# --- Recurrence ---
+
+class RecurrenceRuleCreate(BaseModel):
+    frequency: Literal["daily", "weekly", "monthly", "interval"]
+    interval_value: int = Field(1, ge=1, description="Every N days (used when frequency=interval)")
+    day_of_week: int | None = Field(None, ge=0, le=6, description="0=Mon…6=Sun (weekly only)")
+    day_of_month: int | None = Field(None, ge=1, le=31, description="Day of month (monthly only)")
+    next_run_at: datetime = Field(description="When to first spawn the next task")
+    end_date: datetime | None = None
+    active: bool = True
+
+
+class RecurrenceRuleUpdate(BaseModel):
+    frequency: Literal["daily", "weekly", "monthly", "interval"] | None = None
+    interval_value: int | None = Field(None, ge=1)
+    day_of_week: int | None = Field(None, ge=0, le=6)
+    day_of_month: int | None = Field(None, ge=1, le=31)
+    next_run_at: datetime | None = None
+    end_date: datetime | None = None
+    active: bool | None = None
+
+
+class RecurrenceRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    template_task_id: str
+    frequency: str
+    interval_value: int
+    day_of_week: int | None
+    day_of_month: int | None
+    next_run_at: datetime
+    last_run_at: datetime | None
+    end_date: datetime | None
+    active: bool
+    created_at: datetime
 
 
 # --- API Key ---
@@ -232,6 +306,148 @@ class ApiKeyOut(BaseModel):
     scopes: list[str]
     active: bool
     last_used_at: datetime | None
+    created_at: datetime
+
+
+# --- Assistant ---
+
+class AssistantMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    role: str
+    content: str
+    tool_calls: list | None = None
+    created_at: datetime
+
+
+class AssistantConversationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    messages: list[AssistantMessageOut] = []
+
+
+class AssistantConversationSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AssistantSendMessage(BaseModel):
+    content: str
+
+
+# --- Attachment ---
+
+class AttachmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    task_id: str
+    project_id: str
+    filename: str
+    content_type: str
+    size: int
+    created_at: datetime
+
+
+# --- Task Templates ---
+
+class TaskTemplateCreate(BaseModel):
+    name: str
+    description: str | None = None
+    priority: Literal["low", "medium", "high"] = "medium"
+    subtasks: list[dict] = []
+    label_names: list[str] = []
+    project_id: str | None = None
+
+
+class TaskTemplateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    description: str | None
+    priority: str
+    subtasks: list[dict]
+    label_names: list[str]
+    project_id: str | None
+    created_at: datetime
+
+
+# --- Workflow Rules ---
+
+class WorkflowCondition(BaseModel):
+    field: str  # priority, status, title_contains, has_label, assignee
+    op: str     # eq, neq, contains, in
+    value: str | list[str]
+
+
+class WorkflowAction(BaseModel):
+    type: str   # set_status, set_priority, set_assignee, add_label, remove_label, add_comment, fire_event
+    value: str
+
+
+class WorkflowRuleCreate(BaseModel):
+    name: str
+    project_id: str | None = None
+    trigger: Literal[
+        "task.created",
+        "task.status_changed",
+        "task.label_added",
+        "task.priority_changed"
+    ]
+    conditions: list[WorkflowCondition] = []
+    actions: list[WorkflowAction] = Field(min_length=1)
+    active: bool = True
+
+
+class WorkflowRuleUpdate(BaseModel):
+    name: str | None = None
+    project_id: str | None = None
+    trigger: str | None = None
+    conditions: list[WorkflowCondition] | None = None
+    actions: list[WorkflowAction] | None = None
+    active: bool | None = None
+
+
+class WorkflowRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    project_id: str | None
+    trigger: str
+    conditions: list
+    actions: list
+    active: bool
+    run_count: int
+    last_run_at: datetime | None
+    created_at: datetime
+
+
+# --- Webhook Delivery ---
+
+class WebhookDeliveryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    integration_id: str
+    event: str
+    payload: dict
+    request_url: str
+    request_headers: dict
+    attempt: int
+    status: str
+    status_code: int | None
+    response_body: str | None
+    error: str | None
+    next_retry_at: datetime | None
+    delivered_at: datetime | None
     created_at: datetime
 
 

@@ -1,8 +1,12 @@
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Identity, ProjectIdentity, Project
+from app.models import Identity, ProjectIdentity, Project, ActivityLog
 from app.schemas import IdentityCreate, IdentityUpdate, IdentityOut
 
 router = APIRouter(prefix="/identities", tags=["identities"])
@@ -11,6 +15,8 @@ router = APIRouter(prefix="/identities", tags=["identities"])
 def _enrich(identity: Identity) -> IdentityOut:
     out = IdentityOut.model_validate(identity)
     out.project_count = len(identity.project_identities)
+    out.share_pin_set = identity.share_pin_hash is not None
+    out.share_expires_at = identity.share_expires_at
     return out
 
 
@@ -39,6 +45,17 @@ def update_identity(identity_id: str, body: IdentityUpdate, db: Session = Depend
     db.commit()
     db.refresh(identity)
     return _enrich(identity)
+
+
+@router.post("/{identity_id}/rotate-share-token")
+def rotate_share_token(identity_id: str, db: Session = Depends(get_db)):
+    identity = db.query(Identity).filter(Identity.id == identity_id).first()
+    if not identity:
+        raise HTTPException(status_code=404, detail="Identity not found")
+    identity.share_token = str(uuid.uuid4())
+    db.commit()
+    db.refresh(identity)
+    return {"share_token": identity.share_token}
 
 
 @router.delete("/{identity_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -94,3 +111,63 @@ def get_identity_projects(identity_id: str, db: Session = Depends(get_db)):
         for pi in identity.project_identities
         if pi.project is not None
     ]
+
+
+# ── Share PIN management ─────────────────────────────────────────
+
+class SetPinBody(BaseModel):
+    pin: str
+
+
+@router.post("/{identity_id}/set-pin")
+def set_identity_pin(identity_id: str, body: SetPinBody, db: Session = Depends(get_db)):
+    from app.routers.share import _hash_pin
+    identity = db.query(Identity).filter(Identity.id == identity_id).first()
+    if not identity:
+        raise HTTPException(status_code=404, detail="Identity not found")
+    if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
+        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
+    identity.share_pin_hash = _hash_pin(body.pin)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/{identity_id}/pin")
+def clear_identity_pin(identity_id: str, db: Session = Depends(get_db)):
+    identity = db.query(Identity).filter(Identity.id == identity_id).first()
+    if not identity:
+        raise HTTPException(status_code=404, detail="Identity not found")
+    identity.share_pin_hash = None
+    db.commit()
+    return {"ok": True}
+
+
+# ── Share expiry management ────────���─────────────────────────────
+
+class SetExpiryBody(BaseModel):
+    expires_at: datetime | None
+
+
+@router.post("/{identity_id}/set-expiry")
+def set_identity_expiry(identity_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
+    identity = db.query(Identity).filter(Identity.id == identity_id).first()
+    if not identity:
+        raise HTTPException(status_code=404, detail="Identity not found")
+    identity.share_expires_at = body.expires_at
+    db.commit()
+    return {"ok": True}
+
+
+# ── Share view count ─────────────────────────────────────────────
+
+@router.get("/{identity_id}/share-views")
+def get_share_view_count(identity_id: str, db: Session = Depends(get_db)):
+    identity = db.query(Identity).filter(Identity.id == identity_id).first()
+    if not identity:
+        raise HTTPException(status_code=404, detail="Identity not found")
+    count = (
+        db.query(ActivityLog)
+        .filter(ActivityLog.action == "share.viewed", ActivityLog.detail.contains(identity.name))
+        .count()
+    )
+    return {"view_count": count}

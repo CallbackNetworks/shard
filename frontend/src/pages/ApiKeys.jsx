@@ -2,8 +2,22 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, Eye, EyeOff } from 'lucide-react'
 import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects } from '../api/client'
+import { BRAND, BTN_PRIMARY, BTN_GHOST } from '../constants/theme'
 
 const SCOPES = ['read', 'write', 'admin']
+
+const inputStyle = {
+  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px',
+  fontSize: 14, background: 'rgba(255,255,255,0.05)', color: '#ffffff',
+  display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box',
+}
+
+const METHOD_STYLE = {
+  GET:    { bg: 'rgba(96,165,250,0.15)',  color: '#60a5fa' },
+  POST:   { bg: 'rgba(52,211,153,0.15)',  color: '#1ed760' },
+  PATCH:  { bg: 'rgba(251,191,36,0.15)',  color: '#fbbf24' },
+  DELETE: { bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
+}
 
 export default function ApiKeys() {
   const qc = useQueryClient()
@@ -58,44 +72,45 @@ export default function ApiKeys() {
     })
   }
 
-  if (isLoading) return <p style={{ color: '#6b7280', padding: 24 }}>Loading...</p>
+  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>Loading...</p>
 
   return (
-    <div>
+    <div style={{ padding: '32px 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700 }}>API Keys</h1>
-          <p style={{ color: '#6b7280', marginTop: 4 }}>Manage API keys for external service access</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>API Keys</h1>
+          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Manage API keys for external service access</p>
         </div>
-        <button onClick={() => setShowCreate(true)}
-          style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', cursor: 'pointer', fontWeight: 600 }}>
+        <button onClick={() => setShowCreate(true)} style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 6 }}>
           + New API Key
         </button>
       </div>
 
       {showCreate && (
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <h3 style={{ fontWeight: 600, marginBottom: 16 }}>Create API Key</h3>
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <h3 style={{ fontWeight: 600, marginBottom: 16, color: '#ffffff' }}>Create API Key</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 600 }}>Name *
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Name *
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="My CI/CD Pipeline"
-                style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14, boxSizing: 'border-box' }} />
+                style={inputStyle} />
             </label>
-            <label style={{ fontSize: 13, fontWeight: 600 }}>Project (leave blank for all projects)
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Project (leave blank for all projects)
               <select value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
-                style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+                style={{ ...inputStyle, cursor: 'pointer' }}>
                 <option value="">All projects</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </label>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Scopes
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Scopes
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {SCOPES.map(scope => (
                   <label key={scope} style={{
                     display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-                    background: form.scopes.includes(scope) ? '#ede9fe' : '#f3f4f6',
+                    background: form.scopes.includes(scope) ? 'rgba(30,215,96,0.12)' : 'rgba(255,255,255,0.05)',
+                    color: form.scopes.includes(scope) ? BRAND : 'rgba(255,255,255,0.4)',
                     borderRadius: 999, padding: '4px 12px', fontSize: 13,
+                    border: form.scopes.includes(scope) ? `1px solid rgba(30,215,96,0.3)` : '1px solid rgba(255,255,255,0.08)',
                   }}>
                     <input type="checkbox" checked={form.scopes.includes(scope)} onChange={() => toggleScope(scope)} style={{ cursor: 'pointer' }} />
                     {scope}
@@ -106,54 +121,53 @@ export default function ApiKeys() {
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button onClick={handleCreate} disabled={!form.name || form.scopes.length === 0}
-              style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', cursor: 'pointer', fontWeight: 600 }}>Create</button>
-            <button onClick={() => setShowCreate(false)}
-              style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: '8px 20px', cursor: 'pointer' }}>Cancel</button>
+              style={{ ...BTN_PRIMARY, opacity: (!form.name || form.scopes.length === 0) ? 0.4 : 1 }}>Create</button>
+            <button onClick={() => setShowCreate(false)} style={BTN_GHOST}>Cancel</button>
           </div>
         </div>
       )}
 
       {apiKeys.length === 0 && !showCreate ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>
+        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.25)' }}>
           <p style={{ fontSize: 18 }}>No API keys yet</p>
           <p style={{ marginTop: 8 }}>Create an API key to allow external services to access the TODO Platform API</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {apiKeys.map(ak => (
-            <div key={ak.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '16px 20px' }}>
+            <div key={ak.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>{ak.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: 15, color: '#ffffff' }}>{ak.name}</span>
                     <span style={{
-                      background: ak.active ? '#d1fae5' : '#f3f4f6',
-                      color: ak.active ? '#065f46' : '#6b7280',
+                      background: ak.active ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.06)',
+                      color: ak.active ? '#1ed760' : 'rgba(255,255,255,0.35)',
                       borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600,
                     }}>{ak.active ? 'active' : 'inactive'}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <code style={{
-                      background: '#f3f4f6', padding: '4px 10px', borderRadius: 6, fontSize: 13,
-                      fontFamily: 'monospace', color: '#374151',
+                      background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 6, fontSize: 13,
+                      fontFamily: 'monospace', color: '#1ed760',
                     }}>
                       {visibleKeys[ak.id] ? ak.key : maskKey(ak.key)}
                     </code>
                     <button onClick={() => setVisibleKeys(v => ({ ...v, [ak.id]: !v[ak.id] }))}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 2 }}>
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 2 }}>
                       {visibleKeys[ak.id] ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                     <button onClick={() => copyKey(ak.id, ak.key)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === ak.id ? '#22c55e' : '#6b7280', padding: 2 }}>
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === ak.id ? '#1ed760' : 'rgba(255,255,255,0.35)', padding: 2 }}>
                       {copiedId === ak.id ? <Check size={14} /> : <Copy size={14} />}
                     </button>
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                     {ak.scopes.map(s => (
-                      <span key={s} style={{ background: '#ede9fe', color: '#4f46e5', borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{s}</span>
+                      <span key={s} style={{ background: 'rgba(30,215,96,0.12)', color: BRAND, borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{s}</span>
                     ))}
                   </div>
-                  <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>
                     {ak.project_id
                       ? `Project: ${projects.find(p => p.id === ak.project_id)?.name || ak.project_id}`
                       : 'All projects'}
@@ -163,11 +177,11 @@ export default function ApiKeys() {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => updateMut.mutate({ id: ak.id, data: { active: !ak.active } })}
-                    style={{ background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#ffffff' }}>
                     {ak.active ? 'Disable' : 'Enable'}
                   </button>
                   <button onClick={() => { if (confirm('Delete this API key?')) deleteMut.mutate(ak.id) }}
-                    style={{ background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
+                    style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
                     Delete
                   </button>
                 </div>
@@ -177,10 +191,10 @@ export default function ApiKeys() {
         </div>
       )}
 
-      <div style={{ marginTop: 32, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
-        <h3 style={{ fontWeight: 600, marginBottom: 12 }}>API Usage</h3>
-        <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 12 }}>
-          Use the <code>X-API-Key</code> header to authenticate requests to <code>/api/v1/</code> endpoints.
+      <div style={{ marginTop: 32, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20 }}>
+        <h3 style={{ fontWeight: 600, marginBottom: 12, color: '#ffffff' }}>API Usage</h3>
+        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginBottom: 12 }}>
+          Use the <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#1ed760' }}>X-API-Key</code> header to authenticate requests to <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#1ed760' }}>/api/v1/</code> endpoints.
         </p>
         <div style={{ background: '#1e1e2e', borderRadius: 8, padding: 16, overflow: 'auto' }}>
           <pre style={{ margin: 0, color: '#cdd6f4', fontSize: 13, lineHeight: 1.6 }}>{`# List projects
@@ -210,14 +224,14 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
   http://localhost:8000/api/v1/email/send`}</pre>
         </div>
 
-        <h4 style={{ fontWeight: 600, marginTop: 20, marginBottom: 8 }}>Available Endpoints</h4>
+        <h4 style={{ fontWeight: 600, marginTop: 20, marginBottom: 8, color: '#ffffff' }}>Available Endpoints</h4>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
-              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Method</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Endpoint</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Scope</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Description</th>
+            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', textAlign: 'left' }}>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Method</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Endpoint</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Scope</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Description</th>
             </tr>
           </thead>
           <tbody>
@@ -238,19 +252,19 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
               ['GET', '/api/v1/email/status', 'read', 'SMTP config status'],
               ['POST', '/api/v1/email/send', 'write', 'Send email directly'],
             ].map(([method, path, scope, desc], i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 <td style={{ padding: '6px 12px' }}>
                   <span style={{
-                    background: method === 'GET' ? '#dbeafe' : method === 'POST' ? '#d1fae5' : method === 'PATCH' ? '#fef3c7' : '#fee2e2',
-                    color: method === 'GET' ? '#1e40af' : method === 'POST' ? '#065f46' : method === 'PATCH' ? '#92400e' : '#991b1b',
+                    background: METHOD_STYLE[method]?.bg || 'rgba(255,255,255,0.06)',
+                    color: METHOD_STYLE[method]?.color || '#ffffff',
                     padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: 'monospace',
                   }}>{method}</span>
                 </td>
-                <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12 }}>{path}</td>
+                <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12, color: '#ffffff' }}>{path}</td>
                 <td style={{ padding: '6px 12px' }}>
-                  <span style={{ background: '#ede9fe', color: '#4f46e5', padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>{scope}</span>
+                  <span style={{ background: 'rgba(30,215,96,0.12)', color: BRAND, padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>{scope}</span>
                 </td>
-                <td style={{ padding: '6px 12px', color: '#6b7280' }}>{desc}</td>
+                <td style={{ padding: '6px 12px', color: 'rgba(255,255,255,0.35)' }}>{desc}</td>
               </tr>
             ))}
           </tbody>

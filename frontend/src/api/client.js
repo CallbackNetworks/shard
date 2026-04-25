@@ -10,11 +10,18 @@ api.interceptors.request.use(config => {
 
 api.interceptors.response.use(null, err => {
   if (err.response?.status === 401 && window.location.pathname !== '/' && window.location.pathname !== '/login') {
-    localStorage.removeItem('auth_token')
-    window.location.href = '/login'
+    // Only auto-logout for user-initiated requests, not background refetches
+    const isBackgroundRefetch = err.config?._isBackgroundRefetch
+    if (!isBackgroundRefetch) {
+      localStorage.removeItem('auth_token')
+      window.location.href = '/login'
+    }
   }
   return Promise.reject(err)
 })
+
+// Helper to mark background requests (used by React Query refetch)
+export const markBackground = (config) => ({ ...config, _isBackgroundRefetch: true })
 
 // Projects
 export const getProjects = () => api.get('/projects').then(r => r.data)
@@ -48,6 +55,10 @@ export const addTaskToCycle = (projectId, cycleId, taskId) =>
   api.post(`/projects/${projectId}/cycles/${cycleId}/tasks/${taskId}`).then(r => r.data)
 export const removeTaskFromCycle = (projectId, cycleId, taskId) =>
   api.delete(`/projects/${projectId}/cycles/${cycleId}/tasks/${taskId}`)
+export const duplicateCycle = (projectId, cycleId) =>
+  api.post(`/projects/${projectId}/cycles/${cycleId}/duplicate`).then(r => r.data)
+export const compareCycles = (projectId, cycleId, compareWithId) =>
+  api.get(`/projects/${projectId}/cycles/${cycleId}/compare`, { params: { compare_with: compareWithId } }).then(r => r.data)
 
 // Integrations
 export const getIntegrations = () => api.get('/integrations').then(r => r.data)
@@ -73,3 +84,81 @@ export const unlinkProjectIdentity = (identityId, projectId) => api.delete(`/ide
 
 // Activity
 export const getActivity = (params = {}) => api.get('/activity', { params }).then(r => r.data)
+
+// Comments
+export const getComments = (projectId, taskId) =>
+  api.get(`/projects/${projectId}/tasks/${taskId}/comments`).then(r => r.data)
+export const createComment = (projectId, taskId, data) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/comments`, data).then(r => r.data)
+export const updateComment = (projectId, taskId, commentId, data) =>
+  api.patch(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`, data).then(r => r.data)
+export const deleteComment = (projectId, taskId, commentId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`)
+
+// Task dependencies
+export const addDependency = (projectId, taskId, dependsOnId) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/dependencies/${dependsOnId}`).then(r => r.data)
+export const removeDependency = (projectId, taskId, dependsOnId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}/dependencies/${dependsOnId}`)
+
+// Search
+export const search = (q, projectId) =>
+  api.get('/search', { params: { q, ...(projectId ? { project_id: projectId } : {}) } }).then(r => r.data)
+
+// Workflow Rules
+export const getWorkflowRules = (projectId) =>
+  api.get('/workflow-rules', { params: projectId ? { project_id: projectId } : {} }).then(r => r.data)
+export const createWorkflowRule = (data) => api.post('/workflow-rules', data).then(r => r.data)
+export const updateWorkflowRule = (id, data) => api.patch(`/workflow-rules/${id}`, data).then(r => r.data)
+export const deleteWorkflowRule = (id) => api.delete(`/workflow-rules/${id}`)
+export const testWorkflowRule = (ruleId, taskId) =>
+  api.post(`/workflow-rules/${ruleId}/test`, null, { params: { task_id: taskId } }).then(r => r.data)
+
+// Webhook delivery logs
+export const getDeliveries = (integrationId, params = {}) =>
+  api.get(`/integrations/${integrationId}/deliveries`, { params }).then(r => r.data)
+export const getDelivery = (deliveryId) =>
+  api.get(`/deliveries/${deliveryId}`).then(r => r.data)
+export const retryDelivery = (deliveryId) =>
+  api.post(`/deliveries/${deliveryId}/retry`).then(r => r.data)
+export const purgeDeliveries = (olderThanDays = 30) =>
+  api.delete('/deliveries', { params: { older_than_days: olderThanDays } })
+
+// Recurrence
+export const getRecurrence = (projectId, taskId) =>
+  api.get(`/projects/${projectId}/tasks/${taskId}/recurrence`).then(r => r.data)
+export const setRecurrence = (projectId, taskId, data) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/recurrence`, data).then(r => r.data)
+export const updateRecurrence = (projectId, taskId, data) =>
+  api.patch(`/projects/${projectId}/tasks/${taskId}/recurrence`, data).then(r => r.data)
+export const removeRecurrence = (projectId, taskId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}/recurrence`)
+
+// Attachments
+export const getAttachments = (projectId, taskId) =>
+  api.get(`/projects/${projectId}/tasks/${taskId}/attachments`).then(r => r.data)
+export const uploadAttachment = (projectId, taskId, file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(`/projects/${projectId}/tasks/${taskId}/attachments`, form).then(r => r.data)
+}
+export const deleteAttachment = (projectId, taskId, attachmentId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}`)
+export const getAttachmentUrl = (projectId, taskId, attachmentId) =>
+  `/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}/download`
+
+// Templates
+export const getTemplates = (projectId) =>
+  api.get('/templates', { params: projectId ? { project_id: projectId } : {} }).then(r => r.data)
+export const createTemplate = (data) => api.post('/templates', data).then(r => r.data)
+export const deleteTemplate = (id) => api.delete(`/templates/${id}`)
+
+// Share (public, no auth — uses plain axios to avoid the auth interceptor)
+export const getShareData = (token) => axios.get(`/share/identity/${token}`, { withCredentials: true }).then(r => r.data)
+export const rotateShareToken = (identityId) => api.post(`/identities/${identityId}/rotate-share-token`).then(r => r.data)
+
+// Share PIN & expiry management (authenticated)
+export const setSharePin = (identityId, pin) => api.post(`/identities/${identityId}/set-pin`, { pin }).then(r => r.data)
+export const clearSharePin = (identityId) => api.delete(`/identities/${identityId}/pin`).then(r => r.data)
+export const setShareExpiry = (identityId, expiresAt) => api.post(`/identities/${identityId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
+export const getShareViewCount = (identityId) => api.get(`/identities/${identityId}/share-views`).then(r => r.data)
