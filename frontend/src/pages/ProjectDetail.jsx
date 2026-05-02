@@ -6,6 +6,7 @@ import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
   createCycle, updateCycle, deleteCycle, addTaskToCycle, removeTaskFromCycle,
+  reorderTasks,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
 import GanttChart from '../components/GanttChart'
@@ -234,9 +235,15 @@ export default function ProjectDetail() {
     onSuccess: invalidate,
   })
 
+  const reorderMut = useMutation({
+    mutationFn: (taskIds) => reorderTasks(id, taskIds),
+    onSuccess: invalidate,
+  })
+
   const handleUpdate = (taskId, data) => updateMut.mutate({ taskId, data })
   const handleDelete = (taskId) => deleteMut.mutate(taskId)
   const handleCreateSubtask = (parentId, title) => createSubtaskMut.mutate({ parentId, title })
+  const handleReorder = (taskIds) => reorderMut.mutate(taskIds)
 
   const projectCode = project?.name?.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'TSK'
   const assignees = [...new Set(tasks.map(t => t.assignee).filter(Boolean))].sort()
@@ -545,7 +552,7 @@ export default function ProjectDetail() {
 
         {/* Board */}
         {tab === 'board' && (
-          <BoardView tasks={tasks} projectCode={projectCode} onUpdate={handleUpdate} onDelete={handleDelete} />
+          <BoardView tasks={tasks} projectCode={projectCode} onUpdate={handleUpdate} onDelete={handleDelete} onReorder={handleReorder} />
         )}
 
         {/* Timeline */}
@@ -560,7 +567,7 @@ export default function ProjectDetail() {
 
         {/* Table */}
         {tab === 'table' && (
-          <TableView tasks={tasks} projectId={id} labels={labels} cycles={cycles} onUpdate={handleUpdate} />
+          <TableView tasks={tasks} projectId={id} labels={labels} cycles={cycles} onUpdate={handleUpdate} onReorder={handleReorder} />
         )}
 
         {/* Cycles */}

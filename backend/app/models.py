@@ -48,6 +48,7 @@ class Task(Base):
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     time_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)  # minutes
     time_spent: Mapped[int | None] = mapped_column(Integer, nullable=True)     # minutes
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 

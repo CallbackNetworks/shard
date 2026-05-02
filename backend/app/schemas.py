@@ -125,6 +125,7 @@ class TaskOut(BaseModel):
     due_date: datetime | None
     time_estimate: int | None = None
     time_spent: int | None = None
+    position: int = 0
     created_at: datetime
     updated_at: datetime
     labels: list[LabelOut] = []
@@ -364,6 +365,10 @@ class TaskTemplateCreate(BaseModel):
     subtasks: list[dict] = []
     label_names: list[str] = []
     project_id: str | None = None
+
+
+class ReorderRequest(BaseModel):
+    task_ids: list[str]
 
 
 class TaskTemplateUpdate(BaseModel):

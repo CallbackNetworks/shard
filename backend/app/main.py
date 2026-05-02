@@ -58,6 +58,8 @@ async def lifespan(app: FastAPI):
             conn.execute(text("ALTER TABLE tasks ADD COLUMN time_estimate INTEGER"))
         if "time_spent" not in task_cols:
             conn.execute(text("ALTER TABLE tasks ADD COLUMN time_spent INTEGER"))
+        if "position" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN position INTEGER DEFAULT 0 NOT NULL"))
         conn.commit()
 
     # Start background scheduler for due date reminders

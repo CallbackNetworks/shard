@@ -36,6 +36,7 @@ export const createTask = (projectId, data) => api.post(`/projects/${projectId}/
 export const updateTask = (projectId, taskId, data) => api.patch(`/projects/${projectId}/tasks/${taskId}`, data).then(r => r.data)
 export const deleteTask = (projectId, taskId) => api.delete(`/projects/${projectId}/tasks/${taskId}`)
 export const regenerateToken = (projectId, taskId) => api.post(`/projects/${projectId}/tasks/${taskId}/regenerate-token`).then(r => r.data)
+export const reorderTasks = (projectId, taskIds) => api.post(`/projects/${projectId}/tasks/reorder`, { task_ids: taskIds })
 
 // Labels
 export const getLabels = (projectId) => api.get(`/projects/${projectId}/labels`).then(r => r.data)

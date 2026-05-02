@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Project, Task, TaskDependency
-from app.schemas import TaskCreate, TaskUpdate, TaskOut
+from app.schemas import TaskCreate, TaskUpdate, TaskOut, ReorderRequest
 from app.services.activity import log_activity
 from app.services.rules_engine import run_rules
 from app.services.ws_manager import ws_manager
@@ -26,7 +26,7 @@ def list_tasks(
     q = db.query(Task).filter(Task.project_id == project_id)
     if status_filter:
         q = q.filter(Task.status == status_filter)
-    return q.order_by(Task.created_at.asc()).offset(offset).limit(limit).all()
+    return q.order_by(Task.position.asc(), Task.created_at.asc()).offset(offset).limit(limit).all()
 
 
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
@@ -161,6 +161,16 @@ def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Ses
         raise HTTPException(status_code=404, detail="Dependency not found")
     db.delete(dep)
     db.commit()
+
+
+@router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Depends(get_db)):
+    """Set the position of each task according to the given ordered list of IDs."""
+    _get_project_or_404(project_id, db)
+    for idx, task_id in enumerate(body.task_ids):
+        db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).update({"position": idx})
+    db.commit()
+    await ws_manager.broadcast("task.reordered", {"project_id": project_id})
 
 
 @router.post(

@@ -9,7 +9,13 @@ import {
   closestCenter,
   useDroppable,
 } from '@dnd-kit/core'
-import { useDraggable } from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { STATUS_COLS, PRIORITY, SHADOW_SM, SHADOW_LG } from '../constants/theme'
 
 function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOverlay }) {
@@ -86,20 +92,21 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
   )
 }
 
-function DraggableBoardCard({ task, projectCode, onUpdate, onDelete }) {
+function SortableBoardCard({ task, projectCode, onUpdate, onDelete }) {
   const [hovered, setHovered] = useState(false)
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-    data: { task },
-  })
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id: task.id, data: { task } })
 
   const style = {
-    background: '#181818', borderRadius: 8,
-    padding: '10px 12px', cursor: 'grab',
+    background: '#181818',
+    borderRadius: 8,
+    padding: '10px 12px',
+    cursor: 'grab',
     boxShadow: hovered ? SHADOW_LG : SHADOW_SM,
-    transition: isDragging ? 'none' : 'box-shadow 0.15s',
+    transition: isDragging ? 'none' : `box-shadow 0.15s, ${transition || ''}`,
     opacity: isDragging ? 0.3 : 1,
-    transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
+    transform: CSS.Transform.toString(transform),
     touchAction: 'none',
   }
 
@@ -135,41 +142,43 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
           {tasks.length}
         </span>
       </div>
-      <div
-        ref={setNodeRef}
-        style={{
-          display: 'flex', flexDirection: 'column', gap: 6,
-          minHeight: 48,
-          borderRadius: 8,
-          padding: isOver ? 4 : 0,
-          background: isOver ? 'rgba(255,255,255,0.04)' : 'transparent',
-          border: isOver ? '2px dashed rgba(255,255,255,0.15)' : '2px dashed transparent',
-          transition: 'background 0.15s, border-color 0.15s, padding 0.15s',
-        }}
-      >
-        {tasks.map(task => (
-          <DraggableBoardCard
-            key={task.id}
-            task={task}
-            projectCode={projectCode}
-            onUpdate={onUpdate}
-            onDelete={onDelete}
-          />
-        ))}
-        {tasks.length === 0 && !isOver && (
-          <div style={{
-            padding: '10px 12px', borderRadius: 8,
-            border: '1px dashed rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.15)', fontSize: 12, textAlign: 'center',
-          }}>
-            No issues
-          </div>
-        )}
-      </div>
+      <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+        <div
+          ref={setNodeRef}
+          style={{
+            display: 'flex', flexDirection: 'column', gap: 6,
+            minHeight: 48,
+            borderRadius: 8,
+            padding: isOver ? 4 : 0,
+            background: isOver ? 'rgba(255,255,255,0.04)' : 'transparent',
+            border: isOver ? '2px dashed rgba(255,255,255,0.15)' : '2px dashed transparent',
+            transition: 'background 0.15s, border-color 0.15s, padding 0.15s',
+          }}
+        >
+          {tasks.map(task => (
+            <SortableBoardCard
+              key={task.id}
+              task={task}
+              projectCode={projectCode}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+            />
+          ))}
+          {tasks.length === 0 && !isOver && (
+            <div style={{
+              padding: '10px 12px', borderRadius: 8,
+              border: '1px dashed rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.15)', fontSize: 12, textAlign: 'center',
+            }}>
+              No issues
+            </div>
+          )}
+        </div>
+      </SortableContext>
     </div>
   )
 }
 
-export default function BoardView({ tasks, projectCode, onUpdate, onDelete }) {
+export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onReorder }) {
   const [activeTask, setActiveTask] = useState(null)
   const [overColumn, setOverColumn] = useState(null)
 
@@ -186,6 +195,9 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete }) {
     const overId = event.over?.id
     if (overId && STATUS_COLS.some(c => c.key === overId)) {
       setOverColumn(overId)
+    } else if (overId) {
+      const overTask = tasks.find(t => t.id === overId)
+      setOverColumn(overTask?.status || null)
     } else {
       setOverColumn(null)
     }
@@ -198,22 +210,30 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete }) {
 
     if (!over) return
 
-    const taskId = active.id
     const task = active.data.current?.task
     if (!task) return
 
-    // Determine target status: could be a column id or a task id
-    let targetStatus = null
-    if (STATUS_COLS.some(c => c.key === over.id)) {
-      targetStatus = over.id
-    } else {
-      // Dropped over another task — find that task's status
-      const overTask = tasks.find(t => t.id === over.id)
-      if (overTask) targetStatus = overTask.status
-    }
+    const isOverAColumn = STATUS_COLS.some(c => c.key === over.id)
+    const overTask = tasks.find(t => t.id === over.id)
+    const targetStatus = isOverAColumn ? over.id : overTask?.status
 
-    if (targetStatus && targetStatus !== task.status) {
-      onUpdate(taskId, { status: targetStatus })
+    if (!targetStatus) return
+
+    if (targetStatus !== task.status) {
+      // Cross-column drag: change status
+      onUpdate(task.id, { status: targetStatus })
+    } else if (!isOverAColumn && active.id !== over.id && onReorder) {
+      // Same-column drag: reorder
+      const colTasks = tasks
+        .filter(t => t.status === task.status && t.parent_id == null)
+        .slice()
+        .sort((a, b) => a.position - b.position)
+      const oldIdx = colTasks.findIndex(t => t.id === active.id)
+      const newIdx = colTasks.findIndex(t => t.id === over.id)
+      if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
+        const reordered = arrayMove(colTasks, oldIdx, newIdx)
+        onReorder(reordered.map(t => t.id))
+      }
     }
   }
 
@@ -227,7 +247,10 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete }) {
     >
       <div style={{ display: 'flex', gap: 12, padding: 16, overflowX: 'auto', alignItems: 'flex-start', minHeight: '100%' }}>
         {STATUS_COLS.map(col => {
-          const colTasks = tasks.filter(t => t.status === col.key && t.parent_id == null)
+          const colTasks = tasks
+            .filter(t => t.status === col.key && t.parent_id == null)
+            .slice()
+            .sort((a, b) => a.position - b.position)
           return (
             <DroppableColumn
               key={col.key}
