@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import useBreakpoint from './useBreakpoint'
 import { FONT, BG, DIM, HI } from '../OverviewViews'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 
 export default function SharePinGate({ identity, token, onVerified }) {
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -66,8 +69,8 @@ export default function SharePinGate({ identity, token, onVerified }) {
         background: 'rgba(255,255,255,0.02)',
         borderTop: `1px solid ${color}33`,
         borderBottom: '1px solid rgba(255,255,255,0.04)',
-        padding: '40px 48px',
-        clipPath: PARA_R(20),
+        padding: isMobile ? '32px 20px' : '40px 48px',
+        clipPath: isMobile ? 'none' : PARA_R(20),
         width: '100%', maxWidth: 380,
         animation: 'shareReveal 0.5s ease-out forwards',
       }}>

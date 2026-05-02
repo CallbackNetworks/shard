@@ -96,7 +96,7 @@ function RuleModal({ initial, onSave, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#10111e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 28, width: 560, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#10111e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 28, width: '90vw', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}>
         <h2 style={{ fontWeight: 700, marginBottom: 20, color: '#ffffff', fontSize: 16 }}>{initial ? 'Edit' : 'New'} Workflow Rule</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>

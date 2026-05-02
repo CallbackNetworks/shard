@@ -18,7 +18,7 @@ const STATUS_COLORS = {
 function DeliveryDetailModal({ delivery, onClose, onRetry }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 24, width: 560, maxHeight: '80vh', overflowY: 'auto' }}>
+      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 24, width: '90vw', maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ fontWeight: 700, color: '#ffffff', margin: 0 }}>Delivery Detail</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
@@ -165,7 +165,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 28, width: '90vw', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
         <h2 style={{ fontWeight: 700, marginBottom: 20, color: '#ffffff' }}>{initial ? 'Edit' : 'New'} Integration</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Name

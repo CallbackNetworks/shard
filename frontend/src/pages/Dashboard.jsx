@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, FolderOpen, Archive, Clock, User, Activity } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity } from '../api/client'
 import { BRAND, STATUS_MAP, PRIORITY, DARK, SHADOW_SM, INSET_SHADOW } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 
 /* ── Shimmer progress bar ─────────────────────────────────────────── */
 function GlowBar({ done, inProgress, failed, total }) {
@@ -353,6 +354,8 @@ const inputStyle = {
 
 /* ── Dashboard ────────────────────────────────────────────────────── */
 export default function Dashboard() {
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const { data: activities = [] } = useQuery({
@@ -479,14 +482,14 @@ export default function Dashboard() {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? 12 : 24 }}>
         {isLoading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: DARK.textMid }}>
             <div style={{ width: 18, height: 18, border: `2px solid ${BRAND}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 10, flexShrink: 0 }} />
             Loading…
           </div>
         ) : tab === 'mywork' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 24, alignItems: 'start' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <User size={14} color={BRAND} />
@@ -529,7 +532,7 @@ export default function Dashboard() {
                 <p style={{ marginTop: 6, fontSize: 13 }}>Create your first project to get started</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
                 {displayed.map((p, i) => (
                   <ProjectCard key={p.id} project={p} index={i} onDelete={id => deleteMut.mutate(id)} />
                 ))}

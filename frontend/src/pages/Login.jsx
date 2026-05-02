@@ -72,7 +72,7 @@ export default function Login() {
 
       {/* Form panel */}
       <div style={{
-        width: 340, position: 'relative', zIndex: 1,
+        width: '90vw', maxWidth: 340, position: 'relative', zIndex: 1,
         background: '#181818',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 12,

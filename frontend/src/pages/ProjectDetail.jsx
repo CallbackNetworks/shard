@@ -14,6 +14,7 @@ import TableView from '../components/TableView'
 import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
 import { BRAND, LABEL_PALETTE, SHADOW_LG, INSET_SHADOW } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 
 function LabelChip({ label, onRemove }) {
   return (
@@ -118,6 +119,8 @@ function LabelManager({ labels, onCreateLabel, onDeleteLabel }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ProjectDetail() {
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const { id } = useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -291,7 +294,7 @@ export default function ProjectDetail() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', background: '#121212', color: '#ffffff' }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.015)' }}>
+      <div style={{ padding: isMobile ? '12px 12px 0' : '16px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.015)' }}>
         <button
           onClick={() => navigate('/app')}
           style={{
