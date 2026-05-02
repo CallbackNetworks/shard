@@ -27,6 +27,14 @@ SMTP_USER=notifications@example.com
 SMTP_PASS=smtp_password
 SMTP_FROM=notifications@example.com
 SMTP_USE_TLS=true
+
+# LLM assistant (optional)
+LLM_PROVIDER=claude          # claude | openai | stub
+LLM_API_KEY=sk-ant-...
+LLM_MODEL=claude-sonnet-4-6  # or gpt-4o for OpenAI
+
+# Daily summary email hour (UTC, default 8)
+SUMMARY_HOUR=8
 ```
 
 ### 2. Start services
@@ -77,8 +85,17 @@ server {
         proxy_set_header Host $host;
     }
 
+    # WebSocket
+    location /ws {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+
     # Backend API (FastAPI)
-    location ~ ^/(projects|tasks|integrations|identities|api-keys|activity|webhook|auth|health|api|docs|openapi|redoc) {
+    location ~ ^/(projects|tasks|integrations|identities|api-keys|activity|webhook|auth|health|api|docs|openapi|redoc|search|analytics|templates|workflow-rules|assistant|share|deliveries|attachments) {
         proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -98,6 +115,7 @@ certbot --nginx -d todo.example.com
 
 ```
 todo.example.com {
+    reverse_proxy /ws localhost:8000
     reverse_proxy /projects* localhost:8000
     reverse_proxy /tasks* localhost:8000
     reverse_proxy /integrations* localhost:8000
@@ -110,11 +128,34 @@ todo.example.com {
     reverse_proxy /api* localhost:8000
     reverse_proxy /docs* localhost:8000
     reverse_proxy /openapi.json localhost:8000
+    reverse_proxy /search* localhost:8000
+    reverse_proxy /analytics* localhost:8000
+    reverse_proxy /templates* localhost:8000
+    reverse_proxy /workflow-rules* localhost:8000
+    reverse_proxy /assistant* localhost:8000
+    reverse_proxy /share* localhost:8000
+    reverse_proxy /deliveries* localhost:8000
     reverse_proxy /* localhost:5173
 }
 ```
 
 Caddy handles HTTPS automatically.
+
+---
+
+## Database Migrations
+
+Schema changes are managed with Alembic (configured with `render_as_batch=True` for SQLite compatibility):
+
+```bash
+# Generate a migration after modifying models.py
+docker compose exec backend sh -c "cd /app && alembic revision --autogenerate -m 'add new column'"
+
+# Apply migrations
+docker compose exec backend sh -c "cd /app && alembic upgrade head"
+```
+
+Migrations run automatically on startup via the lifespan handler.
 
 ---
 

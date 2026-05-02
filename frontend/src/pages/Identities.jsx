@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit3, Trash2, Link2, Unlink, ExternalLink, Share2, RefreshCw, Copy, Check, Shield, Clock, Eye } from 'lucide-react'
+import { Plus, Edit3, Trash2, Link2, Unlink, ExternalLink, Share2, RefreshCw, Check, Shield, Clock, Eye } from 'lucide-react'
 import {
   getIdentities, createIdentity, updateIdentity, deleteIdentity,
   getProjects, linkProjectIdentity, unlinkProjectIdentity, rotateShareToken,

@@ -1,20 +1,19 @@
 import hashlib
 import hmac
 import os
-import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import Identity, ActivityLog, Cycle
+from app.models import Identity, ActivityLog, ProjectIdentity
 from app.services.rate_limiter import share_rate_limit
+from app.services.pin_utils import hash_pin, check_pin
 
 router = APIRouter(prefix="/share", tags=["share"])
 
-# Simple signed token for PIN sessions (no JWT dependency needed)
 _PIN_SECRET = os.getenv("SECRET_KEY", "share-pin-default-secret")
 _PIN_TTL = 900  # 15 minutes
 
@@ -42,23 +41,41 @@ def _verify_token(token: str, identity_id: str) -> bool:
         return False
 
 
-def _hash_pin(pin: str) -> str:
-    salt = secrets.token_hex(16)
-    h = hashlib.sha256(f"{salt}:{pin}".encode()).hexdigest()
-    return f"{salt}:{h}"
-
-
-def _check_pin(pin: str, stored: str) -> bool:
-    try:
-        salt, h = stored.split(":", 1)
-        return hmac.compare_digest(hashlib.sha256(f"{salt}:{pin}".encode()).hexdigest(), h)
-    except Exception:
-        return False
-
-
 def _hash_ip(ip: str) -> str:
     daily_salt = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return hashlib.sha256(f"{daily_salt}:{ip}".encode()).hexdigest()[:16]
+
+
+def _load_identity(db: Session, token: str) -> Identity | None:
+    """Load identity with all relationships eagerly to avoid N+1 queries."""
+    return (
+        db.query(Identity)
+        .filter(Identity.share_token == token)
+        .options(
+            selectinload(Identity.project_identities)
+            .selectinload(ProjectIdentity.project)
+            .selectinload("tasks")
+            .selectinload("task_labels")
+            .selectinload("label"),
+            selectinload(Identity.project_identities)
+            .selectinload(ProjectIdentity.project)
+            .selectinload("tasks")
+            .selectinload("subtasks"),
+            selectinload(Identity.project_identities)
+            .selectinload(ProjectIdentity.project)
+            .selectinload("tasks")
+            .selectinload("comments"),
+            selectinload(Identity.project_identities)
+            .selectinload(ProjectIdentity.project)
+            .selectinload("labels"),
+            selectinload(Identity.project_identities)
+            .selectinload(ProjectIdentity.project)
+            .selectinload("cycles")
+            .selectinload("cycle_tasks")
+            .selectinload("task"),
+        )
+        .first()
+    )
 
 
 def _build_response(identity: Identity, db: Session):
@@ -74,7 +91,6 @@ def _build_response(identity: Identity, db: Session):
         total = len(tasks)
         done = sum(1 for t in tasks if t.status == "done")
 
-        # Collect unique labels used in this project
         project_labels = []
         seen_labels = set()
         for lbl in p.labels:
@@ -82,7 +98,6 @@ def _build_response(identity: Identity, db: Session):
                 seen_labels.add(lbl.id)
                 project_labels.append({"name": lbl.name, "color": lbl.color})
 
-        # Active cycle
         active_cycle = None
         for c in p.cycles:
             if c.status == "active":
@@ -96,10 +111,8 @@ def _build_response(identity: Identity, db: Session):
                 }
                 break
 
-        # Comment count for the whole project
         comment_count = sum(len(t.comments) for t in tasks)
 
-        # Build task list (top-level only)
         task_list = []
         for t in tasks:
             if t.parent_id is not None:
@@ -134,12 +147,14 @@ def _build_response(identity: Identity, db: Session):
             "tasks": task_list,
         })
 
-    # Recent activity (last 15 entries for this identity's projects)
     recent_activity = []
     if project_ids:
         logs = (
             db.query(ActivityLog)
-            .filter(ActivityLog.project_id.in_(project_ids))
+            .filter(
+                ActivityLog.project_id.in_(project_ids),
+                ActivityLog.action != "share.viewed",
+            )
             .order_by(ActivityLog.created_at.desc())
             .limit(15)
             .all()
@@ -154,7 +169,6 @@ def _build_response(identity: Identity, db: Session):
                 "created_at": log.created_at.isoformat() if log.created_at else None,
             })
 
-    # Summary stats
     all_tasks_flat = []
     for p_data in projects:
         all_tasks_flat.extend(p_data["tasks"])
@@ -190,13 +204,40 @@ def _build_response(identity: Identity, db: Session):
     }
 
 
+def _maybe_log_view(db: Session, identity: Identity, ip_hash: str):
+    """Log at most one view per IP-hash per hour to avoid bloating activity_logs."""
+    from sqlalchemy import func
+    one_hour_ago = datetime.now(timezone.utc).replace(microsecond=0)
+    one_hour_ago = one_hour_ago.replace(
+        hour=one_hour_ago.hour, minute=0, second=0
+    )
+    existing = (
+        db.query(ActivityLog.id)
+        .filter(
+            ActivityLog.action == "share.viewed",
+            ActivityLog.actor == f"visitor:{ip_hash}",
+            ActivityLog.meta["identity_id"].as_string() == identity.id,
+            ActivityLog.created_at >= one_hour_ago,
+        )
+        .first()
+    )
+    if not existing:
+        view_log = ActivityLog(
+            action="share.viewed",
+            actor=f"visitor:{ip_hash}",
+            detail=f"Share page viewed for {identity.name}",
+            meta={"identity_id": identity.id},
+        )
+        db.add(view_log)
+        db.commit()
+
+
 @router.get("/identity/{token}", dependencies=[Depends(share_rate_limit)])
 def get_share_identity(token: str, request: Request, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.share_token == token).first()
+    identity = _load_identity(db, token)
     if not identity:
         raise HTTPException(status_code=404, detail="Share link not found")
 
-    # Check expiry
     if identity.share_expires_at:
         exp = identity.share_expires_at
         if exp.tzinfo is None:
@@ -204,7 +245,6 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
         if datetime.now(timezone.utc) > exp:
             raise HTTPException(status_code=410, detail="Share link has expired")
 
-    # Check PIN
     if identity.share_pin_hash:
         session_token = request.cookies.get("share_session")
         if not session_token or not _verify_token(session_token, identity.id):
@@ -213,16 +253,9 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
                 "identity": {"name": identity.name, "color": identity.color, "avatar": identity.avatar},
             }
 
-    # Log view
     client_ip = request.client.host if request.client else "unknown"
     ip_hash = _hash_ip(client_ip)
-    view_log = ActivityLog(
-        action="share.viewed",
-        actor=f"visitor:{ip_hash}",
-        detail=f"Share page viewed for {identity.name}",
-    )
-    db.add(view_log)
-    db.commit()
+    _maybe_log_view(db, identity, ip_hash)
 
     return _build_response(identity, db)
 
@@ -233,14 +266,14 @@ class PinVerifyRequest(BaseModel):
 
 @router.post("/identity/{token}/verify", dependencies=[Depends(share_rate_limit)])
 def verify_share_pin(token: str, body: PinVerifyRequest, response: Response, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.share_token == token).first()
+    identity = _load_identity(db, token)
     if not identity:
         raise HTTPException(status_code=404, detail="Share link not found")
 
     if not identity.share_pin_hash:
         raise HTTPException(status_code=400, detail="No PIN set for this share link")
 
-    if not _check_pin(body.pin, identity.share_pin_hash):
+    if not check_pin(body.pin, identity.share_pin_hash):
         raise HTTPException(status_code=403, detail="Invalid PIN")
 
     ts = int(datetime.now(timezone.utc).timestamp())
@@ -253,35 +286,3 @@ def verify_share_pin(token: str, body: PinVerifyRequest, response: Response, db:
         samesite="lax",
     )
     return _build_response(identity, db)
-
-
-# --- Helpers for identity management (PIN set/clear) ---
-
-class SetPinRequest(BaseModel):
-    pin: str  # 4-6 digit string
-
-
-@router.post("/identity/{token}/set-pin")
-def set_share_pin(token: str, body: SetPinRequest, db: Session = Depends(get_db)):
-    """Set or update the PIN for a share link. Called from authenticated Identities page."""
-    identity = db.query(Identity).filter(Identity.share_token == token).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Share link not found")
-
-    if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
-
-    identity.share_pin_hash = _hash_pin(body.pin)
-    db.commit()
-    return {"ok": True}
-
-
-@router.delete("/identity/{token}/pin")
-def clear_share_pin(token: str, db: Session = Depends(get_db)):
-    """Remove the PIN from a share link."""
-    identity = db.query(Identity).filter(Identity.share_token == token).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Share link not found")
-    identity.share_pin_hash = None
-    db.commit()
-    return {"ok": True}

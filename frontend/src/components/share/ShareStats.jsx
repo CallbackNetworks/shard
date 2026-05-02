@@ -1,19 +1,10 @@
-import { useState, useEffect } from 'react'
 import { DIM, HI, useCountUp } from '../OverviewViews'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 
 function StatCard({ label, value, sub, color, delay = 0 }) {
   const animated = useCountUp(value)
-  const [pulsed, setPulsed] = useState(false)
-
-  useEffect(() => {
-    if (animated === value && value > 0) {
-      setPulsed(true)
-      const t = setTimeout(() => setPulsed(false), 400)
-      return () => clearTimeout(t)
-    }
-  }, [animated, value])
+  const done = animated === value && value > 0
 
   return (
     <div style={{
@@ -40,8 +31,7 @@ function StatCard({ label, value, sub, color, delay = 0 }) {
       <div style={{
         fontSize: 28, fontWeight: 900, color,
         letterSpacing: '-0.04em', lineHeight: 1,
-        transform: pulsed ? 'scale(1.08)' : 'scale(1)',
-        transition: 'transform 0.3s ease-out',
+        animation: done ? 'statPulse 0.4s ease-out' : 'none',
       }}>
         {animated}
         {label === 'PROGRESS' && <span style={{ fontSize: 14, fontWeight: 500, color: DIM }}>%</span>}
@@ -55,7 +45,6 @@ function StatCard({ label, value, sub, color, delay = 0 }) {
   )
 }
 
-/* SVG ring for progress */
 function ProgressRing({ pct, color, size = 48, stroke = 4 }) {
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getShareData } from '../api/client'
@@ -12,8 +12,6 @@ import ShareActivityFeed from '../components/share/ShareActivityFeed'
 import SharePinGate from '../components/share/SharePinGate'
 import ShareFooter from '../components/share/ShareFooter'
 import useBreakpoint from '../components/share/useBreakpoint'
-
-const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 
 export default function ShareView() {
   const { token } = useParams()
@@ -30,12 +28,11 @@ export default function ShareView() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['share', token],
     queryFn: () => getShareData(token),
-    refetchInterval: 30000,
+    refetchInterval: pinData ? false : 30000,
     retry: false,
   })
 
   // Section tracking via IntersectionObserver
-  const sectionRefs = useRef({})
   useEffect(() => {
     const observers = []
     SECTIONS.forEach(s => {
@@ -51,7 +48,7 @@ export default function ShareView() {
       observers.push(obs)
     })
     return () => observers.forEach(o => o.disconnect())
-  }, [data, pinData])
+  }, [])
 
   // Check if PIN required
   const requiresPin = data?.meta?.requires_pin === true && !pinData
@@ -84,7 +81,7 @@ export default function ShareView() {
             display: 'inline-block', padding: '20px 40px',
             background: 'rgba(255,255,255,0.02)',
             borderTop: '1px solid rgba(255,85,51,0.3)',
-            clipPath: PARA_R(16),
+            clipPath: 'polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%)',
           }}>
             <div style={{
               fontSize: 13, letterSpacing: '0.14em',

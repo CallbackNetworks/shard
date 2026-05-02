@@ -21,13 +21,11 @@ export default function ShareHero({ identity, summary, now, bp }) {
       overflow: 'hidden',
       animation: 'shareReveal 0.6s ease-out forwards',
     }}>
-      {/* Accent bar */}
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
         background: color,
       }} />
 
-      {/* Aurora orbs */}
       <div style={{
         position: 'absolute', right: -60, top: -80, width: 240, height: 240,
         background: `radial-gradient(circle, ${color}14 0%, transparent 70%)`,
@@ -48,7 +46,6 @@ export default function ShareHero({ identity, summary, now, bp }) {
         gap: isMobile ? 20 : 24,
         position: 'relative',
       }}>
-        {/* Avatar */}
         <div style={{
           width: 64, height: 64, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -63,7 +60,6 @@ export default function ShareHero({ identity, summary, now, bp }) {
           {identity?.avatar || (identity?.name || 'U')[0].toUpperCase()}
         </div>
 
-        {/* Identity info */}
         <div style={{ flex: 1, textAlign: isMobile ? 'center' : 'left', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: isMobile ? 'center' : 'flex-start', marginBottom: 4 }}>
             <span style={{ width: 8, height: 8, background: color, clipPath: PARA(3), flexShrink: 0 }} />
@@ -87,7 +83,6 @@ export default function ShareHero({ identity, summary, now, bp }) {
           )}
         </div>
 
-        {/* Meta badges */}
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'center' : 'flex-end',
           gap: 8, flexShrink: 0,

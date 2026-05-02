@@ -163,6 +163,22 @@ Any service that can receive an HTTP POST works as a notification target.
 }
 ```
 
+### HMAC Signature Verification
+
+When an integration has a `secret` set, outbound webhook payloads are signed:
+- `Authorization: Bearer {secret}`
+- `X-Signature: sha256={hex_digest}` — HMAC-SHA256 over the raw JSON body
+- `X-Hub-Signature-256: sha256={hex_digest}` — same, for GitHub-compatible verification
+
+To verify on the receiving end:
+```python
+import hashlib, hmac
+
+expected = hmac.new(secret.encode(), request_body, hashlib.sha256).hexdigest()
+received = request.headers["X-Signature"].removeprefix("sha256=")
+assert hmac.compare_digest(expected, received)
+```
+
 ### Available Events
 
 | Event | Fired when |
@@ -171,7 +187,44 @@ Any service that can receive an HTTP POST works as a notification target.
 | `task.failed` | Task status → `failed` |
 | `task.in_progress` | Task status → `in_progress` |
 | `task.created` | New task created |
+| `task.due_soon` | Task due date approaching (scheduler) |
+| `task.overdue` | Task past due date (scheduler) |
 | `project.complete` | All tasks in a project reach `done` |
+
+---
+
+## Webhook Delivery Logs & Retries
+
+Every outbound webhook delivery is logged in a `WebhookDelivery` record with full request/response details.
+
+### Viewing Logs
+
+In the management UI, go to **Integrations** → click an integration → **Delivery Logs**.
+
+Via API:
+```bash
+GET /integrations/{id}/deliveries?status=failed&limit=50
+```
+
+### Automatic Retries
+
+Failed deliveries are retried automatically by the background scheduler with exponential backoff:
+- Retry intervals: **1 min**, **5 min**, **30 min**, **2 hours**, **6 hours**
+- After all retries are exhausted, the delivery status becomes `dead`
+
+### Manual Retry
+
+```bash
+POST /deliveries/{delivery_id}/retry
+```
+
+Resets the attempt counter and re-sends the webhook immediately. Only works on `failed` or `dead` deliveries.
+
+### Purging Old Logs
+
+```bash
+DELETE /deliveries?older_than_days=30
+```
 
 ---
 
@@ -230,6 +283,69 @@ curl https://your-domain/api/v1/summary \
 ```
 
 See [API Reference](api.md#external-api-v1) for full endpoint documentation.
+
+---
+
+## Workflow Rules (Automation)
+
+Workflow rules let you automate actions when tasks are created or updated.
+
+### Creating a Rule
+
+1. Go to **Workflow Rules** in the sidebar
+2. Click **New Rule**
+3. Configure:
+   - **Trigger**: when the rule fires (`task.created`, `task.status_changed`, `task.label_added`, `task.priority_changed`)
+   - **Conditions**: optional filters (e.g., priority = high, status = done)
+   - **Actions**: what to do (set status, assign, add label, add comment, fire event)
+4. Optionally scope to a specific project
+
+### Example Rules
+
+**Auto-assign high-priority tasks:**
+- Trigger: `task.created`
+- Condition: `priority eq high`
+- Action: `set_assignee = alice`
+
+**Close parent when all subtasks done:**
+- Trigger: `task.status_changed`
+- Condition: `status eq done`
+- Action: `fire_event = task.done` (triggers notification)
+
+### Dry-run Testing
+
+Use the **Test** button to simulate a rule against a specific task without executing actions:
+```bash
+POST /workflow-rules/{rule_id}/test?task_id={task_id}
+```
+
+---
+
+## LLM Assistant
+
+The built-in AI assistant can read and modify your tasks via natural language.
+
+### Setup
+
+Set these environment variables:
+```env
+LLM_PROVIDER=claude          # or openai, or stub (default)
+LLM_API_KEY=sk-ant-...
+LLM_MODEL=claude-sonnet-4-6
+```
+
+### Usage
+
+Click the assistant button (bottom-right of the management UI). The assistant can:
+- Summarize project status
+- List and search tasks
+- Create tasks and subtasks
+- Update task status, priority, and assignee
+- Manage labels
+- Analyze workload distribution
+- Review recent activity
+
+Quick-action buttons in empty conversations: **Summary**, **Overdue**, **Workload**, **Recent**, **Plan today**.
 
 ---
 

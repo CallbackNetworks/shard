@@ -1,5 +1,6 @@
-import { DIM, MID, HI } from '../OverviewViews'
+import { DIM, MID } from '../OverviewViews'
 import useScrollReveal from './useScrollReveal'
+import { relativeTime } from './utils'
 
 const ACTION_COLORS = {
   'task.done': '#22c55e',
@@ -9,21 +10,6 @@ const ACTION_COLORS = {
   'task.failed': '#f87171',
   'project.created': '#1ed760',
   'project.archived': DIM,
-  'share.viewed': 'rgba(255,255,255,0.15)',
-}
-
-function relativeTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now - d
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(mins / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (mins > 0) return `${mins}m ago`
-  return 'just now'
 }
 
 function ActivityEntry({ entry, index }) {
@@ -35,7 +21,6 @@ function ActivityEntry({ entry, index }) {
       opacity: 0,
       animation: `slideInLeft 0.4s ease-out ${0.05 * index}s forwards`,
     }}>
-      {/* Timeline dot + line */}
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         width: 16, flexShrink: 0, paddingTop: 4,
@@ -51,7 +36,6 @@ function ActivityEntry({ entry, index }) {
         }} />
       </div>
 
-      {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: 12, color: MID, lineHeight: 1.4,

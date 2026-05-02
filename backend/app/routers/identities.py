@@ -121,13 +121,13 @@ class SetPinBody(BaseModel):
 
 @router.post("/{identity_id}/set-pin")
 def set_identity_pin(identity_id: str, body: SetPinBody, db: Session = Depends(get_db)):
-    from app.routers.share import _hash_pin
+    from app.services.pin_utils import hash_pin
     identity = db.query(Identity).filter(Identity.id == identity_id).first()
     if not identity:
         raise HTTPException(status_code=404, detail="Identity not found")
     if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
         raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
-    identity.share_pin_hash = _hash_pin(body.pin)
+    identity.share_pin_hash = hash_pin(body.pin)
     db.commit()
     return {"ok": True}
 
@@ -167,7 +167,10 @@ def get_share_view_count(identity_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Identity not found")
     count = (
         db.query(ActivityLog)
-        .filter(ActivityLog.action == "share.viewed", ActivityLog.detail.contains(identity.name))
+        .filter(
+            ActivityLog.action == "share.viewed",
+            ActivityLog.meta["identity_id"].as_string() == identity_id,
+        )
         .count()
     )
     return {"view_count": count}

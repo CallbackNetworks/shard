@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { DIM, HI, MID, Bar, Label, urgencyScore, urgencyColor, StackedBar } from '../OverviewViews'
+import { DIM, HI, MID, Bar, Label, urgencyScore, urgencyColor } from '../OverviewViews'
 import useScrollReveal from './useScrollReveal'
+import { relativeTime } from './utils'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 const PARA = (px = 8) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
@@ -8,21 +9,6 @@ const PARA = (px = 8) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 
 const STATUS_COLOR = { done: '#22c55e', in_progress: '#38bdf8', failed: '#f87171', todo: 'rgba(255,255,255,0.2)' }
 const STATUS_LABEL = { done: 'DONE', in_progress: 'ACTIVE', failed: 'FAILED', todo: 'TODO' }
 const PRI_COLOR = { high: '#f87171', medium: '#f0b429', low: 'rgba(255,255,255,0.35)' }
-
-function relativeTime(dateStr) {
-  if (!dateStr) return null
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = d - now
-  const absDiff = Math.abs(diff)
-  const mins = Math.floor(absDiff / 60000)
-  const hours = Math.floor(mins / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return diff > 0 ? `in ${days}d` : `${days}d ago`
-  if (hours > 0) return diff > 0 ? `in ${hours}h` : `${hours}h ago`
-  if (mins > 0) return diff > 0 ? `in ${mins}m` : `${mins}m ago`
-  return 'now'
-}
 
 function TaskRow({ task, index, bp }) {
   const sc = STATUS_COLOR[task.status] || DIM
@@ -125,7 +111,6 @@ export default function ShareProjectCard({ project, index, bp }) {
       transform: visible ? 'translateY(0)' : 'translateY(24px)',
       transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
     }}>
-      {/* Card header */}
       <div style={{
         position: 'relative',
         background: 'rgba(255,255,255,0.022)',
@@ -135,13 +120,11 @@ export default function ShareProjectCard({ project, index, bp }) {
         clipPath: isMobile ? 'none' : PARA_R(18),
         transition: 'background 0.2s, transform 0.2s',
       }}>
-        {/* Left accent */}
         <div style={{
           position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
           background: color, transition: 'width 0.2s',
         }} />
 
-        {/* Project name + stats row */}
         <div style={{
           display: 'flex', alignItems: isMobile ? 'flex-start' : 'center',
           flexDirection: isMobile ? 'column' : 'row',
@@ -172,10 +155,8 @@ export default function ShareProjectCard({ project, index, bp }) {
           </div>
         </div>
 
-        {/* Progress bar */}
         <Bar pct={pct} color={color} height={5} />
 
-        {/* Stat chips */}
         <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
           {[['#22c55e', done, 'done'], ['#38bdf8', active, 'active'], ['#f87171', failed, 'failed']].map(([c, n, l]) => (
             <span key={l} style={{
@@ -187,7 +168,6 @@ export default function ShareProjectCard({ project, index, bp }) {
           ))}
         </div>
 
-        {/* Labels */}
         {project.labels?.length > 0 && (
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             {project.labels.map((l, i) => (
@@ -204,12 +184,10 @@ export default function ShareProjectCard({ project, index, bp }) {
         )}
       </div>
 
-      {/* Task list */}
       {visibleTasks.map((t, i) => (
         <TaskRow key={t.id} task={t} index={i} bp={bp} />
       ))}
 
-      {/* Show more/less */}
       {hasMore && (
         <button onClick={() => setExpanded(!expanded)} style={{
           width: '100%', background: 'rgba(255,255,255,0.015)',
