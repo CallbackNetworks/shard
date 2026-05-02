@@ -4,6 +4,7 @@ External API v1 — authenticated with API keys.
 All endpoints require an `X-API-Key` header.
 Scopes: read (GET), write (POST/PATCH/DELETE), admin (all).
 """
+import hashlib
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
@@ -30,7 +31,8 @@ def _get_api_key(
     x_api_key: str = Header(..., alias="X-API-Key", description="API key (starts with tdp_). Create one in the API Keys page."),
     db: Session = Depends(get_db),
 ) -> ApiKey:
-    api_key = db.query(ApiKey).filter(ApiKey.key == x_api_key, ApiKey.active == True).first()
+    key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
+    api_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.active == True).first()
     if not api_key:
         raise HTTPException(status_code=401, detail="Invalid or inactive API key")
     api_key.last_used_at = datetime.now(timezone.utc)

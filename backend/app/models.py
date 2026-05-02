@@ -189,7 +189,9 @@ class ApiKey(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    key_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    key_last4: Mapped[str | None] = mapped_column(String(8), nullable=True)
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # null = access all projects
     scopes: Mapped[list] = mapped_column(JSON, default=lambda: ["read", "write"])  # read, write, admin
     active: Mapped[bool] = mapped_column(Boolean, default=True)

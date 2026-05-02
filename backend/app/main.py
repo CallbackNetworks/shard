@@ -60,6 +60,20 @@ async def lifespan(app: FastAPI):
             conn.execute(text("ALTER TABLE tasks ADD COLUMN time_spent INTEGER"))
         if "position" not in task_cols:
             conn.execute(text("ALTER TABLE tasks ADD COLUMN position INTEGER DEFAULT 0 NOT NULL"))
+        # Migrate API keys to hashed storage
+        import hashlib as _hashlib
+        api_key_cols = {c["name"] for c in inspect(engine).get_columns("api_keys")}
+        if "key_hash" not in api_key_cols:
+            conn.execute(text("ALTER TABLE api_keys ADD COLUMN key_hash VARCHAR(64)"))
+        if "key_last4" not in api_key_cols:
+            conn.execute(text("ALTER TABLE api_keys ADD COLUMN key_last4 VARCHAR(8)"))
+        # Migrate existing plaintext keys to hashes
+        rows = conn.execute(text("SELECT id, key FROM api_keys WHERE key IS NOT NULL AND key_hash IS NULL")).fetchall()
+        for (row_id, raw_key) in rows:
+            key_hash = _hashlib.sha256(raw_key.encode()).hexdigest()
+            key_last4 = raw_key[-4:]
+            conn.execute(text("UPDATE api_keys SET key_hash=:h, key_last4=:l4 WHERE id=:id"),
+                         {"h": key_hash, "l4": key_last4, "id": row_id})
         conn.commit()
 
     # Start background scheduler for due date reminders

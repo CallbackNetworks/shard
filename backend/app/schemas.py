@@ -302,12 +302,27 @@ class ApiKeyOut(BaseModel):
 
     id: str
     name: str
-    key: str
+    key_preview: str = ""    # "tdp_****xxxx" — masked after creation
     project_id: str | None
     scopes: list[str]
     active: bool
     last_used_at: datetime | None
     created_at: datetime
+
+    @classmethod
+    def from_model(cls, m: object) -> "ApiKeyOut":
+        last4 = getattr(m, "key_last4", None) or ""
+        prefix = (getattr(m, "key", None) or "tdp_")[:4]
+        preview = f"{prefix}_****{last4}" if last4 else "****"
+        return cls(
+            id=m.id, name=m.name, key_preview=preview,
+            project_id=m.project_id, scopes=m.scopes, active=m.active,
+            last_used_at=m.last_used_at, created_at=m.created_at,
+        )
+
+
+class ApiKeyCreateOut(ApiKeyOut):
+    key: str = ""    # full key shown once at creation
 
 
 # --- Assistant ---

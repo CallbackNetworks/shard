@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Copy, Check, Eye, EyeOff } from 'lucide-react'
+import { Copy, Check, AlertTriangle, X } from 'lucide-react'
 import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects } from '../api/client'
 import { BRAND, BTN_PRIMARY, BTN_GHOST } from '../constants/theme'
 
@@ -26,7 +26,7 @@ export default function ApiKeys() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ name: '', project_id: '', scopes: ['read', 'write'] })
   const [copiedId, setCopiedId] = useState(null)
-  const [visibleKeys, setVisibleKeys] = useState({})
+  const [newKey, setNewKey] = useState(null)   // full key shown once after creation
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['api-keys'] })
 
@@ -36,7 +36,7 @@ export default function ApiKeys() {
       invalidate()
       setShowCreate(false)
       setForm({ name: '', project_id: '', scopes: ['read', 'write'] })
-      setVisibleKeys(v => ({ ...v, [data.id]: true }))
+      setNewKey(data.key)    // store full key to show in modal once
     }
   })
 
@@ -63,8 +63,6 @@ export default function ApiKeys() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const maskKey = (key) => key.slice(0, 8) + '••••••••••••••••' + key.slice(-4)
-
   const handleCreate = () => {
     createMut.mutate({
       ...form,
@@ -76,6 +74,46 @@ export default function ApiKeys() {
 
   return (
     <div style={{ padding: '32px 40px' }}>
+      {/* Show-once modal for newly created key */}
+      {newKey && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.7)',
+        }}>
+          <div style={{
+            background: '#111827', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
+            padding: 28, width: 520, maxWidth: '90vw',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>API Key Created</span>
+              <button onClick={() => setNewKey(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 12, padding: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8 }}>
+              <AlertTriangle size={14} style={{ color: '#fbbf24', flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 12, color: '#fbbf24' }}>
+                Copy this key now. It will not be shown again.
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <code style={{
+                flex: 1, background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: 6, fontSize: 13,
+                fontFamily: 'monospace', color: '#1ed760', wordBreak: 'break-all', border: '1px solid rgba(255,255,255,0.08)',
+              }}>
+                {newKey}
+              </code>
+              <button onClick={() => copyKey('new', newKey)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === 'new' ? '#1ed760' : '#9ca3af', padding: 4, flexShrink: 0 }}>
+                {copiedId === 'new' ? <Check size={16} /> : <Copy size={16} />}
+              </button>
+            </div>
+            <button onClick={() => setNewKey(null)} style={{ ...BTN_PRIMARY, width: '100%', justifyContent: 'center' }}>
+              I have saved this key
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>API Keys</h1>
@@ -151,16 +189,8 @@ export default function ApiKeys() {
                       background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 6, fontSize: 13,
                       fontFamily: 'monospace', color: '#1ed760',
                     }}>
-                      {visibleKeys[ak.id] ? ak.key : maskKey(ak.key)}
+                      {ak.key_preview}
                     </code>
-                    <button onClick={() => setVisibleKeys(v => ({ ...v, [ak.id]: !v[ak.id] }))}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 2 }}>
-                      {visibleKeys[ak.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                    <button onClick={() => copyKey(ak.id, ak.key)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === ak.id ? '#1ed760' : 'rgba(255,255,255,0.35)', padding: 2 }}>
-                      {copiedId === ak.id ? <Check size={14} /> : <Copy size={14} />}
-                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                     {ak.scopes.map(s => (
