@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import TaskTemplate
-from app.schemas import TaskTemplateCreate, TaskTemplateOut
+from app.schemas import TaskTemplateCreate, TaskTemplateUpdate, TaskTemplateOut
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
@@ -20,6 +20,18 @@ def list_templates(project_id: str | None = None, db: Session = Depends(get_db))
 def create_template(body: TaskTemplateCreate, db: Session = Depends(get_db)):
     tpl = TaskTemplate(**body.model_dump())
     db.add(tpl)
+    db.commit()
+    db.refresh(tpl)
+    return tpl
+
+
+@router.patch("/{template_id}", response_model=TaskTemplateOut)
+def update_template(template_id: str, body: TaskTemplateUpdate, db: Session = Depends(get_db)):
+    tpl = db.query(TaskTemplate).filter(TaskTemplate.id == template_id).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    for field, value in body.model_dump(exclude_none=True).items():
+        setattr(tpl, field, value)
     db.commit()
     db.refresh(tpl)
     return tpl

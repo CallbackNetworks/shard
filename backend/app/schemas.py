@@ -366,6 +366,15 @@ class TaskTemplateCreate(BaseModel):
     project_id: str | None = None
 
 
+class TaskTemplateUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    priority: Literal["low", "medium", "high"] | None = None
+    subtasks: list[dict] | None = None
+    label_names: list[str] | None = None
+    project_id: str | None = None
+
+
 class TaskTemplateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -151,6 +151,7 @@ export const getAttachmentUrl = (projectId, taskId, attachmentId) =>
 export const getTemplates = (projectId) =>
   api.get('/templates', { params: projectId ? { project_id: projectId } : {} }).then(r => r.data)
 export const createTemplate = (data) => api.post('/templates', data).then(r => r.data)
+export const updateTemplate = (id, data) => api.patch(`/templates/${id}`, data).then(r => r.data)
 export const deleteTemplate = (id) => api.delete(`/templates/${id}`)
 
 // Share (public, no auth — uses plain axios to avoid the auth interceptor)
