@@ -8,7 +8,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import Identity, ActivityLog, ProjectIdentity
+from app.models import (
+    Identity, ActivityLog, ProjectIdentity, Project,
+    Task, TaskLabel, Label, Cycle, CycleTask, Comment,
+)
 from app.services.rate_limiter import share_rate_limit
 from app.services.pin_utils import hash_pin, check_pin
 
@@ -54,25 +57,25 @@ def _load_identity(db: Session, token: str) -> Identity | None:
         .options(
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
-            .selectinload("tasks")
-            .selectinload("task_labels")
-            .selectinload("label"),
+            .selectinload(Project.tasks)
+            .selectinload(Task.task_labels)
+            .selectinload(TaskLabel.label),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
-            .selectinload("tasks")
-            .selectinload("subtasks"),
+            .selectinload(Project.tasks)
+            .selectinload(Task.subtasks),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
-            .selectinload("tasks")
-            .selectinload("comments"),
+            .selectinload(Project.tasks)
+            .selectinload(Task.comments),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
-            .selectinload("labels"),
+            .selectinload(Project.labels),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
-            .selectinload("cycles")
-            .selectinload("cycle_tasks")
-            .selectinload("task"),
+            .selectinload(Project.cycles)
+            .selectinload(Cycle.cycle_tasks)
+            .selectinload(CycleTask.task),
         )
         .first()
     )
