@@ -116,6 +116,8 @@ export const testWorkflowRule = (ruleId, taskId) =>
   api.post(`/workflow-rules/${ruleId}/test`, null, { params: { task_id: taskId } }).then(r => r.data)
 
 // Webhook delivery logs
+export const getAllDeliveries = (params = {}) =>
+  api.get('/deliveries', { params }).then(r => r.data)
 export const getDeliveries = (integrationId, params = {}) =>
   api.get(`/integrations/${integrationId}/deliveries`, { params }).then(r => r.data)
 export const getDelivery = (deliveryId) =>

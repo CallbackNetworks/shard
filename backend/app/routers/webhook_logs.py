@@ -9,6 +9,22 @@ from app.services.notifier import retry_delivery
 router = APIRouter(tags=["webhook-logs"])
 
 
+@router.get("/deliveries", response_model=list[WebhookDeliveryOut])
+def list_all_deliveries(
+    delivery_status: str | None = Query(None, alias="status"),
+    integration_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    q = db.query(WebhookDelivery)
+    if integration_id:
+        q = q.filter(WebhookDelivery.integration_id == integration_id)
+    if delivery_status:
+        q = q.filter(WebhookDelivery.status == delivery_status)
+    return q.order_by(WebhookDelivery.created_at.desc()).offset(offset).limit(limit).all()
+
+
 @router.get("/integrations/{integration_id}/deliveries", response_model=list[WebhookDeliveryOut])
 def list_deliveries(
     integration_id: str,

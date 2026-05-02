@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Link, useLocation, Routes, Route, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, FileText } from 'lucide-react'
+import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, FileText, ScrollText } from 'lucide-react'
 import { getProjects, getIdentities } from './api/client'
 import CommandPalette from './components/CommandPalette'
 import AssistantPanel from './components/AssistantPanel'
@@ -13,6 +13,7 @@ import Identities from './pages/Identities'
 import Analytics from './pages/Analytics'
 import WorkflowRules from './pages/WorkflowRules'
 import Templates from './pages/Templates'
+import WebhookLogs from './pages/WebhookLogs'
 import Overview from './pages/Overview'
 import ShareView from './pages/ShareView'
 import Login from './pages/Login'
@@ -256,6 +257,7 @@ function Sidebar({ onOpenPalette }) {
           { to: '/app/analytics', icon: <BarChart2 size={13} />, label: 'Analytics' },
           { to: '/app/workflow-rules', icon: <GitMerge size={13} />, label: 'Workflow Rules' },
           { to: '/app/templates', icon: <FileText size={13} />, label: 'Templates' },
+          { to: '/app/webhook-logs', icon: <ScrollText size={13} />, label: 'Webhook Logs' },
         ].map(({ to, icon, label }) => (
           <Link key={to} to={to} className="sb-link" style={navLinkStyle(to)}>
             {icon}{label}
@@ -437,6 +439,7 @@ function Layout() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="workflow-rules" element={<WorkflowRules />} />
           <Route path="templates" element={<Templates />} />
+          <Route path="webhook-logs" element={<WebhookLogs />} />
         </Routes>
       </main>
       <CommandPalette open={paletteOpen} onClose={closePalette} />
