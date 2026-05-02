@@ -169,6 +169,7 @@ def get_share_view_count(identity_id: str, db: Session = Depends(get_db)):
         db.query(ActivityLog)
         .filter(
             ActivityLog.action == "share.viewed",
+            ActivityLog.meta.isnot(None),
             ActivityLog.meta["identity_id"].as_string() == identity_id,
         )
         .count()

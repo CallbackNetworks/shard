@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -206,30 +206,33 @@ def _build_response(identity: Identity, db: Session):
 
 def _maybe_log_view(db: Session, identity: Identity, ip_hash: str):
     """Log at most one view per IP-hash per hour to avoid bloating activity_logs."""
-    from sqlalchemy import func
-    one_hour_ago = datetime.now(timezone.utc).replace(microsecond=0)
-    one_hour_ago = one_hour_ago.replace(
-        hour=one_hour_ago.hour, minute=0, second=0
-    )
-    existing = (
-        db.query(ActivityLog.id)
-        .filter(
-            ActivityLog.action == "share.viewed",
-            ActivityLog.actor == f"visitor:{ip_hash}",
-            ActivityLog.meta["identity_id"].as_string() == identity.id,
-            ActivityLog.created_at >= one_hour_ago,
+    try:
+        one_hour_ago = datetime.now(timezone.utc).replace(microsecond=0)
+        one_hour_ago = one_hour_ago.replace(
+            hour=one_hour_ago.hour, minute=0, second=0
         )
-        .first()
-    )
-    if not existing:
-        view_log = ActivityLog(
-            action="share.viewed",
-            actor=f"visitor:{ip_hash}",
-            detail=f"Share page viewed for {identity.name}",
-            meta={"identity_id": identity.id},
+        existing = (
+            db.query(ActivityLog.id)
+            .filter(
+                ActivityLog.action == "share.viewed",
+                ActivityLog.actor == f"visitor:{ip_hash}",
+                ActivityLog.meta.isnot(None),
+                ActivityLog.meta["identity_id"].as_string() == identity.id,
+                ActivityLog.created_at >= one_hour_ago,
+            )
+            .first()
         )
-        db.add(view_log)
-        db.commit()
+        if not existing:
+            view_log = ActivityLog(
+                action="share.viewed",
+                actor=f"visitor:{ip_hash}",
+                detail=f"Share page viewed for {identity.name}",
+                meta={"identity_id": identity.id},
+            )
+            db.add(view_log)
+            db.commit()
+    except Exception:
+        db.rollback()
 
 
 @router.get("/identity/{token}", dependencies=[Depends(share_rate_limit)])
@@ -261,7 +264,7 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
 
 
 class PinVerifyRequest(BaseModel):
-    pin: str
+    pin: str = Field(..., min_length=4, max_length=6, pattern=r"^\d{4,6}$")
 
 
 @router.post("/identity/{token}/verify", dependencies=[Depends(share_rate_limit)])
