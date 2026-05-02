@@ -33,6 +33,16 @@ services:
     networks:
       - app-network
 
+  mcp:
+    build: ./mcp_server
+    volumes:
+      - ./backend:/app/backend    # access backend source and SQLite DB
+      - ./mcp_server:/app/mcp_server
+    environment:
+      - DB_PATH=${DB_PATH:-/app/backend/todo_platform.db}
+    networks:
+      - app-network
+
 volumes:
   backend_venv:
   backend_data:
