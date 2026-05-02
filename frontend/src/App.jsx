@@ -5,6 +5,7 @@ import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, S
 import { getProjects, getIdentities } from './api/client'
 import CommandPalette from './components/CommandPalette'
 import AssistantPanel from './components/AssistantPanel'
+import NotificationCenter from './components/NotificationCenter'
 import Dashboard from './pages/Dashboard'
 import ProjectDetail from './pages/ProjectDetail'
 import Integrations from './pages/Integrations'
@@ -443,6 +444,7 @@ function Layout() {
         </Routes>
       </main>
       <CommandPalette open={paletteOpen} onClose={closePalette} />
+      <NotificationCenter />
       <AssistantPanel />
     </div>
   )

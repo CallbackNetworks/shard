@@ -9,7 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.database import engine
 from app.models import Base
 from app.routers import projects, tasks, webhooks, integrations, labels, cycles, api_keys, external_api, activity, identities, share
-from app.routers import comments, search, recurring, webhook_logs, analytics, workflow_rules, assistant, templates, attachments
+from app.routers import comments, search, recurring, webhook_logs, analytics, workflow_rules, assistant, templates, attachments, notifications
 from app.routers import ws as ws_router
 from app.routers.labels import task_label_router
 from app.routers.auth import router as auth_router, verify_token
@@ -189,6 +189,7 @@ app.include_router(workflow_rules.router)
 app.include_router(assistant.router)
 app.include_router(templates.router)
 app.include_router(attachments.router)
+app.include_router(notifications.router)
 app.include_router(ws_router.router)
 
 

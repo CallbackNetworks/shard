@@ -7,8 +7,9 @@ from datetime import datetime, timezone, timedelta
 import httpx
 from sqlalchemy.orm import Session
 
-from app.models import Task, Project, Integration, WebhookDelivery
+from app.models import Task, Project, Integration, WebhookDelivery, Notification
 from app.services.email_sender import send_email, build_notification_email, is_configured as smtp_configured
+from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,42 @@ async def fire_notifications(db: Session, task: Task, event: str) -> None:
     # Send webhook notifications with delivery logging
     for integration in webhook_integrations:
         await _dispatch_webhook(db, integration, event, payload)
+
+    # Create in-app notification
+    _create_notification(db, event, task, project)
+
+
+_EVENT_MESSAGES = {
+    "task.done": lambda t, p: (f'Task "{t.title}" completed in {p.name}', f"/app/projects/{p.id}"),
+    "task.failed": lambda t, p: (f'Task "{t.title}" failed in {p.name}', f"/app/projects/{p.id}"),
+    "task.due_soon": lambda t, p: (f'Task "{t.title}" is due soon', f"/app/projects/{p.id}"),
+    "task.overdue": lambda t, p: (f'Task "{t.title}" is overdue', f"/app/projects/{p.id}"),
+    "project.complete": lambda t, p: (f'All tasks in "{p.name}" are done!', f"/app/projects/{p.id}"),
+}
+
+
+def _create_notification(db: Session, event: str, task: Task, project: Project) -> None:
+    factory = _EVENT_MESSAGES.get(event)
+    if not factory:
+        return
+    message, link = factory(task, project)
+    notif = Notification(
+        type=event,
+        message=message,
+        link=link,
+        project_id=project.id,
+        task_id=task.id,
+    )
+    db.add(notif)
+    db.commit()
+    # Fire-and-forget broadcast (don't await — this is called from sync context too)
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(ws_manager.broadcast("notification.new", {"id": notif.id}))
+    except Exception:
+        pass
 
 
 async def retry_delivery(db: Session, delivery: WebhookDelivery) -> bool:

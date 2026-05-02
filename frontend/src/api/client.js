@@ -115,6 +115,13 @@ export const deleteWorkflowRule = (id) => api.delete(`/workflow-rules/${id}`)
 export const testWorkflowRule = (ruleId, taskId) =>
   api.post(`/workflow-rules/${ruleId}/test`, null, { params: { task_id: taskId } }).then(r => r.data)
 
+// Notifications
+export const getNotifications = (params = {}) => api.get('/notifications', { params }).then(r => r.data)
+export const getUnreadCount = () => api.get('/notifications/unread-count').then(r => r.data)
+export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`).then(r => r.data)
+export const markAllNotificationsRead = () => api.post('/notifications/mark-all-read')
+export const dismissNotification = (id) => api.delete(`/notifications/${id}`)
+
 // Webhook delivery logs
 export const getAllDeliveries = (params = {}) =>
   api.get('/deliveries', { params }).then(r => r.data)

@@ -386,6 +386,21 @@ class ReorderRequest(BaseModel):
     task_ids: list[str]
 
 
+# --- Notifications ---
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    type: str
+    message: str
+    read: bool
+    link: str | None
+    project_id: str | None
+    task_id: str | None
+    created_at: datetime
+
+
 class TaskTemplateUpdate(BaseModel):
     name: str | None = None
     description: str | None = None

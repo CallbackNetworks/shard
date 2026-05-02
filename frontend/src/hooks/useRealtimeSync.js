@@ -21,6 +21,10 @@ export default function useRealtimeSync() {
               qc.invalidateQueries({ queryKey: ['project', data.project_id] })
             }
           }
+          if (event === 'notification.new') {
+            qc.invalidateQueries({ queryKey: ['notifications'] })
+            qc.invalidateQueries({ queryKey: ['notification-count'] })
+          }
         } catch { /* ignore malformed messages */ }
       }
 
