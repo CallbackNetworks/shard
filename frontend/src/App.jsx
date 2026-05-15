@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Link, useLocation, Routes, Route, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, FileText, ScrollText } from 'lucide-react'
 import { getProjects, getIdentities } from './api/client'
 import CommandPalette from './components/CommandPalette'
@@ -143,6 +144,7 @@ const SB_BORDER = 'rgba(255,255,255,0.08)'
 
 function Sidebar({ onOpenPalette }) {
   const location = useLocation()
+  const { t, i18n } = useTranslation()
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [identitiesOpen, setIdentitiesOpen] = useState(true)
 
@@ -241,7 +243,7 @@ function Sidebar({ onOpenPalette }) {
         onMouseLeave={e => e.currentTarget.style.background = '#1f1f1f'}
       >
         <Search size={12} />
-        <span style={{ flex: 1, textAlign: 'left' }}>Search...</span>
+        <span style={{ flex: 1, textAlign: 'left' }}>{t('search')}</span>
         <kbd style={{
           padding: '1px 6px', borderRadius: 3, fontSize: 10,
           background: 'rgba(255,255,255,0.1)', color: '#b3b3b3',
@@ -251,32 +253,32 @@ function Sidebar({ onOpenPalette }) {
       {/* Nav links */}
       <div style={{ padding: '8px 0', borderBottom: `1px solid ${SB_BORDER}` }}>
         {[
-          { to: '/app', icon: <LayoutGrid size={13} />, label: 'My Issues' },
-          { to: '/app/identities', icon: <Users size={13} />, label: 'Identities' },
-          { to: '/app/integrations', icon: <Zap size={13} />, label: 'Integrations' },
-          { to: '/app/api-keys', icon: <Key size={13} />, label: 'API Keys' },
-          { to: '/app/analytics', icon: <BarChart2 size={13} />, label: 'Analytics' },
-          { to: '/app/workflow-rules', icon: <GitMerge size={13} />, label: 'Workflow Rules' },
-          { to: '/app/templates', icon: <FileText size={13} />, label: 'Templates' },
-          { to: '/app/webhook-logs', icon: <ScrollText size={13} />, label: 'Webhook Logs' },
-        ].map(({ to, icon, label }) => (
+          { to: '/app', icon: <LayoutGrid size={13} />, labelKey: 'nav.myIssues' },
+          { to: '/app/identities', icon: <Users size={13} />, labelKey: 'nav.identities' },
+          { to: '/app/integrations', icon: <Zap size={13} />, labelKey: 'nav.integrations' },
+          { to: '/app/api-keys', icon: <Key size={13} />, labelKey: 'nav.apiKeys' },
+          { to: '/app/analytics', icon: <BarChart2 size={13} />, labelKey: 'nav.analytics' },
+          { to: '/app/workflow-rules', icon: <GitMerge size={13} />, labelKey: 'nav.workflowRules' },
+          { to: '/app/templates', icon: <FileText size={13} />, labelKey: 'nav.templates' },
+          { to: '/app/webhook-logs', icon: <ScrollText size={13} />, labelKey: 'nav.webhookLogs' },
+        ].map(({ to, icon, labelKey }) => (
           <Link key={to} to={to} className="sb-link" style={navLinkStyle(to)}>
-            {icon}{label}
+            {icon}{t(labelKey)}
           </Link>
         ))}
         <a href="/" target="_blank" rel="noreferrer" className="sb-link"
           style={{ ...navLinkStyle('/status-noop'), color: SB_TEXT, borderLeft: '2px solid transparent' }}>
-          <ExternalLink size={13} />Status Page
+          <ExternalLink size={13} />{t('nav.statusPage')}
         </a>
       </div>
 
       {/* Project tree */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '8px 0', minHeight: 0 }}>
         {identities.length > 0 && (
           <>
             <button onClick={() => setIdentitiesOpen(v => !v)} style={sectionHeader}>
               {identitiesOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-              By Identity
+              {t('nav.byIdentity')}
             </button>
             {identitiesOpen && identities.map(ident => {
               const group = projectsByIdentity[ident.id]
@@ -324,7 +326,7 @@ function Sidebar({ onOpenPalette }) {
           ...sectionHeader, marginTop: identities.length > 0 ? 8 : 0,
         }}>
           {projectsOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-          {identities.length > 0 ? 'All Projects' : 'Projects'}
+          {identities.length > 0 ? t('nav.allProjects') : t('nav.projects')}
           <span style={{ marginLeft: 'auto', fontWeight: 400, fontSize: 10 }}>{active.length}</span>
         </button>
 
@@ -346,7 +348,7 @@ function Sidebar({ onOpenPalette }) {
             ))}
             {archived.length > 0 && (
               <div style={{ padding: '6px 18px 2px', fontSize: 9, color: 'rgba(255,255,255,0.12)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Archived
+                {t('archived')}
               </div>
             )}
             {archived.map(p => (
@@ -357,10 +359,39 @@ function Sidebar({ onOpenPalette }) {
               </Link>
             ))}
             {projects.length === 0 && (
-              <div style={{ padding: '4px 24px', fontSize: 12, color: 'rgba(255,255,255,0.12)' }}>No projects yet</div>
+              <div style={{ padding: '4px 24px', fontSize: 12, color: 'rgba(255,255,255,0.12)' }}>{t('nav.noProjectsYet')}</div>
             )}
           </>
         )}
+      </div>
+
+      {/* Language switcher */}
+      <div style={{
+        borderTop: `1px solid ${SB_BORDER}`,
+        padding: '10px 16px',
+        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flex: 1, letterSpacing: '0.04em' }}>
+          {t('nav.language')}
+        </span>
+        {[{ code: 'en', label: 'EN' }, { code: 'zh-TW', label: '中文' }].map(({ code, label }) => (
+          <button
+            key={code}
+            onClick={() => i18n.changeLanguage(code)}
+            style={{
+              padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
+              fontSize: 11, fontWeight: i18n.language === code ? 700 : 400,
+              background: i18n.language === code ? SB_ACTIVE : 'transparent',
+              color: i18n.language === code ? '#ffffff' : 'rgba(255,255,255,0.3)',
+              border: i18n.language === code
+                ? `1px solid rgba(255,255,255,0.18)`
+                : '1px solid transparent',
+              transition: 'all 0.15s',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   )

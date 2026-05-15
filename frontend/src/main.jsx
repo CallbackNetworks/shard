@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import './i18n'
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query'
 import { ToastProvider, globalAddToast } from './context/ToastContext'
 import App from './App'

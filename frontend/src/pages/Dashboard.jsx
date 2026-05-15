@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, FolderOpen, Archive, Clock, User, Activity } from 'lucide-react'
@@ -39,6 +40,7 @@ function GlowBar({ done, inProgress, failed, total }) {
 
 /* ── Project card ─────────────────────────────────────────────────── */
 function ProjectCard({ project, onDelete, index }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [hovered, setHovered] = useState(false)
   const tasks = project.tasks || []
@@ -108,7 +110,7 @@ function ProjectCard({ project, onDelete, index }) {
           border: `1px solid ${project.status === 'archived' ? 'rgba(255,255,255,0.08)' : 'rgba(30,215,96,0.3)'}`,
           textTransform: 'capitalize', letterSpacing: '0.05em',
         }}>
-          {project.status === 'archived' ? 'Archived' : 'Active'}
+          {project.status === 'archived' ? t('archived') : t('active')}
         </span>
       </div>
 
@@ -122,7 +124,7 @@ function ProjectCard({ project, onDelete, index }) {
             ✓ {project.done_tasks}
           </span>
           <span style={{ fontSize: 11, color: DARK.textMid }}>
-            ○ {project.total_tasks - project.done_tasks} left
+            ○ {project.total_tasks - project.done_tasks} {t('dashboard.left')}
           </span>
         </div>
         <span style={{
@@ -144,7 +146,7 @@ function ProjectCard({ project, onDelete, index }) {
               transition: 'background 0.15s',
             }}
           >
-            Delete
+            {t('delete')}
           </button>
         )}
       </div>
@@ -175,10 +177,11 @@ function timeAgo(dateStr) {
 }
 
 function ActivityFeed({ activities }) {
+  const { t } = useTranslation()
   if (!activities || activities.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '28px 0', color: DARK.textDim, fontSize: 12 }}>
-        No activity yet
+        {t('dashboard.noActivityYet')}
       </div>
     )
   }
@@ -202,7 +205,7 @@ function ActivityFeed({ activities }) {
               <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5 }}>{a.detail}</div>
               <div style={{ fontSize: 10, color: DARK.textDim, marginTop: 2, display: 'flex', gap: 8 }}>
                 {a.actor && <span>{a.actor}</span>}
-                <span>{timeAgo(a.created_at)} ago</span>
+                <span>{t('dashboard.timeAgo', { time: timeAgo(a.created_at) })}</span>
               </div>
             </div>
           </div>
@@ -213,11 +216,11 @@ function ActivityFeed({ activities }) {
 }
 
 /* ── My Work ──────────────────────────────────────────────────────── */
-function TaskRow({ t, i, total, onClick }) {
+function TaskRow({ t: task, i, total, onClick }) {
   const [hov, setHov] = useState(false)
-  const sc = STATUS_MAP[t.status]?.color || DARK.textMid
-  const pc = PRIORITY[t.priority]?.color || DARK.textMid
-  const overdue = t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()
+  const sc = STATUS_MAP[task.status]?.color || DARK.textMid
+  const pc = PRIORITY[task.priority]?.color || DARK.textMid
+  const overdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
   return (
     <div
       onClick={onClick}
@@ -233,25 +236,25 @@ function TaskRow({ t, i, total, onClick }) {
     >
       <div style={{ width: 7, height: 7, borderRadius: '50%', background: sc, flexShrink: 0, boxShadow: `0 0 5px ${sc}66` }} />
       <span style={{ fontSize: 11, color: pc, flexShrink: 0, width: 10 }}>
-        {PRIORITY[t.priority]?.icon}
+        {PRIORITY[task.priority]?.icon}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 12, color: t.status === 'done' ? DARK.textDim : DARK.textMid,
+          fontSize: 12, color: task.status === 'done' ? DARK.textDim : DARK.textMid,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          textDecoration: t.status === 'done' ? 'line-through' : 'none',
+          textDecoration: task.status === 'done' ? 'line-through' : 'none',
         }}>
-          {t.title}
+          {task.title}
         </div>
       </div>
-      <span style={{ fontSize: 10, color: DARK.textDim, flexShrink: 0 }}>{t.projectName}</span>
-      {t.due_date && (
+      <span style={{ fontSize: 10, color: DARK.textDim, flexShrink: 0 }}>{task.projectName}</span>
+      {task.due_date && (
         <span style={{
           fontSize: 10, color: overdue ? '#f87171' : DARK.textDim,
           flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3,
         }}>
           <Clock size={9} />
-          {new Date(t.due_date).toLocaleDateString()}
+          {new Date(task.due_date).toLocaleDateString()}
         </span>
       )}
     </div>
@@ -259,6 +262,7 @@ function TaskRow({ t, i, total, onClick }) {
 }
 
 function MyWorkSection({ projects }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const priorityOrder = { high: 0, medium: 1, low: 2 }
 
@@ -267,9 +271,9 @@ function MyWorkSection({ projects }) {
 
   for (const p of projects) {
     if (!p.tasks) continue
-    for (const t of p.tasks) {
-      if (t.status === 'done') continue
-      const taskData = { ...t, projectName: p.name, projectId: p.id }
+    for (const task of p.tasks) {
+      if (task.status === 'done') continue
+      const taskData = { ...task, projectName: p.name, projectId: p.id }
       const pIdentities = p.identities || []
       if (pIdentities.length > 0) {
         for (const ident of pIdentities) {
@@ -294,7 +298,7 @@ function MyWorkSection({ projects }) {
   if (identityGroups.length === 0 && ungroupedTasks.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '20px 0', color: DARK.textDim, fontSize: 12 }}>
-        No active tasks. Create tasks to start tracking work.
+        {t('dashboard.noActiveTasks')}
       </div>
     )
   }
@@ -316,23 +320,23 @@ function MyWorkSection({ projects }) {
             </div>
             <span style={{ fontSize: 12, fontWeight: 600, color: ident.color }}>{ident.name}</span>
             <span style={{ fontSize: 10, color: DARK.textDim }}>
-              {tasks.filter(t => t.status !== 'done').length} open
+              {tasks.filter(task => task.status !== 'done').length} {t('dashboard.open')}
             </span>
           </div>
-          {tasks.slice(0, 8).map((t, i) => (
-            <TaskRow key={t.id + ident.id} t={t} i={i} total={Math.min(tasks.length, 8)}
-              onClick={() => navigate(`/app/projects/${t.projectId}`)} />
+          {tasks.slice(0, 8).map((task, i) => (
+            <TaskRow key={task.id + ident.id} t={task} i={i} total={Math.min(tasks.length, 8)}
+              onClick={() => navigate(`/app/projects/${task.projectId}`)} />
           ))}
         </div>
       ))}
       {ungroupedTasks.length > 0 && (
         <div>
           {hasIdentities && (
-            <div style={{ fontSize: 11, fontWeight: 600, color: DARK.textDim, marginBottom: 8 }}>Other</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: DARK.textDim, marginBottom: 8 }}>{t('dashboard.other')}</div>
           )}
-          {ungroupedTasks.slice(0, 8).map((t, i) => (
-            <TaskRow key={t.id} t={t} i={i} total={Math.min(ungroupedTasks.length, 8)}
-              onClick={() => navigate(`/app/projects/${t.projectId}`)} />
+          {ungroupedTasks.slice(0, 8).map((task, i) => (
+            <TaskRow key={task.id} t={task} i={i} total={Math.min(ungroupedTasks.length, 8)}
+              onClick={() => navigate(`/app/projects/${task.projectId}`)} />
           ))}
         </div>
       )}
@@ -354,6 +358,7 @@ const inputStyle = {
 
 /* ── Dashboard ────────────────────────────────────────────────────── */
 export default function Dashboard() {
+  const { t } = useTranslation()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
@@ -392,7 +397,7 @@ export default function Dashboard() {
     marginBottom: -1, transition: 'color 0.15s',
   })
 
-  const filterBtn = (key, label, icon, count) => ({
+  const filterBtn = (key) => ({
     btn: {
       display: 'flex', alignItems: 'center', gap: 5,
       padding: '6px 16px', borderRadius: 9999, cursor: 'pointer', fontSize: 13, fontWeight: filter === key ? 700 : 400,
@@ -412,10 +417,10 @@ export default function Dashboard() {
         background: 'rgba(255,255,255,0.015)',
       }}>
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#ffffff' }}>My Issues</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.title')}</h1>
           <div style={{ fontSize: 12, color: DARK.textDim, marginTop: 2 }}>
-            <span style={{ color: '#1ed760', fontWeight: 600 }}>{active.length}</span> active ·{' '}
-            <span style={{ color: DARK.textMid }}>{archived.length}</span> archived
+            <span style={{ color: '#1ed760', fontWeight: 600 }}>{active.length}</span> {t('active')} ·{' '}
+            <span style={{ color: DARK.textMid }}>{archived.length}</span> {t('archived')}
           </div>
         </div>
         <button
@@ -432,7 +437,7 @@ export default function Dashboard() {
           onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#1fdf64' }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
         >
-          <Plus size={14} /> New Project
+          <Plus size={14} /> {t('dashboard.newProject')}
         </button>
       </div>
 
@@ -445,25 +450,25 @@ export default function Dashboard() {
           animation: 'fadeUpIn 0.2s ease forwards',
         }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input autoFocus placeholder="Project name *" value={name}
+            <input autoFocus placeholder={t('dashboard.projectNamePlaceholder')} value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && name.trim() && createMut.mutate()}
               style={{ ...inputStyle, flex: '1 1 200px' }} />
-            <input placeholder="Description (optional)" value={desc}
+            <input placeholder={t('dashboard.descriptionPlaceholder')} value={desc}
               onChange={e => setDesc(e.target.value)}
               style={{ ...inputStyle, flex: '2 1 280px' }} />
             <button onClick={() => setShowForm(false)} style={{
               padding: '8px 20px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999,
               background: 'transparent', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#ffffff',
               textTransform: 'uppercase', letterSpacing: '1.4px',
-            }}>Cancel</button>
+            }}>{t('cancel')}</button>
             <button disabled={!name.trim() || createMut.isPending} onClick={() => createMut.mutate()} style={{
               padding: '8px 22px', border: 'none', borderRadius: 9999,
               background: BRAND, color: '#000', fontSize: 13, fontWeight: 700, cursor: 'pointer',
               opacity: !name.trim() ? 0.45 : 1, transition: 'opacity 0.15s',
               textTransform: 'uppercase', letterSpacing: '1.4px',
             }}>
-              {createMut.isPending ? 'Creating…' : 'Create'}
+              {createMut.isPending ? t('creating') : t('create')}
             </button>
           </div>
         </div>
@@ -472,11 +477,11 @@ export default function Dashboard() {
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 0, padding: '0 24px', borderBottom: `1px solid ${DARK.border}` }}>
         {[
-          { key: 'projects', label: 'Projects', icon: <FolderOpen size={13} /> },
-          { key: 'mywork',   label: 'My Work',  icon: <User size={13} /> },
-        ].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={tabStyle(t.key)}>
-            {t.icon}{t.label}
+          { key: 'projects', label: t('nav.projects'), icon: <FolderOpen size={13} /> },
+          { key: 'mywork',   label: t('dashboard.myWork'),  icon: <User size={13} /> },
+        ].map(tabItem => (
+          <button key={tabItem.key} onClick={() => setTab(tabItem.key)} style={tabStyle(tabItem.key)}>
+            {tabItem.icon}{tabItem.label}
           </button>
         ))}
       </div>
@@ -486,14 +491,14 @@ export default function Dashboard() {
         {isLoading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: DARK.textMid }}>
             <div style={{ width: 18, height: 18, border: `2px solid ${BRAND}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 10, flexShrink: 0 }} />
-            Loading…
+            {t('loading')}
           </div>
         ) : tab === 'mywork' ? (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 24, alignItems: 'start' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <User size={14} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>Active Work</h2>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.activeWork')}</h2>
               </div>
               <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
                 <MyWorkSection projects={projects} />
@@ -502,7 +507,7 @@ export default function Dashboard() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <Activity size={14} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>Recent Activity</h2>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.recentActivity')}</h2>
               </div>
               <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
                 <ActivityFeed activities={activities} />
@@ -514,9 +519,9 @@ export default function Dashboard() {
             {/* Filter buttons */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
               {[
-                { key: 'active',   label: 'Active',   icon: <FolderOpen size={11} />, count: active.length },
-                { key: 'archived', label: 'Archived', icon: <Archive size={11} />,    count: archived.length },
-                { key: 'all',      label: 'All',      icon: null,                     count: projects.length },
+                { key: 'active',   label: t('active'),   icon: <FolderOpen size={11} />, count: active.length },
+                { key: 'archived', label: t('archived'), icon: <Archive size={11} />,    count: archived.length },
+                { key: 'all',      label: t('all'),      icon: null,                     count: projects.length },
               ].map(f => (
                 <button key={f.key} onClick={() => setFilter(f.key)} style={filterBtn(f.key).btn}>
                   {f.icon}{f.label}
@@ -528,8 +533,8 @@ export default function Dashboard() {
             {displayed.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 60, color: DARK.textDim, animation: 'fadeIn 0.4s ease' }}>
                 <FolderOpen size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: BRAND }} />
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>No projects yet</p>
-                <p style={{ marginTop: 6, fontSize: 13 }}>Create your first project to get started</p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.noProjectsEmpty')}</p>
+                <p style={{ marginTop: 6, fontSize: 13 }}>{t('dashboard.createFirstProject')}</p>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
