@@ -100,7 +100,7 @@ def get_agent_summary(db: Session = Depends(get_db)):
         counts: dict[str, int] = {"todo": 0, "in_progress": 0, "done": 0, "failed": 0}
         enriched_tasks = []
         for t in tasks:
-            counts[t.status] = counts.get(t.status, 0) + 1
+            counts[t.status] += 1
             out = TaskOut.model_validate(t)
             out.labels = [LabelOut.model_validate(tl.label) for tl in t.task_labels if tl.label is not None]
             out.subtask_count = len(t.subtasks)

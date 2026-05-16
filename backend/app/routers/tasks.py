@@ -59,6 +59,14 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
         raise HTTPException(status_code=404, detail="Task not found")
 
     changes = body.model_dump(exclude_none=True)
+
+    if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] is not None:
+        _key = db.query(ApiKey).filter(ApiKey.id == changes["assigned_agent_key_id"]).first()
+        if not _key:
+            raise HTTPException(status_code=400, detail="Agent API key not found")
+        if not _key.active:
+            raise HTTPException(status_code=400, detail="Agent API key is inactive")
+
     old_status = task.status
     old_priority = task.priority
     old_assignee = task.assignee
@@ -100,11 +108,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
         agent_name = None
         if new_key_id:
             agent_key = db.query(ApiKey).filter(ApiKey.id == new_key_id).first()
-            if not agent_key:
-                raise HTTPException(status_code=400, detail="Agent API key not found")
-            if not agent_key.active:
-                raise HTTPException(status_code=400, detail="Agent API key is inactive")
-            agent_name = agent_key.name
+            agent_name = agent_key.name if agent_key else None
         log_activity(
             db, "task.agent_assigned",
             project_id=project_id, task_id=task_id,

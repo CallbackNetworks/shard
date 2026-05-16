@@ -5,12 +5,9 @@ import { Bot, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { getAgentSummary } from '../api/client'
 import { STATUS_MAP, PRIORITY } from '../constants/theme'
 
-const STATUS_COLORS = {
-  todo: '#6b7280',
-  in_progress: '#facc15',
-  done: '#1ed760',
-  failed: '#f87171',
-}
+const STATUS_COLORS = Object.fromEntries(
+  Object.entries(STATUS_MAP).map(([k, v]) => [k, v.color])
+)
 
 function StatusBar({ counts }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
@@ -149,7 +146,6 @@ export default function AgentTasksPanel() {
 
   if (isLoading) return null
 
-  // Only show agents that have tasks or are active
   const relevant = agents.filter(a => a.active || Object.values(a.task_counts).some(c => c > 0))
 
   if (relevant.length === 0) return null
