@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Plus, X, BarChart3, Copy, GitCompareArrows } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { BRAND, STATUS_MAP, BTN_SM } from '../constants/theme'
 import { duplicateCycle, compareCycles } from '../api/client'
 import axios from 'axios'
 
 function BurndownChart({ cycleId }) {
+  const { t } = useTranslation()
   const [data, setData] = useState(null)
   useEffect(() => {
     if (!cycleId) return
@@ -13,8 +15,8 @@ function BurndownChart({ cycleId }) {
       .catch(() => setData([]))
   }, [cycleId])
 
-  if (!data) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '12px 0' }}>Loading chart…</div>
-  if (data.length === 0) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '12px 0' }}>No burndown data available.</div>
+  if (!data) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '12px 0' }}>{t('cycle.loadingChart')}</div>
+  if (data.length === 0) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '12px 0' }}>{t('cycle.noBurndownData')}</div>
 
   const W = 320, H = 120, PX = 30, PY = 10
   const maxVal = Math.max(...data.map(d => d.total), 1)
@@ -84,6 +86,7 @@ function CompareView({ data }) {
 }
 
 function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, onDuplicate, allCycles, projectId }) {
+  const { t } = useTranslation()
   const [showTaskPicker, setShowTaskPicker] = useState(false)
   const [showBurndown, setShowBurndown] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
@@ -130,9 +133,9 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
               style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
             <select value={editData.status} onChange={e => setEditData(p => ({ ...p, status: e.target.value }))}
               style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }}>
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
+              <option value="draft">{t('cycle.draft')}</option>
+              <option value="active">{t('active')}</option>
+              <option value="completed">{t('cycle.completed')}</option>
             </select>
             <input type="date" value={editData.start_date} onChange={e => setEditData(p => ({ ...p, start_date: e.target.value }))}
               style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
@@ -141,11 +144,11 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
               style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
           </div>
           <input value={editData.description} onChange={e => setEditData(p => ({ ...p, description: e.target.value }))}
-            placeholder="Description (optional)"
+            placeholder={t('cycle.descriptionPlaceholder')}
             style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={saveEdit} style={{ ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700 }}>Save</button>
-            <button onClick={() => setEditing(false)} style={BTN_SM}>Cancel</button>
+            <button onClick={saveEdit} style={{ ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700 }}>{t('save')}</button>
+            <button onClick={() => setEditing(false)} style={BTN_SM}>{t('cancel')}</button>
           </div>
         </div>
       ) : (
@@ -171,28 +174,28 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
               )}
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setEditing(true)} title="Edit" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px 10px', fontSize: 11 }}>Edit</button>
+              <button onClick={() => setEditing(true)} title={t('edit')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px 10px', fontSize: 11 }}>{t('edit')}</button>
               <button
                 disabled={duplicating}
                 onClick={async () => {
                   setDuplicating(true)
                   try { await onDuplicate(cycle.id) } finally { setDuplicating(false) }
                 }}
-                title="Duplicate as template"
+                title={t('cycle.duplicateAsTemplate')}
                 style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: '4px 8px', fontSize: 11, display: 'flex', alignItems: 'center' }}
               >
                 <Copy size={11} />
               </button>
-              <button onClick={() => { if (confirm(`Delete cycle "${cycle.name}"?`)) onDelete(cycle.id) }}
+              <button onClick={() => { if (confirm(t('cycle.deleteConfirm', { name: cycle.name }))) onDelete(cycle.id) }}
                 style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, cursor: 'pointer', color: '#f87171', padding: '4px 10px', fontSize: 11 }}>
-                Delete
+                {t('delete')}
               </button>
             </div>
           </div>
 
           <div style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>
-              <span>{cycle.done_tasks}/{cycle.total_tasks} done</span>
+              <span>{t('cycle.doneCount', { done: cycle.done_tasks, total: cycle.total_tasks })}</span>
               <span>{progress}%</span>
             </div>
             <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
@@ -213,7 +216,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                   padding: '3px 10px', cursor: 'pointer', fontWeight: 500,
                 }}
               >
-                <BarChart3 size={11} /> Burndown
+                <BarChart3 size={11} /> {t('cycle.burndown')}
               </button>
               {allCycles.length > 1 && (
                 <button
@@ -226,7 +229,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                     padding: '3px 10px', cursor: 'pointer', fontWeight: 500,
                   }}
                 >
-                  <GitCompareArrows size={11} /> Compare
+                  <GitCompareArrows size={11} /> {t('cycle.compare')}
                 </button>
               )}
             </div>
@@ -244,7 +247,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                   onChange={e => { setCompareTarget(e.target.value); setCompareData(null) }}
                   style={{ padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 11, background: '#181818', color: '#fff' }}
                 >
-                  <option value="">Select cycle…</option>
+                  <option value="">{t('cycle.selectCycle')}</option>
                   {allCycles.filter(c => c.id !== cycle.id).map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -264,7 +267,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                     fontSize: 11, fontWeight: 600, cursor: compareTarget ? 'pointer' : 'default',
                   }}
                 >
-                  Compare
+                  {t('cycle.compare')}
                 </button>
               </div>
               <CompareView data={compareData} />
@@ -293,12 +296,12 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
             style={{ fontSize: 11, color: BRAND, background: 'rgba(30,215,96,0.1)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500 }}
           >
             <Plus size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} />
-            Add issues
+            {t('cycle.addIssues')}
           </button>
           {showTaskPicker && (
             <div style={{ marginTop: 8, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, background: '#181818', maxHeight: 180, overflowY: 'auto' }}>
               {availableTasks.length === 0
-                ? <div style={{ padding: '10px 12px', fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>All issues are already in this cycle.</div>
+                ? <div style={{ padding: '10px 12px', fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>{t('cycle.allIssuesInCycle')}</div>
                 : availableTasks.map(t => (
                   <button key={t.id} onClick={() => { onAddTask(cycle.id, t.id); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, color: '#ffffff', cursor: 'pointer' }}>
@@ -320,6 +323,7 @@ export default function CyclePanel({
   createCycleMut, onUpdateCycle, onDeleteCycle, onAddTask, onRemoveTask,
   onCyclesMutated,
 }) {
+  const { t } = useTranslation()
   const handleDuplicate = async (cycleId) => {
     await duplicateCycle(projectId, cycleId)
     onCyclesMutated && onCyclesMutated()
@@ -329,7 +333,7 @@ export default function CyclePanel({
     <div style={{ padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#ffffff' }}>
-          Cycles / Sprints
+          {t('cycle.title')}
         </h2>
         <button
           onClick={() => setShowCycleForm(v => !v)}
@@ -338,7 +342,7 @@ export default function CyclePanel({
             ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700,
           }}
         >
-          <Plus size={13} /> New Cycle
+          {t('cycle.new')}
         </button>
       </div>
 
@@ -349,14 +353,14 @@ export default function CyclePanel({
               autoFocus
               value={newCycle.name}
               onChange={e => setNewCycle(p => ({ ...p, name: e.target.value }))}
-              placeholder="Cycle name *"
+              placeholder={t('cycle.namePlaceholder')}
               style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
             />
             <select value={newCycle.status} onChange={e => setNewCycle(p => ({ ...p, status: e.target.value }))}
               style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }}>
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
+              <option value="draft">{t('cycle.draft')}</option>
+              <option value="active">{t('active')}</option>
+              <option value="completed">{t('cycle.completed')}</option>
             </select>
             <input type="date" value={newCycle.start_date} onChange={e => setNewCycle(p => ({ ...p, start_date: e.target.value }))}
               style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
@@ -368,12 +372,12 @@ export default function CyclePanel({
             <input
               value={newCycle.description}
               onChange={e => setNewCycle(p => ({ ...p, description: e.target.value }))}
-              placeholder="Description (optional)"
+              placeholder={t('cycle.descriptionPlaceholder')}
               style={{ flex: 1, padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
             />
             <button onClick={() => setShowCycleForm(false)}
               style={{ padding: '6px 12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: '#ffffff', fontSize: 12, cursor: 'pointer' }}>
-              Cancel
+              {t('cancel')}
             </button>
             <button
               disabled={!newCycle.name || createCycleMut.isPending}
@@ -391,7 +395,7 @@ export default function CyclePanel({
                 opacity: !newCycle.name ? 0.5 : 1,
               }}
             >
-              {createCycleMut.isPending ? 'Creating…' : 'Create'}
+              {createCycleMut.isPending ? t('creating') : t('create')}
             </button>
           </div>
         </div>
@@ -399,7 +403,7 @@ export default function CyclePanel({
 
       {cycles.length === 0 ? (
         <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
-          No cycles yet. Click "+ New Cycle" to create your first sprint.
+          {t('cycle.noCyclesYet')}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>

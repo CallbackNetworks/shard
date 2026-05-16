@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link2, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { STATUS_COLS, PRIORITY, SHADOW_SM, SHADOW_LG } from '../constants/theme'
 
 function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOverlay }) {
+  const { t } = useTranslation()
   const p = PRIORITY[task.priority] || PRIORITY.medium
   const issueId = `${projectCode}-${task.id.slice(-4).toUpperCase()}`
   const labels = task.labels || []
@@ -68,10 +70,10 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
               onClick={e => e.stopPropagation()}
               style={{ fontSize: 11, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '2px 4px', background: '#1f1f1f', color: '#ffffff' }}
             >
-              <option value="todo">Todo</option>
-              <option value="in_progress">In Progress</option>
-              <option value="done">Done</option>
-              <option value="failed">Failed</option>
+              <option value="todo">{t('todo')}</option>
+              <option value="in_progress">{t('inProgress')}</option>
+              <option value="done">{t('done')}</option>
+              <option value="failed">{t('failed')}</option>
             </select>
             <button
               onClick={() => { if (confirm(`Delete "${task.title}"?`)) onDelete(task.id) }}
@@ -131,13 +133,17 @@ function SortableBoardCard({ task, projectCode, onUpdate, onDelete }) {
 }
 
 function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpdate, onDelete, isOver }) {
+  const { t } = useTranslation()
   const { setNodeRef } = useDroppable({ id: colKey })
+
+  const STATUS_LABEL_KEYS = { todo: 'todo', in_progress: 'inProgress', done: 'done', failed: 'failed' }
+  const translatedLabel = STATUS_LABEL_KEYS[colKey] ? t(STATUS_LABEL_KEYS[colKey]) : colLabel
 
   return (
     <div key={colKey} style={{ width: 258, minWidth: 258, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', marginBottom: 2 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: colColor }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#ffffff' }}>{colLabel}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#ffffff' }}>{translatedLabel}</span>
         <span style={{ marginLeft: 'auto', fontSize: 11, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)', padding: '1px 6px', borderRadius: 10 }}>
           {tasks.length}
         </span>
@@ -169,7 +175,7 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
               padding: '10px 12px', borderRadius: 8,
               border: '1px dashed rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.15)', fontSize: 12, textAlign: 'center',
             }}>
-              No issues
+              {t('board.noIssues')}
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   DndContext,
   PointerSensor,
@@ -16,6 +17,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { BRAND, PRIORITY, STATUS_MAP } from '../constants/theme'
 
 function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
+  const { t } = useTranslation()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const cycle = cycleByTask[task.id]
   const taskLabels = task.labels || []
@@ -42,10 +44,10 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
             padding: '2px 6px', background: '#181818', color: STATUS_MAP[task.status]?.color || '#ffffff',
           }}
         >
-          <option value="todo">Todo</option>
-          <option value="in_progress">In Progress</option>
-          <option value="done">Done</option>
-          <option value="failed">Failed</option>
+          <option value="todo">{t('todo')}</option>
+          <option value="in_progress">{t('inProgress')}</option>
+          <option value="done">{t('done')}</option>
+          <option value="failed">{t('failed')}</option>
         </select>
       </td>
       <td style={tdStyle}>
@@ -58,9 +60,9 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
             color: PRIORITY[task.priority]?.color || '#ffffff',
           }}
         >
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
+          <option value="high">{t('high')}</option>
+          <option value="medium">{t('medium')}</option>
+          <option value="low">{t('low')}</option>
         </select>
       </td>
       <td style={{ ...tdStyle, maxWidth: 320 }}>
@@ -127,6 +129,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
 }
 
 export default function TableView({ tasks, projectId, labels, cycles, onUpdate, onReorder }) {
+  const { t } = useTranslation()
   const [sortKey, setSortKey] = useState('position')
   const [sortDir, setSortDir] = useState('asc')
 
@@ -195,24 +198,24 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate, 
                   title="Drag to reorder (active when sorted by position)">
               </th>
               <th style={thStyle()} onClick={() => toggleSort('status')}>
-                Status <SortIcon k="status" />
+                {t('status')} <SortIcon k="status" />
               </th>
               <th style={thStyle()} onClick={() => toggleSort('priority')}>
-                Priority <SortIcon k="priority" />
+                {t('priority')} <SortIcon k="priority" />
               </th>
               <th style={{ ...thStyle(), minWidth: 200 }} onClick={() => toggleSort('title')}>
                 Title <SortIcon k="title" />
               </th>
               <th style={thStyle()} onClick={() => toggleSort('assignee')}>
-                Assignee <SortIcon k="assignee" />
+                {t('assignee')} <SortIcon k="assignee" />
               </th>
-              <th style={thStyle()}>Labels</th>
-              <th style={thStyle()}>Cycle</th>
+              <th style={thStyle()}>{t('labels')}</th>
+              <th style={thStyle()}>{t('table.cycle')}</th>
               <th style={thStyle()} onClick={() => toggleSort('due_date')}>
-                Due Date <SortIcon k="due_date" />
+                {t('dueDate')} <SortIcon k="due_date" />
               </th>
               <th style={thStyle()} onClick={() => toggleSort('time_spent')}>
-                Time <SortIcon k="time_spent" />
+                {t('table.time')} <SortIcon k="time_spent" />
               </th>
             </tr>
           </thead>
@@ -230,7 +233,7 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate, 
               {sorted.length === 0 && (
                 <tr>
                   <td colSpan={9} style={{ ...tdStyle, textAlign: 'center', color: 'rgba(255,255,255,0.25)', padding: 40 }}>
-                    No issues yet.
+                    {t('table.noIssues')}
                   </td>
                 </tr>
               )}

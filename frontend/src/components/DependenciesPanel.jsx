@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { addDependency, removeDependency } from '../api/client'
 
 export default function DependenciesPanel({ projectId, task, allTasks, depth }) {
+  const { t } = useTranslation()
   const [depInput, setDepInput] = useState('')
   const qc = useQueryClient()
 
@@ -31,10 +33,10 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
       background: 'rgba(255,255,255,0.02)',
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-        Blocked by
+        {t('deps.blockedBy')}
       </div>
       {blockedBy.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginBottom: 8 }}>No blockers.</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginBottom: 8 }}>{t('deps.noBlockers')}</div>
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
           {blockedBy.map(depId => {
@@ -56,12 +58,12 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
           onChange={e => setDepInput(e.target.value)}
           style={{ flex: 1, padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none' }}
         >
-          <option value="">{'\u2014'} pick a blocker task {'\u2014'}</option>
+          <option value="">{t('deps.pickBlocker')}</option>
           {allTasks.filter(t => t.id !== task.id && !blockedBy.includes(t.id)).map(t => (
             <option key={t.id} value={t.id}>{t.title}</option>
           ))}
         </select>
-        <button onClick={handleAdd} disabled={!depInput} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: '#ffa42b', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: depInput ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>Block</button>
+        <button onClick={handleAdd} disabled={!depInput} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: '#ffa42b', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: depInput ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('deps.block')}</button>
       </div>
     </div>
   )

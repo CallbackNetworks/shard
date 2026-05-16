@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { setRecurrence, updateRecurrence, removeRecurrence } from '../api/client'
 
 export default function RecurrencePanel({ projectId, task, depth }) {
+  const { t } = useTranslation()
   const [recurForm, setRecurForm] = useState({
     frequency: 'weekly',
     interval_value: 1,
@@ -30,24 +32,24 @@ export default function RecurrencePanel({ projectId, task, depth }) {
       background: 'rgba(255,255,255,0.02)',
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-        Recurrence
+        {t('recurrence.title')}
       </div>
       {task.recurrence ? (
         <div style={{ fontSize: 12, color: '#b3b3b3' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <span style={{ color: '#1ed760', fontWeight: 600 }}>
-              Repeats {task.recurrence.frequency === 'interval'
+              {t('recurrence.repeats', { frequency: task.recurrence.frequency === 'interval'
                 ? `every ${task.recurrence.interval_value} day(s)`
-                : task.recurrence.frequency}
+                : task.recurrence.frequency })}
             </span>
             <span style={{ color: task.recurrence.active ? '#1ed760' : '#b3b3b3', fontSize: 10 }}>
-              {task.recurrence.active ? '\u25CF Active' : '\u25CB Paused'}
+              {task.recurrence.active ? t('recurrence.active') : t('recurrence.paused')}
             </span>
           </div>
           <div style={{ color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontSize: 11 }}>
-            Next run: {new Date(task.recurrence.next_run_at).toLocaleString()}
+            {t('recurrence.nextRun')} {new Date(task.recurrence.next_run_at).toLocaleString()}
             {task.recurrence.last_run_at && (
-              <> {'\u00B7'} Last ran: {new Date(task.recurrence.last_run_at).toLocaleString()}</>
+              <> {'\u00B7'} {t('recurrence.lastRan')} {new Date(task.recurrence.last_run_at).toLocaleString()}</>
             )}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -58,7 +60,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
               }}
               style={{ padding: '4px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#1ed760', textTransform: 'uppercase', letterSpacing: '1px' }}
             >
-              {task.recurrence.active ? 'Pause' : 'Resume'}
+              {task.recurrence.active ? t('pause') : t('resume')}
             </button>
             <button
               onClick={async () => {
@@ -68,7 +70,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
               }}
               style={{ padding: '4px 14px', border: '1px solid rgba(243,114,127,0.4)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#f3727f', textTransform: 'uppercase', letterSpacing: '1px' }}
             >
-              Remove
+              {t('remove')}
             </button>
           </div>
         </div>
@@ -80,10 +82,10 @@ export default function RecurrencePanel({ projectId, task, depth }) {
               onChange={e => setRecurForm(p => ({ ...p, frequency: e.target.value }))}
               style={inputStyle}
             >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="interval">Every N days</option>
+              <option value="daily">{t('recurrence.daily')}</option>
+              <option value="weekly">{t('recurrence.weekly')}</option>
+              <option value="monthly">{t('recurrence.monthly')}</option>
+              <option value="interval">{t('recurrence.everyNDays')}</option>
             </select>
             {recurForm.frequency === 'interval' && (
               <input
@@ -104,7 +106,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
             onClick={handleCreate}
             style={{ padding: '4px 16px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}
           >
-            Set Recurrence
+            {t('recurrence.setRecurrence')}
           </button>
         </div>
       )}

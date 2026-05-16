@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { X, Paperclip, Download } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getAttachments, uploadAttachment, deleteAttachment, getAttachmentUrl } from '../api/client'
 
 function formatSize(bytes) {
@@ -10,6 +11,7 @@ function formatSize(bytes) {
 }
 
 export default function AttachmentsPanel({ projectId, taskId, depth }) {
+  const { t } = useTranslation()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -53,7 +55,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Attachments
+          {t('attachments.title')}
         </span>
         <input ref={fileRef} type="file" onChange={handleUpload} style={{ display: 'none' }} />
         <button
@@ -65,13 +67,13 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
             background: 'transparent', fontSize: 11, cursor: 'pointer', color: '#b3b3b3', fontWeight: 600,
           }}
         >
-          <Paperclip size={10} /> {uploading ? 'Uploading\u2026' : 'Add file'}
+          <Paperclip size={10} /> {uploading ? t('attachments.uploading') : t('attachments.addFile')}
         </button>
       </div>
       {loading ? (
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>Loading{'\u2026'}</div>
       ) : files.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>No attachments.</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>{t('attachments.noAttachments')}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {files.map(f => (

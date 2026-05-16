@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { getTemplates } from '../api/client'
 import { BRAND, INSET_SHADOW } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
@@ -10,6 +11,7 @@ const input = {
 }
 
 export default function TaskCreateForm({ showForm, newTask, setNewTask, createMut, labels, onCancel, projectId }) {
+  const { t } = useTranslation()
   const { data: templates = [] } = useQuery({
     queryKey: ['templates', projectId],
     queryFn: () => getTemplates(projectId),
@@ -38,7 +40,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
             onChange={e => { if (e.target.value) applyTemplate(e.target.value); e.target.value = '' }}
             style={{ ...input, fontSize: 11, color: '#b3b3b3' }}
           >
-            <option value="" disabled>Template...</option>
+            <option value="" disabled>{t('taskCreate.templatePlaceholder')}</option>
             {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         )}
@@ -46,7 +48,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
           autoFocus
           value={newTask.title}
           onChange={e => setNewTask(p => ({ ...p, title: e.target.value }))}
-          placeholder="Issue title *"
+          placeholder={t('taskCreate.issueTitlePlaceholder')}
           onKeyDown={e => e.key === 'Enter' && newTask.title && createMut.mutate(newTask)}
           style={{ ...input, flex: '1 1 200px' }}
         />
@@ -69,7 +71,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
           style={{ ...input }} />
         <button onClick={onCancel}
           style={{ padding: '7px 16px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', color: '#ffffff', fontSize: 12, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Cancel
+          {t('cancel')}
         </button>
         <button
           disabled={!newTask.title || createMut.isPending}
@@ -80,7 +82,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
             opacity: !newTask.title ? 0.5 : 1, textTransform: 'uppercase', letterSpacing: '1.4px',
           }}
         >
-          {createMut.isPending ? 'Creating…' : 'Create'}
+          {createMut.isPending ? t('creating') : t('create')}
         </button>
       </div>
       <div style={{ marginTop: 8 }}>

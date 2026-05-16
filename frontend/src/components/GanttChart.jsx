@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { STATUS_MAP } from '../constants/theme'
 const STATUS_COLOR = Object.fromEntries(Object.entries(STATUS_MAP).map(([k, v]) => [k, v.color]))
 
@@ -10,13 +11,14 @@ function fmtDate(date) {
 }
 
 const ZOOM_LEVELS = [
-  { label: 'Day', days: 14 },
-  { label: 'Week', days: 56 },
-  { label: 'Month', days: 120 },
-  { label: 'Auto', days: 0 },
+  { labelKey: 'gantt.day', days: 14 },
+  { labelKey: 'gantt.week', days: 56 },
+  { labelKey: 'gantt.month', days: 120 },
+  { labelKey: 'gantt.auto', days: 0 },
 ]
 
 export default function GanttChart({ tasks }) {
+  const { t } = useTranslation()
   const [zoom, setZoom] = useState(3) // default Auto
 
   const today = new Date()
@@ -93,10 +95,10 @@ export default function GanttChart({ tasks }) {
     <div style={{ overflow: 'auto', minHeight: 200 }}>
       {/* Zoom controls */}
       <div style={{ display: 'flex', gap: 4, padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginRight: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zoom:</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginRight: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('gantt.zoom')}</span>
         {ZOOM_LEVELS.map((z, i) => (
           <button
-            key={z.label}
+            key={z.labelKey}
             onClick={() => setZoom(i)}
             style={{
               padding: '3px 10px', borderRadius: 9999, fontSize: 11, cursor: 'pointer',
@@ -106,7 +108,7 @@ export default function GanttChart({ tasks }) {
               fontWeight: zoom === i ? 700 : 400,
             }}
           >
-            {z.label}
+            {t(z.labelKey)}
           </button>
         ))}
       </div>
@@ -121,7 +123,7 @@ export default function GanttChart({ tasks }) {
           padding: '8px 16px', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)',
           borderRight: '1px solid rgba(255,255,255,0.05)',
         }}>
-          ISSUE
+          {t('gantt.issue')}
         </div>
         <div style={{ flex: 1, position: 'relative', height: 33, minWidth: 400 }}>
           {weeks.map((week, i) => {
@@ -142,7 +144,7 @@ export default function GanttChart({ tasks }) {
           })}
           <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 4 }}>
             <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700, marginLeft: 3, whiteSpace: 'nowrap' }}>
-              Today
+              {t('gantt.today')}
             </span>
           </div>
         </div>
@@ -151,7 +153,7 @@ export default function GanttChart({ tasks }) {
       {/* Rows */}
       {visibleTasks.length === 0 ? (
         <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
-          No issues yet
+          {t('gantt.noIssues')}
         </div>
       ) : (
         <div style={{ position: 'relative' }}>
@@ -246,15 +248,18 @@ export default function GanttChart({ tasks }) {
 
       {/* Legend */}
       <div style={{ display: 'flex', gap: 16, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-        {Object.entries(STATUS_COLOR).map(([s, c]) => (
-          <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />
-            {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
-          </span>
-        ))}
+        {Object.entries(STATUS_COLOR).map(([s, c]) => {
+          const STATUS_LEGEND_KEYS = { todo: 'todo', in_progress: 'inProgress', done: 'done', failed: 'failed' }
+          return (
+            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />
+              {STATUS_LEGEND_KEYS[s] ? t(STATUS_LEGEND_KEYS[s]) : s.charAt(0).toUpperCase() + s.slice(1)}
+            </span>
+          )
+        })}
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
           <span style={{ width: 10, height: 10, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'inline-block' }} />
-          No dates
+          {t('gantt.noDates')}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
           <svg width="16" height="10"><line x1="0" y1="5" x2="16" y2="5" stroke="#ffa42b" strokeWidth="1.5" strokeDasharray="4 2" opacity="0.5" /></svg>

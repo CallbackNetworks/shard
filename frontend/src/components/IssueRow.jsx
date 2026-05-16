@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { regenerateToken } from '../api/client'
 import { PRIORITY, STATUS_MAP } from '../constants/theme'
 import { PriorityIcon, StatusIcon, LabelChip } from './TaskIcons'
@@ -27,6 +28,7 @@ export default function IssueRow({
   const [showRecurrence, setShowRecurrence] = useState(false)
   const [showAttachments, setShowAttachments] = useState(false)
 
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const regenMut = useMutation({
     mutationFn: () => regenerateToken(projectId, task.id),
@@ -125,7 +127,7 @@ export default function IssueRow({
             fontSize: 10, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)',
             padding: '1px 6px', borderRadius: 10, flexShrink: 0, whiteSpace: 'nowrap',
           }}>
-            {subtaskCount} sub
+            {subtaskCount} {t('issue.subtask')}
           </span>
         )}
 
@@ -133,7 +135,7 @@ export default function IssueRow({
         {task.recurrence && (
           <span
             onClick={(e) => { e.stopPropagation(); setShowRecurrence(v => !v) }}
-            title={`Repeats ${task.recurrence.frequency}`}
+            title={t('recurrence.repeats', { frequency: task.recurrence.frequency })}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               fontSize: 10, color: showRecurrence ? '#1ed760' : 'rgba(255,255,255,0.3)',
@@ -151,7 +153,7 @@ export default function IssueRow({
             border: '1px solid rgba(255,164,43,0.3)', padding: '1px 7px', borderRadius: 9999,
             flexShrink: 0, whiteSpace: 'nowrap', fontWeight: 600,
           }}>
-            blocked
+            {t('issue.blocked')}
           </span>
         )}
 
@@ -234,7 +236,7 @@ export default function IssueRow({
                 <Plus size={12} />
               </button>
             )}
-            <button onClick={() => { if (confirm(`Delete "${task.title}"?`)) onDelete(task.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(243,114,127,0.7)', padding: '2px 5px', borderRadius: 4 }}>
+            <button onClick={() => { if (confirm(t('issue.deleteConfirm', { title: task.title }))) onDelete(task.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(243,114,127,0.7)', padding: '2px 5px', borderRadius: 4 }}>
               <Trash2 size={12} />
             </button>
           </div>
@@ -292,11 +294,11 @@ export default function IssueRow({
             value={subtaskTitle}
             onChange={e => setSubtaskTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleCreateSubtask(); if (e.key === 'Escape') setShowSubtaskForm(false) }}
-            placeholder={'Subtask title\u2026'}
+            placeholder={t('issue.subtaskTitlePlaceholder')}
             style={{ flex: 1, padding: '4px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
           />
-          <button onClick={handleCreateSubtask} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Add</button>
-          <button onClick={() => setShowSubtaskForm(false)} style={{ padding: '4px 12px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px' }}>Cancel</button>
+          <button onClick={handleCreateSubtask} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('add')}</button>
+          <button onClick={() => setShowSubtaskForm(false)} style={{ padding: '4px 12px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
         </div>
       )}
 

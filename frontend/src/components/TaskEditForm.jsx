@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { INSET_SHADOW } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
 
@@ -11,6 +12,7 @@ const darkInput = {
 }
 
 export default function TaskEditForm({ task, depth, onSave, onCancel }) {
+  const { t } = useTranslation()
   const [editData, setEditData] = useState({
     title: task.title,
     description: task.description || '',
@@ -43,32 +45,32 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
             autoFocus
             value={editData.title}
             onChange={e => setEditData(p => ({ ...p, title: e.target.value }))}
-            placeholder="Issue title"
+            placeholder={t('taskEdit.issueTitlePlaceholder')}
             style={{ ...darkInput, flex: '1 1 200px', fontSize: 13 }}
           />
           <select value={editData.status} onChange={e => setEditData(p => ({ ...p, status: e.target.value }))}
             style={{ ...darkInput }}>
-            <option value="todo">Todo</option>
-            <option value="in_progress">In Progress</option>
-            <option value="done">Done</option>
-            <option value="failed">Failed</option>
+            <option value="todo">{t('todo')}</option>
+            <option value="in_progress">{t('inProgress')}</option>
+            <option value="done">{t('done')}</option>
+            <option value="failed">{t('failed')}</option>
           </select>
           <select value={editData.priority} onChange={e => setEditData(p => ({ ...p, priority: e.target.value }))}
             style={{ ...darkInput }}>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
+            <option value="high">{t('high')}</option>
+            <option value="medium">{t('medium')}</option>
+            <option value="low">{t('low')}</option>
           </select>
           <input type="date" value={editData.start_date} onChange={e => setEditData(p => ({ ...p, start_date: e.target.value }))}
             style={{ ...darkInput }} />
           <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>{'\u2192'}</span>
           <input type="date" value={editData.due_date} onChange={e => setEditData(p => ({ ...p, due_date: e.target.value }))}
             style={{ ...darkInput }} />
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>Est:</span>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{t('taskEdit.estimated')}</span>
           <input type="number" min="0" placeholder="min" value={editData.time_estimate}
             onChange={e => setEditData(p => ({ ...p, time_estimate: e.target.value }))}
             style={{ ...darkInput, width: 70 }} />
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>Spent:</span>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{t('taskEdit.spent')}</span>
           <input type="number" min="0" placeholder="min" value={editData.time_spent}
             onChange={e => setEditData(p => ({ ...p, time_spent: e.target.value }))}
             style={{ ...darkInput, width: 70 }} />
@@ -77,13 +79,13 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
           <MarkdownEditor
             value={editData.description}
             onChange={(val) => setEditData(p => ({ ...p, description: val }))}
-            placeholder="Description (optional, supports Markdown)"
+            placeholder={t('taskEdit.descriptionPlaceholder')}
             minHeight={80}
           />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button onClick={onCancel} style={{ padding: '5px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px' }}>Cancel</button>
-          <button onClick={handleSave} style={{ padding: '5px 16px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Save</button>
+          <button onClick={onCancel} style={{ padding: '5px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
+          <button onClick={handleSave} style={{ padding: '5px 16px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('save')}</button>
         </div>
       </div>
     </div>
