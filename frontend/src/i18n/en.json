@@ -421,5 +421,20 @@
   "attachments.uploading": "Uploading…",
   "attachments.noAttachments": "No attachments.",
 
-  "projectCard.tasksDone": "{{done}}/{{total}} tasks done"
+  "projectCard.tasksDone": "{{done}}/{{total}} tasks done",
+
+  "agent.label": "Agent",
+  "agent.assignment": "Agent Assignment",
+  "agent.none": "No agent",
+  "agent.assign": "Assign to agent",
+  "agent.unassign": "Unassign agent",
+  "agent.workload": "Agent Workload",
+  "agent.tasks": "Agent Tasks",
+  "agent.active": "Active",
+  "agent.inactive": "Inactive",
+  "agent.lastSeen": "Last seen",
+  "agent.taskCount": "{{count}} tasks",
+  "agent.noTasks": "No tasks assigned to agents",
+  "agent.selfAssigned": "Self-assigned",
+  "agent.noAgents": "No agents configured"
 }

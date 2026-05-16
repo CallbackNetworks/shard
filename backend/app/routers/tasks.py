@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Task, TaskDependency
+from app.models import Project, Task, TaskDependency, ApiKey
 from app.schemas import TaskCreate, TaskUpdate, TaskOut, ReorderRequest
 from app.services.activity import log_activity
 from app.services.rules_engine import run_rules
@@ -62,6 +62,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     old_status = task.status
     old_priority = task.priority
     old_assignee = task.assignee
+    old_agent_key_id = task.assigned_agent_key_id
 
     for field, value in changes.items():
         setattr(task, field, value)
@@ -91,6 +92,25 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
             actor=changes["assignee"],
             detail=f'Task "{task.title}" assigned to {changes["assignee"] or "unassigned"}',
             meta={"old_assignee": old_assignee, "new_assignee": changes["assignee"]},
+        )
+
+    # Log agent assignment change
+    if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] != old_agent_key_id:
+        new_key_id = changes["assigned_agent_key_id"]
+        agent_name = None
+        if new_key_id:
+            agent_key = db.query(ApiKey).filter(ApiKey.id == new_key_id).first()
+            if not agent_key:
+                raise HTTPException(status_code=400, detail="Agent API key not found")
+            if not agent_key.active:
+                raise HTTPException(status_code=400, detail="Agent API key is inactive")
+            agent_name = agent_key.name
+        log_activity(
+            db, "task.agent_assigned",
+            project_id=project_id, task_id=task_id,
+            actor=agent_name or "system",
+            detail=f'Task "{task.title}" agent assignment changed to {agent_name or "none"}',
+            meta={"agent_name": agent_name},
         )
 
     db.commit()

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link2, Trash2 } from 'lucide-react'
+import { Link2, Trash2, Bot } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DndContext,
@@ -44,7 +44,20 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
           ))}
         </div>
       )}
-      {task.assignee && (
+      {task.assigned_agent_name && (
+        <div style={{ fontSize: 11, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
+            background: 'rgba(129,140,248,0.12)', color: '#818cf8',
+            border: '1px solid rgba(129,140,248,0.25)',
+          }}>
+            <Bot size={9} />
+            {task.assigned_agent_name}
+          </span>
+        </div>
+      )}
+      {!task.assigned_agent_name && task.assignee && (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
           <span style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
             {task.assignee.charAt(0).toUpperCase()}

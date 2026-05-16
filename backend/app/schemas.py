@@ -89,6 +89,7 @@ class TaskCreate(BaseModel):
     description: str | None = Field(None, description="Optional task description")
     priority: Literal["low", "medium", "high"] = Field("medium", description="Task priority: low, medium, or high")
     assignee: str | None = Field(None, description="Name of the person assigned to this task")
+    assigned_agent_key_id: str | None = Field(None, description="API key ID of the agent to assign this task to")
     start_date: datetime | None = Field(None, description="Task start date (ISO 8601)")
     due_date: datetime | None = Field(None, description="Task due date (ISO 8601)")
     parent_id: str | None = Field(None, description="Parent task ID for subtasks")
@@ -102,6 +103,7 @@ class TaskUpdate(BaseModel):
     status: Literal["todo", "in_progress", "done", "failed"] | None = Field(None, description="Task status: todo, in_progress, done, or failed")
     priority: Literal["low", "medium", "high"] | None = Field(None, description="Task priority: low, medium, or high")
     assignee: str | None = Field(None, description="Name of the person assigned to this task")
+    assigned_agent_key_id: str | None = Field(None, description="API key ID of the agent to assign this task to (null to unassign)")
     start_date: datetime | None = Field(None, description="Task start date (ISO 8601)")
     due_date: datetime | None = Field(None, description="Task due date (ISO 8601)")
     parent_id: str | None = Field(None, description="Parent task ID for subtasks")
@@ -120,6 +122,8 @@ class TaskOut(BaseModel):
     status: str
     priority: str
     assignee: str | None = None
+    assigned_agent_key_id: str | None = None
+    assigned_agent_name: str | None = None
     callback_token: str
     start_date: datetime | None
     due_date: datetime | None
@@ -323,6 +327,18 @@ class ApiKeyOut(BaseModel):
 
 class ApiKeyCreateOut(ApiKeyOut):
     key: str = ""    # full key shown once at creation
+
+
+# --- Agent Task Summary ---
+
+class AgentTaskSummary(BaseModel):
+    agent_id: str
+    agent_name: str
+    project_id: str | None
+    active: bool
+    last_used_at: datetime | None
+    task_counts: dict  # {"todo": N, "in_progress": N, "done": N, "failed": N}
+    tasks: list[TaskOut] = []
 
 
 # --- Assistant ---

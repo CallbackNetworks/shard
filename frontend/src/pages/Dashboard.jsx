@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity } from '../api/client'
+import AgentTasksPanel from '../components/AgentTasksPanel'
 import { BRAND, STATUS_MAP, PRIORITY, DARK, SHADOW_SM, INSET_SHADOW } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 
@@ -833,6 +834,9 @@ export default function Dashboard() {
           <GettingStarted onNewProject={() => setShowForm(true)} isMobile={isMobile} />
         ) : (
           <>
+            {/* Agent Workload panel */}
+            <AgentTasksPanel />
+
             {/* Due Soon panel */}
             <DueSoonPanel projects={projects} />
 

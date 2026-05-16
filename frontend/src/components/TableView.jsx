@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Bot } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -97,6 +98,19 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
             }}>{lb.name}</span>
           ))}
         </div>
+      </td>
+      <td style={tdStyle}>
+        {task.assigned_agent_name ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
+            background: 'rgba(129,140,248,0.12)', color: '#818cf8',
+            border: '1px solid rgba(129,140,248,0.25)', whiteSpace: 'nowrap',
+          }}>
+            <Bot size={9} />
+            {task.assigned_agent_name}
+          </span>
+        ) : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>}
       </td>
       <td style={tdStyle}>
         {cycle ? (
@@ -210,6 +224,7 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate, 
                 {t('assignee')} <SortIcon k="assignee" />
               </th>
               <th style={thStyle()}>{t('labels')}</th>
+              <th style={thStyle()}>{t('agent.label')}</th>
               <th style={thStyle()}>{t('table.cycle')}</th>
               <th style={thStyle()} onClick={() => toggleSort('due_date')}>
                 {t('dueDate')} <SortIcon k="due_date" />
@@ -232,7 +247,7 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate, 
               ))}
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ ...tdStyle, textAlign: 'center', color: 'rgba(255,255,255,0.25)', padding: 40 }}>
+                  <td colSpan={10} style={{ ...tdStyle, textAlign: 'center', color: 'rgba(255,255,255,0.25)', padding: 40 }}>
                     {t('table.noIssues')}
                   </td>
                 </tr>

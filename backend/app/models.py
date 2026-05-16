@@ -43,6 +43,9 @@ class Task(Base):
     )
     callback_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
     assignee: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    assigned_agent_key_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True
+    )
     start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -70,6 +73,9 @@ class Task(Base):
     blocking_deps: Mapped[list["TaskDependency"]] = relationship(
         "TaskDependency", back_populates="depends_on",
         cascade="all, delete-orphan", foreign_keys="TaskDependency.depends_on_id",
+    )
+    assigned_agent: Mapped["ApiKey | None"] = relationship(
+        "ApiKey", foreign_keys=[assigned_agent_key_id]
     )
 
 

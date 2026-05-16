@@ -73,6 +73,7 @@ export const getApiKeys = () => api.get('/api-keys').then(r => r.data)
 export const createApiKey = (data) => api.post('/api-keys', data).then(r => r.data)
 export const updateApiKey = (id, data) => api.patch(`/api-keys/${id}`, data).then(r => r.data)
 export const deleteApiKey = (id) => api.delete(`/api-keys/${id}`)
+export const getAgentSummary = () => api.get('/api-keys/agents/summary').then(r => r.data)
 
 // Identities
 export const getIdentities = () => api.get('/identities').then(r => r.data)

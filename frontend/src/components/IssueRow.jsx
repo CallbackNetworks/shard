@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip } from 'lucide-react'
+import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { regenerateToken } from '../api/client'
 import { PRIORITY, STATUS_MAP } from '../constants/theme'
@@ -168,6 +168,19 @@ export default function IssueRow({
             }}
           >
             <MessageSquare size={10} />{task.comment_count}
+          </span>
+        )}
+
+        {/* Agent badge */}
+        {task.assigned_agent_name && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
+            background: 'rgba(129,140,248,0.12)', color: '#818cf8',
+            border: '1px solid rgba(129,140,248,0.25)', flexShrink: 0, whiteSpace: 'nowrap',
+          }}>
+            <Bot size={9} />
+            {task.assigned_agent_name}
           </span>
         )}
 

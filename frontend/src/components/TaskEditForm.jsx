@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { INSET_SHADOW } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
+import { getApiKeys } from '../api/client'
 
 const darkInput = {
   background: '#1f1f1f',
@@ -13,6 +15,9 @@ const darkInput = {
 
 export default function TaskEditForm({ task, depth, onSave, onCancel }) {
   const { t } = useTranslation()
+  const { data: apiKeys = [] } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys })
+  const activeKeys = apiKeys.filter(k => k.active)
+
   const [editData, setEditData] = useState({
     title: task.title,
     description: task.description || '',
@@ -22,6 +27,7 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
     due_date: task.due_date ? task.due_date.split('T')[0] : '',
     time_estimate: task.time_estimate || '',
     time_spent: task.time_spent || '',
+    assigned_agent_key_id: task.assigned_agent_key_id || '',
   })
 
   const handleSave = () => {
@@ -33,6 +39,8 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
     if (!data.description) delete data.description
     data.time_estimate = data.time_estimate ? parseInt(data.time_estimate) : null
     data.time_spent = data.time_spent ? parseInt(data.time_spent) : null
+    // empty string means "unassign" — send null
+    if (data.assigned_agent_key_id === '') data.assigned_agent_key_id = null
     onSave(task.id, data)
     onCancel()
   }
@@ -74,6 +82,16 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
           <input type="number" min="0" placeholder="min" value={editData.time_spent}
             onChange={e => setEditData(p => ({ ...p, time_spent: e.target.value }))}
             style={{ ...darkInput, width: 70 }} />
+          {activeKeys.length > 0 && (
+            <select
+              value={editData.assigned_agent_key_id}
+              onChange={e => setEditData(p => ({ ...p, assigned_agent_key_id: e.target.value }))}
+              style={{ ...darkInput, fontSize: 11, color: editData.assigned_agent_key_id ? '#818cf8' : '#b3b3b3' }}
+            >
+              <option value="">{t('agent.none')}</option>
+              {activeKeys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          )}
         </div>
         <div style={{ marginTop: 8 }}>
           <MarkdownEditor

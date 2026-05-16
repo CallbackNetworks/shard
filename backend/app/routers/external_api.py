@@ -96,6 +96,8 @@ def _enrich_task_for_search(task: Task) -> dict:
     out.comment_count = len(task.comments)
     out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
     out.blocking = [d.task_id for d in task.blocking_deps]
+    if task.assigned_agent is not None:
+        out.assigned_agent_name = task.assigned_agent.name
     return out.model_dump()
 
 

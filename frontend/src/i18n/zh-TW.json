@@ -421,5 +421,20 @@
   "attachments.uploading": "上傳中…",
   "attachments.noAttachments": "沒有附件。",
 
-  "projectCard.tasksDone": "{{done}}/{{total}} 任務完成"
+  "projectCard.tasksDone": "{{done}}/{{total}} 任務完成",
+
+  "agent.label": "代理",
+  "agent.assignment": "代理指派",
+  "agent.none": "無代理",
+  "agent.assign": "指派給代理",
+  "agent.unassign": "取消代理指派",
+  "agent.workload": "代理工作量",
+  "agent.tasks": "代理任務",
+  "agent.active": "活躍",
+  "agent.inactive": "停用",
+  "agent.lastSeen": "最後活動",
+  "agent.taskCount": "{{count}} 個任務",
+  "agent.noTasks": "尚無任務指派給代理",
+  "agent.selfAssigned": "自行認領",
+  "agent.noAgents": "尚未設定代理"
 }

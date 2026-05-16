@@ -133,6 +133,7 @@ export default function ProjectDetail() {
   const [filterLabel, setFilterLabel] = useState('all')
   const [filterAssignee, setFilterAssignee] = useState('all')
   const [filterDue, setFilterDue] = useState('all')
+  const [filterAgent, setFilterAgent] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [newTask, setNewTask] = useState({
@@ -248,12 +249,15 @@ export default function ProjectDetail() {
   const projectCode = project?.name?.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'TSK'
   const assignees = [...new Set(tasks.map(t => t.assignee).filter(Boolean))].sort()
 
+  const agentNames = [...new Set(tasks.map(t => t.assigned_agent_name).filter(Boolean))].sort()
+
   const applyFilters = (list) => {
     let result = list
     if (filter !== 'all') result = result.filter(t => t.status === filter)
     if (filterPriority !== 'all') result = result.filter(t => t.priority === filterPriority)
     if (filterLabel !== 'all') result = result.filter(t => (t.labels || []).some(l => l.id === filterLabel))
     if (filterAssignee !== 'all') result = result.filter(t => t.assignee === filterAssignee)
+    if (filterAgent !== 'all') result = result.filter(t => t.assigned_agent_name === filterAgent)
     if (filterDue === 'overdue') result = result.filter(t => t.due_date && new Date(t.due_date) < new Date())
     else if (filterDue === 'this_week') {
       const now = new Date(); const end = new Date(); end.setDate(now.getDate() + 7)
@@ -262,7 +266,7 @@ export default function ProjectDetail() {
     return result
   }
 
-  const activeFilterCount = [filterPriority, filterLabel, filterAssignee, filterDue].filter(f => f !== 'all').length
+  const activeFilterCount = [filterPriority, filterLabel, filterAssignee, filterDue, filterAgent].filter(f => f !== 'all').length
 
   const searchFiltered = searchQ.trim()
     ? tasks.filter(t =>
@@ -502,9 +506,16 @@ export default function ProjectDetail() {
                   <option value="this_week">This week</option>
                   <option value="no_date">No date</option>
                 </select>
+                {agentNames.length > 0 && (
+                  <select value={filterAgent} onChange={e => setFilterAgent(e.target.value)}
+                    style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterAgent !== 'all' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.05)', color: filterAgent !== 'all' ? '#818cf8' : '#ffffff', outline: 'none' }}>
+                    <option value="all">Agent: All</option>
+                    {agentNames.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                )}
                 {activeFilterCount > 0 && (
                   <button
-                    onClick={() => { setFilterPriority('all'); setFilterLabel('all'); setFilterAssignee('all'); setFilterDue('all') }}
+                    onClick={() => { setFilterPriority('all'); setFilterLabel('all'); setFilterAssignee('all'); setFilterDue('all'); setFilterAgent('all') }}
                     style={{ padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(243,114,127,0.3)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: '#f3727f', fontWeight: 600 }}
                   >
                     Clear all

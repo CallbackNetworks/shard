@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getTemplates } from '../api/client'
+import { getTemplates, getApiKeys } from '../api/client'
 import { BRAND, INSET_SHADOW } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
 
@@ -17,6 +17,8 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
     queryFn: () => getTemplates(projectId),
     enabled: showForm,
   })
+  const { data: apiKeys = [] } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys, enabled: showForm })
+  const activeKeys = apiKeys.filter(k => k.active)
 
   const applyTemplate = (tplId) => {
     const tpl = templates.find(t => t.id === tplId)
@@ -64,6 +66,16 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
           placeholder="Assignee"
           style={{ ...input, width: 100 }}
         />
+        {activeKeys.length > 0 && (
+          <select
+            value={newTask.assigned_agent_key_id || ''}
+            onChange={e => setNewTask(p => ({ ...p, assigned_agent_key_id: e.target.value || null }))}
+            style={{ ...input, fontSize: 11, color: newTask.assigned_agent_key_id ? '#818cf8' : '#b3b3b3' }}
+          >
+            <option value="">{t('agent.none')}</option>
+            {activeKeys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+          </select>
+        )}
         <input type="date" value={newTask.start_date} onChange={e => setNewTask(p => ({ ...p, start_date: e.target.value }))}
           style={{ ...input }} />
         <span style={{ color: '#b3b3b3', fontSize: 12 }}>→</span>

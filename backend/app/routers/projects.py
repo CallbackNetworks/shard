@@ -17,6 +17,8 @@ def _enrich_task(task, db=None) -> TaskOut:
     out.comment_count = len(task.comments)
     out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
     out.blocking = [d.task_id for d in task.blocking_deps]
+    if task.assigned_agent is not None:
+        out.assigned_agent_name = task.assigned_agent.name
     if db is not None:
         rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task.id).first()
         out.recurrence = RecurrenceRuleOut.model_validate(rule) if rule else None
