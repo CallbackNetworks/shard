@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Play, X, Zap } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Plus, Trash2, Play, X, Zap, GitMerge } from 'lucide-react'
 import axios from 'axios'
 
 const _api = axios.create({ baseURL: '' })
@@ -150,6 +151,7 @@ function RuleModal({ initial, onSave, onClose }) {
 }
 
 export default function WorkflowRules() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: rules = [], isLoading } = useQuery({ queryKey: ['workflow-rules'], queryFn: getRules })
   const [modal, setModal] = useState(null)
@@ -200,15 +202,27 @@ export default function WorkflowRules() {
       {isLoading ? (
         <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Loading…</div>
       ) : rules.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.15)' }}>
-          <Zap size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <p style={{ fontSize: 16 }}>No rules yet</p>
-          <p style={{ marginTop: 8, fontSize: 13 }}>Create your first automation rule to get started</p>
+        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.2)', animation: 'fadeIn 0.4s ease' }}>
+          <GitMerge size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: '#818cf8' }} />
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{t('rules.empty')}</p>
+          <p style={{ marginTop: 6, fontSize: 13 }}>{t('rules.emptyHint')}</p>
+          <button
+            onClick={() => setModal({ mode: 'create' })}
+            style={{ marginTop: 16, ...btn('primary'), display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Plus size={13} /> {t('rules.new')}
+          </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {rules.map(rule => (
-            <div key={rule.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '14px 18px' }}>
+          {rules.map((rule, ruleIdx) => (
+            <div key={rule.id} style={{
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 10, padding: '14px 18px',
+              animation: 'fadeUpIn 0.35s ease forwards',
+              animationDelay: `${ruleIdx * 0.06}s`,
+              opacity: 0,
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>

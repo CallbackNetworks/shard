@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, FolderOpen, Archive, Clock, User, Activity } from 'lucide-react'
+import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity } from '../api/client'
 import { BRAND, STATUS_MAP, PRIORITY, DARK, SHADOW_SM, INSET_SHADOW } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -215,7 +215,7 @@ function ActivityFeed({ activities }) {
   )
 }
 
-/* ── My Work ──────────────────────────────────────────────────────── */
+/* ── Task row (reused in Due Soon section) ────────────────────────── */
 function TaskRow({ t: task, i, total, onClick }) {
   const [hov, setHov] = useState(false)
   const sc = STATUS_MAP[task.status]?.color || DARK.textMid
@@ -229,8 +229,9 @@ function TaskRow({ t: task, i, total, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
         padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
-        background: hov ? 'rgba(255,255,255,0.05)' : 'transparent',
+        background: overdue ? 'rgba(248,113,113,0.06)' : hov ? 'rgba(255,255,255,0.05)' : 'transparent',
         borderBottom: i < total - 1 ? `1px solid ${DARK.border}` : 'none',
+        borderLeft: overdue ? '2px solid #f87171' : '2px solid transparent',
         transition: 'background 0.12s',
       }}
     >
@@ -261,6 +262,236 @@ function TaskRow({ t: task, i, total, onClick }) {
   )
 }
 
+/* ── Sparkline SVG ────────────────────────────────────────────────── */
+function computeSparkline(activities) {
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (6 - i))
+    return d.toDateString()
+  })
+  return days.map(day =>
+    activities.filter(a =>
+      a.action === 'task.status_changed' &&
+      a.detail?.includes('done') &&
+      new Date(a.created_at).toDateString() === day
+    ).length
+  )
+}
+
+function Sparkline({ activities }) {
+  const sparkData = computeSparkline(activities)
+  const maxVal = Math.max(...sparkData, 1)
+  const points = sparkData.map((v, i) =>
+    `${(i / 6) * 76 + 2},${22 - (v / maxVal) * 20}`
+  ).join(' ')
+  return (
+    <svg width={80} height={24} style={{ display: 'block', marginTop: 6 }}>
+      <polyline
+        points={points}
+        fill="none"
+        stroke={BRAND}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/* ── Summary stat cards ───────────────────────────────────────────── */
+function StatCards({ projects, activities }) {
+  const { t } = useTranslation()
+
+  const allTasks = projects.flatMap(p => p.tasks || [])
+  const totalTasks = allTasks.length
+  const doneTasks = allTasks.filter(task => task.status === 'done').length
+  const overdueTasks = allTasks.filter(task =>
+    task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
+  ).length
+  const completionRate = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0
+
+  const today = new Date().toDateString()
+  const completedToday = activities.filter(a =>
+    a.action === 'task.status_changed' &&
+    a.detail?.includes('done') &&
+    new Date(a.created_at).toDateString() === today
+  ).length
+
+  const cards = [
+    {
+      label: t('dashboard.totalTasks'),
+      value: totalTasks,
+      color: '#ffffff',
+      delay: 0,
+    },
+    {
+      label: t('dashboard.completedToday'),
+      value: completedToday,
+      color: '#1ed760',
+      delay: 0.06,
+    },
+    {
+      label: t('dashboard.overdueCount'),
+      value: overdueTasks,
+      color: overdueTasks > 0 ? '#f87171' : '#ffffff',
+      delay: 0.12,
+    },
+    {
+      label: t('dashboard.completionRate'),
+      value: `${completionRate}%`,
+      color: completionRate === 100 ? BRAND : '#ffffff',
+      delay: 0.18,
+      sparkline: true,
+    },
+  ]
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+      gap: 10,
+      padding: '0 24px 16px',
+    }}>
+      {cards.map((card, idx) => (
+        <div
+          key={idx}
+          style={{
+            background: DARK.surface,
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 8,
+            padding: '14px 16px',
+            animation: 'fadeUpIn 0.35s ease forwards',
+            animationDelay: `${card.delay}s`,
+            opacity: 0,
+          }}
+        >
+          <div style={{ fontSize: 11, color: DARK.textDim, marginBottom: 4 }}>{card.label}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: card.color }}>{card.value}</div>
+          {card.sparkline && <Sparkline activities={activities} />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ── Due Soon panel ───────────────────────────────────────────────── */
+function DueSoonPanel({ projects }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(true)
+
+  const now = new Date()
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const dueSoonTasks = projects.flatMap(p =>
+    (p.tasks || [])
+      .filter(task => task.due_date && task.status !== 'done' && new Date(task.due_date) <= nextWeek)
+      .map(task => ({ ...task, projectName: p.name, projectId: p.id }))
+  ).sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+
+  if (dueSoonTasks.length === 0) return null
+
+  return (
+    <div style={{
+      background: DARK.surface,
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 8,
+      marginBottom: 16,
+      overflow: 'hidden',
+      animation: 'fadeUpIn 0.3s ease forwards',
+      animationDelay: '0.1s',
+      opacity: 0,
+    }}>
+      <button
+        onClick={() => setCollapsed(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          width: '100%', padding: '10px 14px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: DARK.textMid,
+        }}
+      >
+        <Clock size={13} color="#ffa42b" />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', flex: 1, textAlign: 'left' }}>
+          {t('dashboard.dueSoon')}
+        </span>
+        <span style={{
+          fontSize: 10, padding: '1px 7px', borderRadius: 9999, fontWeight: 700,
+          background: 'rgba(255,164,43,0.15)', color: '#ffa42b',
+          border: '1px solid rgba(255,164,43,0.3)',
+        }}>
+          {dueSoonTasks.length}
+        </span>
+        {collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+      </button>
+
+      {!collapsed && (
+        <div style={{ maxHeight: 180, overflowY: 'auto', padding: '0 4px 8px' }}>
+          {dueSoonTasks.map((task, i) => (
+            <TaskRow
+              key={task.id}
+              t={task}
+              i={i}
+              total={dueSoonTasks.length}
+              onClick={() => navigate(`/app/projects/${task.projectId}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Identity group row ───────────────────────────────────────────── */
+function IdentityGroup({ ident, tasks, navigate }) {
+  const { t } = useTranslation()
+  const [showAll, setShowAll] = useState(false)
+  const visibleTasks = showAll ? tasks : tasks.slice(0, 8)
+
+  return (
+    <div style={{
+      borderLeft: `3px solid ${ident.color}`,
+      paddingLeft: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <div style={{
+          width: 18, height: 18, borderRadius: 5, background: ident.color, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 9, color: '#fff', fontWeight: 800,
+          boxShadow: `0 0 8px ${ident.color}66`,
+        }}>
+          {ident.avatar || ident.name.charAt(0)}
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 600, color: ident.color }}>{ident.name}</span>
+        <span style={{
+          fontSize: 10, padding: '1px 6px', borderRadius: 9999, fontWeight: 700,
+          background: `${ident.color}22`, color: ident.color,
+        }}>
+          {tasks.filter(task => task.status !== 'done').length}
+        </span>
+        <span style={{ fontSize: 10, color: DARK.textDim }}>
+          {t('dashboard.open')}
+        </span>
+      </div>
+      {visibleTasks.map((task, i) => (
+        <TaskRow key={task.id + ident.id} t={task} i={i} total={visibleTasks.length}
+          onClick={() => navigate(`/app/projects/${task.projectId}`)} />
+      ))}
+      {tasks.length > 8 && !showAll && (
+        <button
+          onClick={() => setShowAll(true)}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: BRAND, fontSize: 11, padding: '4px 10px', marginTop: 4,
+          }}
+        >
+          {t('dashboard.showMore', { count: tasks.length - 8 })}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* ── My Work ──────────────────────────────────────────────────────── */
 function MyWorkSection({ projects }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -308,26 +539,7 @@ function MyWorkSection({ projects }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {identityGroups.map(({ identity: ident, tasks }) => (
-        <div key={ident.id}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <div style={{
-              width: 18, height: 18, borderRadius: 5, background: ident.color, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 9, color: '#fff', fontWeight: 800,
-              boxShadow: `0 0 8px ${ident.color}66`,
-            }}>
-              {ident.avatar || ident.name.charAt(0)}
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: ident.color }}>{ident.name}</span>
-            <span style={{ fontSize: 10, color: DARK.textDim }}>
-              {tasks.filter(task => task.status !== 'done').length} {t('dashboard.open')}
-            </span>
-          </div>
-          {tasks.slice(0, 8).map((task, i) => (
-            <TaskRow key={task.id + ident.id} t={task} i={i} total={Math.min(tasks.length, 8)}
-              onClick={() => navigate(`/app/projects/${task.projectId}`)} />
-          ))}
-        </div>
+        <IdentityGroup key={ident.id} ident={ident} tasks={tasks} navigate={navigate} />
       ))}
       {ungroupedTasks.length > 0 && (
         <div>
@@ -340,6 +552,93 @@ function MyWorkSection({ projects }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ── Onboarding getting started ───────────────────────────────────── */
+function GettingStarted({ onNewProject, isMobile }) {
+  const { t } = useTranslation()
+
+  const steps = [
+    {
+      num: 1,
+      title: t('dashboard.step1Title'),
+      desc: t('dashboard.step1Desc'),
+      gradient: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+      action: <button
+        onClick={onNewProject}
+        style={{
+          marginTop: 10, padding: '7px 16px', border: 'none', borderRadius: 9999,
+          background: BRAND, color: '#000', fontSize: 12, fontWeight: 700,
+          cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px',
+        }}
+      >
+        <Plus size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+        {t('dashboard.newProject')}
+      </button>,
+    },
+    {
+      num: 2,
+      title: t('dashboard.step2Title'),
+      desc: t('dashboard.step2Desc'),
+      gradient: 'linear-gradient(135deg, #1ed760, #059669)',
+    },
+    {
+      num: 3,
+      title: t('dashboard.step3Title'),
+      desc: t('dashboard.step3Desc'),
+      gradient: 'linear-gradient(135deg, #ffa42b, #d97706)',
+    },
+    {
+      num: 4,
+      title: t('dashboard.step4Title'),
+      desc: t('dashboard.step4Desc'),
+      gradient: 'linear-gradient(135deg, #f87171, #dc2626)',
+    },
+  ]
+
+  return (
+    <div style={{ animation: 'fadeIn 0.4s ease', padding: '20px 0' }}>
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: '#ffffff', marginBottom: 6 }}>
+          {t('dashboard.gettingStarted')}
+        </div>
+        <div style={{ fontSize: 13, color: DARK.textMid }}>{t('dashboard.createFirstProject')}</div>
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
+        gap: 14,
+      }}>
+        {steps.map((step, i) => (
+          <div
+            key={step.num}
+            style={{
+              background: DARK.surface,
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 10,
+              padding: '20px 16px',
+              animation: 'fadeUpIn 0.35s ease forwards',
+              animationDelay: `${i * 0.08}s`,
+              opacity: 0,
+            }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: step.gradient,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, fontWeight: 800, color: '#fff',
+              marginBottom: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}>
+              {step.num}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>{step.title}</div>
+            <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5 }}>{step.desc}</div>
+            {step.action}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -365,7 +664,7 @@ export default function Dashboard() {
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const { data: activities = [] } = useQuery({
     queryKey: ['activity'],
-    queryFn: () => getActivity({ limit: 15 }),
+    queryFn: () => getActivity({ limit: 50 }),
     staleTime: 10000,
   })
   const [name, setName] = useState('')
@@ -388,6 +687,14 @@ export default function Dashboard() {
   const archived = projects.filter(p => p.status === 'archived')
   const displayed = filter === 'all' ? projects : filter === 'archived' ? archived : active
 
+  // Time-of-day greeting
+  const hour = new Date().getHours()
+  const greeting = hour < 12
+    ? t('dashboard.goodMorning')
+    : hour < 18
+    ? t('dashboard.goodAfternoon')
+    : t('dashboard.goodEvening')
+
   const tabStyle = (key) => ({
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '10px 16px', border: 'none', background: 'none',
@@ -408,6 +715,8 @@ export default function Dashboard() {
     },
   })
 
+  const isEmptyState = projects.length === 0 && activities.length === 0
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: DARK.bg, color: DARK.text }}>
       {/* Header */}
@@ -417,6 +726,7 @@ export default function Dashboard() {
         background: 'rgba(255,255,255,0.015)',
       }}>
         <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: DARK.textMid, marginBottom: 2 }}>{greeting}</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.title')}</h1>
           <div style={{ fontSize: 12, color: DARK.textDim, marginTop: 2 }}>
             <span style={{ color: '#1ed760', fontWeight: 600 }}>{active.length}</span> {t('active')} ·{' '}
@@ -474,6 +784,11 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Stat cards (always visible, all tabs) */}
+      {!isLoading && projects.length > 0 && (
+        <StatCards projects={projects} activities={activities} />
+      )}
+
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 0, padding: '0 24px', borderBottom: `1px solid ${DARK.border}` }}>
         {[
@@ -514,8 +829,13 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        ) : isEmptyState ? (
+          <GettingStarted onNewProject={() => setShowForm(true)} isMobile={isMobile} />
         ) : (
           <>
+            {/* Due Soon panel */}
+            <DueSoonPanel projects={projects} />
+
             {/* Filter buttons */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
               {[

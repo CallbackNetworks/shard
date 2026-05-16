@@ -242,6 +242,7 @@
   "analytics.burndownAhead": "Ahead of schedule by {{count}} tasks",
   "analytics.burndownBehind": "Behind schedule by {{count}} tasks",
   "analytics.burndownOnTrack": "On track",
+  "analytics.velocityAvg": "Average {{count}} completed per cycle",
 
   "rules.title": "Workflow Rules",
   "rules.subtitle": "Automate task actions with if-this-then-that rules",

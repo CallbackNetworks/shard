@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, RefreshCw, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, RefreshCw, X, Zap } from 'lucide-react'
 import { getIntegrations, createIntegration, updateIntegration, deleteIntegration, testIntegration, getDeliveries, retryDelivery } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
 import { BRAND, BTN_PRIMARY, BTN_GHOST, BTN_SM } from '../constants/theme'
@@ -16,6 +17,7 @@ const STATUS_COLORS = {
 }
 
 function DeliveryDetailModal({ delivery, onClose, onRetry }) {
+  const { t } = useTranslation()
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
       <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 24, width: '90vw', maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
@@ -54,10 +56,10 @@ function DeliveryDetailModal({ delivery, onClose, onRetry }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           {['failed', 'dead'].includes(delivery.status) && (
             <button onClick={() => onRetry(delivery.id)} style={BTN_PRIMARY}>
-              Retry
+              {t('retry')}
             </button>
           )}
-          <button onClick={onClose} style={BTN_GHOST}>Close</button>
+          <button onClick={onClose} style={BTN_GHOST}>{t('cancel')}</button>
         </div>
       </div>
     </div>
@@ -74,6 +76,7 @@ function Row({ label, value, mono, color }) {
 }
 
 function DeliveryLog({ integrationId }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -97,7 +100,7 @@ function DeliveryLog({ integrationId }) {
         style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: 12, padding: 0 }}
       >
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        Recent Deliveries
+        {t('integrations.recentDeliveries')}
         <button
           onClick={(e) => { e.stopPropagation(); refetch() }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: '0 2px', display: 'flex' }}
@@ -110,7 +113,7 @@ function DeliveryLog({ integrationId }) {
       {expanded && (
         <div style={{ marginTop: 8 }}>
           {deliveries.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', padding: '4px 0' }}>No deliveries yet.</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', padding: '4px 0' }}>{t('integrations.noDeliveries')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {deliveries.slice(0, 10).map(d => {
@@ -132,7 +135,7 @@ function DeliveryLog({ integrationId }) {
                         onClick={(e) => { e.stopPropagation(); retryMut.mutate(d.id) }}
                         style={{ fontSize: 10, padding: '1px 6px', border: '1px solid rgba(79,70,229,0.4)', borderRadius: 4, background: 'rgba(79,70,229,0.1)', color: '#1ed760', cursor: 'pointer' }}
                       >
-                        Retry
+                        {t('retry')}
                       </button>
                     )}
                   </div>
@@ -155,6 +158,7 @@ function DeliveryLog({ integrationId }) {
 }
 
 function IntegrationModal({ initial, onSave, onClose }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState(initial || {
     name: '', type: 'generic', url: '', secret: '', project_id: '', events: ['task.done', 'task.failed', 'project.complete'], active: true,
     email_to: '', email_subject_prefix: '[TODO Platform]',
@@ -166,57 +170,57 @@ function IntegrationModal({ initial, onSave, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 28, width: '90vw', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
-        <h2 style={{ fontWeight: 700, marginBottom: 20, color: '#ffffff' }}>{initial ? 'Edit' : 'New'} Integration</h2>
+        <h2 style={{ fontWeight: 700, marginBottom: 20, color: '#ffffff' }}>{initial ? t('integrations.editDialog') : t('integrations.newDialog')}</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Name
-            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="My Jenkins"
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('name')}
+            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder={t('integrations.namePlaceholder')}
               style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
           </label>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Type
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('type')}
             <select value={form.type} onChange={e => set('type', e.target.value)}
               style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: '#181818', color: '#ffffff' }}>
-              <option value="jenkins">Jenkins</option>
-              <option value="drone">Drone</option>
-              <option value="generic">Generic Webhook</option>
-              <option value="webhook">Webhook (HMAC signed)</option>
-              <option value="email">Email</option>
+              <option value="jenkins">{t('integrations.typeJenkins')}</option>
+              <option value="drone">{t('integrations.typeDrone')}</option>
+              <option value="generic">{t('integrations.typeWebhook')}</option>
+              <option value="webhook">{t('integrations.typeWebhookHmac')}</option>
+              <option value="email">{t('integrations.typeEmail')}</option>
             </select>
           </label>
           {form.type === 'email' ? (
             <>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Recipients (comma-separated) *
-                <input value={form.email_to} onChange={e => set('email_to', e.target.value)} placeholder="user@example.com, admin@example.com"
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('integrations.recipients')}
+                <input value={form.email_to} onChange={e => set('email_to', e.target.value)} placeholder={t('integrations.recipientsPlaceholder')}
                   style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
               </label>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Subject prefix
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('integrations.subjectPrefix')}
                 <input value={form.email_subject_prefix} onChange={e => set('email_subject_prefix', e.target.value)} placeholder="[TODO Platform]"
                   style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
               </label>
             </>
           ) : (
             <>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Webhook URL *
-                <input value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://your-server/notify"
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('integrations.webhookUrl')}
+                <input value={form.url} onChange={e => set('url', e.target.value)} placeholder={t('integrations.webhookUrlPlaceholder')}
                   style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
               </label>
               <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>
-                {form.type === 'webhook' ? 'Signing Secret (HMAC-SHA256)' : 'Secret (Bearer token, optional)'}
+                {form.type === 'webhook' ? t('integrations.signingSecret') : t('integrations.bearerToken')}
                 <input value={form.secret} onChange={e => set('secret', e.target.value)}
-                  placeholder={form.type === 'webhook' ? 'your-secret-key' : 'token...'}
+                  placeholder={form.type === 'webhook' ? t('integrations.signingSecretPlaceholder') : 'token...'}
                   style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
               </label>
               {form.type === 'webhook' && (
                 <div style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#60a5fa' }}>
-                  Requests will include <code>X-Signature: sha256=...</code> and <code>X-Hub-Signature-256</code> headers for verification (GitHub-compatible format).
+                  {t('integrations.hmacInfo')}
                 </div>
               )}
             </>
           )}
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Project ID (leave blank for global)
-            <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder="(all projects)"
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('integrations.projectIdLabel')}
+            <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder={t('integrations.projectIdPlaceholder')}
               style={{ display: 'block', width: '100%', marginTop: 4, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
           </label>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Events
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('integrations.events')}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {ALL_EVENTS.map(ev => (
                 <label key={ev} style={{
@@ -239,8 +243,8 @@ function IntegrationModal({ initial, onSave, onClose }) {
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
           <button onClick={() => onSave(form)} disabled={!form.name || (form.type !== 'email' && !form.url) || (form.type === 'email' && !form.email_to)}
-            style={BTN_PRIMARY}>Save</button>
-          <button onClick={onClose} style={BTN_GHOST}>Cancel</button>
+            style={BTN_PRIMARY}>{t('save')}</button>
+          <button onClick={onClose} style={BTN_GHOST}>{t('cancel')}</button>
         </div>
       </div>
     </div>
@@ -248,6 +252,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
 }
 
 export default function Integrations() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: integrations = [], isLoading } = useQuery({ queryKey: ['integrations'], queryFn: getIntegrations })
   const [modal, setModal] = useState(null)
@@ -292,7 +297,7 @@ export default function Integrations() {
     else createMut.mutate(data)
   }
 
-  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)' }}>Loading...</p>
+  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)' }}>{t('loading')}</p>
 
   return (
     <div style={{ padding: '32px 40px' }}>
@@ -300,21 +305,34 @@ export default function Integrations() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>Integrations</h1>
-          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Configure outbound CI/CD notifications</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('integrations.title')}</h1>
+          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('integrations.subtitle')}</p>
         </div>
-        <button onClick={() => setModal({ mode: 'create' })} style={BTN_PRIMARY}>+ New Integration</button>
+        <button onClick={() => setModal({ mode: 'create' })} style={BTN_PRIMARY}>{t('integrations.new')}</button>
       </div>
 
       {integrations.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.25)' }}>
-          <p style={{ fontSize: 18 }}>No integrations yet</p>
-          <p style={{ marginTop: 8 }}>Add a Jenkins, Drone, generic webhook, or email integration to get notified on task updates</p>
+        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.2)', animation: 'fadeIn 0.4s ease' }}>
+          <Zap size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: BRAND }} />
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{t('integrations.empty')}</p>
+          <p style={{ marginTop: 6, fontSize: 13 }}>{t('integrations.emptyHint')}</p>
+          <button
+            onClick={() => setModal({ mode: 'create' })}
+            style={{ marginTop: 16, ...BTN_PRIMARY, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            {t('integrations.new')}
+          </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {integrations.map(intg => (
-            <div key={intg.id} style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
+          {integrations.map((intg, intgIdx) => (
+            <div key={intg.id} style={{
+              background: '#181818', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 12, padding: '16px 20px',
+              animation: 'fadeUpIn 0.35s ease forwards',
+              animationDelay: `${intgIdx * 0.06}s`,
+              opacity: 0,
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -341,19 +359,20 @@ export default function Integrations() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => testMut.mutate(intg.id)}
                     style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#1ed760', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
-                    {testMut.isPending ? 'Testing...' : 'Test'}
+                    {testMut.isPending ? t('testing') : t('test')}
                   </button>
                   <button onClick={() => setModal({ mode: 'edit', data: { ...intg, secret: intg.secret || '', project_id: intg.project_id || '', email_to: intg.email_to || '', email_subject_prefix: intg.email_subject_prefix || '[TODO Platform]' } })}
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#b3b3b3', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>Edit</button>
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#b3b3b3', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>{t('edit')}</button>
                   <button onClick={() => deleteMut.mutate(intg.id)}
-                    style={{ background: 'none', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>Delete</button>
+                    style={{ background: 'none', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>{t('delete')}</button>
                 </div>
               </div>
               {testResults[intg.id] && (
                 <div style={{ marginTop: 10, background: testResults[intg.id].success ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: testResults[intg.id].success ? '#1ed760' : '#f87171' }}>
                   {testResults[intg.id].success
-                    ? `✓ Test sent (HTTP ${testResults[intg.id].status_code})`
-                    : `✗ Failed: ${testResults[intg.id].error}`}
+                    ? t('integrations.testSent', { code: testResults[intg.id].status_code })
+                    : t('integrations.testFailed', { error: testResults[intg.id].error })
+                  }
                 </div>
               )}
               {/* Only show delivery log for webhook-type integrations */}

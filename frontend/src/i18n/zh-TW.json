@@ -242,6 +242,7 @@
   "analytics.burndownAhead": "比計畫提前 {{count}} 個任務",
   "analytics.burndownBehind": "比計畫落後 {{count}} 個任務",
   "analytics.burndownOnTrack": "進度正常",
+  "analytics.velocityAvg": "平均每衝刺完成 {{count}} 個任務",
 
   "rules.title": "工作流規則",
   "rules.subtitle": "以「如果-那麼」規則自動化任務操作",

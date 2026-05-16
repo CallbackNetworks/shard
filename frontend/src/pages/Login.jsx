@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import { SHADOW_LG, INSET_SHADOW } from '../constants/theme'
 
 const FONT = "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif"
 
 export default function Login() {
+  const { t } = useTranslation()
   const { login } = useAuth()
   const [password, setPassword] = useState('')
   const [error, setError] = useState(false)
@@ -104,7 +106,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={e => { setPassword(e.target.value); setError(false) }}
-              placeholder="Password"
+              placeholder={t('login.password')}
               autoFocus
               style={{
                 width: '100%',
@@ -132,7 +134,7 @@ export default function Login() {
               color: '#f3727f', marginBottom: 12, textAlign: 'center',
               animation: 'fadeUpIn 0.2s ease',
             }}>
-              INCORRECT PASSWORD
+              {t('login.incorrectPassword').toUpperCase()}
             </div>
           )}
 
@@ -163,9 +165,9 @@ export default function Login() {
                   animation: 'spin 0.7s linear infinite',
                   display: 'inline-block',
                 }} />
-                VERIFYING
+                {t('login.verifying').toUpperCase()}
               </span>
-            ) : 'ENTER'}
+            ) : t('login.enter').toUpperCase()}
           </button>
         </form>
       </div>

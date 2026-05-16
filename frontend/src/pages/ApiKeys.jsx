@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Copy, Check, AlertTriangle, X } from 'lucide-react'
+import { Copy, Check, AlertTriangle, X, Key } from 'lucide-react'
 import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects } from '../api/client'
 import { BRAND, BTN_PRIMARY, BTN_GHOST } from '../constants/theme'
 
@@ -20,6 +21,7 @@ const METHOD_STYLE = {
 }
 
 export default function ApiKeys() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: apiKeys = [], isLoading } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys })
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
@@ -70,7 +72,7 @@ export default function ApiKeys() {
     })
   }
 
-  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>Loading...</p>
+  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>{t('loading')}</p>
 
   return (
     <div style={{ padding: '32px 40px' }}>
@@ -86,7 +88,7 @@ export default function ApiKeys() {
             padding: 28, width: 520, maxWidth: '90vw',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>API Key Created</span>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>{t('apiKeys.createdTitle')}</span>
               <button onClick={() => setNewKey(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
                 <X size={16} />
               </button>
@@ -94,7 +96,7 @@ export default function ApiKeys() {
             <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 12, padding: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8 }}>
               <AlertTriangle size={14} style={{ color: '#fbbf24', flexShrink: 0, marginTop: 1 }} />
               <span style={{ fontSize: 12, color: '#fbbf24' }}>
-                Copy this key now. It will not be shown again.
+                {t('apiKeys.copyWarning')}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
@@ -109,38 +111,38 @@ export default function ApiKeys() {
               </button>
             </div>
             <button onClick={() => setNewKey(null)} style={{ ...BTN_PRIMARY, width: '100%', justifyContent: 'center' }}>
-              I have saved this key
+              {t('apiKeys.savedConfirm')}
             </button>
           </div>
         </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>API Keys</h1>
-          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Manage API keys for external service access</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('apiKeys.title')}</h1>
+          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('apiKeys.subtitle')}</p>
         </div>
         <button onClick={() => setShowCreate(true)} style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 6 }}>
-          + New API Key
+          {t('apiKeys.new')}
         </button>
       </div>
 
       {showCreate && (
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <h3 style={{ fontWeight: 600, marginBottom: 16, color: '#ffffff' }}>Create API Key</h3>
+          <h3 style={{ fontWeight: 600, marginBottom: 16, color: '#ffffff' }}>{t('create')} {t('apiKeys.title')}</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Name *
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('name')} *
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="My CI/CD Pipeline"
+                placeholder={t('apiKeys.namePlaceholder')}
                 style={inputStyle} />
             </label>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Project (leave blank for all projects)
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('apiKeys.projectScope')}
               <select value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
                 style={{ ...inputStyle, cursor: 'pointer' }}>
-                <option value="">All projects</option>
+                <option value="">{t('apiKeys.allProjects')}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </label>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Scopes
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('apiKeys.scopes')}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {SCOPES.map(scope => (
                   <label key={scope} style={{
@@ -159,21 +161,34 @@ export default function ApiKeys() {
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button onClick={handleCreate} disabled={!form.name || form.scopes.length === 0}
-              style={{ ...BTN_PRIMARY, opacity: (!form.name || form.scopes.length === 0) ? 0.4 : 1 }}>Create</button>
-            <button onClick={() => setShowCreate(false)} style={BTN_GHOST}>Cancel</button>
+              style={{ ...BTN_PRIMARY, opacity: (!form.name || form.scopes.length === 0) ? 0.4 : 1 }}>{t('create')}</button>
+            <button onClick={() => setShowCreate(false)} style={BTN_GHOST}>{t('cancel')}</button>
           </div>
         </div>
       )}
 
       {apiKeys.length === 0 && !showCreate ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.25)' }}>
-          <p style={{ fontSize: 18 }}>No API keys yet</p>
-          <p style={{ marginTop: 8 }}>Create an API key to allow external services to access the TODO Platform API</p>
+        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.2)', animation: 'fadeIn 0.4s ease' }}>
+          <Key size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: BRAND }} />
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{t('apiKeys.empty')}</p>
+          <p style={{ marginTop: 6, fontSize: 13 }}>{t('apiKeys.emptyHint')}</p>
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{ marginTop: 16, ...BTN_PRIMARY, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            {t('apiKeys.new')}
+          </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {apiKeys.map(ak => (
-            <div key={ak.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
+          {apiKeys.map((ak, akIdx) => (
+            <div key={ak.id} style={{
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 12, padding: '16px 20px',
+              animation: 'fadeUpIn 0.35s ease forwards',
+              animationDelay: `${akIdx * 0.06}s`,
+              opacity: 0,
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -208,11 +223,11 @@ export default function ApiKeys() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => updateMut.mutate({ id: ak.id, data: { active: !ak.active } })}
                     style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#ffffff' }}>
-                    {ak.active ? 'Disable' : 'Enable'}
+                    {ak.active ? t('apiKeys.disable') : t('apiKeys.enable')}
                   </button>
                   <button onClick={() => { if (confirm('Delete this API key?')) deleteMut.mutate(ak.id) }}
                     style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
-                    Delete
+                    {t('delete')}
                   </button>
                 </div>
               </div>
@@ -222,7 +237,7 @@ export default function ApiKeys() {
       )}
 
       <div style={{ marginTop: 32, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20 }}>
-        <h3 style={{ fontWeight: 600, marginBottom: 12, color: '#ffffff' }}>API Usage</h3>
+        <h3 style={{ fontWeight: 600, marginBottom: 12, color: '#ffffff' }}>{t('apiKeys.usage')}</h3>
         <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginBottom: 12 }}>
           Use the <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#1ed760' }}>X-API-Key</code> header to authenticate requests to <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#1ed760' }}>/api/v1/</code> endpoints.
         </p>
@@ -254,14 +269,14 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
   http://localhost:8000/api/v1/email/send`}</pre>
         </div>
 
-        <h4 style={{ fontWeight: 600, marginTop: 20, marginBottom: 8, color: '#ffffff' }}>Available Endpoints</h4>
+        <h4 style={{ fontWeight: 600, marginTop: 20, marginBottom: 8, color: '#ffffff' }}>{t('apiKeys.availableEndpoints')}</h4>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', textAlign: 'left' }}>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Method</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Endpoint</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Scope</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Description</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('method')}</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('endpoint')}</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('scope')}</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('description')}</th>
             </tr>
           </thead>
           <tbody>

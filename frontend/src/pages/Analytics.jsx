@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart2, TrendingUp, Activity, Flame } from 'lucide-react'
 import { getProjects, getCycles } from '../api/client'
@@ -22,8 +23,9 @@ const STATUS_COLORS = { done: '#22c55e', in_progress: '#3b82f6', todo: '#94a3b8'
 
 // ——— Heatmap ———
 function Heatmap({ data }) {
+  const { t } = useTranslation()
   if (!data || data.length === 0) {
-    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>No activity yet.</div>
+    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.noActivityYet')}</div>
   }
 
   // Build 53-week × 7-day grid
@@ -81,11 +83,11 @@ function Heatmap({ data }) {
         )}
       </svg>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
-        Less
+        {t('analytics.less')}
         {[0.05, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
           <span key={i} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: `rgba(129,140,248,${op})` }} />
         ))}
-        More
+        {t('analytics.more')}
       </div>
     </div>
   )
@@ -93,8 +95,9 @@ function Heatmap({ data }) {
 
 // ——— Burndown Chart ———
 function BurndownChart({ data }) {
+  const { t } = useTranslation()
   if (!data || data.length === 0) {
-    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>No data for this cycle.</div>
+    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.noDataForCycle')}</div>
   }
   const W = 500, H = 200, PAD = { t: 10, r: 20, b: 30, l: 40 }
   const innerW = W - PAD.l - PAD.r
@@ -142,17 +145,18 @@ function BurndownChart({ data }) {
       })}
       {/* Legend */}
       <line x1={PAD.l} y1={H - 18} x2={PAD.l + 16} y2={H - 18} stroke="rgba(255,255,255,0.15)" strokeDasharray="4 3" strokeWidth={1} />
-      <text x={PAD.l + 20} y={H - 14} fontSize={9} fill="rgba(255,255,255,0.2)">ideal</text>
+      <text x={PAD.l + 20} y={H - 14} fontSize={9} fill="rgba(255,255,255,0.2)">{t('analytics.ideal')}</text>
       <line x1={PAD.l + 55} y1={H - 18} x2={PAD.l + 71} y2={H - 18} stroke={BRAND} strokeWidth={2} />
-      <text x={PAD.l + 75} y={H - 14} fontSize={9} fill="rgba(255,255,255,0.2)">actual</text>
+      <text x={PAD.l + 75} y={H - 14} fontSize={9} fill="rgba(255,255,255,0.2)">{t('analytics.actual')}</text>
     </svg>
   )
 }
 
 // ——— Velocity Chart ———
 function VelocityChart({ data }) {
+  const { t } = useTranslation()
   if (!data || data.length === 0) {
-    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>Complete at least one cycle to see velocity.</div>
+    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.completeOneCycle')}</div>
   }
   const barH = 28, gap = 8, padding = { l: 130, r: 40, t: 10, b: 10 }
   const maxVal = Math.max(...data.map(d => d.total_tasks), 1)
@@ -171,8 +175,12 @@ function VelocityChart({ data }) {
             <text x={padding.l - 8} y={y + barH / 2 + 4} textAnchor="end" fontSize={11} fill="rgba(255,255,255,0.5)">
               {d.name.length > 18 ? d.name.slice(0, 16) + '…' : d.name}
             </text>
-            <rect x={padding.l} y={y} width={totalW} height={barH} rx={4} fill="rgba(255,255,255,0.06)" />
-            <rect x={padding.l} y={y} width={doneW} height={barH} rx={4} fill="rgba(34,197,94,0.5)" />
+            <rect x={padding.l} y={y} width={totalW} height={barH} rx={4} fill="rgba(255,255,255,0.06)">
+              <title>{d.name}: {d.total_tasks} total tasks</title>
+            </rect>
+            <rect x={padding.l} y={y} width={doneW} height={barH} rx={4} fill="rgba(34,197,94,0.5)">
+              <title>{d.name}: {d.completed_tasks} completed</title>
+            </rect>
             <text x={padding.l + totalW + 6} y={y + barH / 2 + 4} fontSize={10} fill="rgba(255,255,255,0.3)">
               {d.completed_tasks}/{d.total_tasks}
             </text>
@@ -232,11 +240,14 @@ function StatusTrendChart({ data }) {
   )
 }
 
-function StatCard({ icon, label, value, sub, color }) {
+function StatCard({ icon, label, value, sub, color, delay }) {
   return (
     <div style={{
       background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
       borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 6,
+      animation: 'fadeUpIn 0.35s ease forwards',
+      animationDelay: delay != null ? `${delay}s` : '0s',
+      opacity: 0,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
         {icon}{label}
@@ -247,18 +258,30 @@ function StatCard({ icon, label, value, sub, color }) {
   )
 }
 
-function Section({ title, icon, children }) {
+function Section({ title, icon, children, delay, summary }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '20px 24px' }}>
+    <div style={{
+      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+      borderRadius: 12, padding: '20px 24px',
+      animation: 'fadeUpIn 0.35s ease forwards',
+      animationDelay: delay != null ? `${delay}s` : '0s',
+      opacity: 0,
+    }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 600 }}>
         {icon}{title}
       </div>
       {children}
+      {summary && (
+        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
+          {summary}
+        </div>
+      )}
     </div>
   )
 }
 
 export default function Analytics() {
+  const { t } = useTranslation()
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedCycleId, setSelectedCycleId] = useState('')
   const [trendDays, setTrendDays] = useState(30)
@@ -283,43 +306,44 @@ export default function Analytics() {
   return (
     <div style={{ padding: '32px 40px' }}>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', margin: 0 }}>Analytics</h1>
-        <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: 4, fontSize: 13 }}>Insights from your task activity</p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', margin: 0 }}>{t('analytics.title')}</h1>
+        <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: 4, fontSize: 13 }}>{t('analytics.subtitle')}</p>
       </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
         <select value={selectedProjectId} onChange={e => { setSelectedProjectId(e.target.value); setSelectedCycleId('') }} style={selectStyle}>
-          <option value="">All Projects</option>
+          <option value="">{t('analytics.allProjects')}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         {selectedProjectId && cycles.length > 0 && (
           <select value={selectedCycleId} onChange={e => setSelectedCycleId(e.target.value)} style={selectStyle}>
-            <option value="">— Select Cycle —</option>
+            <option value="">{t('analytics.selectCycle')}</option>
             {cycles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
         <select value={trendDays} onChange={e => setTrendDays(Number(e.target.value))} style={selectStyle}>
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
+          <option value={7}>{t('analytics.last7Days')}</option>
+          <option value={30}>{t('analytics.last30Days')}</option>
+          <option value={90}>{t('analytics.last90Days')}</option>
         </select>
       </div>
 
       {/* Overview cards */}
       {overview && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
-          <StatCard icon={<BarChart2 size={13}/>} label="Total Tasks" value={overview.total_tasks} />
-          <StatCard icon={<Activity size={13}/>} label="Done" value={overview.done_tasks} color="#22c55e" />
-          <StatCard icon={<TrendingUp size={13}/>} label="In Progress" value={overview.in_progress_tasks} color="#3b82f6" />
-          <StatCard icon={<Flame size={13}/>} label="Overdue" value={overview.overdue_tasks} color="#ef4444" />
+          <StatCard icon={<BarChart2 size={13}/>} label={t('analytics.totalTasks')} value={overview.total_tasks} delay={0} />
+          <StatCard icon={<Activity size={13}/>} label={t('analytics.done')} value={overview.done_tasks} color="#22c55e" delay={0.08} />
+          <StatCard icon={<TrendingUp size={13}/>} label={t('analytics.inProgress')} value={overview.in_progress_tasks} color="#3b82f6" delay={0.16} />
+          <StatCard icon={<Flame size={13}/>} label={t('analytics.overdueCount')} value={overview.overdue_tasks} color="#ef4444" delay={0.24} />
           {overview.most_active_project && (
             <StatCard
               icon={<Activity size={13}/>}
-              label="Most Active"
+              label={t('analytics.mostActive')}
               value={overview.most_active_project.name}
-              sub={`${overview.most_active_project.activity_count} events this week`}
+              sub={t('analytics.eventsThisWeek', { count: overview.most_active_project.activity_count })}
               color="#1ed760"
+              delay={0.32}
             />
           )}
         </div>
@@ -327,30 +351,59 @@ export default function Analytics() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Activity Heatmap */}
-        <Section title="Activity Heatmap (past year)" icon={<Activity size={13}/>}>
-          <Heatmap data={heatmap} />
-        </Section>
+        {(() => {
+          const mostActive = heatmap.length > 0
+            ? heatmap.reduce((best, d) => d.count > best.count ? d : best, heatmap[0])
+            : null
+          const heatmapSummary = mostActive && mostActive.count > 0
+            ? t('analytics.mostActiveDay', { date: mostActive.date, count: mostActive.count })
+            : null
+          return (
+            <Section title={t('analytics.heatmap')} icon={<Activity size={13}/>} delay={0.05} summary={heatmapSummary}>
+              <Heatmap data={heatmap} />
+            </Section>
+          )
+        })()}
 
         {/* Burndown */}
-        {selectedProjectId && (
-          <Section title="Cycle Burndown" icon={<TrendingUp size={13}/>}>
-            {!selectedCycleId ? (
-              <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>Select a cycle above to see the burndown chart.</div>
-            ) : (
-              <BurndownChart data={burndown} />
-            )}
-          </Section>
-        )}
+        {selectedProjectId && (() => {
+          let burndownSummary = null
+          if (selectedCycleId && burndown.length > 1) {
+            const last = burndown[burndown.length - 1]
+            const total = (burndown[0]?.remaining || 0) + (burndown[0]?.done || 0)
+            const idealRemaining = total - (total / (burndown.length - 1)) * (burndown.length - 1)
+            const diff = Math.round(last.remaining - idealRemaining)
+            if (diff < -1) burndownSummary = t('analytics.burndownAhead', { count: Math.abs(diff) })
+            else if (diff > 1) burndownSummary = t('analytics.burndownBehind', { count: diff })
+            else burndownSummary = t('analytics.burndownOnTrack')
+          }
+          return (
+            <Section title={t('analytics.cycleBurndown')} icon={<TrendingUp size={13}/>} delay={0.13} summary={burndownSummary}>
+              {!selectedCycleId ? (
+                <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>{t('analytics.selectCycleForBurndown')}</div>
+              ) : (
+                <BurndownChart data={burndown} />
+              )}
+            </Section>
+          )
+        })()}
 
         {/* Velocity */}
-        {selectedProjectId && (
-          <Section title="Sprint Velocity" icon={<BarChart2 size={13}/>}>
-            <VelocityChart data={velocity} />
-          </Section>
-        )}
+        {selectedProjectId && (() => {
+          let velocitySummary = null
+          if (velocity.length > 0) {
+            const avg = Math.round(velocity.reduce((sum, d) => sum + d.completed_tasks, 0) / velocity.length)
+            velocitySummary = t('analytics.velocityAvg', { count: avg })
+          }
+          return (
+            <Section title={t('analytics.velocity')} icon={<BarChart2 size={13}/>} delay={0.21} summary={velocitySummary}>
+              <VelocityChart data={velocity} />
+            </Section>
+          )
+        })()}
 
         {/* Status Trend */}
-        <Section title={`Status Trend (${trendDays}d)`} icon={<TrendingUp size={13}/>}>
+        <Section title={t('analytics.statusTrend', { days: trendDays })} icon={<TrendingUp size={13}/>} delay={0.29}>
           <StatusTrendChart data={trend} />
         </Section>
       </div>

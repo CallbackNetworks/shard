@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit3, Trash2, Link2, Unlink, ExternalLink, Share2, RefreshCw, Check, Shield, Clock, Eye } from 'lucide-react'
 import {
@@ -23,6 +24,7 @@ const inputStyle = {
 }
 
 function IdentityForm({ initial, onSave, onCancel }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState(initial || { name: '', color: '#5e6ad2', description: '', avatar: '' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -30,27 +32,27 @@ function IdentityForm({ initial, onSave, onCancel }) {
     <div style={{ background: '#181818', borderRadius: 8, padding: 20, marginBottom: 16, boxShadow: SHADOW_SM }}>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', flex: '0 0 auto' }}>
-          Avatar
+          {t('identities.avatar')}
           <input value={form.avatar} onChange={e => set('avatar', e.target.value)}
-            placeholder="e.g. R"
+            placeholder={t('identities.avatarPlaceholder')}
             maxLength={2}
             style={{ ...inputStyle, width: 48, textAlign: 'center', fontSize: 16 }} />
         </label>
         <label style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', flex: '1 1 160px' }}>
-          Name *
+          {t('name')} *
           <input value={form.name} onChange={e => set('name', e.target.value)}
-            placeholder="e.g. Researcher"
+            placeholder={t('identities.namePlaceholder')}
             style={inputStyle} />
         </label>
         <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', flex: '2 1 200px' }}>
-          Description
+          {t('description')}
           <input value={form.description} onChange={e => set('description', e.target.value)}
-            placeholder="e.g. CGCG computational physics group"
+            placeholder={t('identities.descriptionPlaceholder')}
             style={inputStyle} />
         </label>
       </div>
       <div style={{ marginTop: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Color</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('identities.color')}</span>
         <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
           {COLORS.map(c => (
             <button key={c} onClick={() => set('color', c)} style={{
@@ -64,11 +66,11 @@ function IdentityForm({ initial, onSave, onCancel }) {
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
         <button onClick={() => onSave(form)} disabled={!form.name}
           style={{ background: BRAND, color: '#000', border: 'none', borderRadius: 9999, padding: '8px 22px', cursor: 'pointer', fontWeight: 700, opacity: form.name ? 1 : 0.5, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
-          Save
+          {t('save')}
         </button>
         <button onClick={onCancel}
           style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, padding: '8px 20px', cursor: 'pointer', color: '#ffffff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Cancel
+          {t('cancel')}
         </button>
       </div>
     </div>
@@ -76,6 +78,7 @@ function IdentityForm({ initial, onSave, onCancel }) {
 }
 
 function ShareSettings({ identity, onUpdate }) {
+  const { t } = useTranslation()
   const [pinInput, setPinInput] = useState('')
   const [expiryInput, setExpiryInput] = useState(
     identity.share_expires_at ? new Date(identity.share_expires_at).toISOString().slice(0, 16) : ''
@@ -95,19 +98,19 @@ function ShareSettings({ identity, onUpdate }) {
     try {
       await setSharePin(identity.id, pinInput)
       setPinInput('')
-      setPinMsg('PIN set')
+      setPinMsg(t('identities.pinSet'))
       onUpdate()
       setTimeout(() => setPinMsg(''), 2000)
-    } catch (e) { setPinMsg(e.response?.data?.detail || 'Error') }
+    } catch (e) { setPinMsg(e.response?.data?.detail || t('error')) }
   }
 
   const handleClearPin = async () => {
     try {
       await clearSharePin(identity.id)
-      setPinMsg('PIN removed')
+      setPinMsg(t('identities.pinRemoved'))
       onUpdate()
       setTimeout(() => setPinMsg(''), 2000)
-    } catch { setPinMsg('Error') }
+    } catch { setPinMsg(t('error')) }
   }
 
   const handleSetExpiry = async () => {
@@ -124,22 +127,22 @@ function ShareSettings({ identity, onUpdate }) {
       borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)',
     }}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Shield size={13} /> Share Settings
+        <Shield size={13} /> {t('identities.shareSettings')}
       </div>
 
       {/* PIN */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
           <Shield size={11} />
-          PIN Protection
-          {identity.share_pin_set && <span style={{ color: '#1ed760', fontWeight: 600, fontSize: 11 }}>(Active)</span>}
+          {t('identities.pinProtection')}
+          {identity.share_pin_set && <span style={{ color: '#1ed760', fontWeight: 600, fontSize: 11 }}>{t('identities.active')}</span>}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input
             type="text" inputMode="numeric" pattern="[0-9]*"
             maxLength={6} value={pinInput}
             onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
-            placeholder="4-6 digit PIN"
+            placeholder={t('identities.pinPlaceholder')}
             style={{ ...inputStyle, width: 120, marginTop: 0 }}
           />
           <button onClick={handleSetPin} disabled={pinInput.length < 4}
@@ -150,7 +153,7 @@ function ShareSettings({ identity, onUpdate }) {
               cursor: pinInput.length >= 4 ? 'pointer' : 'default',
               fontSize: 12, fontWeight: 700,
             }}>
-            Set PIN
+            {t('identities.setPIN')}
           </button>
           {identity.share_pin_set && (
             <button onClick={handleClearPin}
@@ -159,7 +162,7 @@ function ShareSettings({ identity, onUpdate }) {
                 color: '#f87171', borderRadius: 6, padding: '5px 12px',
                 cursor: 'pointer', fontSize: 12, fontWeight: 600,
               }}>
-              Remove
+              {t('remove')}
             </button>
           )}
           {pinMsg && <span style={{ fontSize: 11, color: pinMsg.includes('Error') ? '#f87171' : '#1ed760', fontWeight: 600 }}>{pinMsg}</span>}
@@ -170,9 +173,9 @@ function ShareSettings({ identity, onUpdate }) {
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
           <Clock size={11} />
-          Link Expiry
+          {t('identities.linkExpiry')}
           {identity.share_expires_at && <span style={{ color: '#ffa42b', fontWeight: 600, fontSize: 11 }}>
-            (Expires {new Date(identity.share_expires_at).toLocaleDateString()})
+            {t('identities.expires', { date: new Date(identity.share_expires_at).toLocaleDateString() })}
           </span>}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -188,7 +191,7 @@ function ShareSettings({ identity, onUpdate }) {
               borderRadius: 6, padding: '5px 14px', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
             }}>
-            {expiryInput ? 'Set' : 'Clear'}
+            {expiryInput ? t('set') : t('clear')}
           </button>
         </div>
       </div>
@@ -197,7 +200,7 @@ function ShareSettings({ identity, onUpdate }) {
       <div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 4 }}>
           <Eye size={11} />
-          Views
+          {t('identities.views')}
           {viewCount !== null && <span style={{ fontWeight: 600, color: '#ffffff' }}>{viewCount}</span>}
           <button onClick={loadViews}
             style={{
@@ -205,7 +208,7 @@ function ShareSettings({ identity, onUpdate }) {
               color: 'rgba(255,255,255,0.3)', fontSize: 11, textDecoration: 'underline',
               padding: 0, marginLeft: 4,
             }}>
-            {viewCount === null ? 'Load' : 'Refresh'}
+            {viewCount === null ? t('identities.load') : t('refresh')}
           </button>
         </div>
       </div>
@@ -214,6 +217,7 @@ function ShareSettings({ identity, onUpdate }) {
 }
 
 export default function Identities() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: identities = [], isLoading } = useQuery({ queryKey: ['identities'], queryFn: getIdentities })
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
@@ -265,18 +269,18 @@ export default function Identities() {
     return linked
   }
 
-  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>Loading...</p>
+  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>{t('loading')}</p>
 
   return (
     <div style={{ padding: '32px 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>Identities</h1>
-          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Manage your roles and identities across projects</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('identities.title')}</h1>
+          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('identities.subtitle')}</p>
         </div>
         <button onClick={() => setShowCreate(true)}
           style={{ background: BRAND, color: '#000', border: 'none', borderRadius: 9999, padding: '10px 24px', cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Plus size={14} />New Identity
+          <Plus size={14} />{t('identities.new')}
         </button>
       </div>
 
@@ -289,8 +293,8 @@ export default function Identities() {
 
       {identities.length === 0 && !showCreate ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.25)' }}>
-          <p style={{ fontSize: 18 }}>No identities yet</p>
-          <p style={{ marginTop: 8 }}>Create identities to represent different roles you play (researcher, developer, maintainer...)</p>
+          <p style={{ fontSize: 18 }}>{t('identities.empty')}</p>
+          <p style={{ marginTop: 8 }}>{t('identities.emptyHint')}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -333,7 +337,7 @@ export default function Identities() {
                   <div style={{ display: 'flex', gap: 6 }}>
                     <a href={`/?identity=${identity.id}`} target="_blank" rel="noreferrer"
                       style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', color: '#ffffff' }}>
-                      <ExternalLink size={13} /> Overview
+                      <ExternalLink size={13} /> {t('identities.overview')}
                     </a>
                     {identity.share_token && (
                       <>
@@ -346,7 +350,7 @@ export default function Identities() {
                             color: copiedId === identity.id ? '#1ed760' : '#ffffff',
                           }}>
                           {copiedId === identity.id ? <Check size={13} /> : <Share2 size={13} />}
-                          {copiedId === identity.id ? 'Copied' : 'Share'}
+                          {copiedId === identity.id ? t('copied') : t('identities.share')}
                         </button>
                         <button
                           onClick={() => { if (confirm('Revoke current share link and generate a new one?')) rotateMut.mutate(identity.id) }}
@@ -362,7 +366,7 @@ export default function Identities() {
                         border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
                         color: settingsId === identity.id ? BRAND : '#ffffff',
                       }}>
-                      <Shield size={13} /> Settings
+                      <Shield size={13} /> {t('identities.settings')}
                     </button>
                     <button onClick={() => setLinkingId(isLinking ? null : identity.id)}
                       style={{
@@ -370,7 +374,7 @@ export default function Identities() {
                         border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
                         color: isLinking ? BRAND : '#ffffff',
                       }}>
-                      <Link2 size={13} /> Projects
+                      <Link2 size={13} /> {t('identities.projects')}
                     </button>
                     <button onClick={() => setEditingId(identity.id)}
                       style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#ffffff' }}>
@@ -406,7 +410,7 @@ export default function Identities() {
                 {/* Project linking panel */}
                 {isLinking && (
                   <div style={{ marginTop: 12, padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#ffffff' }}>Link / Unlink Projects</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#ffffff' }}>{t('identities.linkUnlinkProjects')}</div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {projects.map(p => {
                         const isLinked = linked.has(p.id)

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
@@ -40,6 +41,7 @@ const btn = (variant = 'default') => ({
 const EMPTY_FORM = { name: '', description: '', priority: 'medium', subtasks: [], label_names: [] }
 
 function TemplateForm({ initial, onSave, onClose }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState(initial || EMPTY_FORM)
   const [subtaskInput, setSubtaskInput] = useState('')
   const [labelInput, setLabelInput] = useState('')
@@ -75,7 +77,9 @@ function TemplateForm({ initial, onSave, onClose }) {
         padding: 24, width: 520, maxHeight: '85vh', overflow: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>{initial ? 'Edit Template' : 'New Template'}</span>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>
+            {initial ? t('templates.editDialog') : t('templates.newDialog')}
+          </span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
             <X size={16} />
           </button>
@@ -83,39 +87,42 @@ function TemplateForm({ initial, onSave, onClose }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Name *</div>
-            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Template name" style={inp} />
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('name')} *</div>
+            <input value={form.name} onChange={e => set('name', e.target.value)}
+              placeholder={t('templates.namePlaceholder')} style={inp} />
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Description</div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('description')}</div>
             <textarea
               value={form.description || ''}
               onChange={e => set('description', e.target.value)}
-              placeholder="Optional description"
+              placeholder={t('templates.descriptionPlaceholder')}
               rows={2}
               style={{ ...inp, resize: 'vertical' }}
             />
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Default Priority</div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('templates.defaultPriority')}</div>
             <select value={form.priority} onChange={e => set('priority', e.target.value)} style={inp}>
-              {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+              {PRIORITIES.map(p => (
+                <option key={p} value={p}>{t(p)}</option>
+              ))}
             </select>
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Subtasks</div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('templates.subtasks')}</div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
               <input
                 value={subtaskInput}
                 onChange={e => setSubtaskInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addSubtask()}
-                placeholder="Add subtask title..."
+                placeholder={t('templates.addSubtask')}
                 style={{ ...inp, flex: 1 }}
               />
-              <button onClick={addSubtask} style={{ ...btn(), padding: '5px 10px' }}>Add</button>
+              <button onClick={addSubtask} style={{ ...btn(), padding: '5px 10px' }}>{t('add')}</button>
             </div>
             {form.subtasks.map((s, i) => (
               <div key={i} style={{
@@ -131,16 +138,16 @@ function TemplateForm({ initial, onSave, onClose }) {
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Labels (names)</div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('templates.labelsNames')}</div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
               <input
                 value={labelInput}
                 onChange={e => setLabelInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addLabel()}
-                placeholder="Add label name..."
+                placeholder={t('templates.addLabel')}
                 style={{ ...inp, flex: 1 }}
               />
-              <button onClick={addLabel} style={{ ...btn(), padding: '5px 10px' }}>Add</button>
+              <button onClick={addLabel} style={{ ...btn(), padding: '5px 10px' }}>{t('add')}</button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {form.label_names.map(l => (
@@ -159,13 +166,13 @@ function TemplateForm({ initial, onSave, onClose }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
-          <button onClick={onClose} style={btn()}>Cancel</button>
+          <button onClick={onClose} style={btn()}>{t('cancel')}</button>
           <button
             onClick={() => form.name.trim() && onSave(form)}
             style={btn('primary')}
             disabled={!form.name.trim()}
           >
-            {initial ? 'Save Changes' : 'Create Template'}
+            {initial ? t('templates.saveChanges') : t('templates.createTemplate')}
           </button>
         </div>
       </div>
@@ -202,7 +209,7 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 11, padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}
               >
                 {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                {tpl.subtasks.length} subtask{tpl.subtasks.length !== 1 ? 's' : ''}
+                {tpl.subtasks.length}
               </button>
             )}
             {tpl.label_names.length > 0 && (
@@ -238,9 +245,11 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
 }
 
 export default function Templates() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
+  const [search, setSearch] = useState('')
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates'],
@@ -263,58 +272,92 @@ export default function Templates() {
   })
 
   const handleDelete = (id) => {
-    if (window.confirm('Delete this template?')) remove.mutate(id)
+    if (window.confirm(t('issue.deleteConfirm', { title: t('templates.title') }))) remove.mutate(id)
   }
 
   return (
     <div style={{ padding: 28, maxWidth: 800, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Task Templates</h1>
+          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t('templates.title')}</h1>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-            Reusable task blueprints with default priority, subtasks, and labels.
+            {t('templates.subtitle')}
           </div>
         </div>
         <button onClick={() => setShowForm(true)} style={{ ...btn('primary'), display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Plus size={13} /> New Template
+          <Plus size={13} /> {t('templates.new')}
         </button>
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>{t('loading')}</div>
       ) : templates.length === 0 ? (
         <div style={{
           textAlign: 'center', padding: 64, color: '#4b5563', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12,
+          animation: 'fadeIn 0.4s ease',
         }}>
-          <FileText size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No templates yet</div>
-          <div style={{ fontSize: 12 }}>Create a template to speed up task creation.</div>
+          <FileText size={36} style={{ marginBottom: 14, opacity: 0.3, display: 'block', margin: '0 auto 14px', color: '#818cf8' }} />
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>{t('templates.empty')}</div>
+          <div style={{ fontSize: 13, marginBottom: 16 }}>{t('templates.emptyHint')}</div>
+          <button onClick={() => setShowForm(true)} style={{ ...btn('primary') }}>
+            {t('templates.new')}
+          </button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {templates.map(tpl => (
-            <TemplateCard
-              key={tpl.id}
-              tpl={tpl}
-              onEdit={t => setEditTarget(t)}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
+        <>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={t('search')}
+            style={{
+              ...inp,
+              marginBottom: 14,
+              fontSize: 13,
+              padding: '7px 12px',
+            }}
+          />
+          {(() => {
+            const filtered = templates.filter(tp =>
+              !search ||
+              tp.name.toLowerCase().includes(search.toLowerCase()) ||
+              (tp.description || '').toLowerCase().includes(search.toLowerCase())
+            )
+            if (filtered.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', fontSize: 13 }}>
+                  {t('noResults')}
+                </div>
+              )
+            }
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filtered.map((tpl, i) => (
+                  <div key={tpl.id} style={{
+                    animation: 'fadeUpIn 0.35s ease forwards',
+                    animationDelay: `${i * 0.06}s`,
+                    opacity: 0,
+                  }}>
+                    <TemplateCard
+                      tpl={tpl}
+                      onEdit={tpl2 => setEditTarget(tpl2)}
+                      onDelete={handleDelete}
+                    />
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </>
       )}
 
-      {showForm && (
-        <TemplateForm
-          onSave={data => create.mutate(data)}
-          onClose={() => setShowForm(false)}
-        />
-      )}
-
-      {editTarget && (
+      {(showForm || editTarget) && (
         <TemplateForm
           initial={editTarget}
-          onSave={data => edit.mutate({ id: editTarget.id, data })}
-          onClose={() => setEditTarget(null)}
+          onSave={(data) => {
+            if (editTarget) edit.mutate({ id: editTarget.id, data })
+            else create.mutate(data)
+          }}
+          onClose={() => { setShowForm(false); setEditTarget(null) }}
         />
       )}
     </div>
