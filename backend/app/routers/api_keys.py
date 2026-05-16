@@ -1,8 +1,9 @@
 import hashlib
 import secrets
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import ApiKey, Task
@@ -68,10 +69,35 @@ def delete_api_key(key_id: str, db: Session = Depends(get_db)):
 def get_agent_summary(db: Session = Depends(get_db)):
     """Return workload summary for each API key (agent), including task counts and tasks."""
     keys = db.query(ApiKey).order_by(ApiKey.created_at.desc()).all()
+    if not keys:
+        return []
+
+    key_ids = [k.id for k in keys]
+
+    # Single query for all tasks across all agent keys, with all lazy relationships
+    # eager-loaded to avoid O(N*M*5) implicit SELECTs.
+    all_tasks = (
+        db.query(Task)
+        .filter(Task.assigned_agent_key_id.in_(key_ids))
+        .options(
+            joinedload(Task.task_labels).joinedload("label"),
+            joinedload(Task.subtasks),
+            joinedload(Task.comments),
+            joinedload(Task.blocked_by_deps),
+            joinedload(Task.blocking_deps),
+        )
+        .all()
+    )
+
+    # Group tasks by agent key in Python — no further DB round-trips.
+    tasks_by_key: dict[str, list[Task]] = defaultdict(list)
+    for t in all_tasks:
+        tasks_by_key[t.assigned_agent_key_id].append(t)
+
     result = []
     for key in keys:
-        tasks = db.query(Task).filter(Task.assigned_agent_key_id == key.id).all()
-        counts = {"todo": 0, "in_progress": 0, "done": 0, "failed": 0}
+        tasks = tasks_by_key.get(key.id, [])
+        counts: dict[str, int] = {"todo": 0, "in_progress": 0, "done": 0, "failed": 0}
         enriched_tasks = []
         for t in tasks:
             counts[t.status] = counts.get(t.status, 0) + 1
