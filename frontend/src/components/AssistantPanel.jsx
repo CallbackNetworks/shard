@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { MessageCircle, X, Plus, Send, ChevronDown, Wrench, Loader } from 'lucide-react'
 import axios from 'axios'
 import { INSET_SHADOW, SHADOW_LG } from '../constants/theme'
@@ -17,11 +18,11 @@ const createConversation = () => _api.post('/assistant/conversations').then(r =>
 const deleteConversation = (id) => _api.delete(`/assistant/conversations/${id}`)
 
 const PROMPT_TEMPLATES = [
-  { label: 'Summary', prompt: 'Give me a summary of all my projects and tasks.' },
-  { label: 'Overdue', prompt: 'What tasks are overdue? List them with their due dates.' },
-  { label: 'Workload', prompt: 'Analyze my current workload. Show breakdown by status, priority, and assignee.' },
-  { label: 'Recent', prompt: 'What happened recently? Show the latest activity.' },
-  { label: 'Plan today', prompt: "Based on my current tasks, suggest what I should focus on today. Prioritize overdue and high-priority items." },
+  { labelKey: 'assistant.promptSummary',   prompt: 'Give me a summary of all my projects and tasks.' },
+  { labelKey: 'assistant.promptOverdue',   prompt: 'What tasks are overdue? List them with their due dates.' },
+  { labelKey: 'assistant.promptWorkload',  prompt: 'Analyze my current workload. Show breakdown by status, priority, and assignee.' },
+  { labelKey: 'assistant.promptRecent',    prompt: 'What happened recently? Show the latest activity.' },
+  { labelKey: 'assistant.promptPlanToday', prompt: "Based on my current tasks, suggest what I should focus on today. Prioritize overdue and high-priority items." },
 ]
 
 const PANEL_BG   = '#181818'
@@ -108,6 +109,7 @@ function StreamingMessage({ events }) {
 
 export default function AssistantPanel() {
   const qc = useQueryClient()
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [convId, setConvId] = useState(null)
   const [input, setInput] = useState('')
@@ -255,12 +257,12 @@ export default function AssistantPanel() {
           <MessageCircle size={14} color="#000" />
         </div>
         <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {currentConv?.title || 'AI Assistant'}
+          {currentConv?.title || t('assistant.title')}
         </span>
-        <button onClick={() => setShowConvList(v => !v)} title="Conversations" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
+        <button onClick={() => setShowConvList(v => !v)} title={t('assistant.conversations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
           <ChevronDown size={14} />
         </button>
-        <button onClick={() => createMut.mutate()} title="New chat" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
+        <button onClick={() => createMut.mutate()} title={t('assistant.newChat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
           <Plus size={14} />
         </button>
         <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
@@ -275,12 +277,12 @@ export default function AssistantPanel() {
             <input
               value={convSearch}
               onChange={e => setConvSearch(e.target.value)}
-              placeholder="Search conversations…"
+              placeholder={t('assistant.searchConversations')}
               style={{ width: '100%', padding: '5px 8px', border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 11, background: 'rgba(255,255,255,0.05)', color: '#fff', outline: 'none' }}
             />
           </div>
           {conversations.length === 0 ? (
-            <div style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>{convSearch ? 'No matches' : 'No conversations yet'}</div>
+            <div style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>{convSearch ? t('assistant.noMatches') : t('assistant.noConversations')}</div>
           ) : conversations.map(c => (
             <div
               key={c.id}
@@ -304,9 +306,9 @@ export default function AssistantPanel() {
         {!convId ? (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.2)' }}>
             <MessageCircle size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
-            <p style={{ fontSize: 13 }}>Start a new conversation</p>
+            <p style={{ fontSize: 13 }}>{t('assistant.noConversations')}</p>
             <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: '#1ed760', border: 'none', borderRadius: 9999, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
-              New Chat
+              {t('assistant.newChat')}
             </button>
           </div>
         ) : (
@@ -315,7 +317,7 @@ export default function AssistantPanel() {
             {showStreaming && <StreamingMessage events={streamEvents} />}
             {streaming && streamEvents.length === 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>
-                <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> Thinking…
+                <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> {t('assistant.thinking')}
               </div>
             )}
           </>
@@ -326,10 +328,10 @@ export default function AssistantPanel() {
       {/* Quick prompts */}
       {convId && messages.length === 0 && !streaming && (
         <div style={{ padding: '0 12px 6px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {PROMPT_TEMPLATES.map(t => (
+          {PROMPT_TEMPLATES.map(tmpl => (
             <button
-              key={t.label}
-              onClick={() => { setInput(t.prompt) }}
+              key={tmpl.labelKey}
+              onClick={() => { setInput(tmpl.prompt) }}
               style={{
                 padding: '4px 10px', borderRadius: 9999,
                 border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
@@ -337,7 +339,7 @@ export default function AssistantPanel() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {t.label}
+              {t(tmpl.labelKey)}
             </button>
           ))}
         </div>
@@ -351,7 +353,7 @@ export default function AssistantPanel() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={convId ? "Ask anything… (Enter to send)" : "Create a conversation first"}
+            placeholder={convId ? t('assistant.askAnything') : t('assistant.noConversations')}
             disabled={!convId || streaming}
             rows={2}
             style={{ ...inp, flex: 1, minHeight: 40, maxHeight: 120 }}

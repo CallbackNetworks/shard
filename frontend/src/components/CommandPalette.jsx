@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash } from 'lucide-react'
 import { getProjects, getIdentities, search } from '../api/client'
 import { SHADOW_LG } from '../constants/theme'
@@ -12,10 +13,10 @@ const ACCENT   = '#1ed760'
 const ITEM_HOVER = 'rgba(255,255,255,0.08)'
 
 const STATIC_COMMANDS = [
-  { id: 'nav-dashboard',    label: 'My Issues',    section: 'Navigation', icon: <LayoutGrid size={14}/>, path: '/app' },
-  { id: 'nav-identities',  label: 'Identities',   section: 'Navigation', icon: <Users size={14}/>,      path: '/app/identities' },
-  { id: 'nav-integrations',label: 'Integrations', section: 'Navigation', icon: <Zap size={14}/>,        path: '/app/integrations' },
-  { id: 'nav-apikeys',     label: 'API Keys',     section: 'Navigation', icon: <Key size={14}/>,        path: '/app/api-keys' },
+  { id: 'nav-dashboard',    labelKey: 'nav.myIssues',      section: 'Navigation', icon: <LayoutGrid size={14}/>, path: '/app' },
+  { id: 'nav-identities',  labelKey: 'nav.identities',    section: 'Navigation', icon: <Users size={14}/>,      path: '/app/identities' },
+  { id: 'nav-integrations',labelKey: 'nav.integrations',  section: 'Navigation', icon: <Zap size={14}/>,        path: '/app/integrations' },
+  { id: 'nav-apikeys',     labelKey: 'nav.apiKeys',       section: 'Navigation', icon: <Key size={14}/>,        path: '/app/api-keys' },
 ]
 
 function useDebounce(value, delay) {
@@ -82,6 +83,7 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
 
 export default function CommandPalette({ open, onClose }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [query, setQuery]     = useState('')
   const [activeIdx, setActive] = useState(0)
   const inputRef = useRef(null)
@@ -104,10 +106,11 @@ export default function CommandPalette({ open, onClose }) {
   // Build command list
   const items = []
   const q = query.trim().toLowerCase()
+  const resolvedStatic = STATIC_COMMANDS.map(c => ({ ...c, label: t(c.labelKey) }))
 
   if (!q) {
     // No query: show static nav + all projects
-    const matchedStatic = STATIC_COMMANDS
+    const matchedStatic = resolvedStatic
     matchedStatic.forEach(c => items.push(c))
 
     if (projects.length > 0) {
@@ -123,7 +126,7 @@ export default function CommandPalette({ open, onClose }) {
     }
   } else {
     // With query: filter static commands
-    const matchedStatic = STATIC_COMMANDS.filter(c =>
+    const matchedStatic = resolvedStatic.filter(c =>
       c.label.toLowerCase().includes(q)
     )
     matchedStatic.forEach(c => items.push(c))
@@ -248,7 +251,7 @@ export default function CommandPalette({ open, onClose }) {
             ref={inputRef}
             value={query}
             onChange={e => { setQuery(e.target.value); setActive(0) }}
-            placeholder="Search or jump to..."
+            placeholder={t('palette.placeholder')}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
               color: '#ffffff', fontSize: 15, fontWeight: 400,
@@ -266,7 +269,7 @@ export default function CommandPalette({ open, onClose }) {
         <div style={{ maxHeight: 400, overflowY: 'auto', padding: '6px 0' }}>
           {grouped.length === 0 && (
             <div style={{ padding: '24px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
-              No results
+              {t('palette.noResults')}
             </div>
           )}
           {grouped.map((entry, i) =>
@@ -289,7 +292,7 @@ export default function CommandPalette({ open, onClose }) {
           display: 'flex', gap: 16,
           color: 'rgba(255,255,255,0.2)', fontSize: 11,
         }}>
-          {[['↑↓', 'navigate'], ['↵', 'select'], ['esc', 'close']].map(([key, label]) => (
+          {[['↑↓', t('palette.navigate')], ['↵', t('palette.select')], ['esc', t('palette.close')]].map(([key, label]) => (
             <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <kbd style={{
                 padding: '1px 5px', borderRadius: 3,

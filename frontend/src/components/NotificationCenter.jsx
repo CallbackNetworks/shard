@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Bell, Check, CheckCheck, X, AlertCircle, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import {
   getNotifications, getUnreadCount,
@@ -15,18 +16,19 @@ const TYPE_ICON = {
   'project.complete': <CheckCheck size={13} style={{ color: '#818cf8' }} />,
 }
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t) {
   if (!dateStr) return ''
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
-  if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
+  if (diff < 60) return t('notifications.justNow')
+  if (diff < 3600) return t('notifications.minutesAgo', { n: Math.floor(diff / 60) })
+  if (diff < 86400) return t('notifications.hoursAgo', { n: Math.floor(diff / 3600) })
+  return t('notifications.daysAgo', { n: Math.floor(diff / 86400) })
 }
 
 export default function NotificationCenter() {
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const panelRef = useRef(null)
 
@@ -133,15 +135,15 @@ export default function NotificationCenter() {
         }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontWeight: 700, fontSize: 13 }}>Notifications</span>
+            <span style={{ fontWeight: 700, fontSize: 13 }}>{t('notifications.title')}</span>
             <div style={{ display: 'flex', gap: 6 }}>
               {unread > 0 && (
                 <button
                   onClick={() => markAll.mutate()}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#818cf8', fontSize: 11, padding: '2px 6px', borderRadius: 4 }}
-                  title="Mark all read"
+                  title={t('notifications.markAllRead')}
                 >
-                  <Check size={11} style={{ verticalAlign: 'middle' }} /> Mark all read
+                  <Check size={11} style={{ verticalAlign: 'middle' }} /> {t('notifications.markAllRead')}
                 </button>
               )}
             </div>
@@ -152,7 +154,7 @@ export default function NotificationCenter() {
             {notifications.length === 0 ? (
               <div style={{ padding: 32, textAlign: 'center', color: '#4b5563' }}>
                 <Bell size={24} style={{ marginBottom: 8, opacity: 0.3 }} />
-                <div style={{ fontSize: 12 }}>No notifications</div>
+                <div style={{ fontSize: 12 }}>{t('notifications.empty')}</div>
               </div>
             ) : (
               notifications.map(n => (
@@ -176,7 +178,7 @@ export default function NotificationCenter() {
                     <div style={{ fontSize: 12, color: n.read ? '#6b7280' : '#ffffff', lineHeight: 1.4 }}>
                       {n.message}
                     </div>
-                    <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>{timeAgo(n.created_at)}</div>
+                    <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>{timeAgo(n.created_at, t)}</div>
                   </div>
                   {!n.read && (
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#818cf8', flexShrink: 0, marginTop: 4 }} />
