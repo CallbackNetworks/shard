@@ -5,10 +5,6 @@ import { Bot, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { getAgentSummary } from '../api/client'
 import { STATUS_MAP, PRIORITY } from '../constants/theme'
 
-const STATUS_COLORS = Object.fromEntries(
-  Object.entries(STATUS_MAP).map(([k, v]) => [k, v.color])
-)
-
 function StatusBar({ counts }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
   if (total === 0) return null
@@ -19,7 +15,7 @@ function StatusBar({ counts }) {
         return (
           <div key={status} style={{
             flex: count,
-            background: STATUS_COLORS[status],
+            background: STATUS_MAP[status]?.color,
             minWidth: 4,
           }} title={`${status}: ${count}`} />
         )
@@ -89,7 +85,7 @@ function AgentCard({ agent, index }) {
               <span key={s} style={{
                 fontSize: 10, fontWeight: 600,
                 padding: '1px 6px', borderRadius: 9999,
-                background: STATUS_COLORS[s] + '18', color: STATUS_COLORS[s],
+                background: (STATUS_MAP[s]?.color ?? '#6b7280') + '18', color: STATUS_MAP[s]?.color ?? '#6b7280',
               }}>
                 {count}
               </span>

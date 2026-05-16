@@ -60,11 +60,12 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
 
     changes = body.model_dump(exclude_none=True)
 
+    _validated_agent: ApiKey | None = None
     if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] is not None:
-        _key = db.query(ApiKey).filter(ApiKey.id == changes["assigned_agent_key_id"]).first()
-        if not _key:
+        _validated_agent = db.query(ApiKey).filter(ApiKey.id == changes["assigned_agent_key_id"]).first()
+        if not _validated_agent:
             raise HTTPException(status_code=400, detail="Agent API key not found")
-        if not _key.active:
+        if not _validated_agent.active:
             raise HTTPException(status_code=400, detail="Agent API key is inactive")
 
     old_status = task.status
@@ -104,11 +105,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
 
     # Log agent assignment change
     if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] != old_agent_key_id:
-        new_key_id = changes["assigned_agent_key_id"]
-        agent_name = None
-        if new_key_id:
-            agent_key = db.query(ApiKey).filter(ApiKey.id == new_key_id).first()
-            agent_name = agent_key.name if agent_key else None
+        agent_name = _validated_agent.name if _validated_agent else None
         log_activity(
             db, "task.agent_assigned",
             project_id=project_id, task_id=task_id,
