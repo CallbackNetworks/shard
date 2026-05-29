@@ -300,7 +300,7 @@ export default function Integrations() {
   if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)' }}>{t('loading')}</p>
 
   return (
-    <div style={{ padding: '32px 40px' }}>
+    <div className="page-content" style={{ padding: '32px 40px' }}>
       {modal && <IntegrationModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -356,7 +356,7 @@ export default function Integrations() {
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={() => testMut.mutate(intg.id)}
                     style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#1ed760', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
                     {testMut.isPending ? t('testing') : t('test')}

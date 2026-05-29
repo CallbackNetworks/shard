@@ -272,7 +272,7 @@ export default function Identities() {
   if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div style={{ padding: '32px 40px' }}>
+    <div className="page-content" style={{ padding: '32px 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('identities.title')}</h1>

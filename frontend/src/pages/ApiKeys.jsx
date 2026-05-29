@@ -75,7 +75,7 @@ export default function ApiKeys() {
   if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div style={{ padding: '32px 40px' }}>
+    <div className="page-content" style={{ padding: '32px 40px' }}>
       {/* Show-once modal for newly created key */}
       {newKey && (
         <div style={{
@@ -220,7 +220,7 @@ export default function ApiKeys() {
                     {` · Created: ${new Date(ak.created_at).toLocaleString()}`}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={() => updateMut.mutate({ id: ak.id, data: { active: !ak.active } })}
                     style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#ffffff' }}>
                     {ak.active ? t('apiKeys.disable') : t('apiKeys.enable')}
@@ -270,7 +270,8 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
         </div>
 
         <h4 style={{ fontWeight: 600, marginTop: 20, marginBottom: 8, color: '#ffffff' }}>{t('apiKeys.availableEndpoints')}</h4>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', textAlign: 'left' }}>
               <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('method')}</th>
@@ -314,6 +315,7 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

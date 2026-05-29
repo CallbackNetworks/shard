@@ -186,7 +186,7 @@ export default function WorkflowRules() {
   const TRIGGER_LABELS = Object.fromEntries(TRIGGERS.map(t => [t.value, t.label]))
 
   return (
-    <div style={{ padding: '32px 40px' }}>
+    <div className="page-content" style={{ padding: '32px 40px' }}>
       {modal && <RuleModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>

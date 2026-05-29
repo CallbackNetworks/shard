@@ -7,6 +7,7 @@ import { getProjects, getIdentities } from './api/client'
 import CommandPalette from './components/CommandPalette'
 import AssistantPanel from './components/AssistantPanel'
 import NotificationCenter from './components/NotificationCenter'
+import PWAInstallPrompt from './components/PWAInstallPrompt'
 import Dashboard from './pages/Dashboard'
 import ProjectDetail from './pages/ProjectDetail'
 import Integrations from './pages/Integrations'
@@ -129,6 +130,9 @@ const GLOBAL_CSS = `
     }
     .mobile-menu-btn {
       display: flex !important;
+    }
+    .page-content {
+      padding: 16px 12px !important;
     }
   }
   @media (min-width: 769px) {
@@ -477,6 +481,7 @@ function Layout() {
       <CommandPalette open={paletteOpen} onClose={closePalette} />
       <NotificationCenter />
       <AssistantPanel />
+      <PWAInstallPrompt />
     </div>
   )
 }
