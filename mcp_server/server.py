@@ -537,6 +537,207 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
     return [types.TextContent(type="text", text=result)]
 
 
+# ── MCP Resources ────────────────────────────────────────────────
+
+
+@server.list_resources()
+async def list_resources() -> list[types.Resource]:
+    return [
+        types.Resource(
+            uri="todo://summary",
+            name="Platform Summary",
+            description="Comprehensive summary of all projects, tasks, and recent activity",
+            mimeType="application/json",
+        ),
+        types.Resource(
+            uri="todo://activity",
+            name="Recent Activity",
+            description="Recent activity log showing what changed and by whom",
+            mimeType="application/json",
+        ),
+        types.Resource(
+            uri="todo://notifications",
+            name="Unread Notifications",
+            description="Unread in-app notifications",
+            mimeType="application/json",
+        ),
+        types.Resource(
+            uri="todo://agent-context",
+            name="Agent Context",
+            description="Platform capabilities, conventions, and agent instructions",
+            mimeType="application/json",
+        ),
+    ]
+
+
+@server.list_resource_templates()
+async def list_resource_templates() -> list[types.ResourceTemplate]:
+    return [
+        types.ResourceTemplate(
+            uriTemplate="todo://projects/{project_id}",
+            name="Project Detail",
+            description="Full project detail including all tasks",
+            mimeType="application/json",
+        ),
+    ]
+
+
+@server.read_resource()
+async def read_resource(uri) -> list[types.TextResourceContents]:
+    uri_str = str(uri)
+
+    if uri_str == "todo://summary":
+        data = await _get("/summary")
+    elif uri_str == "todo://activity":
+        data = await _get("/activity", params={"limit": 50})
+    elif uri_str == "todo://notifications":
+        data = await _get("/notifications", params={"unread_only": "true", "limit": 50})
+    elif uri_str == "todo://agent-context":
+        data = await _get("/agent-context")
+    elif uri_str.startswith("todo://projects/"):
+        project_id = uri_str.split("todo://projects/")[1]
+        data = await _get(f"/projects/{project_id}")
+    else:
+        data = {"error": f"Unknown resource: {uri_str}"}
+
+    text = json.dumps(data, indent=2) if not isinstance(data, str) else data
+    return [types.TextResourceContents(uri=uri, text=text, mimeType="application/json")]
+
+
+# ── MCP Prompts ──────────────────────────────────────────────────
+
+
+@server.list_prompts()
+async def list_prompts() -> list[types.Prompt]:
+    return [
+        types.Prompt(
+            name="plan-my-day",
+            description="Review overdue and in-progress tasks, then suggest a prioritized plan for today",
+        ),
+        types.Prompt(
+            name="project-review",
+            description="Summarize a project's current state, identify blockers, and suggest next actions",
+            arguments=[
+                types.PromptArgument(
+                    name="project_name",
+                    description="Name or ID of the project to review",
+                    required=True,
+                ),
+            ],
+        ),
+        types.Prompt(
+            name="triage-inbox",
+            description="Review all todo tasks and help prioritize them by urgency and importance",
+        ),
+        types.Prompt(
+            name="weekly-summary",
+            description="Generate a summary of accomplishments and progress from the past week",
+        ),
+    ]
+
+
+@server.get_prompt()
+async def get_prompt(name: str, arguments: dict | None = None) -> types.GetPromptResult:
+    if name == "plan-my-day":
+        return types.GetPromptResult(
+            description="Plan your day based on current tasks",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=(
+                            "Please review my current tasks using the get_summary tool, "
+                            "then help me plan my day. Focus on:\n"
+                            "1. Overdue tasks that need immediate attention\n"
+                            "2. In-progress tasks I should continue\n"
+                            "3. High-priority todo tasks to start today\n"
+                            "4. Suggest a realistic schedule considering task dependencies\n\n"
+                            "Be specific about which tasks to tackle and in what order."
+                        ),
+                    ),
+                ),
+            ],
+        )
+
+    if name == "project-review":
+        project_name = (arguments or {}).get("project_name", "")
+        return types.GetPromptResult(
+            description=f"Review project: {project_name}",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=(
+                            f"Please review the project '{project_name}'. Use the search tool to find it, "
+                            "then list its tasks. Provide:\n"
+                            "1. Overall progress and health assessment\n"
+                            "2. Blocked or stalled tasks\n"
+                            "3. Overdue items\n"
+                            "4. Suggested next actions to move the project forward\n"
+                            "5. Any risks or concerns"
+                        ),
+                    ),
+                ),
+            ],
+        )
+
+    if name == "triage-inbox":
+        return types.GetPromptResult(
+            description="Triage and prioritize todo tasks",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=(
+                            "Please review all tasks with 'todo' status across all projects. "
+                            "Help me triage them by:\n"
+                            "1. Identifying tasks that should be high priority\n"
+                            "2. Grouping related tasks that could be batched\n"
+                            "3. Flagging tasks that are unclear and need more detail\n"
+                            "4. Suggesting which tasks to start next\n"
+                            "5. Identifying any tasks that might be obsolete"
+                        ),
+                    ),
+                ),
+            ],
+        )
+
+    if name == "weekly-summary":
+        return types.GetPromptResult(
+            description="Weekly progress summary",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=(
+                            "Please generate a weekly summary of my work. Use the get_activity tool "
+                            "with a limit of 200 to get recent activity, then:\n"
+                            "1. List tasks completed this week\n"
+                            "2. List tasks started or progressed\n"
+                            "3. Highlight any blockers encountered\n"
+                            "4. Calculate overall velocity (tasks done per day)\n"
+                            "5. Suggest focus areas for next week"
+                        ),
+                    ),
+                ),
+            ],
+        )
+
+    return types.GetPromptResult(
+        description="Unknown prompt",
+        messages=[
+            types.PromptMessage(
+                role="user",
+                content=types.TextContent(type="text", text=f"Unknown prompt: {name}"),
+            ),
+        ],
+    )
+
+
 async def main():
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
