@@ -55,11 +55,16 @@ services:
 
   mcp:
     build: ./mcp_server
+    ports:
+      - "${MCP_HTTP_PORT:-8001}:${MCP_HTTP_PORT:-8001}"
     volumes:
       - ./mcp_server:/app/mcp_server
     environment:
       - API_BASE_URL=${MCP_API_BASE_URL:-http://backend:8000}
       - API_KEY=${MCP_API_KEY:-}
+      - MCP_TRANSPORT=${MCP_TRANSPORT:-stdio}
+      - MCP_HTTP_PORT=${MCP_HTTP_PORT:-8001}
+      - MCP_HTTP_TOKEN=${MCP_HTTP_TOKEN:-}
     depends_on:
       backend:
         condition: service_healthy

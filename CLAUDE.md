@@ -42,13 +42,18 @@ docker compose up --build
 | `LLM_API_KEY` | API key for the chosen LLM provider |
 | `LLM_MODEL` | Model name (e.g. `claude-sonnet-4-6` for Claude, `gpt-4o` for OpenAI) |
 | `SUMMARY_HOUR` | Hour (UTC) to send daily summary email (default `8`) |
+| `AGENT_CONTEXT_INSTRUCTIONS` | Global instructions for AI agents (shown in `/api/v1/agent-context`) |
+| `MCP_API_KEY` | API key for MCP server to authenticate with backend |
+| `MCP_TRANSPORT` | `stdio` (default) or `http` for remote access |
+| `MCP_HTTP_PORT` | Port for MCP HTTP transport (default `8001`) |
+| `MCP_HTTP_TOKEN` | Bearer token to protect MCP HTTP endpoint |
 
 ## Backend architecture (`backend/app/`)
 
 **Entry point: `main.py`**
 - Registers all routers
 - `lifespan` context: runs `Base.metadata.create_all()` + `ALTER TABLE` migrations for columns added after initial schema, then starts the background scheduler as an `asyncio.Task`
-- Auth middleware reads `AUTH_PASSWORD`; bypasses `/auth/`, `/health`, `/webhook/`, `/share/`, `/docs`, `/openapi.json`, `/redoc`
+- Auth middleware reads `AUTH_PASSWORD`; bypasses `/auth/`, `/health`, `/webhook/`, `/share/`, `/docs`, `/openapi.json`, `/redoc`, `/api/v1/`
 
 **Data layer**
 - `models.py` — all SQLAlchemy ORM models (SQLite)
@@ -164,7 +169,13 @@ POST /webhook/callback/{task.callback_token}
 
 **Webhook HMAC signing** (type `webhook` integrations): `X-Signature: sha256=<hex>` and `X-Hub-Signature-256` computed over the exact JSON bytes sent.
 
-**External API** (`/api/v1`): requires `X-API-Key` header. `GET /api/v1/summary` is the primary endpoint for AI agents — returns full project/task snapshot. Scopes: `read`, `write`, `admin`.
+**External API** (`/api/v1`): requires `X-API-Key` header. Auth middleware is bypassed for `/api/v1/` — API key is the sole auth mechanism. Key endpoints for AI agents:
+- `GET /api/v1/agent-context` — onboarding: capabilities, conventions, per-project instructions
+- `GET /api/v1/summary` — full project/task snapshot optimized for LLMs
+- `POST /api/v1/projects/{id}/tasks/{id}/progress` — report intermediate progress (0-100%)
+- Scopes: `read`, `write`, `admin`
+
+**MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio (default) and Streamable HTTP transport (`MCP_TRANSPORT=http`). Provides 15 tools, 4 resources (`todo://summary`, `todo://activity`, `todo://notifications`, `todo://agent-context`), 1 resource template (`todo://projects/{id}`), and 4 prompts (`plan-my-day`, `project-review`, `triage-inbox`, `weekly-summary`).
 
 **LLM assistant flow:**
 ```

@@ -738,12 +738,80 @@ async def get_prompt(name: str, arguments: dict | None = None) -> types.GetPromp
     )
 
 
-async def main():
+async def main_stdio():
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream, write_stream, server.create_initialization_options()
         )
 
 
+def create_http_app():
+    """Create a Starlette ASGI app for Streamable HTTP transport."""
+    from contextlib import asynccontextmanager
+
+    import uvicorn
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+    from starlette.applications import Starlette
+    from starlette.middleware import Middleware
+    from starlette.middleware.cors import CORSMiddleware
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse, Response
+    from starlette.routing import Mount, Route
+
+    http_token = os.environ.get("MCP_HTTP_TOKEN", "")
+
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=False,
+        stateless=True,
+    )
+
+    async def auth_check(request: Request):
+        if http_token:
+            auth = request.headers.get("authorization", "")
+            token = auth.removeprefix("Bearer ").strip()
+            if token != http_token:
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        return None
+
+    async def handle_mcp(request: Request):
+        err = await auth_check(request)
+        if err:
+            return err
+        await session_manager.handle_request(
+            request.scope, request.receive, request._send
+        )
+        return Response()
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with session_manager.run():
+            yield
+
+    app = Starlette(
+        lifespan=lifespan,
+        routes=[
+            Route("/mcp", endpoint=handle_mcp, methods=["GET", "POST", "DELETE"]),
+        ],
+        middleware=[
+            Middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_methods=["*"],
+                allow_headers=["*"],
+            ),
+        ],
+    )
+    return app
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    if transport == "http":
+        import uvicorn
+
+        app = create_http_app()
+        port = int(os.environ.get("MCP_HTTP_PORT", "8001"))
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    else:
+        asyncio.run(main_stdio())
