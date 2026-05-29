@@ -100,6 +100,10 @@ class Label(Base):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     color: Mapped[str] = mapped_column(String(20), nullable=False, default="#5e6ad2")
+    type: Mapped[str] = mapped_column(String(20), nullable=False, default="label")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decision_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     project: Mapped["Project"] = relationship("Project", back_populates="labels")

@@ -39,14 +39,22 @@ export function StatusIcon({ status }) {
 }
 
 export function LabelChip({ label }) {
+  const isDecision = label.type === 'decision'
+  const isDashed = isDecision && label.decision_status === 'proposed'
   return (
     <span style={{
       fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 500,
       background: label.color + '22',
       color: label.color,
-      border: `1px solid ${label.color}44`,
+      border: isDashed ? `1px dashed ${label.color}88` : `1px solid ${label.color}44`,
       whiteSpace: 'nowrap', flexShrink: 0,
+      display: 'inline-flex', alignItems: 'center', gap: 3,
     }}>
+      {isDecision && (
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" />
+        </svg>
+      )}
       {label.name}
     </span>
   )

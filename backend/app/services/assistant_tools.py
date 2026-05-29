@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import ActivityLog, Label, Project, Task, TaskLabel
+from app.models import ActivityLog, Comment, Label, Project, Task, TaskLabel, WorkflowRule
 
 TOOLS = [
     {
@@ -131,6 +131,46 @@ TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "analyze_decisions",
+        "description": "Gather comprehensive project context (tasks, activity, comments, workflow rules, existing decisions) for decision analysis. Call this first, then reason about implied decisions from the data.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID to analyze"},
+            },
+            "required": ["project_id"],
+        },
+    },
+    {
+        "name": "create_decision",
+        "description": "Create a decision record (as a decision-type label) for a project. Status is set to 'proposed' for user review.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID"},
+                "name": {"type": "string", "description": "Decision title (short, clear)"},
+                "description": {
+                    "type": "string",
+                    "description": "Decision content in markdown with ## Context, ## Decision, ## Consequences sections",
+                },
+            },
+            "required": ["project_id", "name", "description"],
+        },
+    },
+    {
+        "name": "tag_task_with_decision",
+        "description": "Tag a task with a decision label and add a comment explaining the relevance.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string", "description": "Task ID to tag"},
+                "decision_label_id": {"type": "string", "description": "Decision label ID to attach"},
+                "reason": {"type": "string", "description": "Explanation of why this task relates to or conflicts with the decision"},
+            },
+            "required": ["task_id", "decision_label_id", "reason"],
+        },
+    },
 ]
 
 
@@ -158,6 +198,12 @@ async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
             return _tool_search(db, tool_input.get("query", ""))
         elif tool_name == "get_activity":
             return _tool_get_activity(db, tool_input.get("limit", 20))
+        elif tool_name == "analyze_decisions":
+            return _tool_analyze_decisions(db, tool_input["project_id"])
+        elif tool_name == "create_decision":
+            return _tool_create_decision(db, **tool_input)
+        elif tool_name == "tag_task_with_decision":
+            return _tool_tag_task_with_decision(db, **tool_input)
         else:
             return f"Unknown tool: {tool_name}"
     except Exception as exc:
@@ -392,3 +438,122 @@ def _tool_get_activity(db: Session, limit: int = 20) -> str:
         ],
         default=str,
     )
+
+
+def _tool_analyze_decisions(db: Session, project_id: str) -> str:
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        return f"Project {project_id} not found"
+
+    # Tasks with details
+    tasks = db.query(Task).filter(Task.project_id == project_id).order_by(Task.created_at.desc()).limit(100).all()
+    tasks_data = [
+        {
+            "id": t.id,
+            "title": t.title,
+            "status": t.status,
+            "priority": t.priority,
+            "assignee": t.assignee,
+            "description": (t.description or "")[:200],
+            "due_date": t.due_date.isoformat() if t.due_date else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+        for t in tasks
+    ]
+
+    # Activity logs for this project
+    activities = (
+        db.query(ActivityLog)
+        .filter(ActivityLog.project_id == project_id)
+        .order_by(ActivityLog.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    activity_data = [
+        {"action": a.action, "detail": a.detail, "actor": a.actor, "created_at": a.created_at.isoformat() if a.created_at else None}
+        for a in activities
+    ]
+
+    # Comments on tasks in this project
+    task_ids = [t.id for t in tasks]
+    comments = db.query(Comment).filter(Comment.task_id.in_(task_ids)).order_by(Comment.created_at.desc()).limit(50).all() if task_ids else []
+    comments_data = [
+        {"task_id": c.task_id, "body": (c.body or "")[:300], "author": c.author, "created_at": c.created_at.isoformat() if c.created_at else None}
+        for c in comments
+    ]
+
+    # Workflow rules
+    rules = db.query(WorkflowRule).filter(WorkflowRule.project_id == project_id).all()
+    rules_data = [
+        {"name": r.name, "trigger": r.trigger, "conditions": r.conditions, "actions": r.actions}
+        for r in rules
+    ]
+
+    # Existing decisions (to avoid duplicates)
+    existing_decisions = db.query(Label).filter(Label.project_id == project_id, Label.type == "decision").all()
+    decisions_data = [
+        {"id": d.id, "name": d.name, "status": d.decision_status, "description": (d.description or "")[:200]}
+        for d in existing_decisions
+    ]
+
+    return json.dumps(
+        {
+            "project": {"id": project.id, "name": project.name, "description": project.description},
+            "tasks": tasks_data,
+            "activity": activity_data,
+            "comments": comments_data,
+            "workflow_rules": rules_data,
+            "existing_decisions": decisions_data,
+        },
+        default=str,
+    )
+
+
+def _tool_create_decision(db: Session, project_id: str, name: str, description: str) -> str:
+    import uuid
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        return f"Project {project_id} not found"
+
+    label = Label(
+        id=str(uuid.uuid4()),
+        project_id=project_id,
+        name=name,
+        color="#818cf8",
+        type="decision",
+        description=description,
+        decision_status="proposed",
+        source="ai",
+    )
+    db.add(label)
+    db.commit()
+    return json.dumps({"id": label.id, "name": label.name, "status": "proposed", "source": "ai"})
+
+
+def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: str, reason: str) -> str:
+    import uuid
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        return f"Task {task_id} not found"
+
+    label = db.query(Label).filter(Label.id == decision_label_id, Label.type == "decision").first()
+    if not label:
+        return f"Decision label {decision_label_id} not found"
+
+    # Add label to task if not already attached
+    existing = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == decision_label_id).first()
+    if not existing:
+        db.add(TaskLabel(task_id=task_id, label_id=decision_label_id))
+
+    # Add comment explaining the relevance
+    comment = Comment(
+        id=str(uuid.uuid4()),
+        task_id=task_id,
+        body=f"**Decision: {label.name}**\n\n{reason}",
+        author="AI Assistant",
+    )
+    db.add(comment)
+    db.commit()
+    return json.dumps({"status": "tagged", "task_id": task_id, "decision": label.name, "reason": reason})

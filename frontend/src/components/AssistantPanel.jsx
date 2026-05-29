@@ -23,6 +23,7 @@ const PROMPT_TEMPLATES = [
   { labelKey: 'assistant.promptWorkload',  prompt: 'Analyze my current workload. Show breakdown by status, priority, and assignee.' },
   { labelKey: 'assistant.promptRecent',    prompt: 'What happened recently? Show the latest activity.' },
   { labelKey: 'assistant.promptPlanToday', prompt: "Based on my current tasks, suggest what I should focus on today. Prioritize overdue and high-priority items." },
+  { labelKey: 'assistant.promptDecisions', prompt: "Analyze my projects and identify key decisions that have been made or should be recorded. For each decision, create a decision record with context, the decision itself, and consequences. Tag relevant tasks with the decision labels." },
 ]
 
 const PANEL_BG   = '#181818'

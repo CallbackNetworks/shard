@@ -30,7 +30,7 @@ export default defineConfig({
         navigateFallbackAllowlist: [/^\/app/, /^\/share/],
         runtimeCaching: [
           {
-            urlPattern: /^\/(projects|identities|activity|analytics|api-keys|workflow-rules|search)/,
+            urlPattern: /^\/(projects|identities|activity|analytics|api-keys|workflow-rules|decisions|search)/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
@@ -46,7 +46,7 @@ export default defineConfig({
         server.middlewares.use((req, _res, next) => {
           const url = req.url || '/'
           const isAsset = url.startsWith('/@') || url.startsWith('/src') || url.startsWith('/node_modules') || /\.\w+$/.test(url.split('?')[0])
-          const isProxied = ['/projects','/webhook','/integrations','/identities','/activity','/api-keys','/api/v1','/share/identity','/auth','/health','/docs','/openapi.json','/redoc','/search','/deliveries','/analytics','/workflow-rules','/assistant','/templates','/notifications','/ws'].some(p => url.startsWith(p))
+          const isProxied = ['/projects','/webhook','/integrations','/identities','/activity','/api-keys','/api/v1','/share/identity','/auth','/health','/docs','/openapi.json','/redoc','/search','/deliveries','/analytics','/workflow-rules','/assistant','/templates','/notifications','/decisions','/ws'].some(p => url.startsWith(p))
           if (!isAsset && !isProxied) req.url = '/'
           next()
         })
@@ -75,6 +75,7 @@ export default defineConfig({
       '/assistant': backendUrl,
       '/templates': backendUrl,
       '/notifications': backendUrl,
+      '/decisions': backendUrl,
       '/ws': { target: backendUrl, ws: true },
     }
   }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Link, useLocation, Routes, Route, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, FileText, ScrollText } from 'lucide-react'
+import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText } from 'lucide-react'
 import { getProjects, getIdentities } from './api/client'
 import CommandPalette from './components/CommandPalette'
 import AssistantPanel from './components/AssistantPanel'
@@ -17,6 +17,7 @@ import Analytics from './pages/Analytics'
 import WorkflowRules from './pages/WorkflowRules'
 import Templates from './pages/Templates'
 import WebhookLogs from './pages/WebhookLogs'
+import Decisions from './pages/Decisions'
 import Overview from './pages/Overview'
 import ShareView from './pages/ShareView'
 import Login from './pages/Login'
@@ -263,6 +264,7 @@ function Sidebar({ onOpenPalette }) {
           { to: '/app/api-keys', icon: <Key size={13} />, labelKey: 'nav.apiKeys' },
           { to: '/app/analytics', icon: <BarChart2 size={13} />, labelKey: 'nav.analytics' },
           { to: '/app/workflow-rules', icon: <GitMerge size={13} />, labelKey: 'nav.workflowRules' },
+          { to: '/app/decisions', icon: <GitFork size={13} />, labelKey: 'nav.decisions' },
           { to: '/app/templates', icon: <FileText size={13} />, labelKey: 'nav.templates' },
           { to: '/app/webhook-logs', icon: <ScrollText size={13} />, labelKey: 'nav.webhookLogs' },
         ].map(({ to, icon, labelKey }) => (
@@ -474,6 +476,7 @@ function Layout() {
           <Route path="identities" element={<Identities />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="workflow-rules" element={<WorkflowRules />} />
+          <Route path="decisions" element={<Decisions />} />
           <Route path="templates" element={<Templates />} />
           <Route path="webhook-logs" element={<WebhookLogs />} />
         </Routes>

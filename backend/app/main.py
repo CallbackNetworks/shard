@@ -20,6 +20,7 @@ from app.routers import (
     attachments,
     comments,
     cycles,
+    decisions,
     external_api,
     identities,
     integrations,
@@ -210,6 +211,7 @@ app.include_router(webhooks.router)
 app.include_router(integrations.router)
 app.include_router(labels.router)
 app.include_router(task_label_router)
+app.include_router(decisions.router)
 app.include_router(cycles.router)
 app.include_router(api_keys.router)
 app.include_router(external_api.router)

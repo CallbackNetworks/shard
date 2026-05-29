@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Label, Task, TaskLabel
 from app.routers.deps import get_project_or_404 as _get_project_or_404
-from app.schemas import LabelCreate, LabelOut
+from app.schemas import LabelCreate, LabelOut, LabelUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/labels", tags=["labels"])
 
@@ -20,6 +20,19 @@ def create_label(project_id: str, body: LabelCreate, db: Session = Depends(get_d
     _get_project_or_404(project_id, db)
     label = Label(project_id=project_id, **body.model_dump())
     db.add(label)
+    db.commit()
+    db.refresh(label)
+    return label
+
+
+@router.patch("/{label_id}", response_model=LabelOut)
+def update_label(project_id: str, label_id: str, body: LabelUpdate, db: Session = Depends(get_db)):
+    _get_project_or_404(project_id, db)
+    label = db.query(Label).filter(Label.id == label_id, Label.project_id == project_id).first()
+    if not label:
+        raise HTTPException(status_code=404, detail="Label not found")
+    for field, value in body.model_dump(exclude_none=True).items():
+        setattr(label, field, value)
     db.commit()
     db.refresh(label)
     return label

@@ -41,6 +41,7 @@ export const reorderTasks = (projectId, taskIds) => api.post(`/projects/${projec
 // Labels
 export const getLabels = (projectId) => api.get(`/projects/${projectId}/labels`).then(r => r.data)
 export const createLabel = (projectId, data) => api.post(`/projects/${projectId}/labels`, data).then(r => r.data)
+export const updateLabel = (projectId, labelId, data) => api.patch(`/projects/${projectId}/labels/${labelId}`, data).then(r => r.data)
 export const deleteLabel = (projectId, labelId) => api.delete(`/projects/${projectId}/labels/${labelId}`)
 export const addLabelToTask = (projectId, taskId, labelId) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/labels/${labelId}`).then(r => r.data)
@@ -164,6 +165,11 @@ export const getTemplates = (projectId) =>
 export const createTemplate = (data) => api.post('/templates', data).then(r => r.data)
 export const updateTemplate = (id, data) => api.patch(`/templates/${id}`, data).then(r => r.data)
 export const deleteTemplate = (id) => api.delete(`/templates/${id}`)
+
+// Decisions
+export const getDecisions = (params = {}) => api.get('/decisions', { params }).then(r => r.data)
+export const getDecision = (id) => api.get(`/decisions/${id}`).then(r => r.data)
+export const exportDecision = (id) => api.get(`/decisions/${id}/export`).then(r => r.data)
 
 // Share (public, no auth — uses plain axios to avoid the auth interceptor)
 export const getShareData = (token) => axios.get(`/share/identity/${token}`, { withCredentials: true }).then(r => r.data)

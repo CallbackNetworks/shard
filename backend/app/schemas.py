@@ -41,6 +41,17 @@ class IdentityOut(BaseModel):
 class LabelCreate(BaseModel):
     name: str
     color: str = "#5e6ad2"
+    type: Literal["label", "decision"] = "label"
+    description: str | None = None
+    decision_status: Literal["proposed", "accepted", "deprecated", "superseded"] | None = None
+    source: Literal["manual", "ai"] | None = None
+
+
+class LabelUpdate(BaseModel):
+    name: str | None = None
+    color: str | None = None
+    description: str | None = None
+    decision_status: Literal["proposed", "accepted", "deprecated", "superseded"] | None = None
 
 
 class LabelOut(BaseModel):
@@ -50,6 +61,10 @@ class LabelOut(BaseModel):
     project_id: str
     name: str
     color: str
+    type: str = "label"
+    description: str | None = None
+    decision_status: str | None = None
+    source: str | None = None
     created_at: datetime
 
 
