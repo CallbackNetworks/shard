@@ -36,24 +36,37 @@ async def upload_attachment(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="File too large (max 20MB)")
-
     file_id = str(uuid.uuid4())
     ext = Path(file.filename or "file").suffix
     storage_name = f"{file_id}{ext}"
     storage_path = UPLOAD_DIR / storage_name
 
-    with open(storage_path, "wb") as f:
-        f.write(content)
+    chunk_size = 64 * 1024  # 64KB
+    total_size = 0
+    try:
+        with open(storage_path, "wb") as f:
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > MAX_FILE_SIZE:
+                    f.close()
+                    storage_path.unlink(missing_ok=True)
+                    raise HTTPException(status_code=400, detail="File too large (max 20MB)")
+                f.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        storage_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="Failed to save file") from exc
 
     attachment = Attachment(
         task_id=task_id,
         project_id=project_id,
         filename=file.filename or "file",
         content_type=file.content_type or "application/octet-stream",
-        size=len(content),
+        size=total_size,
         storage_path=str(storage_path),
     )
     db.add(attachment)

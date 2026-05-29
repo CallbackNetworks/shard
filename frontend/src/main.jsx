@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import './i18n'
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query'
 import { ToastProvider, globalAddToast } from './context/ToastContext'
+import ErrorBoundary from './components/ErrorBoundary'
 import App from './App'
 
 const queryClient = new QueryClient({
@@ -17,10 +18,12 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 )

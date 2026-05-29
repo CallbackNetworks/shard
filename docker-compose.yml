@@ -16,6 +16,17 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-stub}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - SUMMARY_HOUR=${SUMMARY_HOUR:-8}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - app-network
 
@@ -29,7 +40,15 @@ services:
     environment:
       - BACKEND_URL=http://backend:8000    # vite proxy target (internal Docker network)
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - app-network
 
@@ -39,7 +58,8 @@ services:
       - ./backend:/app/backend    # access backend source and SQLite DB
       - ./mcp_server:/app/mcp_server
     environment:
-      - DB_PATH=${DB_PATH:-/app/backend/todo_platform.db}
+      - DB_PATH=${DB_PATH:-/app/backend/data/todo_platform.db}
+    restart: unless-stopped
     networks:
       - app-network
 
