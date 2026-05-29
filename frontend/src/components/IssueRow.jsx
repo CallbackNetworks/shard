@@ -184,6 +184,29 @@ export default function IssueRow({
           </span>
         )}
 
+        {task.progress_pct != null && task.progress_pct >= 0 && (
+          <span
+            title={`Progress: ${task.progress_pct}%${task.agent_notes ? '\n' + task.agent_notes : ''}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 10, color: 'rgba(255,255,255,0.45)', flexShrink: 0, whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{
+              width: 36, height: 4, background: 'rgba(255,255,255,0.1)',
+              borderRadius: 2, overflow: 'hidden', display: 'inline-block',
+            }}>
+              <span style={{
+                display: 'block', height: '100%',
+                width: `${task.progress_pct}%`,
+                background: task.progress_pct >= 100 ? '#1ed760' : '#818cf8',
+                borderRadius: 2, transition: 'width 0.3s',
+              }} />
+            </span>
+            {task.progress_pct}%
+          </span>
+        )}
+
         {showProject && projectName && (
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
             {projectName}

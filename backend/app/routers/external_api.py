@@ -6,6 +6,7 @@ Scopes: read (GET), write (POST/PATCH/DELETE), admin (all).
 """
 
 import hashlib
+import os
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -28,6 +29,8 @@ from app.models import (
 )
 from app.schemas import (
     ActivityEntryOut,
+    AgentContextOut,
+    AgentProjectInfo,
     CommentCreate,
     CommentOut,
     CommentUpdate,
@@ -43,6 +46,7 @@ from app.schemas import (
     SummaryOut,
     TaskCreate,
     TaskOut,
+    TaskProgressUpdate,
     TaskUpdate,
 )
 from app.services.activity import log_activity
@@ -1427,3 +1431,126 @@ def api_mark_notification_read(
     db.commit()
     db.refresh(notif)
     return notif
+
+
+# ── Agent Context (onboarding for AI agents) ────────────────────
+
+
+@router.get(
+    "/agent-context",
+    summary="Agent onboarding context",
+    description="""Returns platform capabilities, conventions, per-project agent instructions,
+and a quick-start guide. Designed as the first endpoint an AI agent should call
+to understand the platform and how to interact with it. Requires `read` scope.""",
+    response_model=AgentContextOut,
+    responses=_auth_errors,
+)
+def api_agent_context(
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    query = db.query(Project).filter(Project.status == "active")
+    if api_key.project_id:
+        query = query.filter(Project.id == api_key.project_id)
+    projects = query.order_by(Project.created_at.desc()).all()
+
+    project_infos = []
+    for p in projects:
+        label_names = [lb.name for lb in p.labels if lb.type == "label"]
+        project_infos.append(
+            AgentProjectInfo(
+                id=p.id,
+                name=p.name,
+                status=p.status,
+                agent_instructions=p.agent_instructions,
+                label_names=label_names,
+            )
+        )
+
+    global_instructions = os.environ.get("AGENT_CONTEXT_INSTRUCTIONS", "")
+
+    return AgentContextOut(
+        capabilities=[
+            "projects", "tasks", "subtasks", "labels", "comments",
+            "dependencies", "search", "analytics", "notifications",
+            "webhooks", "workflow-rules", "attachments",
+        ],
+        instructions=global_instructions or None,
+        conventions={
+            "task_statuses": ["todo", "in_progress", "done", "failed"],
+            "priorities": ["low", "medium", "high"],
+            "naming": "Use clear, actionable task titles in imperative form",
+            "progress": "Use POST .../progress to report intermediate progress (0-100%)",
+        },
+        projects=project_infos,
+        quick_start=(
+            "1. Call GET /api/v1/agent-context (this endpoint) to understand the platform. "
+            "2. Call GET /api/v1/summary for current state of all projects and tasks. "
+            "3. Use POST /api/v1/projects/{id}/tasks to create tasks. "
+            "4. Use PATCH /api/v1/projects/{id}/tasks/{id} to update task status/fields. "
+            "5. Use POST /api/v1/projects/{id}/tasks/{id}/progress to report progress."
+        ),
+    )
+
+
+# ── Task Progress Reporting ──────────────────────────────────────
+
+
+@router.post(
+    "/projects/{project_id}/tasks/{task_id}/progress",
+    summary="Report task progress",
+    description="""Atomically update task progress percentage and agent notes, optionally
+adding a comment. Designed for AI agents to report intermediate progress on
+long-running tasks. Requires `write` scope.
+
+- `progress_pct`: 0-100 integer (null to clear)
+- `agent_notes`: free-text markdown scratchpad for the agent
+- `comment`: if provided, a comment is added to the task""",
+    response_model=TaskOut,
+    responses={**_auth_errors, 404: {"description": "Task not found"}},
+)
+async def api_report_progress(
+    project_id: str,
+    task_id: str,
+    body: TaskProgressUpdate,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "write")
+    _check_project_access(api_key, project_id)
+    task = _get_task_or_404(project_id, task_id, db)
+
+    if body.progress_pct is not None:
+        task.progress_pct = body.progress_pct
+    if body.agent_notes is not None:
+        task.agent_notes = body.agent_notes
+
+    if body.comment:
+        comment = Comment(
+            task_id=task_id,
+            body=body.comment,
+            author=f"api:{api_key.name}",
+        )
+        db.add(comment)
+
+    log_activity(
+        db,
+        "task.progress_updated",
+        project_id=project_id,
+        task_id=task_id,
+        actor=f"api:{api_key.name}",
+        detail=f'Task "{task.title}" progress updated to {body.progress_pct}%'
+        if body.progress_pct is not None
+        else f'Task "{task.title}" agent notes updated',
+        meta={
+            "progress_pct": body.progress_pct,
+            "has_notes": body.agent_notes is not None,
+            "has_comment": body.comment is not None,
+        },
+    )
+
+    db.commit()
+    db.refresh(task)
+    await ws_manager.broadcast("task.updated", {"id": task_id, "project_id": project_id})
+    return task

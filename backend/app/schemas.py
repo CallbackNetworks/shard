@@ -74,12 +74,14 @@ class LabelOut(BaseModel):
 class ProjectCreate(BaseModel):
     name: str = Field(description="Project name")
     description: str | None = Field(None, description="Optional project description")
+    agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
 
 
 class ProjectUpdate(BaseModel):
     name: str | None = Field(None, description="New project name")
     description: str | None = Field(None, description="New project description")
     status: Literal["active", "archived"] | None = Field(None, description="Project status: 'active' or 'archived'")
+    agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
 
 
 class ProjectOut(BaseModel):
@@ -153,6 +155,8 @@ class TaskOut(BaseModel):
     time_estimate: int | None = None
     time_spent: int | None = None
     position: int = 0
+    progress_pct: int | None = None
+    agent_notes: str | None = None
     created_at: datetime
     updated_at: datetime
     labels: list[LabelOut] = []
@@ -161,6 +165,12 @@ class TaskOut(BaseModel):
     blocked_by: list[str] = []  # task IDs this task depends on (must complete first)
     blocking: list[str] = []  # task IDs that depend on this task
     recurrence: "RecurrenceRuleOut | None" = None
+
+
+class TaskProgressUpdate(BaseModel):
+    progress_pct: int | None = Field(None, ge=0, le=100, description="Progress percentage (0-100)")
+    agent_notes: str | None = Field(None, description="Agent status notes (markdown)")
+    comment: str | None = Field(None, description="Optional comment to add to the task")
 
 
 # --- Cycle ---
@@ -651,6 +661,24 @@ class SummaryOut(BaseModel):
     identities: list[IdentitySummaryItem]
     projects: list[ProjectSummaryItem]
     recent_activity: list[ActivitySummaryItem]
+
+
+class AgentProjectInfo(BaseModel):
+    id: str
+    name: str
+    status: str
+    agent_instructions: str | None = None
+    label_names: list[str] = []
+
+
+class AgentContextOut(BaseModel):
+    platform: str = "TODO Platform"
+    version: str = "1.0.0"
+    capabilities: list[str]
+    instructions: str | None = Field(None, description="Global agent instructions from platform config")
+    conventions: dict
+    projects: list[AgentProjectInfo]
+    quick_start: str
 
 
 class ActivityEntryOut(BaseModel):

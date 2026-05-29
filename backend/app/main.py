@@ -110,6 +110,15 @@ async def lifespan(app: FastAPI):
                 text("UPDATE api_keys SET key_hash=:h, key_last4=:l4 WHERE id=:id"),
                 {"h": key_hash, "l4": key_last4, "id": row_id},
             )
+        # Migrate project agent_instructions
+        proj_cols = {c["name"] for c in inspect(engine).get_columns("projects")}
+        if "agent_instructions" not in proj_cols:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN agent_instructions TEXT"))
+        # Migrate task progress fields
+        if "progress_pct" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN progress_pct INTEGER"))
+        if "agent_notes" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN agent_notes TEXT"))
         conn.commit()
 
     # Start background scheduler for due date reminders

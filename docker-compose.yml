@@ -20,6 +20,7 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
       - SUMMARY_HOUR=${SUMMARY_HOUR:-8}
+      - AGENT_CONTEXT_INSTRUCTIONS=${AGENT_CONTEXT_INSTRUCTIONS:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

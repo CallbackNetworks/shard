@@ -219,6 +219,31 @@ async def _get_notifications(unread_only: bool = True, limit: int = 20) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _get_agent_context() -> str:
+    result = await _get("/agent-context")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _report_progress(
+    project_id: str,
+    task_id: str,
+    progress_pct: int | None = None,
+    agent_notes: str | None = None,
+    comment: str | None = None,
+) -> str:
+    body: dict = {}
+    if progress_pct is not None:
+        body["progress_pct"] = progress_pct
+    if agent_notes is not None:
+        body["agent_notes"] = agent_notes
+    if comment is not None:
+        body["comment"] = comment
+    result = await _post(
+        f"/projects/{project_id}/tasks/{task_id}/progress", body
+    )
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 # ── MCP tool registry ────────────────────────────────────────────────
 
 TOOL_DEFINITIONS = [
@@ -400,6 +425,30 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     ),
+    types.Tool(
+        name="get_agent_context",
+        description=(
+            "Get platform onboarding context: capabilities, conventions, per-project "
+            "agent instructions, and a quick-start guide. Call this first to understand "
+            "how to interact with the platform."
+        ),
+        inputSchema={"type": "object", "properties": {}, "required": []},
+    ),
+    types.Tool(
+        name="report_progress",
+        description="Report intermediate progress on a task. Updates progress percentage, agent notes, and optionally adds a comment.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID"},
+                "task_id": {"type": "string", "description": "Task ID"},
+                "progress_pct": {"type": "integer", "description": "Progress percentage 0-100"},
+                "agent_notes": {"type": "string", "description": "Agent status notes (markdown)"},
+                "comment": {"type": "string", "description": "Optional comment to add to the task"},
+            },
+            "required": ["project_id", "task_id"],
+        },
+    ),
 ]
 
 
@@ -469,6 +518,16 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
             result = await _get_notifications(
                 unread_only=args.get("unread_only", True),
                 limit=args.get("limit", 20),
+            )
+        elif name == "get_agent_context":
+            result = await _get_agent_context()
+        elif name == "report_progress":
+            result = await _report_progress(
+                project_id=args["project_id"],
+                task_id=args["task_id"],
+                progress_pct=args.get("progress_pct"),
+                agent_notes=args.get("agent_notes"),
+                comment=args.get("comment"),
             )
         else:
             result = f"Unknown tool: {name}"

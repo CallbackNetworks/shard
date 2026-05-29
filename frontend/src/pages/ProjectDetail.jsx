@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -142,6 +142,9 @@ export default function ProjectDetail() {
   })
   const [showCycleForm, setShowCycleForm] = useState(false)
   const [newCycle, setNewCycle] = useState({ name: '', description: '', status: 'draft', start_date: '', end_date: '' })
+  const [showAgentInstr, setShowAgentInstr] = useState(false)
+  const [agentInstr, setAgentInstr] = useState('')
+  const [agentInstrDirty, setAgentInstrDirty] = useState(false)
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -199,6 +202,11 @@ export default function ProjectDetail() {
   const archiveMut = useMutation({
     mutationFn: () => updateProject(id, { status: project.status === 'archived' ? 'active' : 'archived' }),
     onSuccess: invalidate,
+  })
+
+  const saveAgentInstrMut = useMutation({
+    mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null }),
+    onSuccess: () => { invalidate(); setAgentInstrDirty(false) },
   })
 
   const createLabelMut = useMutation({
@@ -365,6 +373,18 @@ export default function ProjectDetail() {
               onDeleteLabel={labelId => deleteLabelMut.mutate(labelId)}
             />
             <button
+              onClick={() => { setShowAgentInstr(v => !v); if (!agentInstrDirty) setAgentInstr(project.agent_instructions || '') }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 14px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)',
+                background: showAgentInstr ? 'rgba(129,140,248,0.15)' : 'transparent',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff',
+                textTransform: 'uppercase', letterSpacing: '1px',
+              }}
+            >
+              <Bot size={12} /> Agent
+            </button>
+            <button
               onClick={() => archiveMut.mutate()}
               style={{ padding: '7px 16px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px' }}
             >
@@ -385,6 +405,57 @@ export default function ProjectDetail() {
             </button>
           </div>
         </div>
+
+        {showAgentInstr && (
+          <div style={{
+            background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.2)',
+            borderRadius: 10, padding: 16, marginBottom: 16,
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Agent Instructions
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+              Instructions for AI agents working on this project. Agents can read these via the API.
+            </div>
+            <textarea
+              value={agentInstr}
+              onChange={e => { setAgentInstr(e.target.value); setAgentInstrDirty(true) }}
+              placeholder="e.g. Use conventional commit style for task titles. Always create subtasks for multi-step work."
+              rows={4}
+              style={{
+                width: '100%', background: 'rgba(0,0,0,0.3)', color: '#ffffff',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6,
+                padding: '8px 10px', fontSize: 13, fontFamily: 'monospace',
+                resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            {agentInstrDirty && (
+              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => saveAgentInstrMut.mutate()}
+                  disabled={saveAgentInstrMut.isPending}
+                  style={{
+                    padding: '5px 14px', borderRadius: 6, border: 'none',
+                    background: '#818cf8', color: '#000', fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {saveAgentInstrMut.isPending ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => { setAgentInstr(project.agent_instructions || ''); setAgentInstrDirty(false) }}
+                  style={{
+                    padding: '5px 14px', borderRadius: 6,
+                    border: '1px solid rgba(255,255,255,0.15)', background: 'transparent',
+                    color: '#fff', fontSize: 12, cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: 'flex' }}>
