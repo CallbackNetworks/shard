@@ -1,13 +1,11 @@
-import asyncio
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task, Project
-from app.schemas import WebhookCallback, TaskOut
-from app.services.notifier import fire_notifications
+from app.models import Project, Task
+from app.schemas import TaskOut, WebhookCallback
 from app.services.activity import log_activity
+from app.services.notifier import fire_notifications
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 
@@ -25,8 +23,10 @@ async def webhook_callback(
     prev_status = task.status
     task.status = body.status
     log_activity(
-        db, "task.status_changed",
-        project_id=task.project_id, task_id=task.id,
+        db,
+        "task.status_changed",
+        project_id=task.project_id,
+        task_id=task.id,
         actor="webhook",
         detail=f'Task "{task.title}" changed from {prev_status} to {body.status} via webhook',
         meta={"old_status": prev_status, "new_status": body.status, "source": "webhook"},
@@ -35,11 +35,7 @@ async def webhook_callback(
     db.refresh(task)
 
     # Reload with project relationship
-    task = (
-        db.query(Task)
-        .filter(Task.id == task.id)
-        .first()
-    )
+    task = db.query(Task).filter(Task.id == task.id).first()
     # Eagerly load project
     _ = task.project
 

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import TaskTemplate
-from app.schemas import TaskTemplateCreate, TaskTemplateUpdate, TaskTemplateOut
+from app.schemas import TaskTemplateCreate, TaskTemplateOut, TaskTemplateUpdate
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 

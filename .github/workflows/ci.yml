@@ -27,8 +27,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run tests
-        run: pytest tests/ -v --tb=short
+      - name: Lint
+        run: ruff check app/ tests/
+
+      - name: Format check
+        run: ruff format --check app/ tests/
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+
+      - name: Security audit
+        run: pip install pip-audit && pip-audit --strict
 
   frontend-build:
     name: Frontend build
@@ -50,14 +59,50 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint -- --max-warnings 300
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate || true
+
       - name: Build
         run: npm run build
 
   docker-build:
-    name: Docker Compose build
+    name: Docker Compose build (dev)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Build all images
         run: docker compose build --no-cache
+
+  integration:
+    name: Integration smoke test (prod)
+    needs: [backend, frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production images
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+      - name: Start services
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 2
+          done
+          echo "Backend health check failed"
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml logs backend
+          exit 1
+
+      - name: Smoke test frontend
+        run: curl -sf http://localhost:80/ > /dev/null
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml down

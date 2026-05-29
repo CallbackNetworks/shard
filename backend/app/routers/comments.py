@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task, Comment
-from app.schemas import CommentCreate, CommentUpdate, CommentOut
+from app.models import Comment, Task
 from app.routers.deps import get_project_or_404
+from app.schemas import CommentCreate, CommentOut, CommentUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/tasks/{task_id}/comments", tags=["comments"])
 
@@ -20,12 +20,7 @@ def _get_task_or_404(project_id: str, task_id: str, db: Session) -> Task:
 @router.get("", response_model=list[CommentOut])
 def list_comments(project_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_task_or_404(project_id, task_id, db)
-    return (
-        db.query(Comment)
-        .filter(Comment.task_id == task_id)
-        .order_by(Comment.created_at.asc())
-        .all()
-    )
+    return db.query(Comment).filter(Comment.task_id == task_id).order_by(Comment.created_at.asc()).all()
 
 
 @router.post("", response_model=CommentOut, status_code=status.HTTP_201_CREATED)

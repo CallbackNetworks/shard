@@ -39,13 +39,25 @@ SUMMARY_HOUR=8
 
 ### 2. Start services
 
+**Production** (recommended):
+
 ```bash
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 This starts:
-- Backend API on port `8000`
-- Frontend dev server on port `5173`
+- Backend API on port `8000` (multi-worker uvicorn)
+- Frontend on port `80` (nginx serving pre-built static files)
+
+**Development** (with hot-reload):
+
+```bash
+docker compose up
+```
+
+This starts:
+- Backend API on port `8000` (uvicorn with `--reload`)
+- Frontend dev server on port `5173` (Vite HMR)
 
 ### 3. Verify
 
@@ -163,8 +175,8 @@ Migrations run automatically on startup via the lifespan handler.
 
 ```bash
 git pull
-docker compose down
-docker compose up --build -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 ```
 
 The SQLite database is stored in the `backend_data` named volume and is preserved across rebuilds.

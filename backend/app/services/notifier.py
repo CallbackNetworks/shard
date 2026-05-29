@@ -2,13 +2,14 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy.orm import Session
 
-from app.models import Task, Project, Integration, WebhookDelivery, Notification
-from app.services.email_sender import send_email, build_notification_email, is_configured as smtp_configured
+from app.models import Integration, Notification, Project, Task, WebhookDelivery
+from app.services.email_sender import build_notification_email, send_email
+from app.services.email_sender import is_configured as smtp_configured
 from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ async def _dispatch_webhook(
     """Send one webhook request, create/update delivery log, return success."""
     body_bytes = json.dumps(payload, separators=(",", ":")).encode()
     headers = _build_headers(integration, body_bytes)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if delivery is None:
         delivery = WebhookDelivery(
@@ -87,9 +88,7 @@ async def _dispatch_webhook(
             logger.info("Notified %s [%s] → %s", integration.name, integration.type, resp.status_code)
             return True
         else:
-            raise httpx.HTTPStatusError(
-                f"HTTP {resp.status_code}", request=resp.request, response=resp
-            )
+            raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
     except Exception as exc:
         delivery.error = str(exc)[:500]
         if delivery.attempt >= MAX_ATTEMPTS:
@@ -124,7 +123,7 @@ async def fire_notifications(db: Session, task: Task, event: str) -> None:
             "status": task.status,
             "priority": task.priority,
         },
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     integrations = (
@@ -186,6 +185,7 @@ def _create_notification(db: Session, event: str, task: Task, project: Project) 
     db.commit()
     # Fire-and-forget broadcast (don't await — this is called from sync context too)
     import asyncio
+
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -220,7 +220,7 @@ async def fire_test_notification(integration: Integration) -> dict:
         "integration": {"id": integration.id, "name": integration.name, "type": integration.type},
         "project": {"name": "Test Project", "progress": 75.0, "total_tasks": 4, "done_tasks": 3},
         "task": {"title": "Test Task", "status": "done", "priority": "high"},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     if integration.type == "email":

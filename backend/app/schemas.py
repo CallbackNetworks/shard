@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # --- Identity ---
+
 
 class IdentityCreate(BaseModel):
     name: str
@@ -36,6 +37,7 @@ class IdentityOut(BaseModel):
 
 # --- Label ---
 
+
 class LabelCreate(BaseModel):
     name: str
     color: str = "#5e6ad2"
@@ -52,6 +54,7 @@ class LabelOut(BaseModel):
 
 
 # --- Project ---
+
 
 class ProjectCreate(BaseModel):
     name: str = Field(description="Project name")
@@ -84,6 +87,7 @@ class ProjectOut(BaseModel):
 
 # --- Task ---
 
+
 class TaskCreate(BaseModel):
     title: str = Field(description="Task title")
     description: str | None = Field(None, description="Optional task description")
@@ -100,10 +104,14 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: str | None = Field(None, description="New task title")
     description: str | None = Field(None, description="New task description")
-    status: Literal["todo", "in_progress", "done", "failed"] | None = Field(None, description="Task status: todo, in_progress, done, or failed")
+    status: Literal["todo", "in_progress", "done", "failed"] | None = Field(
+        None, description="Task status: todo, in_progress, done, or failed"
+    )
     priority: Literal["low", "medium", "high"] | None = Field(None, description="Task priority: low, medium, or high")
     assignee: str | None = Field(None, description="Name of the person assigned to this task")
-    assigned_agent_key_id: str | None = Field(None, description="API key ID of the agent to assign this task to (null to unassign)")
+    assigned_agent_key_id: str | None = Field(
+        None, description="API key ID of the agent to assign this task to (null to unassign)"
+    )
     start_date: datetime | None = Field(None, description="Task start date (ISO 8601)")
     due_date: datetime | None = Field(None, description="Task due date (ISO 8601)")
     parent_id: str | None = Field(None, description="Parent task ID for subtasks")
@@ -135,12 +143,13 @@ class TaskOut(BaseModel):
     labels: list[LabelOut] = []
     subtask_count: int = 0
     comment_count: int = 0
-    blocked_by: list[str] = []   # task IDs this task depends on (must complete first)
-    blocking: list[str] = []     # task IDs that depend on this task
+    blocked_by: list[str] = []  # task IDs this task depends on (must complete first)
+    blocking: list[str] = []  # task IDs that depend on this task
     recurrence: "RecurrenceRuleOut | None" = None
 
 
 # --- Cycle ---
+
 
 class CycleCreate(BaseModel):
     name: str
@@ -177,12 +186,14 @@ class CycleOut(BaseModel):
 
 # --- Webhook callback ---
 
+
 class WebhookCallback(BaseModel):
     status: Literal["todo", "in_progress", "done", "failed"] = Field(description="New task status from CI/CD pipeline")
     message: str | None = Field(None, description="Optional status message from CI/CD pipeline")
 
 
 # --- Integration ---
+
 
 class IntegrationCreate(BaseModel):
     name: str
@@ -227,6 +238,7 @@ class IntegrationOut(BaseModel):
 
 # --- Comment ---
 
+
 class CommentCreate(BaseModel):
     author: str | None = Field(None, description="Author name (optional)")
     body: str = Field(description="Comment body (supports Markdown)")
@@ -249,6 +261,7 @@ class CommentOut(BaseModel):
 
 
 # --- Recurrence ---
+
 
 class RecurrenceRuleCreate(BaseModel):
     frequency: Literal["daily", "weekly", "monthly", "interval"]
@@ -288,6 +301,7 @@ class RecurrenceRuleOut(BaseModel):
 
 # --- API Key ---
 
+
 class ApiKeyCreate(BaseModel):
     name: str
     project_id: str | None = None
@@ -306,7 +320,7 @@ class ApiKeyOut(BaseModel):
 
     id: str
     name: str
-    key_preview: str = ""    # "tdp_****xxxx" — masked after creation
+    key_preview: str = ""  # "tdp_****xxxx" — masked after creation
     project_id: str | None
     scopes: list[str]
     active: bool
@@ -319,17 +333,23 @@ class ApiKeyOut(BaseModel):
         prefix = (getattr(m, "key", None) or "tdp_")[:4]
         preview = f"{prefix}_****{last4}" if last4 else "****"
         return cls(
-            id=m.id, name=m.name, key_preview=preview,
-            project_id=m.project_id, scopes=m.scopes, active=m.active,
-            last_used_at=m.last_used_at, created_at=m.created_at,
+            id=m.id,
+            name=m.name,
+            key_preview=preview,
+            project_id=m.project_id,
+            scopes=m.scopes,
+            active=m.active,
+            last_used_at=m.last_used_at,
+            created_at=m.created_at,
         )
 
 
 class ApiKeyCreateOut(ApiKeyOut):
-    key: str = ""    # full key shown once at creation
+    key: str = ""  # full key shown once at creation
 
 
 # --- Agent Task Summary ---
+
 
 class AgentTaskSummary(BaseModel):
     agent_id: str
@@ -342,6 +362,7 @@ class AgentTaskSummary(BaseModel):
 
 
 # --- Assistant ---
+
 
 class AssistantMessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -375,6 +396,7 @@ class AssistantSendMessage(BaseModel):
 
 # --- Attachment ---
 
+
 class AttachmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -388,6 +410,7 @@ class AttachmentOut(BaseModel):
 
 
 # --- Task Templates ---
+
 
 class TaskTemplateCreate(BaseModel):
     name: str
@@ -403,6 +426,7 @@ class ReorderRequest(BaseModel):
 
 
 # --- Notifications ---
+
 
 class NotificationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -441,26 +465,22 @@ class TaskTemplateOut(BaseModel):
 
 # --- Workflow Rules ---
 
+
 class WorkflowCondition(BaseModel):
     field: str  # priority, status, title_contains, has_label, assignee
-    op: str     # eq, neq, contains, in
+    op: str  # eq, neq, contains, in
     value: str | list[str]
 
 
 class WorkflowAction(BaseModel):
-    type: str   # set_status, set_priority, set_assignee, add_label, remove_label, add_comment, fire_event
+    type: str  # set_status, set_priority, set_assignee, add_label, remove_label, add_comment, fire_event
     value: str
 
 
 class WorkflowRuleCreate(BaseModel):
     name: str
     project_id: str | None = None
-    trigger: Literal[
-        "task.created",
-        "task.status_changed",
-        "task.label_added",
-        "task.priority_changed"
-    ]
+    trigger: Literal["task.created", "task.status_changed", "task.label_added", "task.priority_changed"]
     conditions: list[WorkflowCondition] = []
     actions: list[WorkflowAction] = Field(min_length=1)
     active: bool = True
@@ -492,6 +512,7 @@ class WorkflowRuleOut(BaseModel):
 
 # --- Webhook Delivery ---
 
+
 class WebhookDeliveryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -513,6 +534,7 @@ class WebhookDeliveryOut(BaseModel):
 
 # --- Activity Log ---
 
+
 class ActivityLogOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -527,6 +549,7 @@ class ActivityLogOut(BaseModel):
 
 
 # --- External API response schemas ---
+
 
 class ProjectStatsOut(BaseModel):
     project_id: str

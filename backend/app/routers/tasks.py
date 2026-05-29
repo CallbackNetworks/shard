@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Task, TaskDependency, ApiKey
-from app.schemas import TaskCreate, TaskUpdate, TaskOut, ReorderRequest
+from app.models import ApiKey, Task, TaskDependency
+from app.routers.deps import get_project_or_404 as _get_project_or_404
+from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate
 from app.services.activity import log_activity
 from app.services.rules_engine import run_rules
 from app.services.ws_manager import ws_manager
-from app.routers.deps import get_project_or_404 as _get_project_or_404
 
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["tasks"])
 
@@ -36,8 +36,10 @@ async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(g
     db.add(task)
     db.flush()
     log_activity(
-        db, "task.created",
-        project_id=project_id, task_id=task.id,
+        db,
+        "task.created",
+        project_id=project_id,
+        task_id=task.id,
         actor=body.assignee,
         detail=f'Task "{task.title}" created in {project.name}',
         meta={"title": task.title, "priority": task.priority},
@@ -81,8 +83,10 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     # Log status change
     if "status" in changes and changes["status"] != old_status:
         log_activity(
-            db, "task.status_changed",
-            project_id=project_id, task_id=task_id,
+            db,
+            "task.status_changed",
+            project_id=project_id,
+            task_id=task_id,
             actor=task.assignee,
             detail=f'Task "{task.title}" changed from {old_status} to {changes["status"]}',
             meta={"old_status": old_status, "new_status": changes["status"]},
@@ -96,8 +100,10 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     # Log assignee change
     if "assignee" in changes and changes["assignee"] != old_assignee:
         log_activity(
-            db, "task.assigned",
-            project_id=project_id, task_id=task_id,
+            db,
+            "task.assigned",
+            project_id=project_id,
+            task_id=task_id,
             actor=changes["assignee"],
             detail=f'Task "{task.title}" assigned to {changes["assignee"] or "unassigned"}',
             meta={"old_assignee": old_assignee, "new_assignee": changes["assignee"]},
@@ -107,8 +113,10 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] != old_agent_key_id:
         agent_name = _validated_agent.name if _validated_agent else None
         log_activity(
-            db, "task.agent_assigned",
-            project_id=project_id, task_id=task_id,
+            db,
+            "task.agent_assigned",
+            project_id=project_id,
+            task_id=task_id,
             actor=agent_name or "system",
             detail=f'Task "{task.title}" agent assignment changed to {agent_name or "none"}',
             meta={"agent_name": agent_name},
@@ -134,13 +142,14 @@ async def delete_task(project_id: str, task_id: str, db: Session = Depends(get_d
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     log_activity(
-        db, "task.deleted",
-        project_id=project_id, task_id=task_id,
+        db,
+        "task.deleted",
+        project_id=project_id,
+        task_id=task_id,
         actor=task.assignee,
         detail=f'Task "{task.title}" deleted',
         meta={"title": task.title},
     )
-    title = task.title
     db.delete(task)
     db.commit()
     await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": task_id})
@@ -158,10 +167,14 @@ def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Sessio
         raise HTTPException(status_code=404, detail="Blocker task not found")
     if task_id == depends_on_id:
         raise HTTPException(status_code=400, detail="A task cannot depend on itself")
-    existing = db.query(TaskDependency).filter(
-        TaskDependency.task_id == task_id,
-        TaskDependency.depends_on_id == depends_on_id,
-    ).first()
+    existing = (
+        db.query(TaskDependency)
+        .filter(
+            TaskDependency.task_id == task_id,
+            TaskDependency.depends_on_id == depends_on_id,
+        )
+        .first()
+    )
     if existing:
         return {"task_id": task_id, "depends_on_id": depends_on_id}
     dep = TaskDependency(task_id=task_id, depends_on_id=depends_on_id)
@@ -174,10 +187,14 @@ def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Sessio
 def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
     """Remove the blocked-by dependency between task_id and depends_on_id."""
     _get_project_or_404(project_id, db)
-    dep = db.query(TaskDependency).filter(
-        TaskDependency.task_id == task_id,
-        TaskDependency.depends_on_id == depends_on_id,
-    ).first()
+    dep = (
+        db.query(TaskDependency)
+        .filter(
+            TaskDependency.task_id == task_id,
+            TaskDependency.depends_on_id == depends_on_id,
+        )
+        .first()
+    )
     if not dep:
         raise HTTPException(status_code=404, detail="Dependency not found")
     db.delete(dep)
@@ -207,8 +224,10 @@ def regenerate_token(project_id: str, task_id: str, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail="Task not found")
     task.callback_token = str(uuid.uuid4())
     log_activity(
-        db, "task.token_regenerated",
-        project_id=project_id, task_id=task_id,
+        db,
+        "task.token_regenerated",
+        project_id=project_id,
+        task_id=task_id,
         actor="system",
         detail=f'Webhook token regenerated for "{task.title}"',
         meta={"title": task.title},

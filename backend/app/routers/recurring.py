@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models import Task, RecurrenceRule
-from app.schemas import RecurrenceRuleCreate, RecurrenceRuleUpdate, RecurrenceRuleOut
+from app.models import RecurrenceRule, Task
+from app.schemas import RecurrenceRuleCreate, RecurrenceRuleOut, RecurrenceRuleUpdate
 
 router = APIRouter(
     prefix="/projects/{project_id}/tasks/{task_id}/recurrence",

@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -9,11 +9,17 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import (
-    Identity, ActivityLog, ProjectIdentity, Project,
-    Task, TaskLabel, Label, Cycle, CycleTask, Comment,
+    ActivityLog,
+    Cycle,
+    CycleTask,
+    Identity,
+    Project,
+    ProjectIdentity,
+    Task,
+    TaskLabel,
 )
+from app.services.pin_utils import check_pin
 from app.services.rate_limiter import share_rate_limit
-from app.services.pin_utils import hash_pin, check_pin
 
 router = APIRouter(prefix="/share", tags=["share"])
 
@@ -36,7 +42,7 @@ def _verify_token(token: str, identity_id: str) -> bool:
         if tid != identity_id:
             return False
         ts = int(ts_str)
-        if datetime.now(timezone.utc).timestamp() - ts > _PIN_TTL:
+        if datetime.now(UTC).timestamp() - ts > _PIN_TTL:
             return False
         expected = hmac.new(_PIN_SECRET.encode(), f"{tid}:{ts_str}".encode(), hashlib.sha256).hexdigest()[:32]
         return hmac.compare_digest(sig, expected)
@@ -45,7 +51,7 @@ def _verify_token(token: str, identity_id: str) -> bool:
 
 
 def _hash_ip(ip: str) -> str:
-    daily_salt = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    daily_salt = datetime.now(UTC).strftime("%Y-%m-%d")
     return hashlib.sha256(f"{daily_salt}:{ip}".encode()).hexdigest()[:16]
 
 
@@ -120,35 +126,35 @@ def _build_response(identity: Identity, db: Session):
         for t in tasks:
             if t.parent_id is not None:
                 continue
-            t_labels = [
-                {"name": tl.label.name, "color": tl.label.color}
-                for tl in t.task_labels
-                if tl.label
-            ]
-            task_list.append({
-                "id": t.id,
-                "title": t.title,
-                "status": t.status,
-                "priority": t.priority,
-                "assignee": t.assignee,
-                "due_date": t.due_date.isoformat() if t.due_date else None,
-                "labels": t_labels,
-                "subtask_count": len(t.subtasks),
-                "comment_count": len(t.comments),
-            })
+            t_labels = [{"name": tl.label.name, "color": tl.label.color} for tl in t.task_labels if tl.label]
+            task_list.append(
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "status": t.status,
+                    "priority": t.priority,
+                    "assignee": t.assignee,
+                    "due_date": t.due_date.isoformat() if t.due_date else None,
+                    "labels": t_labels,
+                    "subtask_count": len(t.subtasks),
+                    "comment_count": len(t.comments),
+                }
+            )
 
-        projects.append({
-            "id": p.id,
-            "name": p.name,
-            "status": p.status,
-            "total_tasks": total,
-            "done_tasks": done,
-            "progress": round(done / total * 100, 1) if total > 0 else 0.0,
-            "labels": project_labels,
-            "active_cycle": active_cycle,
-            "comment_count": comment_count,
-            "tasks": task_list,
-        })
+        projects.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "status": p.status,
+                "total_tasks": total,
+                "done_tasks": done,
+                "progress": round(done / total * 100, 1) if total > 0 else 0.0,
+                "labels": project_labels,
+                "active_cycle": active_cycle,
+                "comment_count": comment_count,
+                "tasks": task_list,
+            }
+        )
 
     recent_activity = []
     if project_ids:
@@ -163,14 +169,16 @@ def _build_response(identity: Identity, db: Session):
             .all()
         )
         for log in logs:
-            recent_activity.append({
-                "action": log.action,
-                "detail": log.detail,
-                "project_id": log.project_id,
-                "task_id": log.task_id,
-                "actor": log.actor,
-                "created_at": log.created_at.isoformat() if log.created_at else None,
-            })
+            recent_activity.append(
+                {
+                    "action": log.action,
+                    "detail": log.detail,
+                    "project_id": log.project_id,
+                    "task_id": log.task_id,
+                    "actor": log.actor,
+                    "created_at": log.created_at.isoformat() if log.created_at else None,
+                }
+            )
 
     all_tasks_flat = []
     for p_data in projects:
@@ -178,9 +186,9 @@ def _build_response(identity: Identity, db: Session):
     total_tasks = sum(p["total_tasks"] for p in projects)
     done_tasks = sum(p["done_tasks"] for p in projects)
     overdue_tasks = sum(
-        1 for t in all_tasks_flat
-        if t["due_date"] and t["status"] != "done"
-        and datetime.fromisoformat(t["due_date"]) < datetime.now(timezone.utc)
+        1
+        for t in all_tasks_flat
+        if t["due_date"] and t["status"] != "done" and datetime.fromisoformat(t["due_date"]) < datetime.now(UTC)
     )
 
     return {
@@ -201,7 +209,7 @@ def _build_response(identity: Identity, db: Session):
             "overall_progress": round(done_tasks / total_tasks * 100, 1) if total_tasks > 0 else 0.0,
         },
         "meta": {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "requires_pin": False,
         },
     }
@@ -210,10 +218,8 @@ def _build_response(identity: Identity, db: Session):
 def _maybe_log_view(db: Session, identity: Identity, ip_hash: str):
     """Log at most one view per IP-hash per hour to avoid bloating activity_logs."""
     try:
-        one_hour_ago = datetime.now(timezone.utc).replace(microsecond=0)
-        one_hour_ago = one_hour_ago.replace(
-            hour=one_hour_ago.hour, minute=0, second=0
-        )
+        one_hour_ago = datetime.now(UTC).replace(microsecond=0)
+        one_hour_ago = one_hour_ago.replace(hour=one_hour_ago.hour, minute=0, second=0)
         existing = (
             db.query(ActivityLog.id)
             .filter(
@@ -247,15 +253,15 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
     if identity.share_expires_at:
         exp = identity.share_expires_at
         if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > exp:
+            exp = exp.replace(tzinfo=UTC)
+        if datetime.now(UTC) > exp:
             raise HTTPException(status_code=410, detail="Share link has expired")
 
     if identity.share_pin_hash:
         session_token = request.cookies.get("share_session")
         if not session_token or not _verify_token(session_token, identity.id):
             return {
-                "meta": {"requires_pin": True, "generated_at": datetime.now(timezone.utc).isoformat()},
+                "meta": {"requires_pin": True, "generated_at": datetime.now(UTC).isoformat()},
                 "identity": {"name": identity.name, "color": identity.color, "avatar": identity.avatar},
             }
 
@@ -282,7 +288,7 @@ def verify_share_pin(token: str, body: PinVerifyRequest, response: Response, db:
     if not check_pin(body.pin, identity.share_pin_hash):
         raise HTTPException(status_code=403, detail="Invalid PIN")
 
-    ts = int(datetime.now(timezone.utc).timestamp())
+    ts = int(datetime.now(UTC).timestamp())
     session_token = _sign_token(identity.id, ts)
     response.set_cookie(
         key="share_session",

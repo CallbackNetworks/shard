@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.models import ActivityLog
 
@@ -19,10 +19,11 @@ def test_get_share_invalid_token(client):
 
 def test_get_share_expired(client, db):
     from app.models import Identity
+
     identity = Identity(
         name="Expired",
         share_token="expired-token",
-        share_expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        share_expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db.add(identity)
     db.commit()

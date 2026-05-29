@@ -1,6 +1,8 @@
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.models import Integration, WebhookDelivery
 from app.schemas import WebhookDeliveryOut
@@ -69,6 +71,6 @@ def purge_old_deliveries(
     older_than_days: int = Query(30, ge=1),
     db: Session = Depends(get_db),
 ):
-    cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+    cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
     db.query(WebhookDelivery).filter(WebhookDelivery.created_at < cutoff).delete()
     db.commit()

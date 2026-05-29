@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Label, Task, TaskLabel
-from app.schemas import LabelCreate, LabelOut
+from app.models import Label, Task, TaskLabel
 from app.routers.deps import get_project_or_404 as _get_project_or_404
+from app.schemas import LabelCreate, LabelOut
 
 router = APIRouter(prefix="/projects/{project_id}/labels", tags=["labels"])
 
@@ -51,9 +51,7 @@ def add_label_to_task(project_id: str, task_id: str, label_id: str, db: Session 
     label = db.query(Label).filter(Label.id == label_id, Label.project_id == project_id).first()
     if not label:
         raise HTTPException(status_code=404, detail="Label not found")
-    existing = db.query(TaskLabel).filter(
-        TaskLabel.task_id == task_id, TaskLabel.label_id == label_id
-    ).first()
+    existing = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
     if not existing:
         tl = TaskLabel(task_id=task_id, label_id=label_id)
         db.add(tl)
@@ -64,9 +62,7 @@ def add_label_to_task(project_id: str, task_id: str, label_id: str, db: Session 
 @task_label_router.delete("/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_label_from_task(project_id: str, task_id: str, label_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    tl = db.query(TaskLabel).filter(
-        TaskLabel.task_id == task_id, TaskLabel.label_id == label_id
-    ).first()
+    tl = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
     if not tl:
         raise HTTPException(status_code=404, detail="Label not assigned to task")
     db.delete(tl)

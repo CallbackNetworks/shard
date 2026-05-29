@@ -1,4 +1,4 @@
-from app.services.pin_utils import hash_pin, check_pin
+from app.services.pin_utils import check_pin, hash_pin
 
 
 def test_hash_pin_format():

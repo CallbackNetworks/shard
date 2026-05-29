@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Cycle, CycleTask, Task
-from app.schemas import CycleCreate, CycleUpdate, CycleOut
+from app.models import Cycle, CycleTask, Task
 from app.routers.deps import get_project_or_404 as _get_project_or_404
+from app.schemas import CycleCreate, CycleOut, CycleUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/cycles", tags=["cycles"])
 
@@ -81,9 +81,7 @@ def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Session 
     task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    existing = db.query(CycleTask).filter(
-        CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id
-    ).first()
+    existing = db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id).first()
     if not existing:
         ct = CycleTask(cycle_id=cycle_id, task_id=task_id)
         db.add(ct)
@@ -94,9 +92,7 @@ def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Session 
 @router.delete("/{cycle_id}/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    ct = db.query(CycleTask).filter(
-        CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id
-    ).first()
+    ct = db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id).first()
     if not ct:
         raise HTTPException(status_code=404, detail="Task not in cycle")
     db.delete(ct)

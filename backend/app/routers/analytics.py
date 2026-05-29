@@ -1,26 +1,26 @@
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import Date, cast, func
 from sqlalchemy.orm import Session
-from sqlalchemy import func, cast, Date
 
 from app.database import get_db
-from app.models import Task, Project, ActivityLog, Cycle, CycleTask
+from app.models import ActivityLog, Cycle, CycleTask, Project, Task
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
 @router.get("/overview")
 def get_overview(db: Session = Depends(get_db)):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
 
     total_tasks = db.query(func.count(Task.id)).scalar() or 0
     done_tasks = db.query(func.count(Task.id)).filter(Task.status == "done").scalar() or 0
     in_progress = db.query(func.count(Task.id)).filter(Task.status == "in_progress").scalar() or 0
-    overdue = db.query(func.count(Task.id)).filter(
-        Task.due_date < now,
-        Task.status.notin_(["done", "failed"])
-    ).scalar() or 0
+    overdue = (
+        db.query(func.count(Task.id)).filter(Task.due_date < now, Task.status.notin_(["done", "failed"])).scalar() or 0
+    )
 
     # Most active project last 7 days
     activity_counts = (
@@ -57,14 +57,11 @@ def get_heatmap(
     project_id: str | None = None,
     db: Session = Depends(get_db),
 ):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     end_dt = datetime.fromisoformat(end) if end else now
     start_dt = datetime.fromisoformat(start) if start else end_dt - timedelta(days=365)
 
-    q = db.query(
-        cast(ActivityLog.created_at, Date).label("day"),
-        func.count(ActivityLog.id).label("count")
-    ).filter(
+    q = db.query(cast(ActivityLog.created_at, Date).label("day"), func.count(ActivityLog.id).label("count")).filter(
         ActivityLog.created_at >= start_dt,
         ActivityLog.created_at <= end_dt,
     )
@@ -81,7 +78,7 @@ def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
         return []
 
     start = cycle.start_date or cycle.created_at
-    end = cycle.end_date or datetime.now(timezone.utc)
+    end = cycle.end_date or datetime.now(UTC)
     if not start:
         return []
 
@@ -98,13 +95,16 @@ def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
         done_count = (
             db.query(func.count(Task.id))
             .filter(Task.id.in_(task_ids), Task.status == "done", Task.updated_at <= day_end)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
-        result.append({
-            "date": current.strftime("%Y-%m-%d"),
-            "remaining": total - done_count,
-            "done": done_count,
-        })
+        result.append(
+            {
+                "date": current.strftime("%Y-%m-%d"),
+                "remaining": total - done_count,
+                "done": done_count,
+            }
+        )
         current += timedelta(days=1)
         if len(result) > 365:
             break
@@ -114,23 +114,30 @@ def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
 
 @router.get("/velocity")
 def get_velocity(project_id: str, db: Session = Depends(get_db)):
-    cycles = db.query(Cycle).filter(
-        Cycle.project_id == project_id,
-        Cycle.status == "completed",
-    ).order_by(Cycle.start_date).all()
+    cycles = (
+        db.query(Cycle)
+        .filter(
+            Cycle.project_id == project_id,
+            Cycle.status == "completed",
+        )
+        .order_by(Cycle.start_date)
+        .all()
+    )
 
     result = []
     for cycle in cycles:
         task_ids = [ct.task_id for ct in cycle.cycle_tasks]
         done_count = sum(1 for ct in cycle.cycle_tasks if ct.task and ct.task.status == "done")
-        result.append({
-            "cycle_id": cycle.id,
-            "name": cycle.name,
-            "total_tasks": len(task_ids),
-            "completed_tasks": done_count,
-            "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
-            "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
-        })
+        result.append(
+            {
+                "cycle_id": cycle.id,
+                "name": cycle.name,
+                "total_tasks": len(task_ids),
+                "completed_tasks": done_count,
+                "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
+                "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
+            }
+        )
     return result
 
 
@@ -151,31 +158,30 @@ def get_cycle_burndown(
     tasks = db.query(Task).filter(Task.id.in_(cycle_task_ids)).all()
     total = len(tasks)
 
-    start = cycle.start_date or min((t.created_at for t in tasks), default=datetime.now(timezone.utc))
-    end = cycle.end_date or datetime.now(timezone.utc)
+    start = cycle.start_date or min((t.created_at for t in tasks), default=datetime.now(UTC))
+    end = cycle.end_date or datetime.now(UTC)
 
     # Build daily burndown
     result = []
     current = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end_day = end.replace(hour=23, minute=59, second=59)
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     if end_day > today:
         end_day = today
 
     while current <= end_day:
         day_end = current.replace(hour=23, minute=59, second=59)
         # Count tasks completed by this day
-        done_by_day = sum(
-            1 for t in tasks
-            if t.status == "done" and t.updated_at and t.updated_at <= day_end
-        )
+        done_by_day = sum(1 for t in tasks if t.status == "done" and t.updated_at and t.updated_at <= day_end)
         remaining = total - done_by_day
-        result.append({
-            "date": current.strftime("%Y-%m-%d"),
-            "remaining": remaining,
-            "total": total,
-            "done": done_by_day,
-        })
+        result.append(
+            {
+                "date": current.strftime("%Y-%m-%d"),
+                "remaining": remaining,
+                "total": total,
+                "done": done_by_day,
+            }
+        )
         current += timedelta(days=1)
 
     # Add ideal burndown line
@@ -192,7 +198,7 @@ def get_status_trend(
     days: int = Query(30, ge=1, le=365),
     db: Session = Depends(get_db),
 ):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = []
     for i in range(days - 1, -1, -1):
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)

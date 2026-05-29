@@ -3,7 +3,7 @@
 import time
 from collections import defaultdict
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 
 
 class RateLimiter:

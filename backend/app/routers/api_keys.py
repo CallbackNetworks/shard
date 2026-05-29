@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import ApiKey, Task
-from app.schemas import ApiKeyCreate, ApiKeyUpdate, ApiKeyOut, ApiKeyCreateOut, AgentTaskSummary, TaskOut, LabelOut
+from app.schemas import AgentTaskSummary, ApiKeyCreate, ApiKeyCreateOut, ApiKeyOut, ApiKeyUpdate, LabelOut, TaskOut
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -109,13 +109,15 @@ def get_agent_summary(db: Session = Depends(get_db)):
             out.blocking = [d.task_id for d in t.blocking_deps]
             out.assigned_agent_name = key.name
             enriched_tasks.append(out)
-        result.append(AgentTaskSummary(
-            agent_id=key.id,
-            agent_name=key.name,
-            project_id=key.project_id,
-            active=key.active,
-            last_used_at=key.last_used_at,
-            task_counts=counts,
-            tasks=enriched_tasks,
-        ))
+        result.append(
+            AgentTaskSummary(
+                agent_id=key.id,
+                agent_name=key.name,
+                project_id=key.project_id,
+                active=key.active,
+                last_used_at=key.last_used_at,
+                task_counts=counts,
+                tasks=enriched_tasks,
+            )
+        )
     return result

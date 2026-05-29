@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Task, WorkflowRule
-from app.schemas import WorkflowRuleCreate, WorkflowRuleUpdate, WorkflowRuleOut
-from app.services.rules_engine import run_rules
+from app.schemas import WorkflowRuleCreate, WorkflowRuleOut, WorkflowRuleUpdate
 
 router = APIRouter(prefix="/workflow-rules", tags=["workflow-rules"])
 
@@ -78,6 +77,7 @@ async def test_rule(rule_id: str, task_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     from app.services.rules_engine import _eval_condition
+
     all_match = all(_eval_condition(c, task, {}) for c in (rule.conditions or []))
     return {
         "would_fire": all_match,

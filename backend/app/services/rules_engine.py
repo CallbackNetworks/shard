@@ -2,12 +2,13 @@
 Workflow rules engine.
 Evaluates WorkflowRule conditions against a task and executes actions.
 """
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import Task, WorkflowRule, Comment, TaskLabel, Label
+from app.models import Comment, Label, Task, TaskLabel, WorkflowRule
 from app.services.activity import log_activity
 
 logger = logging.getLogger(__name__)
@@ -63,20 +64,20 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
     elif atype == "set_assignee":
         task.assignee = value or None
     elif atype == "add_label":
-        label = db.query(Label).filter(
-            Label.project_id == task.project_id,
-            Label.id == value,
-        ).first()
+        label = (
+            db.query(Label)
+            .filter(
+                Label.project_id == task.project_id,
+                Label.id == value,
+            )
+            .first()
+        )
         if label:
-            existing = db.query(TaskLabel).filter(
-                TaskLabel.task_id == task.id, TaskLabel.label_id == value
-            ).first()
+            existing = db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == value).first()
             if not existing:
                 db.add(TaskLabel(task_id=task.id, label_id=label.id))
     elif atype == "remove_label":
-        db.query(TaskLabel).filter(
-            TaskLabel.task_id == task.id, TaskLabel.label_id == value
-        ).delete()
+        db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == value).delete()
     elif atype == "add_comment":
         comment = Comment(
             task_id=task.id,
@@ -87,8 +88,10 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
         db.add(comment)
     elif atype == "fire_event":
         # Deferred import to avoid circular
-        from app.services.notifier import fire_notifications
         import asyncio
+
+        from app.services.notifier import fire_notifications
+
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
@@ -131,11 +134,11 @@ async def run_rules(
                 continue
 
             # Execute actions
-            for action in (rule.actions or []):
+            for action in rule.actions or []:
                 _exec_action(db, action, task)
 
             rule.run_count = (rule.run_count or 0) + 1
-            rule.last_run_at = datetime.now(timezone.utc)
+            rule.last_run_at = datetime.now(UTC)
             db.flush()
 
             log_activity(

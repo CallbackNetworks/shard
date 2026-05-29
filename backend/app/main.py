@@ -1,7 +1,8 @@
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
-import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,11 +12,33 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.database import engine
 from app.models import Base
-from app.routers import projects, tasks, webhooks, integrations, labels, cycles, api_keys, external_api, activity, identities, share
-from app.routers import comments, search, recurring, webhook_logs, analytics, workflow_rules, assistant, templates, attachments, notifications
+from app.routers import (
+    activity,
+    analytics,
+    api_keys,
+    assistant,
+    attachments,
+    comments,
+    cycles,
+    external_api,
+    identities,
+    integrations,
+    labels,
+    notifications,
+    projects,
+    recurring,
+    search,
+    share,
+    tasks,
+    templates,
+    webhook_logs,
+    webhooks,
+    workflow_rules,
+)
 from app.routers import ws as ws_router
+from app.routers.auth import router as auth_router
+from app.routers.auth import verify_token
 from app.routers.labels import task_label_router
-from app.routers.auth import router as auth_router, verify_token
 from app.services.scheduler import due_date_reminder_loop
 
 
@@ -23,7 +46,8 @@ from app.services.scheduler import due_date_reminder_loop
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     # Migrate: add columns if they don't exist yet
-    from sqlalchemy import text, inspect
+    from sqlalchemy import inspect, text
+
     with engine.connect() as conn:
         task_cols = {c["name"] for c in inspect(engine).get_columns("tasks")}
         for col in ("start_date", "due_date"):
@@ -38,16 +62,21 @@ async def lifespan(app: FastAPI):
         if "email_to" not in intg_cols:
             conn.execute(text("ALTER TABLE integrations ADD COLUMN email_to TEXT"))
         if "email_subject_prefix" not in intg_cols:
-            conn.execute(text("ALTER TABLE integrations ADD COLUMN email_subject_prefix VARCHAR(255) DEFAULT '[TODO Platform]'"))
+            conn.execute(
+                text("ALTER TABLE integrations ADD COLUMN email_subject_prefix VARCHAR(255) DEFAULT '[TODO Platform]'")
+            )
         # Migrate identity share_token
         import uuid as _uuid
+
         identity_cols = {c["name"] for c in inspect(engine).get_columns("identities")}
         if "share_token" not in identity_cols:
             conn.execute(text("ALTER TABLE identities ADD COLUMN share_token VARCHAR(36)"))
             rows = conn.execute(text("SELECT id FROM identities")).fetchall()
             for (row_id,) in rows:
-                conn.execute(text("UPDATE identities SET share_token = :t WHERE id = :id"),
-                             {"t": str(_uuid.uuid4()), "id": row_id})
+                conn.execute(
+                    text("UPDATE identities SET share_token = :t WHERE id = :id"),
+                    {"t": str(_uuid.uuid4()), "id": row_id},
+                )
         # Migrate identity share PIN and expiry
         if "share_pin_hash" not in identity_cols:
             conn.execute(text("ALTER TABLE identities ADD COLUMN share_pin_hash VARCHAR(128)"))
@@ -65,6 +94,7 @@ async def lifespan(app: FastAPI):
             conn.execute(text("ALTER TABLE tasks ADD COLUMN position INTEGER DEFAULT 0 NOT NULL"))
         # Migrate API keys to hashed storage
         import hashlib as _hashlib
+
         api_key_cols = {c["name"] for c in inspect(engine).get_columns("api_keys")}
         if "key_hash" not in api_key_cols:
             conn.execute(text("ALTER TABLE api_keys ADD COLUMN key_hash VARCHAR(64)"))
@@ -72,11 +102,13 @@ async def lifespan(app: FastAPI):
             conn.execute(text("ALTER TABLE api_keys ADD COLUMN key_last4 VARCHAR(8)"))
         # Migrate existing plaintext keys to hashes
         rows = conn.execute(text("SELECT id, key FROM api_keys WHERE key IS NOT NULL AND key_hash IS NULL")).fetchall()
-        for (row_id, raw_key) in rows:
+        for row_id, raw_key in rows:
             key_hash = _hashlib.sha256(raw_key.encode()).hexdigest()
             key_last4 = raw_key[-4:]
-            conn.execute(text("UPDATE api_keys SET key_hash=:h, key_last4=:l4 WHERE id=:id"),
-                         {"h": key_hash, "l4": key_last4, "id": row_id})
+            conn.execute(
+                text("UPDATE api_keys SET key_hash=:h, key_last4=:l4 WHERE id=:id"),
+                {"h": key_hash, "l4": key_last4, "id": row_id},
+            )
         conn.commit()
 
     # Start background scheduler for due date reminders
@@ -138,6 +170,7 @@ _AUTH_BYPASS = (
     "/redoc",
     "/ws",
 )
+
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

@@ -1,6 +1,7 @@
-from fastapi import WebSocket
 import asyncio
 import json
+
+from fastapi import WebSocket
 
 
 class ConnectionManager:

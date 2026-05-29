@@ -3,13 +3,15 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Integration
-from app.schemas import IntegrationCreate, IntegrationUpdate, IntegrationOut
-from app.services.notifier import fire_test_notification
+from app.schemas import IntegrationCreate, IntegrationOut, IntegrationUpdate
 from app.services.email_sender import is_configured as smtp_configured
+from app.services.notifier import fire_test_notification
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
-SMTP_WARNING = "SMTP is not configured. Emails will not be sent until SMTP_HOST and SMTP_FROM environment variables are set."
+SMTP_WARNING = (
+    "SMTP is not configured. Emails will not be sent until SMTP_HOST and SMTP_FROM environment variables are set."
+)
 
 
 @router.get("", response_model=list[IntegrationOut])

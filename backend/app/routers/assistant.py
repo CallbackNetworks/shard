@@ -1,5 +1,6 @@
 import json
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -7,11 +8,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import AssistantConversation, AssistantMessage
 from app.schemas import (
-    AssistantConversationOut, AssistantConversationSummary,
-    AssistantSendMessage, AssistantMessageOut
+    AssistantConversationOut,
+    AssistantConversationSummary,
+    AssistantSendMessage,
 )
-from app.services.llm import get_provider
 from app.services.assistant_tools import TOOLS, dispatch_tool
+from app.services.llm import get_provider
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/assistant", tags=["assistant"])
@@ -30,18 +32,12 @@ def list_conversations(
     if q:
         # Search conversations by title or message content
         conv_ids_by_msg = (
-            db.query(AssistantMessage.conversation_id)
-            .filter(AssistantMessage.content.ilike(f"%{q}%"))
-            .distinct()
-            .all()
+            db.query(AssistantMessage.conversation_id).filter(AssistantMessage.content.ilike(f"%{q}%")).distinct().all()
         )
         conv_ids = [c[0] for c in conv_ids_by_msg]
         return (
             db.query(AssistantConversation)
-            .filter(
-                (AssistantConversation.title.ilike(f"%{q}%")) |
-                (AssistantConversation.id.in_(conv_ids))
-            )
+            .filter((AssistantConversation.title.ilike(f"%{q}%")) | (AssistantConversation.id.in_(conv_ids)))
             .order_by(AssistantConversation.updated_at.desc())
             .limit(20)
             .all()
@@ -92,9 +88,12 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
     db.commit()
 
     # Build message history for LLM
-    history = db.query(AssistantMessage).filter(
-        AssistantMessage.conversation_id == conv_id
-    ).order_by(AssistantMessage.created_at).all()
+    history = (
+        db.query(AssistantMessage)
+        .filter(AssistantMessage.conversation_id == conv_id)
+        .order_by(AssistantMessage.created_at)
+        .all()
+    )
 
     messages = [{"role": m.role if m.role != "tool" else "user", "content": m.content} for m in history]
 

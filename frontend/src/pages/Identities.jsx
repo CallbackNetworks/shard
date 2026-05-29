@@ -118,7 +118,7 @@ function ShareSettings({ identity, onUpdate }) {
     try {
       await setShareExpiry(identity.id, val)
       onUpdate()
-    } catch {}
+    } catch { /* ignore */ }
   }
 
   return (

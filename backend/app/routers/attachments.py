@@ -2,12 +2,12 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task, Attachment
+from app.models import Attachment, Task
 from app.schemas import AttachmentOut
 
 UPLOAD_DIR = Path("/app/uploads")
@@ -19,10 +19,15 @@ router = APIRouter(prefix="/projects/{project_id}/tasks/{task_id}/attachments", 
 
 @router.get("", response_model=list[AttachmentOut])
 def list_attachments(project_id: str, task_id: str, db: Session = Depends(get_db)):
-    return db.query(Attachment).filter(
-        Attachment.task_id == task_id,
-        Attachment.project_id == project_id,
-    ).order_by(Attachment.created_at.desc()).all()
+    return (
+        db.query(Attachment)
+        .filter(
+            Attachment.task_id == task_id,
+            Attachment.project_id == project_id,
+        )
+        .order_by(Attachment.created_at.desc())
+        .all()
+    )
 
 
 @router.post("", response_model=AttachmentOut, status_code=status.HTTP_201_CREATED)
@@ -77,10 +82,14 @@ async def upload_attachment(
 
 @router.get("/{attachment_id}/download")
 def download_attachment(project_id: str, task_id: str, attachment_id: str, db: Session = Depends(get_db)):
-    att = db.query(Attachment).filter(
-        Attachment.id == attachment_id,
-        Attachment.task_id == task_id,
-    ).first()
+    att = (
+        db.query(Attachment)
+        .filter(
+            Attachment.id == attachment_id,
+            Attachment.task_id == task_id,
+        )
+        .first()
+    )
     if not att:
         raise HTTPException(status_code=404, detail="Attachment not found")
     if not os.path.exists(att.storage_path):
@@ -90,10 +99,14 @@ def download_attachment(project_id: str, task_id: str, attachment_id: str, db: S
 
 @router.delete("/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_attachment(project_id: str, task_id: str, attachment_id: str, db: Session = Depends(get_db)):
-    att = db.query(Attachment).filter(
-        Attachment.id == attachment_id,
-        Attachment.task_id == task_id,
-    ).first()
+    att = (
+        db.query(Attachment)
+        .filter(
+            Attachment.id == attachment_id,
+            Attachment.task_id == task_id,
+        )
+        .first()
+    )
     if not att:
         raise HTTPException(status_code=404, detail="Attachment not found")
     if os.path.exists(att.storage_path):

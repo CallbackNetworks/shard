@@ -1,0 +1,25 @@
+# Production overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    volumes:
+      - backend_data:/app/data
+    # Remove source mount and dev venv volume; image is self-contained
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    volumes: []
+    # No source mount; nginx serves pre-built static files
+
+  mcp:
+    profiles:
+      - mcp
+    # Only start mcp if explicitly requested: docker compose --profile mcp up

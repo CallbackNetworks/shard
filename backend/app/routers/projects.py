@@ -2,8 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Label, Cycle, RecurrenceRule
-from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut, TaskOut, LabelOut, CycleOut, IdentityOut, RecurrenceRuleOut
+from app.models import Project, RecurrenceRule
+from app.schemas import (
+    CycleOut,
+    IdentityOut,
+    LabelOut,
+    ProjectCreate,
+    ProjectOut,
+    ProjectUpdate,
+    RecurrenceRuleOut,
+    TaskOut,
+)
 from app.services.activity import log_activity
 from app.services.ws_manager import ws_manager
 
@@ -82,7 +91,8 @@ async def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
     db.add(project)
     db.flush()
     log_activity(
-        db, "project.created",
+        db,
+        "project.created",
         project_id=project.id,
         detail=f'Project "{project.name}" created',
     )
@@ -111,7 +121,8 @@ async def update_project(project_id: str, body: ProjectUpdate, db: Session = Dep
         setattr(project, field, value)
     if "status" in changes and changes["status"] != old_status:
         log_activity(
-            db, f'project.{changes["status"]}',
+            db,
+            f'project.{changes["status"]}',
             project_id=project_id,
             detail=f'Project "{project.name}" changed to {changes["status"]}',
             meta={"old_status": old_status, "new_status": changes["status"]},
@@ -128,7 +139,8 @@ async def delete_project(project_id: str, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     log_activity(
-        db, "project.deleted",
+        db,
+        "project.deleted",
         project_id=project_id,
         detail=f'Project "{project.name}" deleted',
     )

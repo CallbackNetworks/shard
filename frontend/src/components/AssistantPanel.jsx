@@ -198,7 +198,7 @@ export default function AssistantPanel() {
                 qc.invalidateQueries({ queryKey: ['assistant-conv', convId] })
                 qc.invalidateQueries({ queryKey: ['assistant-conversations'] })
               }
-            } catch {}
+            } catch { /* ignore cleanup errors */ }
           }
         }
       }

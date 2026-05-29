@@ -2,11 +2,12 @@
 Provider-agnostic LLM abstraction for the Assistant feature.
 Set LLM_PROVIDER env var to: "claude" | "openai" | "stub"
 """
+
 import json
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,10 @@ class LLMProvider(ABC):
 
 class StubProvider(LLMProvider):
     async def chat(self, messages, tools, system=None):
-        yield {"type": "text", "text": "LLM provider not configured. Set LLM_PROVIDER, LLM_API_KEY, and LLM_MODEL env vars."}
+        yield {
+            "type": "text",
+            "text": "LLM provider not configured. Set LLM_PROVIDER, LLM_API_KEY, and LLM_MODEL env vars.",
+        }
         yield {"type": "done"}
 
 
@@ -42,13 +46,13 @@ class ClaudeProvider(LLMProvider):
     def __init__(self):
         try:
             import anthropic
+
             self.client = anthropic.AsyncAnthropic(api_key=LLM_API_KEY)
             self.model = LLM_MODEL or "claude-sonnet-4-6"
-        except ImportError:
-            raise RuntimeError("anthropic package not installed. Add 'anthropic' to requirements.txt")
+        except ImportError as err:
+            raise RuntimeError("anthropic package not installed. Add 'anthropic' to requirements.txt") from err
 
     async def chat(self, messages, tools, system=None):
-        import anthropic
         formatted_tools = [
             {
                 "name": t["name"],
@@ -68,16 +72,16 @@ class ClaudeProvider(LLMProvider):
 
         async with self.client.messages.stream(**kwargs) as stream:
             async for event in stream:
-                if hasattr(event, 'type'):
-                    if event.type == 'content_block_delta':
-                        if hasattr(event.delta, 'text'):
+                if hasattr(event, "type"):
+                    if event.type == "content_block_delta":
+                        if hasattr(event.delta, "text"):
                             yield {"type": "text", "text": event.delta.text}
-                        elif hasattr(event.delta, 'partial_json'):
+                        elif hasattr(event.delta, "partial_json"):
                             pass  # handled at stop_reason
-                    elif event.type == 'message_stop':
+                    elif event.type == "message_stop":
                         msg = await stream.get_final_message()
                         for block in msg.content:
-                            if block.type == 'tool_use':
+                            if block.type == "tool_use":
                                 yield {"type": "tool_call", "name": block.name, "input": block.input, "id": block.id}
                         yield {"type": "done"}
                         return
@@ -89,10 +93,11 @@ class OpenAIProvider(LLMProvider):
     def __init__(self):
         try:
             from openai import AsyncOpenAI
+
             self.client = AsyncOpenAI(api_key=LLM_API_KEY)
             self.model = LLM_MODEL or "gpt-4o"
-        except ImportError:
-            raise RuntimeError("openai package not installed. Add 'openai' to requirements.txt")
+        except ImportError as err:
+            raise RuntimeError("openai package not installed. Add 'openai' to requirements.txt") from err
 
     async def chat(self, messages, tools, system=None):
         formatted_tools = [

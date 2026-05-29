@@ -2,12 +2,13 @@
 Tool definitions and implementations for the LLM Assistant.
 Each tool is a JSON schema (for the LLM) + a Python function (for execution).
 """
+
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
 
-from app.models import Task, Project, ActivityLog, Label, TaskLabel, Cycle, CycleTask
-from app.routers.projects import _enrich_task
+from app.models import ActivityLog, Label, Project, Task, TaskLabel
 
 TOOLS = [
     {
@@ -26,7 +27,11 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "project_id": {"type": "string", "description": "Project ID (required)"},
-                "status": {"type": "string", "enum": ["todo", "in_progress", "done", "failed"], "description": "Filter by status"},
+                "status": {
+                    "type": "string",
+                    "enum": ["todo", "in_progress", "done", "failed"],
+                    "description": "Filter by status",
+                },
             },
             "required": ["project_id"],
         },
@@ -166,13 +171,20 @@ async def _tool_get_summary(db: Session) -> str:
         total = len([t for t in p.tasks if t.parent_id is None])
         done = sum(1 for t in p.tasks if t.status == "done" and t.parent_id is None)
         in_prog = sum(1 for t in p.tasks if t.status == "in_progress" and t.parent_id is None)
-        overdue = sum(1 for t in p.tasks if t.due_date and t.due_date < datetime.now(timezone.utc) and t.status not in ("done", "failed"))
-        result.append({
-            "id": p.id,
-            "name": p.name,
-            "total": total, "done": done, "in_progress": in_prog, "overdue": overdue,
-            "progress": f"{round(done/total*100,1) if total else 0}%",
-        })
+        overdue = sum(
+            1 for t in p.tasks if t.due_date and t.due_date < datetime.now(UTC) and t.status not in ("done", "failed")
+        )
+        result.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "total": total,
+                "done": done,
+                "in_progress": in_prog,
+                "overdue": overdue,
+                "progress": f"{round(done/total*100,1) if total else 0}%",
+            }
+        )
     return json.dumps(result, default=str)
 
 
@@ -181,14 +193,33 @@ def _tool_list_tasks(db: Session, project_id: str, status: str | None = None) ->
     if status:
         q = q.filter(Task.status == status)
     tasks = q.order_by(Task.created_at.desc()).limit(50).all()
-    return json.dumps([{
-        "id": t.id, "title": t.title, "status": t.status, "priority": t.priority,
-        "assignee": t.assignee, "due_date": t.due_date.isoformat() if t.due_date else None,
-    } for t in tasks], default=str)
+    return json.dumps(
+        [
+            {
+                "id": t.id,
+                "title": t.title,
+                "status": t.status,
+                "priority": t.priority,
+                "assignee": t.assignee,
+                "due_date": t.due_date.isoformat() if t.due_date else None,
+            }
+            for t in tasks
+        ],
+        default=str,
+    )
 
 
-async def _tool_create_task(db: Session, project_id: str, title: str, priority: str = "medium", description: str | None = None, assignee: str | None = None, due_date: str | None = None) -> str:
+async def _tool_create_task(
+    db: Session,
+    project_id: str,
+    title: str,
+    priority: str = "medium",
+    description: str | None = None,
+    assignee: str | None = None,
+    due_date: str | None = None,
+) -> str:
     import uuid
+
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         return f"Project {project_id} not found"
@@ -202,7 +233,7 @@ async def _tool_create_task(db: Session, project_id: str, title: str, priority: 
         callback_token=str(uuid.uuid4()),
     )
     if due_date:
-        task.due_date = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        task.due_date = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=UTC)
     db.add(task)
     db.commit()
     return json.dumps({"id": task.id, "title": task.title, "status": task.status})
@@ -219,16 +250,29 @@ def _tool_update_task(db: Session, task_id: str, **kwargs) -> str:
     if "due_date" in kwargs:
         val = kwargs["due_date"]
         if val and val != "null":
-            task.due_date = datetime.fromisoformat(val).replace(tzinfo=timezone.utc) if "T" in val else datetime.strptime(val, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            task.due_date = (
+                datetime.fromisoformat(val).replace(tzinfo=UTC)
+                if "T" in val
+                else datetime.strptime(val, "%Y-%m-%d").replace(tzinfo=UTC)
+            )
         else:
             task.due_date = None
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now(UTC)
     db.commit()
-    return json.dumps({"id": task.id, "title": task.title, "status": task.status, "priority": task.priority, "due_date": task.due_date.isoformat() if task.due_date else None})
+    return json.dumps(
+        {
+            "id": task.id,
+            "title": task.title,
+            "status": task.status,
+            "priority": task.priority,
+            "due_date": task.due_date.isoformat() if task.due_date else None,
+        }
+    )
 
 
 async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, priority: str = "medium") -> str:
     import uuid
+
     parent = db.query(Task).filter(Task.id == parent_task_id).first()
     if not parent:
         return f"Parent task {parent_task_id} not found"
@@ -245,12 +289,14 @@ async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, pri
     return json.dumps({"id": task.id, "title": task.title, "parent_id": parent_task_id})
 
 
-def _tool_manage_labels(db: Session, action: str, project_id: str | None = None, task_id: str | None = None, label_id: str | None = None) -> str:
+def _tool_manage_labels(
+    db: Session, action: str, project_id: str | None = None, task_id: str | None = None, label_id: str | None = None
+) -> str:
     if action == "list":
         if not project_id:
             return "project_id required for list action"
         labels = db.query(Label).filter(Label.project_id == project_id).all()
-        return json.dumps([{"id": l.id, "name": l.name, "color": l.color} for l in labels])
+        return json.dumps([{"id": lb.id, "name": lb.name, "color": lb.color} for lb in labels])
     elif action == "add":
         if not task_id or not label_id:
             return "task_id and label_id required for add action"
@@ -277,7 +323,7 @@ def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
         q = q.filter(Task.project_id == project_id)
     tasks = q.all()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     by_status = {}
     by_priority = {}
     by_assignee = {}
@@ -303,35 +349,46 @@ def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
         if t.time_spent:
             total_spent += t.time_spent
 
-    return json.dumps({
-        "total_tasks": len(tasks),
-        "by_status": by_status,
-        "by_priority": by_priority,
-        "by_assignee": by_assignee,
-        "overdue": overdue,
-        "total_estimate_hours": round(total_estimate / 60, 1),
-        "total_spent_hours": round(total_spent / 60, 1),
-    })
+    return json.dumps(
+        {
+            "total_tasks": len(tasks),
+            "by_status": by_status,
+            "by_priority": by_priority,
+            "by_assignee": by_assignee,
+            "overdue": overdue,
+            "total_estimate_hours": round(total_estimate / 60, 1),
+            "total_spent_hours": round(total_spent / 60, 1),
+        }
+    )
 
 
 def _tool_search(db: Session, query: str) -> str:
     from sqlalchemy import or_
+
     q = query.lower()
-    tasks = db.query(Task).filter(
-        or_(Task.title.ilike(f"%{q}%"), Task.description.ilike(f"%{q}%"))
-    ).limit(20).all()
-    projects = db.query(Project).filter(
-        or_(Project.name.ilike(f"%{q}%"), Project.description.ilike(f"%{q}%"))
-    ).limit(10).all()
-    return json.dumps({
-        "tasks": [{"id": t.id, "title": t.title, "status": t.status, "project_id": t.project_id} for t in tasks],
-        "projects": [{"id": p.id, "name": p.name} for p in projects],
-    })
+    tasks = db.query(Task).filter(or_(Task.title.ilike(f"%{q}%"), Task.description.ilike(f"%{q}%"))).limit(20).all()
+    projects = (
+        db.query(Project).filter(or_(Project.name.ilike(f"%{q}%"), Project.description.ilike(f"%{q}%"))).limit(10).all()
+    )
+    return json.dumps(
+        {
+            "tasks": [{"id": t.id, "title": t.title, "status": t.status, "project_id": t.project_id} for t in tasks],
+            "projects": [{"id": p.id, "name": p.name} for p in projects],
+        }
+    )
 
 
 def _tool_get_activity(db: Session, limit: int = 20) -> str:
     logs = db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit).all()
-    return json.dumps([{
-        "action": l.action, "detail": l.detail, "actor": l.actor,
-        "created_at": l.created_at.isoformat() if l.created_at else None,
-    } for l in logs], default=str)
+    return json.dumps(
+        [
+            {
+                "action": entry.action,
+                "detail": entry.detail,
+                "actor": entry.actor,
+                "created_at": entry.created_at.isoformat() if entry.created_at else None,
+            }
+            for entry in logs
+        ],
+        default=str,
+    )

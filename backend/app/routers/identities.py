@@ -1,13 +1,13 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Identity, ProjectIdentity, Project, ActivityLog
-from app.schemas import IdentityCreate, IdentityUpdate, IdentityOut
+from app.models import ActivityLog, Identity, Project, ProjectIdentity
+from app.schemas import IdentityCreate, IdentityOut, IdentityUpdate
 
 router = APIRouter(prefix="/identities", tags=["identities"])
 
@@ -69,6 +69,7 @@ def delete_identity(identity_id: str, db: Session = Depends(get_db)):
 
 # ── Project ↔ Identity linking ────────────────────────────────────
 
+
 @router.post("/{identity_id}/projects/{project_id}", status_code=status.HTTP_201_CREATED)
 def link_project(identity_id: str, project_id: str, db: Session = Depends(get_db)):
     identity = db.query(Identity).filter(Identity.id == identity_id).first()
@@ -77,10 +78,14 @@ def link_project(identity_id: str, project_id: str, db: Session = Depends(get_db
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    existing = db.query(ProjectIdentity).filter(
-        ProjectIdentity.identity_id == identity_id,
-        ProjectIdentity.project_id == project_id,
-    ).first()
+    existing = (
+        db.query(ProjectIdentity)
+        .filter(
+            ProjectIdentity.identity_id == identity_id,
+            ProjectIdentity.project_id == project_id,
+        )
+        .first()
+    )
     if existing:
         return {"status": "already linked"}
     link = ProjectIdentity(project_id=project_id, identity_id=identity_id)
@@ -91,10 +96,14 @@ def link_project(identity_id: str, project_id: str, db: Session = Depends(get_db
 
 @router.delete("/{identity_id}/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def unlink_project(identity_id: str, project_id: str, db: Session = Depends(get_db)):
-    link = db.query(ProjectIdentity).filter(
-        ProjectIdentity.identity_id == identity_id,
-        ProjectIdentity.project_id == project_id,
-    ).first()
+    link = (
+        db.query(ProjectIdentity)
+        .filter(
+            ProjectIdentity.identity_id == identity_id,
+            ProjectIdentity.project_id == project_id,
+        )
+        .first()
+    )
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
     db.delete(link)
@@ -115,6 +124,7 @@ def get_identity_projects(identity_id: str, db: Session = Depends(get_db)):
 
 # ── Share PIN management ─────────────────────────────────────────
 
+
 class SetPinBody(BaseModel):
     pin: str
 
@@ -122,6 +132,7 @@ class SetPinBody(BaseModel):
 @router.post("/{identity_id}/set-pin")
 def set_identity_pin(identity_id: str, body: SetPinBody, db: Session = Depends(get_db)):
     from app.services.pin_utils import hash_pin
+
     identity = db.query(Identity).filter(Identity.id == identity_id).first()
     if not identity:
         raise HTTPException(status_code=404, detail="Identity not found")
@@ -144,6 +155,7 @@ def clear_identity_pin(identity_id: str, db: Session = Depends(get_db)):
 
 # ── Share expiry management ────────���─────────────────────────────
 
+
 class SetExpiryBody(BaseModel):
     expires_at: datetime | None
 
@@ -159,6 +171,7 @@ def set_identity_expiry(identity_id: str, body: SetExpiryBody, db: Session = Dep
 
 
 # ── Share view count ─────────────────────────────────────────────
+
 
 @router.get("/{identity_id}/share-views")
 def get_share_view_count(identity_id: str, db: Session = Depends(get_db)):

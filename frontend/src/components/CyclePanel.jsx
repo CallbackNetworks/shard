@@ -258,7 +258,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                     try {
                       const data = await compareCycles(projectId, cycle.id, compareTarget)
                       setCompareData(data)
-                    } catch {}
+                    } catch { /* ignore */ }
                   }}
                   style={{
                     padding: '4px 12px', border: 'none', borderRadius: 6,

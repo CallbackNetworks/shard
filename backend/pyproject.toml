@@ -2,11 +2,17 @@
 name = "todo-platform-backend"
 version = "1.0.0"
 requires-python = ">=3.11"
-dependencies = [
-    "fastapi==0.115.5",
-    "uvicorn[standard]==0.32.1",
-    "sqlalchemy==2.0.36",
-    "httpx==0.28.0",
-    "pydantic-settings==2.6.1",
-    "python-multipart==0.0.17",
-]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["B008", "E402", "E501", "E711", "E712"]
+
+[tool.ruff.format]
+quote-style = "double"

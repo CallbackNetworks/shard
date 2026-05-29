@@ -4,30 +4,49 @@ External API v1 — authenticated with API keys.
 All endpoints require an `X-API-Key` header.
 Scopes: read (GET), write (POST/PATCH/DELETE), admin (all).
 """
-import hashlib
-from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
-from sqlalchemy import func, cast, Date
+import hashlib
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from sqlalchemy import Date, cast, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import (
-    ApiKey, Project, Task, Integration, ActivityLog, Identity,
-    Comment, Label, TaskLabel, TaskDependency, Notification, Cycle, CycleTask,
+    ActivityLog,
+    ApiKey,
+    Comment,
+    Cycle,
+    Identity,
+    Label,
+    Notification,
+    Project,
+    Task,
+    TaskDependency,
+    TaskLabel,
 )
 from app.schemas import (
-    ProjectCreate, ProjectUpdate, ProjectOut,
-    TaskCreate, TaskUpdate, TaskOut,
-    WebhookCallback,
-    ProjectStatsOut, EmailStatusOut, EmailSendRequest, EmailSendOut,
-    SummaryOut, ActivityEntryOut,
-    CommentCreate, CommentUpdate, CommentOut,
-    LabelCreate, LabelOut,
+    ActivityEntryOut,
+    CommentCreate,
+    CommentOut,
+    CommentUpdate,
+    EmailSendOut,
+    EmailSendRequest,
+    EmailStatusOut,
+    LabelCreate,
+    LabelOut,
     NotificationOut,
+    ProjectCreate,
+    ProjectStatsOut,
+    ProjectUpdate,
+    SummaryOut,
+    TaskCreate,
+    TaskOut,
+    TaskUpdate,
 )
-from app.services.notifier import fire_notifications
 from app.services.activity import log_activity
+from app.services.notifier import fire_notifications
 from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/api/v1", tags=["External API v1"])
@@ -35,15 +54,18 @@ router = APIRouter(prefix="/api/v1", tags=["External API v1"])
 
 # ── Auth dependency ───────────────────────────────────────────────
 
+
 def _get_api_key(
-    x_api_key: str = Header(..., alias="X-API-Key", description="API key (starts with tdp_). Create one in the API Keys page."),
+    x_api_key: str = Header(
+        ..., alias="X-API-Key", description="API key (starts with tdp_). Create one in the API Keys page."
+    ),
     db: Session = Depends(get_db),
 ) -> ApiKey:
     key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
     api_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.active == True).first()
     if not api_key:
         raise HTTPException(status_code=401, detail="Invalid or inactive API key")
-    api_key.last_used_at = datetime.now(timezone.utc)
+    api_key.last_used_at = datetime.now(UTC)
     db.commit()
     return api_key
 
@@ -103,6 +125,7 @@ def _enrich_task_for_search(task: Task) -> dict:
 
 # ── Projects ──────────────────────────────────────────────────────
 
+
 @router.get(
     "/projects",
     summary="List all projects",
@@ -138,10 +161,7 @@ def api_get_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     result = _enrich_project(project)
-    result["tasks"] = [
-        {c.name: getattr(t, c.name) for c in t.__table__.columns}
-        for t in project.tasks
-    ]
+    result["tasks"] = [{c.name: getattr(t, c.name) for c in t.__table__.columns} for t in project.tasks]
     return result
 
 
@@ -212,6 +232,7 @@ def api_delete_project(
 
 # ── Tasks ─────────────────────────────────────────────────────────
 
+
 @router.get(
     "/projects/{project_id}/tasks",
     summary="List tasks in a project",
@@ -280,8 +301,10 @@ def api_create_task(
     db.add(task)
     db.flush()
     log_activity(
-        db, "task.created",
-        project_id=project_id, task_id=task.id,
+        db,
+        "task.created",
+        project_id=project_id,
+        task_id=task.id,
         actor=f"api:{api_key.name}",
         detail=f'Task "{task.title}" created via API',
         meta={"title": task.title, "priority": task.priority, "api_key": api_key.name},
@@ -316,8 +339,10 @@ async def api_update_task(
 
     if body.status and body.status != old_status:
         log_activity(
-            db, "task.status_changed",
-            project_id=project_id, task_id=task_id,
+            db,
+            "task.status_changed",
+            project_id=project_id,
+            task_id=task_id,
             actor=f"api:{api_key.name}",
             detail=f'Task "{task.title}" changed from {old_status} to {body.status} via API',
             meta={"old_status": old_status, "new_status": body.status, "api_key": api_key.name},
@@ -361,6 +386,7 @@ def api_delete_task(
 
 
 # ── Bulk operations ───────────────────────────────────────────────
+
 
 @router.post(
     "/projects/{project_id}/tasks/bulk",
@@ -432,6 +458,7 @@ async def api_bulk_update_tasks(
 
 # ── Project stats ─────────────────────────────────────────────────
 
+
 @router.get(
     "/projects/{project_id}/stats",
     summary="Get project statistics",
@@ -455,7 +482,7 @@ def api_project_stats(
     by_status = {}
     by_priority = {}
     overdue = 0
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     for t in tasks:
         by_status[t.status] = by_status.get(t.status, 0) + 1
@@ -478,6 +505,7 @@ def api_project_stats(
 
 # ── Email config status ──────────────────────────────────────────
 
+
 @router.get(
     "/email/status",
     summary="Check SMTP configuration status",
@@ -486,7 +514,8 @@ def api_project_stats(
     responses=_auth_errors,
 )
 def api_email_status(api_key: ApiKey = Depends(_get_api_key)):
-    from app.services.email_sender import is_configured, SMTP_HOST, SMTP_PORT, SMTP_FROM
+    from app.services.email_sender import SMTP_FROM, SMTP_HOST, SMTP_PORT, is_configured
+
     _require_scope(api_key, "read")
     return {
         "configured": is_configured(),
@@ -498,18 +527,24 @@ def api_email_status(api_key: ApiKey = Depends(_get_api_key)):
 
 # ── Send email directly ──────────────────────────────────────────
 
+
 @router.post(
     "/email/send",
     summary="Send an email directly",
     description="Sends an email to specified recipients. SMTP must be configured. Requires `write` scope.",
     response_model=EmailSendOut,
-    responses={**_auth_errors, 502: {"description": "Failed to send email"}, 503: {"description": "SMTP not configured"}},
+    responses={
+        **_auth_errors,
+        502: {"description": "Failed to send email"},
+        503: {"description": "SMTP not configured"},
+    },
 )
 def api_send_email(
     email: EmailSendRequest,
     api_key: ApiKey = Depends(_get_api_key),
 ):
-    from app.services.email_sender import send_email, is_configured
+    from app.services.email_sender import is_configured, send_email
+
     _require_scope(api_key, "write")
     if not is_configured():
         raise HTTPException(status_code=503, detail="SMTP not configured")
@@ -523,6 +558,7 @@ def api_send_email(
 
 
 # ── Summary (designed for AI Agents) ─────────────────────────────
+
 
 @router.get(
     "/summary",
@@ -545,7 +581,7 @@ def api_summary(
 ):
     _require_scope(api_key, "read")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     query = db.query(Project)
     if api_key.project_id:
@@ -578,28 +614,28 @@ def api_summary(
             elif t.status == "failed":
                 failed += 1
 
-            is_overdue = (
-                t.due_date and t.due_date < now
-                and t.status not in ("done", "failed")
-            )
+            is_overdue = t.due_date and t.due_date < now and t.status not in ("done", "failed")
             if is_overdue:
                 overdue += 1
 
             if t.status == "in_progress" or is_overdue:
-                active_tasks.append({
-                    "id": t.id,
-                    "title": t.title,
-                    "status": t.status,
-                    "priority": t.priority,
-                    "assignee": t.assignee,
-                    "due_date": t.due_date.isoformat() if t.due_date else None,
-                })
+                active_tasks.append(
+                    {
+                        "id": t.id,
+                        "title": t.title,
+                        "status": t.status,
+                        "priority": t.priority,
+                        "assignee": t.assignee,
+                        "due_date": t.due_date.isoformat() if t.due_date else None,
+                    }
+                )
 
             if t.assignee:
                 assignees_set.add(t.assignee)
 
             if (
-                t.due_date and t.due_date >= now
+                t.due_date
+                and t.due_date >= now
                 and t.status not in ("done", "failed")
                 and (next_due is None or t.due_date < next_due)
             ):
@@ -609,20 +645,22 @@ def api_summary(
         total_done_all += done
         total_overdue += overdue
 
-        project_summaries.append({
-            "id": p.id,
-            "name": p.name,
-            "status": p.status,
-            "progress": f"{round(done / total * 100, 1)}%" if total > 0 else "0%",
-            "total_tasks": total,
-            "done": done,
-            "in_progress": in_progress,
-            "failed": failed,
-            "overdue": overdue,
-            "next_due": next_due.isoformat() if next_due else None,
-            "assignees": list(assignees_set),
-            "active_tasks": active_tasks,
-        })
+        project_summaries.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "status": p.status,
+                "progress": f"{round(done / total * 100, 1)}%" if total > 0 else "0%",
+                "total_tasks": total,
+                "done": done,
+                "in_progress": in_progress,
+                "failed": failed,
+                "overdue": overdue,
+                "next_due": next_due.isoformat() if next_due else None,
+                "assignees": list(assignees_set),
+                "active_tasks": active_tasks,
+            }
+        )
 
     # Recent activity
     activity_query = db.query(ActivityLog).order_by(ActivityLog.created_at.desc())
@@ -633,7 +671,7 @@ def api_summary(
     def _time_ago(dt):
         if not dt:
             return ""
-        delta = now - dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else now - dt
+        delta = now - dt.replace(tzinfo=UTC) if dt.tzinfo is None else now - dt
         secs = int(delta.total_seconds())
         if secs < 60:
             return f"{secs}s ago"
@@ -664,26 +702,33 @@ def api_summary(
         ident_project_ids = {pi.project_id for pi in ident.project_identities}
         ident_projects = [ps for ps in project_summaries if ps["id"] in ident_project_ids]
         if not ident_projects:
-            identity_summaries.append({
+            identity_summaries.append(
+                {
+                    "id": ident.id,
+                    "name": ident.name,
+                    "color": ident.color,
+                    "avatar": ident.avatar,
+                    "total_tasks": 0,
+                    "done": 0,
+                    "in_progress": 0,
+                    "overdue": 0,
+                    "projects": [],
+                }
+            )
+            continue
+        identity_summaries.append(
+            {
                 "id": ident.id,
                 "name": ident.name,
                 "color": ident.color,
                 "avatar": ident.avatar,
-                "total_tasks": 0, "done": 0, "in_progress": 0, "overdue": 0,
-                "projects": [],
-            })
-            continue
-        identity_summaries.append({
-            "id": ident.id,
-            "name": ident.name,
-            "color": ident.color,
-            "avatar": ident.avatar,
-            "total_tasks": sum(p["total_tasks"] for p in ident_projects),
-            "done": sum(p["done"] for p in ident_projects),
-            "in_progress": sum(p["in_progress"] for p in ident_projects),
-            "overdue": sum(p["overdue"] for p in ident_projects),
-            "projects": [{"id": p["id"], "name": p["name"], "progress": p["progress"]} for p in ident_projects],
-        })
+                "total_tasks": sum(p["total_tasks"] for p in ident_projects),
+                "done": sum(p["done"] for p in ident_projects),
+                "in_progress": sum(p["in_progress"] for p in ident_projects),
+                "overdue": sum(p["overdue"] for p in ident_projects),
+                "projects": [{"id": p["id"], "name": p["name"], "progress": p["progress"]} for p in ident_projects],
+            }
+        )
 
     return {
         "timestamp": now.isoformat(),
@@ -700,6 +745,7 @@ def api_summary(
 
 
 # ── Activity log via API ─────────────────────────────────────────
+
 
 @router.get(
     "/activity",
@@ -740,6 +786,7 @@ def api_activity(
 
 # ── Search ────────────────────────────────────────────────────────
 
+
 @router.get(
     "/search",
     summary="Search tasks and projects",
@@ -766,32 +813,30 @@ def api_search(
 
     pattern = f"%{q}%"
 
-    task_query = db.query(Task).filter(
-        (Task.title.ilike(pattern)) | (Task.description.ilike(pattern))
-    )
+    task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
     if project_id:
         task_query = task_query.filter(Task.project_id == project_id)
     tasks = task_query.order_by(Task.updated_at.desc()).offset(offset).limit(limit).all()
 
     projects = []
     if not project_id:
-        proj_query = db.query(Project).filter(
-            (Project.name.ilike(pattern)) | (Project.description.ilike(pattern))
-        )
+        proj_query = db.query(Project).filter((Project.name.ilike(pattern)) | (Project.description.ilike(pattern)))
         for p in proj_query.limit(20).all():
             total = len(p.tasks)
             done = sum(1 for t in p.tasks if t.status == "done")
-            projects.append({
-                "id": p.id,
-                "name": p.name,
-                "description": p.description,
-                "status": p.status,
-                "total_tasks": total,
-                "done_tasks": done,
-                "progress": round(done / total * 100, 1) if total > 0 else 0.0,
-                "created_at": p.created_at.isoformat(),
-                "updated_at": p.updated_at.isoformat(),
-            })
+            projects.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "description": p.description,
+                    "status": p.status,
+                    "total_tasks": total,
+                    "done_tasks": done,
+                    "progress": round(done / total * 100, 1) if total > 0 else 0.0,
+                    "created_at": p.created_at.isoformat(),
+                    "updated_at": p.updated_at.isoformat(),
+                }
+            )
 
     return {
         "query": q,
@@ -801,6 +846,7 @@ def api_search(
 
 
 # ── Comments ──────────────────────────────────────────────────────
+
 
 @router.get(
     "/projects/{project_id}/tasks/{task_id}/comments",
@@ -818,12 +864,7 @@ def api_list_comments(
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
     _get_task_or_404(project_id, task_id, db)
-    return (
-        db.query(Comment)
-        .filter(Comment.task_id == task_id)
-        .order_by(Comment.created_at.asc())
-        .all()
-    )
+    return db.query(Comment).filter(Comment.task_id == task_id).order_by(Comment.created_at.asc()).all()
 
 
 @router.post(
@@ -855,8 +896,10 @@ async def api_create_comment(
     db.add(comment)
     db.flush()
     log_activity(
-        db, "comment.created",
-        project_id=project_id, task_id=task_id,
+        db,
+        "comment.created",
+        project_id=project_id,
+        task_id=task_id,
         actor=f"api:{api_key.name}",
         detail=f"Comment added via API by {data['author']}",
         meta={"api_key": api_key.name},
@@ -919,6 +962,7 @@ def api_delete_comment(
 
 
 # ── Labels ────────────────────────────────────────────────────────
+
 
 @router.get(
     "/projects/{project_id}/labels",
@@ -1013,8 +1057,10 @@ async def api_add_label_to_task(
     if not existing:
         db.add(TaskLabel(task_id=task_id, label_id=label_id))
         log_activity(
-            db, "task.label_added",
-            project_id=project_id, task_id=task_id,
+            db,
+            "task.label_added",
+            project_id=project_id,
+            task_id=task_id,
             actor=f"api:{api_key.name}",
             detail=f'Label "{label.name}" added to task "{task.title}" via API',
             meta={"label_id": label_id, "label_name": label.name, "api_key": api_key.name},
@@ -1048,6 +1094,7 @@ def api_remove_label_from_task(
 
 
 # ── Task dependencies ─────────────────────────────────────────────
+
 
 @router.get(
     "/projects/{project_id}/tasks/{task_id}/dependencies",
@@ -1087,7 +1134,11 @@ def api_get_dependencies(
     status_code=status.HTTP_201_CREATED,
     summary="Add a blocker dependency",
     description="Marks `task_id` as blocked by `depends_on_id` — the blocker task must complete before this task can proceed. Idempotent. Requires `write` scope.",
-    responses={**_auth_errors, 400: {"description": "Self-dependency not allowed"}, 404: {"description": "Task not found"}},
+    responses={
+        **_auth_errors,
+        400: {"description": "Self-dependency not allowed"},
+        404: {"description": "Task not found"},
+    },
 )
 def api_add_dependency(
     project_id: str,
@@ -1104,10 +1155,14 @@ def api_add_dependency(
         raise HTTPException(status_code=404, detail="Blocker task not found")
     if task_id == depends_on_id:
         raise HTTPException(status_code=400, detail="A task cannot depend on itself")
-    existing = db.query(TaskDependency).filter(
-        TaskDependency.task_id == task_id,
-        TaskDependency.depends_on_id == depends_on_id,
-    ).first()
+    existing = (
+        db.query(TaskDependency)
+        .filter(
+            TaskDependency.task_id == task_id,
+            TaskDependency.depends_on_id == depends_on_id,
+        )
+        .first()
+    )
     if existing:
         return {"task_id": task_id, "depends_on_id": depends_on_id}
     db.add(TaskDependency(task_id=task_id, depends_on_id=depends_on_id))
@@ -1131,10 +1186,14 @@ def api_remove_dependency(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    dep = db.query(TaskDependency).filter(
-        TaskDependency.task_id == task_id,
-        TaskDependency.depends_on_id == depends_on_id,
-    ).first()
+    dep = (
+        db.query(TaskDependency)
+        .filter(
+            TaskDependency.task_id == task_id,
+            TaskDependency.depends_on_id == depends_on_id,
+        )
+        .first()
+    )
     if not dep:
         raise HTTPException(status_code=404, detail="Dependency not found")
     db.delete(dep)
@@ -1142,6 +1201,7 @@ def api_remove_dependency(
 
 
 # ── Analytics ─────────────────────────────────────────────────────
+
 
 @router.get(
     "/analytics/overview",
@@ -1156,7 +1216,7 @@ def api_analytics_overview(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
     pid = api_key.project_id  # None means platform-wide
 
@@ -1177,9 +1237,8 @@ def api_analytics_overview(
     total_projects = proj_q.scalar() or 0
     active_projects = proj_q.filter(Project.status == "active").scalar() or 0
 
-    act_q = (
-        db.query(ActivityLog.project_id, func.count(ActivityLog.id).label("cnt"))
-        .filter(ActivityLog.created_at >= week_ago, ActivityLog.project_id.isnot(None))
+    act_q = db.query(ActivityLog.project_id, func.count(ActivityLog.id).label("cnt")).filter(
+        ActivityLog.created_at >= week_ago, ActivityLog.project_id.isnot(None)
     )
     if pid:
         act_q = act_q.filter(ActivityLog.project_id == pid)
@@ -1219,7 +1278,7 @@ def api_analytics_heatmap(
     _require_scope(api_key, "read")
     if api_key.project_id:
         project_id = api_key.project_id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     end_dt = datetime.fromisoformat(end) if end else now
     start_dt = datetime.fromisoformat(start) if start else end_dt - timedelta(days=365)
 
@@ -1250,7 +1309,7 @@ def api_analytics_status_trend(
     _require_scope(api_key, "read")
     if api_key.project_id:
         project_id = api_key.project_id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = []
     for i in range(days - 1, -1, -1):
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
@@ -1284,26 +1343,34 @@ def api_analytics_velocity(
     if not pid:
         raise HTTPException(status_code=400, detail="project_id is required")
     _check_project_access(api_key, pid)
-    cycles = db.query(Cycle).filter(
-        Cycle.project_id == pid,
-        Cycle.status == "completed",
-    ).order_by(Cycle.start_date).all()
+    cycles = (
+        db.query(Cycle)
+        .filter(
+            Cycle.project_id == pid,
+            Cycle.status == "completed",
+        )
+        .order_by(Cycle.start_date)
+        .all()
+    )
     result = []
     for cycle in cycles:
         task_ids = [ct.task_id for ct in cycle.cycle_tasks]
         done_count = sum(1 for ct in cycle.cycle_tasks if ct.task and ct.task.status == "done")
-        result.append({
-            "cycle_id": cycle.id,
-            "name": cycle.name,
-            "total_tasks": len(task_ids),
-            "completed_tasks": done_count,
-            "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
-            "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
-        })
+        result.append(
+            {
+                "cycle_id": cycle.id,
+                "name": cycle.name,
+                "total_tasks": len(task_ids),
+                "completed_tasks": done_count,
+                "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
+                "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
+            }
+        )
     return result
 
 
 # ── Notifications ─────────────────────────────────────────────────
+
 
 @router.get(
     "/notifications",

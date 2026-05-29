@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Project, Task
-from app.schemas import TaskOut, LabelOut
+from app.schemas import LabelOut, TaskOut
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -32,9 +32,7 @@ def search(
     pattern = f"%{q}%"
 
     # Search tasks
-    task_query = db.query(Task).filter(
-        (Task.title.ilike(pattern)) | (Task.description.ilike(pattern))
-    )
+    task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
     if project_id:
         task_query = task_query.filter(Task.project_id == project_id)
     tasks = task_query.order_by(Task.updated_at.desc()).offset(offset).limit(limit).all()
@@ -42,23 +40,23 @@ def search(
     # Search projects (only if no project_id filter)
     projects = []
     if not project_id:
-        proj_query = db.query(Project).filter(
-            (Project.name.ilike(pattern)) | (Project.description.ilike(pattern))
-        )
+        proj_query = db.query(Project).filter((Project.name.ilike(pattern)) | (Project.description.ilike(pattern)))
         for p in proj_query.limit(20).all():
             total = len(p.tasks)
             done = sum(1 for t in p.tasks if t.status == "done")
-            projects.append({
-                "id": p.id,
-                "name": p.name,
-                "description": p.description,
-                "status": p.status,
-                "total_tasks": total,
-                "done_tasks": done,
-                "progress": round(done / total * 100, 1) if total > 0 else 0.0,
-                "created_at": p.created_at.isoformat(),
-                "updated_at": p.updated_at.isoformat(),
-            })
+            projects.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "description": p.description,
+                    "status": p.status,
+                    "total_tasks": total,
+                    "done_tasks": done,
+                    "progress": round(done / total * 100, 1) if total > 0 else 0.0,
+                    "created_at": p.created_at.isoformat(),
+                    "updated_at": p.updated_at.isoformat(),
+                }
+            )
 
     return {
         "query": q,

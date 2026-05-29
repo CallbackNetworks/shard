@@ -2,30 +2,30 @@
 Background scheduler — due date reminders + recurring task generation + daily summary.
 Runs as an asyncio task in the FastAPI lifespan. Ticks every hour.
 """
+
 import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.database import SessionLocal
-from app.models import Task, Project, RecurrenceRule, WebhookDelivery, Integration
-from app.services.notifier import fire_notifications, retry_delivery
-from app.services.activity import log_activity
+from app.models import Integration, Project, RecurrenceRule, Task, WebhookDelivery
 from app.services import email_sender
+from app.services.activity import log_activity
+from app.services.notifier import fire_notifications, retry_delivery
 
 logger = logging.getLogger(__name__)
 
 CHECK_INTERVAL_SECONDS = 3600  # every hour
-DUE_SOON_WINDOW_HOURS = 24     # fire "due_soon" when task is due within this many hours
-REMINDER_COOLDOWN_HOURS = 23   # don't re-send a reminder within this window
+DUE_SOON_WINDOW_HOURS = 24  # fire "due_soon" when task is due within this many hours
+REMINDER_COOLDOWN_HOURS = 23  # don't re-send a reminder within this window
 
 
 async def _check_and_fire(db: Session) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     due_soon_cutoff = now + timedelta(hours=DUE_SOON_WINDOW_HOURS)
     cooldown_cutoff = now - timedelta(hours=REMINDER_COOLDOWN_HOURS)
 
@@ -66,6 +66,7 @@ def _compute_next_run(rule: RecurrenceRule, from_time: datetime) -> datetime:
         month = ((month - 1) % 12) + 1
         day = rule.day_of_month or from_time.day
         import calendar
+
         max_day = calendar.monthrange(year, month)[1]
         day = min(day, max_day)
         return from_time.replace(year=year, month=month, day=day)
@@ -73,7 +74,7 @@ def _compute_next_run(rule: RecurrenceRule, from_time: datetime) -> datetime:
 
 
 async def _check_recurring(db: Session) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rules = (
         db.query(RecurrenceRule)
         .filter(
@@ -129,7 +130,7 @@ async def _check_recurring(db: Session) -> None:
 
 
 async def _retry_failed_webhooks(db: Session) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     deliveries = (
         db.query(WebhookDelivery)
         .filter(
@@ -152,7 +153,7 @@ _last_summary_date: str | None = None
 async def _send_daily_summary(db: Session) -> None:
     """Generate and send a daily summary email to all email-type integrations."""
     global _last_summary_date
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     today_str = now.strftime("%Y-%m-%d")
 
     # Only send once per day, at or after the configured hour
@@ -165,26 +166,38 @@ async def _send_daily_summary(db: Session) -> None:
     if not projects:
         return
 
-    overdue_tasks = db.query(Task).filter(
-        Task.due_date < now,
-        Task.status.notin_(["done", "failed"]),
-    ).all()
+    overdue_tasks = (
+        db.query(Task)
+        .filter(
+            Task.due_date < now,
+            Task.status.notin_(["done", "failed"]),
+        )
+        .all()
+    )
 
-    due_today = db.query(Task).filter(
-        Task.due_date >= now.replace(hour=0, minute=0, second=0),
-        Task.due_date <= now.replace(hour=23, minute=59, second=59),
-        Task.status.notin_(["done", "failed"]),
-    ).all()
+    due_today = (
+        db.query(Task)
+        .filter(
+            Task.due_date >= now.replace(hour=0, minute=0, second=0),
+            Task.due_date <= now.replace(hour=23, minute=59, second=59),
+            Task.status.notin_(["done", "failed"]),
+        )
+        .all()
+    )
 
     in_progress = db.query(Task).filter(Task.status == "in_progress", Task.parent_id == None).all()
 
     # Yesterday's completions
     yesterday = now - timedelta(days=1)
-    completed_yesterday = db.query(Task).filter(
-        Task.status == "done",
-        Task.updated_at >= yesterday.replace(hour=0, minute=0, second=0),
-        Task.updated_at <= yesterday.replace(hour=23, minute=59, second=59),
-    ).all()
+    completed_yesterday = (
+        db.query(Task)
+        .filter(
+            Task.status == "done",
+            Task.updated_at >= yesterday.replace(hour=0, minute=0, second=0),
+            Task.updated_at <= yesterday.replace(hour=23, minute=59, second=59),
+        )
+        .all()
+    )
 
     # Build summary
     project_summaries = []
@@ -223,10 +236,14 @@ async def _send_daily_summary(db: Session) -> None:
     subject = f"[TODO Platform] Daily Summary — {now.strftime('%b %d')}"
 
     # Send to all email-type integrations
-    integrations = db.query(Integration).filter(
-        Integration.type == "email",
-        Integration.active == True,
-    ).all()
+    integrations = (
+        db.query(Integration)
+        .filter(
+            Integration.type == "email",
+            Integration.active == True,
+        )
+        .all()
+    )
 
     for intg in integrations:
         to_addrs = [addr.strip() for addr in (intg.email_to or "").split(",") if addr.strip()]
