@@ -170,6 +170,7 @@ _AUTH_BYPASS = (
     "/openapi.json",
     "/redoc",
     "/ws",
+    "/api/v1/",
 )
 
 

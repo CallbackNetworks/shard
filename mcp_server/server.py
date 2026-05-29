@@ -1,95 +1,87 @@
 #!/usr/bin/env python3
-"""MCP server exposing TODO Platform task management tools via stdio transport."""
+"""MCP server exposing TODO Platform tools via stdio transport.
+
+Proxies all operations through the backend HTTP API (/api/v1) to ensure
+business logic (activity logging, notifications, workflow rules, WebSocket
+broadcasts) is applied consistently.  See ADR-0005 for rationale.
+"""
 
 import asyncio
 import json
 import os
-import sqlite3
-import uuid
-from contextlib import contextmanager
-from datetime import datetime, timezone
 
+import httpx
 import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-DB_PATH = os.environ.get("DB_PATH", "/app/backend/todo_platform.db")
+API_BASE_URL = os.environ.get("API_BASE_URL", "http://backend:8000")
+API_KEY = os.environ.get("API_KEY", "")
 
 server = Server("todo-platform")
 
 
-@contextmanager
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+def _api_url(path: str) -> str:
+    return f"{API_BASE_URL}/api/v1{path}"
 
 
-def _row_to_dict(row) -> dict:
-    return dict(row) if row else {}
+def _headers() -> dict:
+    return {"X-API-Key": API_KEY, "Content-Type": "application/json"}
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+async def _get(path: str, params: dict | None = None) -> dict | list | str:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(_api_url(path), headers=_headers(), params=params)
+        if resp.status_code >= 400:
+            return f"Error {resp.status_code}: {resp.text}"
+        return resp.json()
 
 
-# ── Tool implementations ──────────────────────────────────────────────────────
-
-def _get_summary() -> str:
-    with get_db() as conn:
-        projects = conn.execute(
-            "SELECT id, name, status FROM projects WHERE status = 'active'"
-        ).fetchall()
-        result = []
-        for p in projects:
-            pid = p["id"]
-            total = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE project_id=? AND parent_id IS NULL", (pid,)
-            ).fetchone()[0]
-            done = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE project_id=? AND parent_id IS NULL AND status='done'", (pid,)
-            ).fetchone()[0]
-            in_prog = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE project_id=? AND parent_id IS NULL AND status='in_progress'", (pid,)
-            ).fetchone()[0]
-            overdue = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE project_id=? AND due_date IS NOT NULL"
-                " AND due_date < ? AND status NOT IN ('done','failed')",
-                (pid, _now_iso()),
-            ).fetchone()[0]
-            result.append({
-                "id": pid,
-                "name": p["name"],
-                "total": total,
-                "done": done,
-                "in_progress": in_prog,
-                "overdue": overdue,
-                "progress": f"{round(done / total * 100, 1) if total else 0}%",
-            })
-        return json.dumps(result)
+async def _post(path: str, body: dict | list | None = None) -> dict | list | str:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(_api_url(path), headers=_headers(), json=body)
+        if resp.status_code >= 400:
+            return f"Error {resp.status_code}: {resp.text}"
+        if resp.status_code == 204:
+            return {"status": "ok"}
+        return resp.json()
 
 
-def _list_tasks(project_id: str, status: str | None = None) -> str:
-    with get_db() as conn:
-        sql = "SELECT id, title, status, priority, assignee, due_date FROM tasks WHERE project_id=?"
-        params: list = [project_id]
-        if status:
-            sql += " AND status=?"
-            params.append(status)
-        sql += " ORDER BY created_at DESC LIMIT 50"
-        rows = conn.execute(sql, params).fetchall()
-        return json.dumps([dict(r) for r in rows])
+async def _patch(path: str, body: dict | None = None) -> dict | list | str:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.patch(_api_url(path), headers=_headers(), json=body)
+        if resp.status_code >= 400:
+            return f"Error {resp.status_code}: {resp.text}"
+        return resp.json()
 
 
-def _create_task(
+async def _delete(path: str) -> dict | str:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.delete(_api_url(path), headers=_headers())
+        if resp.status_code >= 400:
+            return f"Error {resp.status_code}: {resp.text}"
+        if resp.status_code == 204:
+            return {"status": "deleted"}
+        return resp.json()
+
+
+# ── Tool implementations ────────────────────────────────────────────
+
+
+async def _get_summary() -> str:
+    result = await _get("/summary")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _list_tasks(project_id: str, status: str | None = None) -> str:
+    params = {}
+    if status:
+        params["status_filter"] = status
+    result = await _get(f"/projects/{project_id}/tasks", params=params)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _create_task(
     project_id: str,
     title: str,
     priority: str = "medium",
@@ -97,212 +89,146 @@ def _create_task(
     assignee: str | None = None,
     due_date: str | None = None,
 ) -> str:
-    task_id = str(uuid.uuid4())
-    token = str(uuid.uuid4())
-    now = _now_iso()
-    parsed_due = None
+    body: dict = {"title": title, "priority": priority}
+    if description:
+        body["description"] = description
+    if assignee:
+        body["assignee"] = assignee
     if due_date:
-        try:
-            parsed_due = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
-        except ValueError:
-            parsed_due = due_date
-
-    with get_db() as conn:
-        project = conn.execute("SELECT id FROM projects WHERE id=?", (project_id,)).fetchone()
-        if not project:
-            return f"Project {project_id} not found"
-        conn.execute(
-            "INSERT INTO tasks (id, project_id, title, priority, description, assignee, due_date,"
-            " callback_token, status, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?,?,'todo',?,?)",
-            (task_id, project_id, title, priority, description, assignee, parsed_due, token, now, now),
-        )
-        return json.dumps({"id": task_id, "title": title, "status": "todo"})
+        body["due_date"] = due_date
+    result = await _post(f"/projects/{project_id}/tasks", body)
+    return json.dumps(result) if not isinstance(result, str) else result
 
 
-def _update_task(task_id: str, **kwargs) -> str:
-    updatable = ("status", "priority", "title", "description", "assignee", "time_estimate", "time_spent")
-    with get_db() as conn:
-        row = conn.execute("SELECT id, title, status, priority, due_date FROM tasks WHERE id=?", (task_id,)).fetchone()
-        if not row:
-            return f"Task {task_id} not found"
-
-        sets = []
-        params = []
-        for field in updatable:
-            if field in kwargs and kwargs[field] is not None:
-                sets.append(f"{field}=?")
-                params.append(kwargs[field])
-
-        if "due_date" in kwargs:
-            val = kwargs["due_date"]
-            sets.append("due_date=?")
-            if val and val not in ("null", ""):
-                try:
-                    parsed = (
-                        datetime.fromisoformat(val).replace(tzinfo=timezone.utc).isoformat()
-                        if "T" in val
-                        else datetime.strptime(val, "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
-                    )
-                except ValueError:
-                    parsed = val
-                params.append(parsed)
-            else:
-                params.append(None)
-
-        if sets:
-            sets.append("updated_at=?")
-            params.append(_now_iso())
-            params.append(task_id)
-            conn.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id=?", params)
-
-        updated = conn.execute(
-            "SELECT id, title, status, priority, due_date FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
-        return json.dumps(dict(updated))
+async def _update_task(project_id: str, task_id: str, **kwargs) -> str:
+    body = {k: v for k, v in kwargs.items() if v is not None}
+    if not body:
+        return "No fields to update"
+    result = await _patch(f"/projects/{project_id}/tasks/{task_id}", body)
+    return json.dumps(result) if not isinstance(result, str) else result
 
 
-def _create_subtask(parent_task_id: str, title: str, priority: str = "medium") -> str:
-    task_id = str(uuid.uuid4())
-    token = str(uuid.uuid4())
-    now = _now_iso()
-    with get_db() as conn:
-        parent = conn.execute(
-            "SELECT id, project_id FROM tasks WHERE id=?", (parent_task_id,)
-        ).fetchone()
-        if not parent:
-            return f"Parent task {parent_task_id} not found"
-        conn.execute(
-            "INSERT INTO tasks (id, project_id, parent_id, title, priority, callback_token,"
-            " status, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,'todo',?,?)",
-            (task_id, parent["project_id"], parent_task_id, title, priority, token, now, now),
-        )
-        return json.dumps({"id": task_id, "title": title, "parent_id": parent_task_id})
+async def _create_subtask(
+    project_id: str, parent_task_id: str, title: str, priority: str = "medium"
+) -> str:
+    body = {"title": title, "priority": priority, "parent_id": parent_task_id}
+    result = await _post(f"/projects/{project_id}/tasks", body)
+    return json.dumps(result) if not isinstance(result, str) else result
 
 
-def _manage_labels(
+async def _manage_labels(
     action: str,
     project_id: str | None = None,
     task_id: str | None = None,
     label_id: str | None = None,
 ) -> str:
-    with get_db() as conn:
-        if action == "list":
-            if not project_id:
-                return "project_id required for list action"
-            rows = conn.execute(
-                "SELECT id, name, color FROM labels WHERE project_id=?", (project_id,)
-            ).fetchall()
-            return json.dumps([dict(r) for r in rows])
+    if action == "list":
+        if not project_id:
+            return "project_id required for list action"
+        result = await _get(f"/projects/{project_id}/labels")
+        return json.dumps(result) if not isinstance(result, str) else result
 
-        if action == "add":
-            if not task_id or not label_id:
-                return "task_id and label_id required for add action"
-            exists = conn.execute(
-                "SELECT 1 FROM task_labels WHERE task_id=? AND label_id=?", (task_id, label_id)
-            ).fetchone()
-            if exists:
-                return "Label already assigned"
-            conn.execute(
-                "INSERT INTO task_labels (task_id, label_id) VALUES (?,?)", (task_id, label_id)
-            )
-            return json.dumps({"status": "added", "task_id": task_id, "label_id": label_id})
+    if action == "add":
+        if not project_id or not task_id or not label_id:
+            return "project_id, task_id, and label_id required for add action"
+        result = await _post(
+            f"/projects/{project_id}/tasks/{task_id}/labels/{label_id}"
+        )
+        return json.dumps(result) if not isinstance(result, str) else result
 
-        if action == "remove":
-            if not task_id or not label_id:
-                return "task_id and label_id required for remove action"
-            conn.execute(
-                "DELETE FROM task_labels WHERE task_id=? AND label_id=?", (task_id, label_id)
-            )
-            return json.dumps({"status": "removed", "task_id": task_id, "label_id": label_id})
+    if action == "remove":
+        if not project_id or not task_id or not label_id:
+            return "project_id, task_id, and label_id required for remove action"
+        result = await _delete(
+            f"/projects/{project_id}/tasks/{task_id}/labels/{label_id}"
+        )
+        return json.dumps(result) if not isinstance(result, str) else result
 
-        return f"Unknown label action: {action}"
+    return f"Unknown label action: {action}"
 
 
-def _analyze_workload(project_id: str | None = None) -> str:
-    with get_db() as conn:
-        sql = "SELECT status, priority, assignee, due_date, time_estimate, time_spent FROM tasks WHERE parent_id IS NULL"
-        params: list = []
-        if project_id:
-            sql += " AND project_id=?"
-            params.append(project_id)
-        rows = conn.execute(sql, params).fetchall()
-
-        now = _now_iso()
-        by_status: dict = {}
-        by_priority: dict = {}
-        by_assignee: dict = {}
-        overdue = 0
-        total_estimate = 0
-        total_spent = 0
-
-        for r in rows:
-            status = r["status"]
-            priority = r["priority"]
-            assignee = r["assignee"] or "(unassigned)"
-            by_status[status] = by_status.get(status, 0) + 1
-            by_priority[priority] = by_priority.get(priority, 0) + 1
-            if assignee not in by_assignee:
-                by_assignee[assignee] = {"total": 0, "done": 0, "in_progress": 0}
-            by_assignee[assignee]["total"] += 1
-            if status == "done":
-                by_assignee[assignee]["done"] += 1
-            elif status == "in_progress":
-                by_assignee[assignee]["in_progress"] += 1
-            if r["due_date"] and r["due_date"] < now and status not in ("done", "failed"):
-                overdue += 1
-            if r["time_estimate"]:
-                total_estimate += r["time_estimate"]
-            if r["time_spent"]:
-                total_spent += r["time_spent"]
-
-        return json.dumps({
-            "total_tasks": len(rows),
-            "by_status": by_status,
-            "by_priority": by_priority,
-            "by_assignee": by_assignee,
-            "overdue": overdue,
-            "total_estimate_hours": round(total_estimate / 60, 1),
-            "total_spent_hours": round(total_spent / 60, 1),
-        })
+async def _analyze_workload(project_id: str | None = None) -> str:
+    if project_id:
+        result = await _get(f"/projects/{project_id}/stats")
+    else:
+        result = await _get("/analytics/overview")
+    return json.dumps(result) if not isinstance(result, str) else result
 
 
-def _search(query: str) -> str:
-    like = f"%{query.lower()}%"
-    with get_db() as conn:
-        tasks = conn.execute(
-            "SELECT id, title, status, project_id FROM tasks"
-            " WHERE lower(title) LIKE ? OR lower(description) LIKE ? LIMIT 20",
-            (like, like),
-        ).fetchall()
-        projects = conn.execute(
-            "SELECT id, name FROM projects"
-            " WHERE lower(name) LIKE ? OR lower(description) LIKE ? LIMIT 10",
-            (like, like),
-        ).fetchall()
-        return json.dumps({
-            "tasks": [dict(r) for r in tasks],
-            "projects": [dict(r) for r in projects],
-        })
+async def _search(query: str) -> str:
+    result = await _get("/search", params={"q": query, "limit": 20})
+    return json.dumps(result) if not isinstance(result, str) else result
 
 
-def _get_activity(limit: int = 20) -> str:
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT action, detail, actor, created_at FROM activity_logs"
-            " ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-        return json.dumps([dict(r) for r in rows])
+async def _get_activity(limit: int = 20) -> str:
+    result = await _get("/activity", params={"limit": limit})
+    return json.dumps(result) if not isinstance(result, str) else result
 
 
-# ── MCP tool registry ─────────────────────────────────────────────────────────
+async def _add_comment(
+    project_id: str, task_id: str, body: str, author: str | None = None
+) -> str:
+    payload: dict = {"body": body}
+    if author:
+        payload["author"] = author
+    result = await _post(
+        f"/projects/{project_id}/tasks/{task_id}/comments", payload
+    )
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _list_comments(project_id: str, task_id: str) -> str:
+    result = await _get(f"/projects/{project_id}/tasks/{task_id}/comments")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_dependencies(
+    action: str,
+    project_id: str,
+    task_id: str,
+    depends_on_id: str | None = None,
+) -> str:
+    if action == "list":
+        result = await _get(
+            f"/projects/{project_id}/tasks/{task_id}/dependencies"
+        )
+        return json.dumps(result) if not isinstance(result, str) else result
+
+    if action == "add":
+        if not depends_on_id:
+            return "depends_on_id required for add action"
+        result = await _post(
+            f"/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}"
+        )
+        return json.dumps(result) if not isinstance(result, str) else result
+
+    if action == "remove":
+        if not depends_on_id:
+            return "depends_on_id required for remove action"
+        result = await _delete(
+            f"/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}"
+        )
+        return json.dumps(result) if not isinstance(result, str) else result
+
+    return f"Unknown dependency action: {action}"
+
+
+async def _get_notifications(unread_only: bool = True, limit: int = 20) -> str:
+    params = {"unread_only": str(unread_only).lower(), "limit": limit}
+    result = await _get("/notifications", params=params)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+# ── MCP tool registry ────────────────────────────────────────────────
 
 TOOL_DEFINITIONS = [
     types.Tool(
         name="get_summary",
-        description="Get a high-level summary of all active projects and their task counts, progress, and overdue items.",
+        description=(
+            "Get a comprehensive summary of the entire platform: project stats, "
+            "identity breakdown, active/overdue tasks, and recent activity. "
+            "This is the best starting point for understanding current state."
+        ),
         inputSchema={"type": "object", "properties": {}, "required": []},
     ),
     types.Tool(
@@ -327,7 +253,7 @@ TOOL_DEFINITIONS = [
         inputSchema={
             "type": "object",
             "properties": {
-                "project_id": {"type": "string"},
+                "project_id": {"type": "string", "description": "Project ID (required)"},
                 "title": {"type": "string"},
                 "priority": {"type": "string", "enum": ["low", "medium", "high"]},
                 "description": {"type": "string"},
@@ -343,7 +269,8 @@ TOOL_DEFINITIONS = [
         inputSchema={
             "type": "object",
             "properties": {
-                "task_id": {"type": "string"},
+                "project_id": {"type": "string", "description": "Project ID (required)"},
+                "task_id": {"type": "string", "description": "Task ID (required)"},
                 "status": {"type": "string", "enum": ["todo", "in_progress", "done", "failed"]},
                 "priority": {"type": "string", "enum": ["low", "medium", "high"]},
                 "title": {"type": "string"},
@@ -353,7 +280,7 @@ TOOL_DEFINITIONS = [
                 "time_estimate": {"type": "integer", "description": "Estimated minutes"},
                 "time_spent": {"type": "integer", "description": "Minutes spent"},
             },
-            "required": ["task_id"],
+            "required": ["project_id", "task_id"],
         },
     ),
     types.Tool(
@@ -362,11 +289,12 @@ TOOL_DEFINITIONS = [
         inputSchema={
             "type": "object",
             "properties": {
-                "parent_task_id": {"type": "string"},
+                "project_id": {"type": "string", "description": "Project ID (required)"},
+                "parent_task_id": {"type": "string", "description": "Parent task ID (required)"},
                 "title": {"type": "string"},
                 "priority": {"type": "string", "enum": ["low", "medium", "high"]},
             },
-            "required": ["parent_task_id", "title"],
+            "required": ["project_id", "parent_task_id", "title"],
         },
     ),
     types.Tool(
@@ -376,27 +304,27 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {
                 "action": {"type": "string", "enum": ["list", "add", "remove"]},
-                "project_id": {"type": "string", "description": "Required for list"},
+                "project_id": {"type": "string", "description": "Required for all actions"},
                 "task_id": {"type": "string", "description": "Required for add/remove"},
                 "label_id": {"type": "string", "description": "Required for add/remove"},
             },
-            "required": ["action"],
+            "required": ["action", "project_id"],
         },
     ),
     types.Tool(
         name="analyze_workload",
-        description="Analyze workload: tasks by status, priority, assignee, and overdue count.",
+        description="Analyze workload: tasks by status, priority, overdue count. Pass project_id for per-project stats, omit for platform overview.",
         inputSchema={
             "type": "object",
             "properties": {
-                "project_id": {"type": "string", "description": "Optional; all projects if omitted"},
+                "project_id": {"type": "string", "description": "Optional; platform overview if omitted"},
             },
             "required": [],
         },
     ),
     types.Tool(
         name="search",
-        description="Search for tasks and projects by keyword.",
+        description="Search for tasks and projects by keyword (searches titles and descriptions).",
         inputSchema={
             "type": "object",
             "properties": {
@@ -407,11 +335,67 @@ TOOL_DEFINITIONS = [
     ),
     types.Tool(
         name="get_activity",
-        description="Get recent activity log entries.",
+        description="Get recent activity log entries showing what changed and who did it.",
         inputSchema={
             "type": "object",
             "properties": {
-                "limit": {"type": "integer", "description": "Number of entries (default 20)"},
+                "limit": {"type": "integer", "description": "Number of entries (default 20, max 200)"},
+            },
+            "required": [],
+        },
+    ),
+    types.Tool(
+        name="add_comment",
+        description="Add a comment to a task. Useful for leaving notes, progress updates, or context.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID"},
+                "task_id": {"type": "string", "description": "Task ID"},
+                "body": {"type": "string", "description": "Comment text (markdown supported)"},
+                "author": {"type": "string", "description": "Author name (optional, defaults to API key name)"},
+            },
+            "required": ["project_id", "task_id", "body"],
+        },
+    ),
+    types.Tool(
+        name="list_comments",
+        description="List all comments on a task in chronological order.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID"},
+                "task_id": {"type": "string", "description": "Task ID"},
+            },
+            "required": ["project_id", "task_id"],
+        },
+    ),
+    types.Tool(
+        name="manage_dependencies",
+        description="View, add, or remove task dependencies (blocker relationships).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["list", "add", "remove"],
+                    "description": "list: view blockers/dependents; add/remove: manage a specific dependency",
+                },
+                "project_id": {"type": "string", "description": "Project ID"},
+                "task_id": {"type": "string", "description": "Task ID"},
+                "depends_on_id": {"type": "string", "description": "ID of the blocking task (required for add/remove)"},
+            },
+            "required": ["action", "project_id", "task_id"],
+        },
+    ),
+    types.Tool(
+        name="get_notifications",
+        description="Get in-app notifications. Useful for checking what events occurred recently.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "unread_only": {"type": "boolean", "description": "Only show unread notifications (default true)"},
+                "limit": {"type": "integer", "description": "Max notifications to return (default 20)"},
             },
             "required": [],
         },
@@ -429,23 +413,63 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
     args = arguments or {}
     try:
         if name == "get_summary":
-            result = _get_summary()
+            result = await _get_summary()
         elif name == "list_tasks":
-            result = _list_tasks(**args)
+            result = await _list_tasks(args["project_id"], args.get("status"))
         elif name == "create_task":
-            result = _create_task(**args)
+            result = await _create_task(
+                project_id=args["project_id"],
+                title=args["title"],
+                priority=args.get("priority", "medium"),
+                description=args.get("description"),
+                assignee=args.get("assignee"),
+                due_date=args.get("due_date"),
+            )
         elif name == "update_task":
-            result = _update_task(**args)
+            pid = args.pop("project_id")
+            tid = args.pop("task_id")
+            result = await _update_task(pid, tid, **args)
         elif name == "create_subtask":
-            result = _create_subtask(**args)
+            result = await _create_subtask(
+                project_id=args["project_id"],
+                parent_task_id=args["parent_task_id"],
+                title=args["title"],
+                priority=args.get("priority", "medium"),
+            )
         elif name == "manage_labels":
-            result = _manage_labels(**args)
+            result = await _manage_labels(
+                action=args["action"],
+                project_id=args.get("project_id"),
+                task_id=args.get("task_id"),
+                label_id=args.get("label_id"),
+            )
         elif name == "analyze_workload":
-            result = _analyze_workload(args.get("project_id"))
+            result = await _analyze_workload(args.get("project_id"))
         elif name == "search":
-            result = _search(args.get("query", ""))
+            result = await _search(args.get("query", ""))
         elif name == "get_activity":
-            result = _get_activity(args.get("limit", 20))
+            result = await _get_activity(args.get("limit", 20))
+        elif name == "add_comment":
+            result = await _add_comment(
+                project_id=args["project_id"],
+                task_id=args["task_id"],
+                body=args["body"],
+                author=args.get("author"),
+            )
+        elif name == "list_comments":
+            result = await _list_comments(args["project_id"], args["task_id"])
+        elif name == "manage_dependencies":
+            result = await _manage_dependencies(
+                action=args["action"],
+                project_id=args["project_id"],
+                task_id=args["task_id"],
+                depends_on_id=args.get("depends_on_id"),
+            )
+        elif name == "get_notifications":
+            result = await _get_notifications(
+                unread_only=args.get("unread_only", True),
+                limit=args.get("limit", 20),
+            )
         else:
             result = f"Unknown tool: {name}"
     except Exception as exc:
@@ -456,7 +480,9 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
 
 async def main():
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+        await server.run(
+            read_stream, write_stream, server.create_initialization_options()
+        )
 
 
 if __name__ == "__main__":

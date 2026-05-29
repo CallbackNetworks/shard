@@ -55,10 +55,13 @@ services:
   mcp:
     build: ./mcp_server
     volumes:
-      - ./backend:/app/backend    # access backend source and SQLite DB
       - ./mcp_server:/app/mcp_server
     environment:
-      - DB_PATH=${DB_PATH:-/app/backend/data/todo_platform.db}
+      - API_BASE_URL=${MCP_API_BASE_URL:-http://backend:8000}
+      - API_KEY=${MCP_API_KEY:-}
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - app-network
