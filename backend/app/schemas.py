@@ -76,6 +76,7 @@ class ProjectCreate(BaseModel):
     description: str | None = Field(None, description="Optional project description")
     agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
     repo_url: str | None = Field(None, description="Repository URL linked to this project")
+    wip_limits: dict | None = Field(None, description="WIP limits per status column, e.g. {\"in_progress\": 3}")
 
 
 class ProjectUpdate(BaseModel):
@@ -84,6 +85,7 @@ class ProjectUpdate(BaseModel):
     status: Literal["active", "archived"] | None = Field(None, description="Project status: 'active' or 'archived'")
     agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
     repo_url: str | None = Field(None, description="Repository URL linked to this project")
+    wip_limits: dict | None = Field(None, description="WIP limits per status column")
 
 
 class ProjectOut(BaseModel):
@@ -94,6 +96,7 @@ class ProjectOut(BaseModel):
     description: str | None
     status: str
     repo_url: str | None = None
+    wip_limits: dict | None = None
     created_at: datetime
     updated_at: datetime
     progress: float = 0.0
@@ -119,6 +122,7 @@ class TaskCreate(BaseModel):
     parent_id: str | None = Field(None, description="Parent task ID for subtasks")
     time_estimate: int | None = Field(None, ge=0, description="Estimated time in minutes")
     time_spent: int | None = Field(None, ge=0, description="Time spent in minutes")
+    is_pinned: bool = False
 
 
 class TaskUpdate(BaseModel):
@@ -137,6 +141,7 @@ class TaskUpdate(BaseModel):
     parent_id: str | None = Field(None, description="Parent task ID for subtasks")
     time_estimate: int | None = Field(None, ge=0, description="Estimated time in minutes")
     time_spent: int | None = Field(None, ge=0, description="Time spent in minutes")
+    is_pinned: bool | None = None
 
 
 class TaskOut(BaseModel):
@@ -158,6 +163,7 @@ class TaskOut(BaseModel):
     due_date: datetime | None
     time_estimate: int | None = None
     time_spent: int | None = None
+    is_pinned: bool = False
     position: int = 0
     progress_pct: int | None = None
     agent_notes: str | None = None
@@ -737,3 +743,108 @@ class ActivityEntryOut(BaseModel):
     detail: str | None
     meta: dict | None
     created_at: str | None
+
+
+# --- Saved Filters ---
+
+
+class SavedFilterCreate(BaseModel):
+    name: str
+    project_id: str | None = None
+    filters: dict = Field(description="Filter criteria: {status[], priority[], label_ids[], assignee, due_before, due_after}")
+
+
+class SavedFilterUpdate(BaseModel):
+    name: str | None = None
+    filters: dict | None = None
+
+
+class SavedFilterOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    project_id: str | None
+    filters: dict
+    created_at: datetime
+
+
+# --- Goals / OKR ---
+
+
+class GoalCreate(BaseModel):
+    title: str
+    description: str | None = None
+    target_date: datetime | None = None
+    project_ids: list[str] = []
+
+
+class GoalUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    status: Literal["active", "completed", "cancelled"] | None = None
+    target_date: datetime | None = None
+    project_ids: list[str] | None = None
+
+
+class GoalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    description: str | None
+    status: str
+    target_date: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    projects: list["GoalProjectOut"] = []
+    progress: float = 0.0
+
+
+class GoalProjectOut(BaseModel):
+    project_id: str
+    project_name: str
+    progress: float = 0.0
+
+
+# --- Bulk Actions ---
+
+
+class BulkTaskUpdate(BaseModel):
+    task_ids: list[str] = Field(min_length=1)
+    status: Literal["todo", "in_progress", "done", "failed"] | None = None
+    priority: Literal["low", "medium", "high"] | None = None
+    assignee: str | None = None
+    add_label_ids: list[str] = []
+    remove_label_ids: list[str] = []
+    is_pinned: bool | None = None
+
+
+class BulkActionResult(BaseModel):
+    updated: int
+    task_ids: list[str]
+
+
+# --- Import/Export ---
+
+
+class TaskImportItem(BaseModel):
+    title: str
+    description: str | None = None
+    status: Literal["todo", "in_progress", "done", "failed"] = "todo"
+    priority: Literal["low", "medium", "high"] = "medium"
+    assignee: str | None = None
+    due_date: datetime | None = None
+    start_date: datetime | None = None
+    time_estimate: int | None = None
+    time_spent: int | None = None
+    subtasks: list["TaskImportItem"] = []
+
+
+class TaskImportRequest(BaseModel):
+    tasks: list[TaskImportItem]
+
+
+class TaskImportResult(BaseModel):
+    imported: int
+    task_ids: list[str]

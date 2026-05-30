@@ -191,6 +191,32 @@ export const getDecisions = (params = {}) => api.get('/decisions', { params }).t
 export const getDecision = (id) => api.get(`/decisions/${id}`).then(r => r.data)
 export const exportDecision = (id) => api.get(`/decisions/${id}/export`).then(r => r.data)
 
+// Goals
+export const getGoals = (params = {}) => api.get('/goals', { params }).then(r => r.data)
+export const getGoal = (id) => api.get(`/goals/${id}`).then(r => r.data)
+export const createGoal = (data) => api.post('/goals', data).then(r => r.data)
+export const updateGoal = (id, data) => api.patch(`/goals/${id}`, data).then(r => r.data)
+export const deleteGoal = (id) => api.delete(`/goals/${id}`)
+
+// Saved Filters
+export const getSavedFilters = (projectId) =>
+  api.get('/saved-filters', { params: projectId ? { project_id: projectId } : {} }).then(r => r.data)
+export const createSavedFilter = (data) => api.post('/saved-filters', data).then(r => r.data)
+export const updateSavedFilter = (id, data) => api.patch(`/saved-filters/${id}`, data).then(r => r.data)
+export const deleteSavedFilter = (id) => api.delete(`/saved-filters/${id}`)
+
+// Bulk Operations
+export const bulkUpdateTasks = (projectId, data) =>
+  api.post(`/projects/${projectId}/tasks/bulk-update`, data).then(r => r.data)
+
+// Import / Export
+export const exportTasks = (projectId, format = 'json') =>
+  api.get(`/projects/${projectId}/tasks/export`, { params: { format } }).then(r => r.data)
+export const exportTasksCsv = (projectId) =>
+  api.get(`/projects/${projectId}/tasks/export`, { params: { format: 'csv' }, responseType: 'blob' })
+export const importTasks = (projectId, data) =>
+  api.post(`/projects/${projectId}/tasks/import`, data).then(r => r.data)
+
 // Share (public, no auth — uses plain axios to avoid the auth interceptor)
 export const getShareData = (token) => axios.get(`/share/identity/${token}`, { withCredentials: true }).then(r => r.data)
 export const rotateShareToken = (identityId) => api.post(`/identities/${identityId}/rotate-share-token`).then(r => r.data)

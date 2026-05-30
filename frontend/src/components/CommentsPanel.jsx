@@ -1,9 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { getComments, createComment, deleteComment } from '../api/client'
+import { getComments, createComment, deleteComment, getIdentities } from '../api/client'
 import { DARK } from '../constants/theme'
+
+function renderMentions(text) {
+  const parts = text.split(/(@\w+)/g)
+  return parts.map((part, i) =>
+    part.startsWith('@') ? (
+      <span key={i} style={{ color: DARK.info, fontWeight: 600, cursor: 'default' }}>{part}</span>
+    ) : part
+  )
+}
 
 export default function CommentsPanel({ projectId, taskId, depth }) {
   const { t } = useTranslation()
@@ -11,6 +20,9 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
   const [loading, setLoading] = useState(false)
   const [body, setBody] = useState('')
   const [author, setAuthor] = useState('')
+  const [showMentions, setShowMentions] = useState(false)
+  const [identities, setIdentities] = useState([])
+  const textareaRef = useRef(null)
   const qc = useQueryClient()
 
   useEffect(() => {
@@ -18,6 +30,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
     getComments(projectId, taskId)
       .then(setComments)
       .finally(() => setLoading(false))
+    getIdentities().then(setIdentities).catch(() => {})
   }, [projectId, taskId])
 
   const handleAdd = async () => {
@@ -66,7 +79,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                   </button>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{c.body}</div>
+              <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{renderMentions(c.body)}</div>
             </div>
           ))}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
@@ -79,14 +92,65 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
               />
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <textarea
-                value={body}
-                onChange={e => setBody(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleAdd() }}
-                placeholder={t('comments.addComment')}
-                rows={2}
-                style={{ flex: 1, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: 'rgba(255,255,255,0.05)', color: DARK.text, resize: 'vertical', minHeight: 40 }}
-              />
+              <div style={{ flex: 1, position: 'relative' }}>
+                <textarea
+                  ref={textareaRef}
+                  value={body}
+                  onChange={e => {
+                    setBody(e.target.value)
+                    const val = e.target.value
+                    const pos = e.target.selectionStart
+                    const before = val.slice(0, pos)
+                    const match = before.match(/@(\w*)$/)
+                    setShowMentions(!!match)
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleAdd() }}
+                  placeholder={t('comments.addComment')}
+                  rows={2}
+                  style={{ width: '100%', padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: 'rgba(255,255,255,0.05)', color: DARK.text, resize: 'vertical', minHeight: 40 }}
+                />
+                {showMentions && identities.length > 0 && (
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: 0, background: DARK.elevated,
+                    border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: 4,
+                    zIndex: 10, minWidth: 140, boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  }}>
+                    {identities.map(ident => (
+                      <button
+                        key={ident.id}
+                        onClick={() => {
+                          const ta = textareaRef.current
+                          if (!ta) return
+                          const pos = ta.selectionStart
+                          const before = body.slice(0, pos)
+                          const after = body.slice(pos)
+                          const replaced = before.replace(/@(\w*)$/, `@${ident.name.replace(/\s+/g, '_')} `)
+                          setBody(replaced + after)
+                          setShowMentions(false)
+                          ta.focus()
+                        }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                          padding: '4px 8px', border: 'none', background: 'transparent',
+                          color: DARK.text, fontSize: 11, cursor: 'pointer', borderRadius: 4,
+                          textAlign: 'left',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span style={{
+                          width: 16, height: 16, borderRadius: 4, background: ident.color,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 8, color: '#fff', fontWeight: 900, flexShrink: 0,
+                        }}>
+                          {ident.avatar || ident.name.charAt(0).toUpperCase()}
+                        </span>
+                        {ident.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button onClick={handleAdd} disabled={!body.trim()} style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, alignSelf: 'flex-end', opacity: body.trim() ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('comments.post')}</button>
             </div>
           </div>

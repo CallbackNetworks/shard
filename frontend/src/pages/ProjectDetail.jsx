@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, Calendar, CheckSquare, Save, Bookmark } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
   createCycle, updateCycle, deleteCycle, addTaskToCycle, removeTaskFromCycle,
   reorderTasks,
+  bulkUpdateTasks, exportTasks, exportTasksCsv, importTasks,
+  getSavedFilters, createSavedFilter, deleteSavedFilter,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
 import GanttChart from '../components/GanttChart'
 import BoardView from '../components/BoardView'
+import CalendarView from '../components/CalendarView'
 import TableView from '../components/TableView'
 import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
-import { BRAND, LABEL_PALETTE } from '../constants/theme'
+import { BRAND, DARK, LABEL_PALETTE } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './ProjectDetail.module.css'
 
@@ -130,6 +133,10 @@ export default function ProjectDetail() {
   const [agentInstr, setAgentInstr] = useState('')
   const [repoUrl, setRepoUrl] = useState('')
   const [agentInstrDirty, setAgentInstrDirty] = useState(false)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedTasks, setSelectedTasks] = useState(new Set())
+  const [showImport, setShowImport] = useState(false)
+  const [importJson, setImportJson] = useState('')
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -232,6 +239,31 @@ export default function ProjectDetail() {
   const reorderMut = useMutation({
     mutationFn: (taskIds) => reorderTasks(id, taskIds),
     onSuccess: invalidate,
+  })
+
+  const bulkUpdateMut = useMutation({
+    mutationFn: (data) => bulkUpdateTasks(id, data),
+    onSuccess: () => { invalidate(); setSelectedTasks(new Set()); setBulkMode(false) },
+  })
+
+  const importMut = useMutation({
+    mutationFn: (data) => importTasks(id, data),
+    onSuccess: () => { invalidate(); setShowImport(false); setImportJson('') },
+  })
+
+  const { data: savedFilters = [] } = useQuery({
+    queryKey: ['saved-filters', id],
+    queryFn: () => getSavedFilters(id),
+  })
+
+  const saveFilterMut = useMutation({
+    mutationFn: (data) => createSavedFilter(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-filters', id] }),
+  })
+
+  const deleteFilterMut = useMutation({
+    mutationFn: (filterId) => deleteSavedFilter(filterId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-filters', id] }),
   })
 
   const handleUpdate = (taskId, data) => updateMut.mutate({ taskId, data })
@@ -404,6 +436,7 @@ export default function ProjectDetail() {
           <button className={`${s.tab} ${tab === 'issues' ? s.tabActive : ''}`} onClick={() => setTab('issues')}>Issues</button>
           <button className={`${s.tab} ${tab === 'board' ? s.tabActive : ''}`} onClick={() => setTab('board')}>Board</button>
           <button className={`${s.tab} ${tab === 'timeline' ? s.tabActive : ''}`} onClick={() => setTab('timeline')}>Timeline</button>
+          <button className={`${s.tab} ${tab === 'calendar' ? s.tabActive : ''}`} onClick={() => setTab('calendar')}>Calendar</button>
           <button className={`${s.tab} ${tab === 'table' ? s.tabActive : ''}`} onClick={() => setTab('table')}>Table</button>
           <button className={`${s.tab} ${tab === 'cycles' ? s.tabActive : ''}`} onClick={() => setTab('cycles')}>
             <span className={s.cycleTabContent}>
@@ -443,6 +476,86 @@ export default function ProjectDetail() {
                 </button>
               ))}
               <div className={s.filterRight}>
+                {/* Saved filters dropdown */}
+                {savedFilters.length > 0 && (
+                  <select
+                    onChange={e => {
+                      const sf = savedFilters.find(f => f.id === e.target.value)
+                      if (!sf) return
+                      const fl = sf.filters || {}
+                      setFilter(fl.status || 'all')
+                      setFilterPriority(fl.priority || 'all')
+                      setFilterLabel(fl.label_id || 'all')
+                      setFilterAssignee(fl.assignee || 'all')
+                      setFilterDue(fl.due || 'all')
+                      setShowFilters(true)
+                    }}
+                    style={{ fontSize: 11, background: DARK.elevated, color: DARK.textMid, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
+                    value=""
+                  >
+                    <option value="">Saved views</option>
+                    {savedFilters.map(sf => (
+                      <option key={sf.id} value={sf.id}>{sf.name}</option>
+                    ))}
+                  </select>
+                )}
+                {/* Save current filter */}
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={() => {
+                      const name = prompt('Name for this saved view:')
+                      if (!name) return
+                      saveFilterMut.mutate({
+                        name,
+                        project_id: id,
+                        filters: {
+                          status: filter !== 'all' ? filter : undefined,
+                          priority: filterPriority !== 'all' ? filterPriority : undefined,
+                          label_id: filterLabel !== 'all' ? filterLabel : undefined,
+                          assignee: filterAssignee !== 'all' ? filterAssignee : undefined,
+                          due: filterDue !== 'all' ? filterDue : undefined,
+                        },
+                      })
+                    }}
+                    title="Save current filter"
+                    style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}
+                  >
+                    <Bookmark size={11} /> Save
+                  </button>
+                )}
+                {/* Bulk mode toggle */}
+                <button
+                  onClick={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
+                  style={{
+                    background: bulkMode ? 'rgba(129,140,248,0.12)' : 'none',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
+                    color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
+                  }}
+                >
+                  <CheckSquare size={11} /> Bulk
+                </button>
+                {/* Export */}
+                <button
+                  onClick={async () => {
+                    const data = await exportTasks(id, 'json')
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a'); a.href = url; a.download = `${project?.name || 'tasks'}.json`; a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                  title="Export tasks"
+                  style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center' }}
+                >
+                  <Download size={11} />
+                </button>
+                {/* Import */}
+                <button
+                  onClick={() => setShowImport(v => !v)}
+                  title="Import tasks"
+                  style={{ background: showImport ? 'rgba(129,140,248,0.12)' : 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
+                >
+                  <Upload size={11} />
+                </button>
                 <button
                   onClick={() => setShowFilters(v => !v)}
                   className={`${s.advancedFilterBtn} ${activeFilterCount > 0 ? s.advancedFilterActive : s.advancedFilterInactive}`}
@@ -515,6 +628,70 @@ export default function ProjectDetail() {
               </div>
             )}
 
+            {/* Bulk action bar */}
+            {bulkMode && selectedTasks.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(129,140,248,0.08)', borderBottom: '1px solid rgba(129,140,248,0.2)' }}>
+                <span style={{ fontSize: 12, color: DARK.info, fontWeight: 600 }}>{selectedTasks.size} selected</span>
+                <select
+                  onChange={e => { if (e.target.value) { bulkUpdateMut.mutate({ task_ids: [...selectedTasks], status: e.target.value }); e.target.value = '' } }}
+                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '3px 6px' }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Set status...</option>
+                  <option value="todo">Todo</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="done">Done</option>
+                  <option value="failed">Failed</option>
+                </select>
+                <select
+                  onChange={e => { if (e.target.value) { bulkUpdateMut.mutate({ task_ids: [...selectedTasks], priority: e.target.value }); e.target.value = '' } }}
+                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '3px 6px' }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Set priority...</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <button
+                  onClick={() => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], is_pinned: true })}
+                  style={{ fontSize: 11, background: 'rgba(255,164,43,0.1)', color: DARK.warning, border: '1px solid rgba(255,164,43,0.3)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
+                >Pin</button>
+                <button
+                  onClick={() => setSelectedTasks(new Set())}
+                  style={{ marginLeft: 'auto', fontSize: 11, background: 'none', color: DARK.textMid, border: 'none', cursor: 'pointer' }}
+                >Clear</button>
+              </div>
+            )}
+
+            {/* Import modal */}
+            {showImport && (
+              <div style={{ padding: 16, background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ fontSize: 12, color: DARK.text, fontWeight: 600, marginBottom: 8 }}>Import Tasks (JSON)</div>
+                <textarea
+                  value={importJson}
+                  onChange={e => setImportJson(e.target.value)}
+                  placeholder={'[\n  { "title": "Task 1", "priority": "high" },\n  { "title": "Task 2", "subtasks": [{ "title": "Sub 1" }] }\n]'}
+                  style={{ width: '100%', minHeight: 100, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: 10, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    onClick={() => {
+                      try {
+                        const parsed = JSON.parse(importJson)
+                        importMut.mutate({ tasks: Array.isArray(parsed) ? parsed : [parsed] })
+                      } catch { alert('Invalid JSON') }
+                    }}
+                    disabled={!importJson.trim() || importMut.isPending}
+                    style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: DARK.info, color: '#fff', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: importJson.trim() ? 1 : 0.5 }}
+                  >
+                    {importMut.isPending ? 'Importing...' : 'Import'}
+                  </button>
+                  <button onClick={() => setShowImport(false)} style={{ padding: '5px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.text }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
             {filteredTopTasks.length > 0 && (
               <div className={s.tableHeader}>
                 <span className={s.colSpacer12} /><span className={s.colSpacer22} /><span className={s.colSpacer14} />
@@ -534,16 +711,33 @@ export default function ProjectDetail() {
               </div>
             ) : (
               filteredTopTasks.map(task => (
-                <IssueRow
-                  key={task.id}
-                  task={task}
-                  projectId={id}
-                  projectCode={projectCode}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                  onCreateSubtask={handleCreateSubtask}
-                  allTasks={tasks}
-                />
+                <div key={task.id} style={{ display: 'flex', alignItems: 'stretch' }}>
+                  {bulkMode && (
+                    <label style={{ display: 'flex', alignItems: 'center', paddingLeft: 12, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedTasks.has(task.id)}
+                        onChange={e => {
+                          const next = new Set(selectedTasks)
+                          e.target.checked ? next.add(task.id) : next.delete(task.id)
+                          setSelectedTasks(next)
+                        }}
+                        style={{ accentColor: DARK.info }}
+                      />
+                    </label>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <IssueRow
+                      task={task}
+                      projectId={id}
+                      projectCode={projectCode}
+                      onUpdate={handleUpdate}
+                      onDelete={handleDelete}
+                      onCreateSubtask={handleCreateSubtask}
+                      allTasks={tasks}
+                    />
+                  </div>
+                </div>
               ))
             )}
           </div>
@@ -551,7 +745,12 @@ export default function ProjectDetail() {
 
         {/* Board */}
         {tab === 'board' && (
-          <BoardView tasks={tasks} projectCode={projectCode} onUpdate={handleUpdate} onDelete={handleDelete} onReorder={handleReorder} />
+          <BoardView tasks={tasks} projectCode={projectCode} onUpdate={handleUpdate} onDelete={handleDelete} onReorder={handleReorder} wipLimits={project?.wip_limits || {}} />
+        )}
+
+        {/* Calendar */}
+        {tab === 'calendar' && (
+          <CalendarView tasks={tasks} onUpdateTask={(taskId, data) => handleUpdate(taskId, data)} projectId={id} />
         )}
 
         {/* Timeline */}
@@ -560,7 +759,7 @@ export default function ProjectDetail() {
             <div className={s.timelineHint}>
               Set <strong className={s.timelineHintStrong}>start date</strong> and <strong className={s.timelineHintStrong}>due date</strong> on issues (click ✎ in Issues tab) to see them on the timeline.
             </div>
-            <GanttChart tasks={tasks} />
+            <GanttChart tasks={tasks} onUpdateTask={(taskId, data) => handleUpdate(taskId, data)} />
           </div>
         )}
 

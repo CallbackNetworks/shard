@@ -17,7 +17,7 @@ const ZOOM_LEVELS = [
   { labelKey: 'gantt.auto', days: 0 },
 ]
 
-export default function GanttChart({ tasks }) {
+export default function GanttChart({ tasks, onUpdateTask }) {
   const { t } = useTranslation()
   const [zoom, setZoom] = useState(3) // default Auto
 
@@ -206,7 +206,29 @@ export default function GanttChart({ tasks }) {
                   </span>
                 </div>
 
-                <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 400 }}>
+                <div
+                  style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 400 }}
+                  onDragOver={e => { if (onUpdateTask) e.preventDefault() }}
+                  onDrop={e => {
+                    if (!onUpdateTask) return
+                    e.preventDefault()
+                    try {
+                      const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const pct = (e.clientX - rect.left) / rect.width
+                      const dropTime = viewStart.getTime() + pct * totalMs
+                      const origStart = new Date(data.startDate).getTime()
+                      const origEnd = new Date(data.dueDate).getTime()
+                      const duration = origEnd - origStart
+                      const newStart = new Date(dropTime - duration / 2)
+                      const newEnd = new Date(newStart.getTime() + duration)
+                      onUpdateTask(data.taskId, {
+                        start_date: newStart.toISOString(),
+                        due_date: newEnd.toISOString(),
+                      })
+                    } catch { /* ignore invalid drag data */ }
+                  }}
+                >
                   {weeks.map((week, i) => (
                     <div key={i} style={{ position: 'absolute', left: `${getLeft(week)}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.03)' }} />
                   ))}
@@ -214,6 +236,14 @@ export default function GanttChart({ tasks }) {
                   {hasDates ? (
                     <div
                       title={`${fmtDate(task.start_date)} \u2192 ${fmtDate(task.due_date)}`}
+                      draggable={!!onUpdateTask}
+                      onDragStart={e => {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({
+                          taskId: task.id,
+                          startDate: task.start_date,
+                          dueDate: task.due_date,
+                        }))
+                      }}
                       style={{
                         position: 'absolute',
                         left: `${getLeft(task.start_date)}%`,
@@ -222,7 +252,7 @@ export default function GanttChart({ tasks }) {
                         height: 20, minWidth: 8,
                         background: STATUS_COLOR[task.status] || '#94a3b8',
                         borderRadius: 4, zIndex: 2, opacity: 0.85,
-                        cursor: 'default',
+                        cursor: onUpdateTask ? 'grab' : 'default',
                         display: 'flex', alignItems: 'center', overflow: 'hidden',
                       }}
                     >

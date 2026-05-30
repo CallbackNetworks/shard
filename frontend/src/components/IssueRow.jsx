@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity } from 'lucide-react'
+import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { regenerateToken } from '../api/client'
 import { PRIORITY, STATUS_MAP, DARK } from '../constants/theme'
@@ -98,6 +98,11 @@ export default function IssueRow({
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontFamily: 'monospace', minWidth: 64, flexShrink: 0 }}>
           {issueId}
         </span>
+
+        {/* Pin indicator */}
+        {task.is_pinned && (
+          <Pin size={11} style={{ color: DARK.warning, flexShrink: 0, transform: 'rotate(45deg)' }} />
+        )}
 
         <span style={{
           flex: 1, fontSize: 13,
@@ -215,6 +220,18 @@ export default function IssueRow({
           </span>
         )}
 
+        {/* Time tracking */}
+        {(task.time_estimate || task.time_spent) ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 10, color: 'rgba(255,255,255,0.3)', flexShrink: 0, whiteSpace: 'nowrap',
+          }}>
+            <Clock size={10} />
+            {task.time_spent != null ? `${task.time_spent}m` : '0m'}
+            {task.time_estimate != null && <span style={{ color: 'rgba(255,255,255,0.15)' }}>/ {task.time_estimate}m</span>}
+          </span>
+        ) : null}
+
         {task.due_date && (
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
@@ -265,6 +282,13 @@ export default function IssueRow({
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}
             >
               <RefreshCw size={12} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { is_pinned: !task.is_pinned }) }}
+              title={task.is_pinned ? t('issue.unpin') : t('issue.pin')}
+              style={{ background: task.is_pinned ? 'rgba(255,164,43,0.12)' : 'none', border: 'none', cursor: 'pointer', color: task.is_pinned ? DARK.warning : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}
+            >
+              <Pin size={12} style={{ transform: 'rotate(45deg)' }} />
             </button>
             <button onClick={() => setEditing(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Pencil size={12} />

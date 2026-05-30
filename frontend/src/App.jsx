@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { BrowserRouter, useLocation, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom'
 import CommandPalette from './components/CommandPalette'
 import AssistantPanel from './components/AssistantPanel'
 import NotificationCenter from './components/NotificationCenter'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
+import OfflineIndicator from './components/OfflineIndicator'
+import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp'
 import Sidebar from './components/Sidebar'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { BRAND, DARK } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
+import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import './styles/global.css'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -20,6 +23,7 @@ const WorkflowRules = lazy(() => import('./pages/WorkflowRules'))
 const Templates = lazy(() => import('./pages/Templates'))
 const WebhookLogs = lazy(() => import('./pages/WebhookLogs'))
 const Decisions = lazy(() => import('./pages/Decisions'))
+const Goals = lazy(() => import('./pages/Goals'))
 const Overview = lazy(() => import('./pages/Overview'))
 const ShareView = lazy(() => import('./pages/ShareView'))
 const Login = lazy(() => import('./pages/Login'))
@@ -43,10 +47,18 @@ function Layout() {
   const { isAuthenticated, authRequired, isLoading } = useAuth()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
   useRealtimeSync()
 
+  const nav = useNavigate()
   const openPalette = useCallback(() => setPaletteOpen(true), [])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
+
+  useKeyboardShortcuts({
+    onSearch: openPalette,
+    onShowHelp: () => setShortcutsHelpOpen(v => !v),
+    navigate: nav,
+  })
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -114,6 +126,7 @@ function Layout() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="workflow-rules" element={<WorkflowRules />} />
             <Route path="decisions" element={<Decisions />} />
+            <Route path="goals" element={<Goals />} />
             <Route path="templates" element={<Templates />} />
             <Route path="webhook-logs" element={<WebhookLogs />} />
           </Routes>
@@ -123,6 +136,8 @@ function Layout() {
       <NotificationCenter />
       <AssistantPanel />
       <PWAInstallPrompt />
+      <KeyboardShortcutsHelp open={shortcutsHelpOpen} onClose={() => setShortcutsHelpOpen(false)} />
+      <OfflineIndicator />
     </div>
   )
 }

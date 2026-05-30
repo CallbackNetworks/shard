@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Source location
-
-The **actual editable source** is at `/home/chungchen/20260318/`. The directory `/home/chungchen/todo-plateform/` only contains `__pycache__` — never edit files there.
-
 ## Environment
 
 All services run in Docker with hot-reload. **Never install Python packages or Node modules on the host.**
@@ -32,6 +28,14 @@ docker volume rm 20260318_frontend_modules
 docker compose up --build
 ```
 
+### Production build
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# MCP server only starts with explicit profile:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up -d
+```
+
 ### Environment variables (`.env` in project root)
 
 | Variable | Purpose |
@@ -48,54 +52,88 @@ docker compose up --build
 | `MCP_HTTP_PORT` | Port for MCP HTTP transport (default `8001`) |
 | `MCP_HTTP_TOKEN` | Bearer token to protect MCP HTTP endpoint |
 
+## Testing
+
+### Backend (pytest)
+
+```bash
+# All tests with coverage
+docker compose exec backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+
+# Single test file
+docker compose exec backend pytest tests/test_tasks.py -v
+
+# Single test function
+docker compose exec backend pytest tests/test_tasks.py::test_create_task -v
+```
+
+Tests use an in-memory SQLite database (via `StaticPool`). The `conftest.py` provides `db`, `client`, `sample_identity`, and `sample_project` fixtures. Auth middleware is disabled in tests (`AUTH_PASSWORD=""`).
+
+CI enforces `--cov-fail-under=70`.
+
+### Frontend (vitest)
+
+```bash
+# All tests
+docker compose exec frontend npx vitest run
+
+# Watch mode
+docker compose exec frontend npx vitest
+
+# Single test file
+docker compose exec frontend npx vitest run src/components/__tests__/TaskIcons.test.jsx
+```
+
+Tests use jsdom environment with `@testing-library/react`. Setup file: `src/test/setup.js`.
+
+## Linting & formatting
+
+### Backend (ruff)
+
+```bash
+docker compose exec backend ruff check app/ tests/      # lint
+docker compose exec backend ruff format --check app/ tests/  # format check
+docker compose exec backend ruff format app/ tests/      # auto-format
+```
+
+Config in `backend/pyproject.toml`: line-length 120, rules `E,F,I,W,UP,B`. Ignored: `B008` (function call in default arg — FastAPI `Depends()`), `E501` (line length handled by formatter).
+
+### Frontend (ESLint)
+
+```bash
+docker compose exec frontend npm run lint
+```
+
+Config in `frontend/eslint.config.js` (flat config). CI allows up to 300 warnings (`--max-warnings 300`).
+
+## CI pipeline (`.github/workflows/ci.yml`)
+
+Runs on push/PR to `main`. Four jobs:
+1. **Backend**: ruff lint + format check, pytest with coverage (>=70%), pip-audit
+2. **Frontend**: ESLint, vitest, npm audit, vite build
+3. **Docker build**: `docker compose build --no-cache`
+4. **Integration**: production compose up, backend health check, frontend smoke test
+
+## Schema migrations (Alembic)
+
+```bash
+docker compose exec backend sh -c "cd /app && alembic revision --autogenerate -m 'description'"
+docker compose exec backend sh -c "cd /app && alembic upgrade head"
+```
+
+Alembic uses `render_as_batch=True` for SQLite compatibility. Legacy `ALTER TABLE` blocks remain in `main.py` lifespan for backward compat — new schema changes should use Alembic.
+
 ## Backend architecture (`backend/app/`)
 
 **Entry point: `main.py`**
 - Registers all routers
-- `lifespan` context: runs `Base.metadata.create_all()` + `ALTER TABLE` migrations for columns added after initial schema, then starts the background scheduler as an `asyncio.Task`
+- `lifespan` context: runs `Base.metadata.create_all()` + legacy `ALTER TABLE` migrations, then starts the background scheduler as an `asyncio.Task`
 - Auth middleware reads `AUTH_PASSWORD`; bypasses `/auth/`, `/health`, `/webhook/`, `/share/`, `/docs`, `/openapi.json`, `/redoc`, `/api/v1/`
 
 **Data layer**
 - `models.py` — all SQLAlchemy ORM models (SQLite)
 - `schemas.py` — all Pydantic v2 request/response types
 - `database.py` — `SessionLocal`, `Base`, `get_db` dependency
-
-**Current models** (all in `models.py`):
-`Project`, `Task`, `Label`, `TaskLabel`, `Cycle`, `CycleTask`, `Integration`, `Identity`, `ProjectIdentity`, `ActivityLog`, `ApiKey`, `Comment`, `TaskDependency`, `RecurrenceRule`, `WebhookDelivery`, `WebhookEvent`, `AssistantConversation`, `AssistantMessage`, `WorkflowRule`, `Attachment`, `TaskTemplate`, `Notification`
-
-**Schema migrations**: Alembic is set up with `render_as_batch=True` for SQLite compatibility. Migration scripts are in `backend/migrations/versions/`. Legacy `ALTER TABLE` blocks remain in `main.py` lifespan for backward compat. For **new** schema changes, use Alembic:
-```bash
-docker compose exec backend sh -c "cd /app && alembic revision --autogenerate -m 'description'"
-docker compose exec backend sh -c "cd /app && alembic upgrade head"
-```
-
-### Routers
-
-| Router | Prefix | Notes |
-|--------|--------|-------|
-| `projects.py` | `/projects` | CRUD; progress computed on read via `_enrich()` |
-| `tasks.py` | `/projects/{id}/tasks` | async endpoints; calls `run_rules()` on create/update |
-| `labels.py` + `task_label_router` | `/projects/{id}/labels`, `/projects/{id}/tasks/{tid}/labels` | |
-| `cycles.py` | `/projects/{id}/cycles` | Sprint management |
-| `comments.py` | `/projects/{id}/tasks/{tid}/comments` | |
-| `recurring.py` | `/projects/{id}/tasks/{tid}/recurrence` | GET/POST/PATCH/DELETE |
-| `webhooks.py` | `/webhook/callback/{token}`, `/webhook/events/{task_id}` | Inbound CI/CD with auto-detection; build history; signature verification |
-| `webhook_logs.py` | `/integrations/{id}/deliveries`, `/deliveries/{id}`, `/integrations/{id}/health` | Delivery logs + retry + bulk retry + health stats |
-| `integrations.py` | `/integrations`, `/integrations/templates` | Outbound notification config + CI/CD templates |
-| `cicd.py` | `/cicd/trigger/{provider}` | Trigger CI/CD pipelines (GitHub, GitLab, Jenkins, generic) |
-| `identities.py` | `/identities` | Multi-identity + share tokens |
-| `search.py` | `/search?q=&project_id=` | Tasks + projects, case-insensitive LIKE |
-| `analytics.py` | `/analytics/{overview,heatmap,burndown,velocity,status-trend,cycle-burndown}` | Aggregation endpoints |
-| `templates.py` | `/templates` | Task template CRUD |
-| `attachments.py` | `/projects/{id}/tasks/{tid}/attachments` | File upload/download/delete |
-| `workflow_rules.py` | `/workflow-rules` | CRUD + `POST /{id}/test?task_id=` dry-run |
-| `assistant.py` | `/assistant/conversations` | SSE streaming chat |
-| `external_api.py` | `/api/v1` | API-key-authenticated external API |
-| `share.py` | `/share/identity/{token}` | Public read-only identity view |
-| `activity.py` | `/activity` | Activity log |
-| `api_keys.py` | `/api-keys` | API key management |
-| `auth.py` | `/auth` | Login / token |
-| `ws.py` | `/ws` | WebSocket real-time events |
 
 ### Key patterns
 
@@ -111,13 +149,11 @@ docker compose exec backend sh -c "cd /app && alembic upgrade head"
 
 **Scheduler** (`services/scheduler.py`): asyncio loop, ticks every 3600 s. Runs four checks: due-date reminders (`task.due_soon`/`task.overdue`), recurring task generation, failed webhook retries, and daily summary email (sent once per day at `SUMMARY_HOUR` UTC to all email-type integrations).
 
-**LLM assistant** (`services/llm.py` + `services/assistant_tools.py`): provider-agnostic. `get_provider()` reads `LLM_PROVIDER` env var and returns `ClaudeProvider`, `OpenAIProvider`, or `StubProvider`. Tools: `get_summary`, `list_tasks`, `create_task`, `update_task`, `create_subtask`, `manage_labels`, `analyze_workload`, `search`, `get_activity`. Frontend has prompt templates (Summary, Overdue, Workload, Recent, Plan today) shown as quick-action buttons in empty conversations.
+**LLM assistant** (`services/llm.py` + `services/assistant_tools.py`): provider-agnostic. `get_provider()` reads `LLM_PROVIDER` env var and returns `ClaudeProvider`, `OpenAIProvider`, or `StubProvider`. Tools: `get_summary`, `list_tasks`, `create_task`, `update_task`, `create_subtask`, `manage_labels`, `analyze_workload`, `search`, `get_activity`.
 
-**CI/CD adapters** (`services/cicd_adapters.py`): auto-detects CI/CD provider from request headers (GitHub, GitLab, Jenkins, Drone, Bitbucket) and normalizes payloads to a common format with status, commit_sha, branch, build_url, build_duration_ms, triggered_by, etc. Used by `webhooks.py` for inbound callbacks.
+**CI/CD adapters** (`services/cicd_adapters.py`): auto-detects CI/CD provider from request headers (GitHub, GitLab, Jenkins, Drone, Bitbucket) and normalizes payloads to a common format. Used by `webhooks.py` for inbound callbacks.
 
-**CI/CD triggers** (`services/cicd_trigger.py`): triggers pipelines on external CI/CD platforms (GitHub workflow_dispatch, GitLab pipeline trigger, Jenkins build, generic webhook).
-
-**Integration templates** (`services/integration_templates.py`): predefined configurations for popular CI/CD platforms with setup instructions, default events, and example payloads. Served via `/integrations/templates`.
+**MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio and Streamable HTTP transport. Provides 15 tools, 4 resources, 1 resource template, and 4 prompts.
 
 ## Frontend architecture (`frontend/src/`)
 
@@ -127,67 +163,35 @@ docker compose exec backend sh -c "cd /app && alembic upgrade head"
 
 **API layer**: `src/api/client.js` — all backend calls go through an axios instance with auth header injection. The `getShareData` function uses a plain `axios` instance (no auth interceptor) for public share endpoints.
 
-**Routing** (all under `/app/*` in `Layout`):
-
-| Route | Component |
-|-------|-----------|
-| `/app` | `Dashboard` |
-| `/app/projects/:id` | `ProjectDetail` |
-| `/app/identities` | `Identities` |
-| `/app/integrations` | `Integrations` |
-| `/app/api-keys` | `ApiKeys` |
-| `/app/analytics` | `Analytics` |
-| `/app/workflow-rules` | `WorkflowRules` |
-
-**Global UI** (mounted in `Layout`):
-- `CommandPalette` — ⌘K / Ctrl+K; fuzzy search over projects and tasks
-- `AssistantPanel` — floating bottom-right button; SSE streaming chat panel
-
 **Vite proxy** (`vite.config.js`): all backend paths listed in both `server.proxy` and the `isProxied` array in the SPA fallback middleware. When adding new backend routes, update **both** places.
 
 **Real-time sync**: `hooks/useRealtimeSync.js` — connects to `/ws` WebSocket, auto-reconnects on disconnect (3s delay), invalidates `['projects']` and `['project', id]` queries on `task.*` and `project.*` events.
 
-**IssueRow sub-components**: `TaskIcons.jsx` (PriorityIcon, StatusIcon, LabelChip), `TaskEditForm.jsx`, `CommentsPanel.jsx`, `DependenciesPanel.jsx`, `RecurrencePanel.jsx`, `AttachmentsPanel.jsx` — extracted from IssueRow for maintainability.
+**`IssueRow.jsx`**: orchestrator component. Renders a task row with inline edit, comments panel, dependencies panel, and recurrence panel. Subtasks are rendered recursively with `depth + 1`. Sub-components: `TaskIcons.jsx`, `TaskEditForm.jsx`, `CommentsPanel.jsx`, `DependenciesPanel.jsx`, `RecurrencePanel.jsx`, `AttachmentsPanel.jsx`.
 
-**`IssueRow.jsx`**: orchestrator component. Renders a task row with inline edit, comments panel, dependencies panel, and recurrence panel. Each panel is toggled by hover-action buttons. Subtasks are rendered recursively with `depth + 1`.
+**`ProjectDetail.jsx`**: loads full project (tasks + labels + cycles), supports board/table/gantt/calendar views, client-side search filter on task title. Features: bulk actions (multi-select status/priority/pin), saved filter views, JSON import/export, board WIP limits.
 
-**`ProjectDetail.jsx`**: loads full project (tasks + labels + cycles), supports board/table/gantt views, client-side search filter on task title.
+**Keyboard shortcuts** (`hooks/useKeyboardShortcuts.js` + `components/KeyboardShortcutsHelp.jsx`): global single-key (`c`, `n`, `/`, `?`) and chord (`g→h`, `g→a`, `g→i`, `g→g`) shortcuts. `?` toggles the help modal.
+
+**Offline support** (`hooks/useOfflineSync.js` + `components/OfflineIndicator.jsx`): IndexedDB queue for pending mutations when offline. Auto-syncs when reconnected. Bottom-center indicator shows offline status and pending count.
 
 ## Data flows
 
 **Inbound CI/CD callback:**
 ```
 POST /webhook/callback/{task.callback_token}
-  → task.status updated → log_activity()
-  → fire_notifications() → WebhookDelivery logged
-  → if all tasks done → fire "project.complete" too
-  → run_rules() called for status_changed trigger
+  -> task.status updated -> log_activity()
+  -> fire_notifications() -> WebhookDelivery logged
+  -> if all tasks done -> fire "project.complete" too
+  -> run_rules() called for status_changed trigger
 ```
 
-**Outbound notification payload:**
-```json
-{
-  "event": "task.done",
-  "project": { "id", "name", "status", "progress", "total_tasks", "done_tasks" },
-  "task": { "id", "title", "status", "priority" },
-  "timestamp": "ISO8601"
-}
-```
-
-**Webhook HMAC signing** (type `webhook` integrations): `X-Signature: sha256=<hex>` and `X-Hub-Signature-256` computed over the exact JSON bytes sent.
-
-**External API** (`/api/v1`): requires `X-API-Key` header. Auth middleware is bypassed for `/api/v1/` — API key is the sole auth mechanism. Key endpoints for AI agents:
-- `GET /api/v1/agent-context` — onboarding: capabilities, conventions, per-project instructions
-- `GET /api/v1/summary` — full project/task snapshot optimized for LLMs
-- `POST /api/v1/projects/{id}/tasks/{id}/progress` — report intermediate progress (0-100%)
-- Scopes: `read`, `write`, `admin`
-
-**MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio (default) and Streamable HTTP transport (`MCP_TRANSPORT=http`). Provides 15 tools, 4 resources (`todo://summary`, `todo://activity`, `todo://notifications`, `todo://agent-context`), 1 resource template (`todo://projects/{id}`), and 4 prompts (`plan-my-day`, `project-review`, `triage-inbox`, `weekly-summary`).
+**External API** (`/api/v1`): requires `X-API-Key` header. Auth middleware is bypassed for `/api/v1/` — API key is the sole auth mechanism. Scopes: `read`, `write`, `admin`.
 
 **LLM assistant flow:**
 ```
 POST /assistant/conversations/{id}/messages
-  → SSE stream: text chunks, tool_start, tool_result, done
-  → dispatch_tool() executes DB operations directly
-  → saves AssistantMessage after done event
+  -> SSE stream: text chunks, tool_start, tool_result, done
+  -> dispatch_tool() executes DB operations directly
+  -> saves AssistantMessage after done event
 ```

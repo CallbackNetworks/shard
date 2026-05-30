@@ -145,20 +145,26 @@ function SortableBoardCard({ task, projectCode, onUpdate, onDelete }) {
   )
 }
 
-function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpdate, onDelete, isOver }) {
+function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpdate, onDelete, isOver, wipLimit }) {
   const { t } = useTranslation()
   const { setNodeRef } = useDroppable({ id: colKey })
 
   const STATUS_LABEL_KEYS = { todo: 'todo', in_progress: 'inProgress', done: 'done', failed: 'failed' }
   const translatedLabel = STATUS_LABEL_KEYS[colKey] ? t(STATUS_LABEL_KEYS[colKey]) : colLabel
+  const overWip = wipLimit && tasks.length > wipLimit
 
   return (
     <div key={colKey} style={{ width: 258, minWidth: 258, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', marginBottom: 2 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: colColor }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: DARK.text }}>{translatedLabel}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 11, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)', padding: '1px 6px', borderRadius: 10 }}>
-          {tasks.length}
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: overWip ? '#f37280' : colColor }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: overWip ? '#f37280' : DARK.text }}>{translatedLabel}</span>
+        <span style={{
+          marginLeft: 'auto', fontSize: 11, padding: '1px 6px', borderRadius: 10,
+          background: overWip ? 'rgba(243,114,127,0.15)' : 'rgba(255,255,255,0.06)',
+          color: overWip ? '#f37280' : 'rgba(255,255,255,0.35)',
+          fontWeight: overWip ? 700 : 400,
+        }}>
+          {tasks.length}{wipLimit ? ` / ${wipLimit}` : ''}
         </span>
       </div>
       <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
@@ -197,7 +203,7 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
   )
 }
 
-export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onReorder }) {
+export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onReorder, wipLimits = {} }) {
   const [activeTask, setActiveTask] = useState(null)
   const [overColumn, setOverColumn] = useState(null)
 
@@ -281,6 +287,7 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onRe
               onUpdate={onUpdate}
               onDelete={onDelete}
               isOver={overColumn === col.key}
+              wipLimit={wipLimits[col.key]}
             />
           )
         })}

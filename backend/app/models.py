@@ -24,6 +24,7 @@ class Project(Base):
 
     agent_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    wip_limits: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {"todo": N, "in_progress": N, ...}
 
     tasks: Mapped[list["Task"]] = relationship(
         "Task", back_populates="project", cascade="all, delete-orphan", foreign_keys="Task.project_id"
@@ -64,6 +65,7 @@ class Task(Base):
     time_spent: Mapped[int | None] = mapped_column(Integer, nullable=True)  # minutes
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     progress_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     agent_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
@@ -433,6 +435,52 @@ class WebhookEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     task: Mapped["Task"] = relationship("Task", foreign_keys=[task_id])
+
+
+class SavedFilter(Base):
+    """Persisted filter/view configuration for task lists."""
+
+    __tablename__ = "saved_filters"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # null = global
+    filters: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # {status, priority, label_ids, ...}
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+class Goal(Base):
+    """High-level objective / OKR that groups multiple projects."""
+
+    __tablename__ = "goals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        SAEnum("active", "completed", "cancelled", name="goal_status"), default="active"
+    )
+    target_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    goal_projects: Mapped[list["GoalProject"]] = relationship(
+        "GoalProject", back_populates="goal", cascade="all, delete-orphan"
+    )
+
+
+class GoalProject(Base):
+    """Association between goals and projects."""
+
+    __tablename__ = "goal_projects"
+
+    goal_id: Mapped[str] = mapped_column(String(36), ForeignKey("goals.id", ondelete="CASCADE"), primary_key=True)
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    goal: Mapped["Goal"] = relationship("Goal", back_populates="goal_projects")
+    project: Mapped["Project"] = relationship("Project")
 
 
 class WorkflowRule(Base):

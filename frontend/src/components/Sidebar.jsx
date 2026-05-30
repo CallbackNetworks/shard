@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText } from 'lucide-react'
+import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText, Target } from 'lucide-react'
 import { getProjects, getIdentities } from '../api/client'
 import { BRAND, INSET_SHADOW, DARK } from '../constants/theme'
 
@@ -127,6 +127,7 @@ export default function Sidebar({ onOpenPalette }) {
           { to: '/app/api-keys', icon: <Key size={13} />, labelKey: 'nav.apiKeys' },
           { to: '/app/analytics', icon: <BarChart2 size={13} />, labelKey: 'nav.analytics' },
           { to: '/app/workflow-rules', icon: <GitMerge size={13} />, labelKey: 'nav.workflowRules' },
+          { to: '/app/goals', icon: <Target size={13} />, labelKey: 'nav.goals' },
           { to: '/app/decisions', icon: <GitFork size={13} />, labelKey: 'nav.decisions' },
           { to: '/app/templates', icon: <FileText size={13} />, labelKey: 'nav.templates' },
           { to: '/app/webhook-logs', icon: <ScrollText size={13} />, labelKey: 'nav.webhookLogs' },
