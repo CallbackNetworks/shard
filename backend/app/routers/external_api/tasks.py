@@ -1,0 +1,243 @@
+"""
+External API v1 — Task CRUD and bulk operations.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import ApiKey, Project, Task
+from app.routers.external_api.auth import (
+    _auth_errors,
+    _check_project_access,
+    _get_api_key,
+    _require_scope,
+)
+from app.schemas import TaskCreate, TaskOut, TaskUpdate
+from app.services.activity import log_activity
+from app.services.notifier import fire_notifications
+
+sub_router = APIRouter()
+
+
+@sub_router.get(
+    "/projects/{project_id}/tasks",
+    summary="List tasks in a project",
+    description="Returns tasks for a project, optionally filtered by status and/or priority. Requires `read` scope.",
+    response_model=list[TaskOut],
+    responses={**_auth_errors, 404: {"description": "Project not found"}},
+)
+def api_list_tasks(
+    project_id: str,
+    status_filter: str | None = Query(None, description="Filter by status: todo, in_progress, done, or failed"),
+    priority: str | None = Query(None, description="Filter by priority: low, medium, or high"),
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    _check_project_access(api_key, project_id)
+    query = db.query(Task).filter(Task.project_id == project_id)
+    if status_filter:
+        query = query.filter(Task.status == status_filter)
+    if priority:
+        query = query.filter(Task.priority == priority)
+    return query.order_by(Task.created_at.asc()).all()
+
+
+@sub_router.get(
+    "/projects/{project_id}/tasks/{task_id}",
+    summary="Get a single task",
+    description="Returns a single task by ID within a project. Requires `read` scope.",
+    response_model=TaskOut,
+    responses={**_auth_errors, 404: {"description": "Task not found"}},
+)
+def api_get_task(
+    project_id: str,
+    task_id: str,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    _check_project_access(api_key, project_id)
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+@sub_router.post(
+    "/projects/{project_id}/tasks",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new task",
+    description="Creates a task in a project. The task gets a unique `callback_token` for CI/CD webhook integration. Requires `write` scope.",
+    response_model=TaskOut,
+    responses={**_auth_errors, 404: {"description": "Project not found"}},
+)
+def api_create_task(
+    project_id: str,
+    body: TaskCreate,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "write")
+    _check_project_access(api_key, project_id)
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    task = Task(project_id=project_id, **body.model_dump())
+    db.add(task)
+    db.flush()
+    log_activity(
+        db,
+        "task.created",
+        project_id=project_id,
+        task_id=task.id,
+        actor=f"api:{api_key.name}",
+        detail=f'Task "{task.title}" created via API',
+        meta={"title": task.title, "priority": task.priority, "api_key": api_key.name},
+    )
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@sub_router.patch(
+    "/projects/{project_id}/tasks/{task_id}",
+    summary="Update a task",
+    description="Partially updates a task. When status changes, outbound notifications are fired to matching integrations. Requires `write` scope.",
+    response_model=TaskOut,
+    responses={**_auth_errors, 404: {"description": "Task not found"}},
+)
+async def api_update_task(
+    project_id: str,
+    task_id: str,
+    body: TaskUpdate,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "write")
+    _check_project_access(api_key, project_id)
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    old_status = task.status
+    for field, value in body.model_dump(exclude_none=True).items():
+        setattr(task, field, value)
+
+    if body.status and body.status != old_status:
+        log_activity(
+            db,
+            "task.status_changed",
+            project_id=project_id,
+            task_id=task_id,
+            actor=f"api:{api_key.name}",
+            detail=f'Task "{task.title}" changed from {old_status} to {body.status} via API',
+            meta={"old_status": old_status, "new_status": body.status, "api_key": api_key.name},
+        )
+
+    db.commit()
+    db.refresh(task)
+
+    # Fire notifications on status change
+    if body.status and body.status != old_status:
+        event = f"task.{body.status}"
+        await fire_notifications(db, task, event)
+        if body.status == "done":
+            project = task.project
+            if all(t.status == "done" for t in project.tasks):
+                await fire_notifications(db, task, "project.complete")
+
+    return task
+
+
+@sub_router.delete(
+    "/projects/{project_id}/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a task",
+    description="Permanently deletes a task. Requires `write` scope.",
+    responses={**_auth_errors, 404: {"description": "Task not found"}},
+)
+def api_delete_task(
+    project_id: str,
+    task_id: str,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "write")
+    _check_project_access(api_key, project_id)
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    db.delete(task)
+    db.commit()
+
+
+# ── Bulk operations ───────────────────────────────────────────────
+
+
+@sub_router.post(
+    "/projects/{project_id}/tasks/bulk",
+    summary="Bulk create tasks",
+    description="Creates multiple tasks in one request. Returns the list of created tasks. Requires `write` scope.",
+    response_model=list[TaskOut],
+    responses={**_auth_errors, 404: {"description": "Project not found"}},
+)
+async def api_bulk_create_tasks(
+    project_id: str,
+    tasks: list[TaskCreate],
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "write")
+    _check_project_access(api_key, project_id)
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    created = []
+    for body in tasks:
+        task = Task(project_id=project_id, **body.model_dump())
+        db.add(task)
+        created.append(task)
+    db.commit()
+    for t in created:
+        db.refresh(t)
+    return created
+
+
+@sub_router.post(
+    "/projects/{project_id}/tasks/bulk-update",
+    summary="Bulk update tasks",
+    description="Updates multiple tasks in one request. Each item needs an `id` field and the fields to update. Status changes trigger notifications. Requires `write` scope.",
+    responses={**_auth_errors},
+)
+async def api_bulk_update_tasks(
+    project_id: str,
+    updates: list[dict],
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    """Bulk update tasks. Each item needs 'id' and fields to update."""
+    _require_scope(api_key, "write")
+    _check_project_access(api_key, project_id)
+    results = []
+    for update in updates:
+        task_id = update.pop("id", None)
+        if not task_id:
+            continue
+        task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+        if not task:
+            continue
+        old_status = task.status
+        for field, value in update.items():
+            if hasattr(task, field):
+                setattr(task, field, value)
+        results.append(task)
+
+        if "status" in update and update["status"] != old_status:
+            event = f"task.{update['status']}"
+            await fire_notifications(db, task, event)
+
+    db.commit()
+    for t in results:
+        db.refresh(t)
+    return results
