@@ -24,123 +24,7 @@ import Login from './pages/Login'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { BRAND, INSET_SHADOW, DARK } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
-
-const GLOBAL_CSS = `
-  *, *::before, *::after { box-sizing: border-box; }
-  body { margin: 0; background: #121212; font-family: 'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif; }
-  ::selection { background: rgba(30,215,96,0.3); color: #ffffff; }
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
-  input, select, button, textarea { font-family: inherit; }
-
-  @keyframes fadeUpIn {
-    from { opacity: 0; transform: translateY(14px) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0)   scale(1); }
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  @keyframes shimmerSlide {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(500%); }
-  }
-  @keyframes auroraFloat1 {
-    0%,100% { transform: translate(0,0) scale(1); }
-    33%     { transform: translate(40px,-25px) scale(1.06); }
-    66%     { transform: translate(-20px,12px) scale(0.96); }
-  }
-  @keyframes auroraFloat2 {
-    0%,100% { transform: translate(0,0) scale(1); }
-    40%     { transform: translate(-30px,20px) scale(1.08); }
-    70%     { transform: translate(18px,-12px) scale(0.94); }
-  }
-  @keyframes auroraFloat3 {
-    0%,100% { transform: translate(-50%,-50%) scale(1); }
-    50%     { transform: translate(-50%,-50%) scale(1.18); }
-  }
-  @keyframes pulseRing {
-    0%   { box-shadow: 0 0 0 0 rgba(243,114,127,0.4); }
-    70%  { box-shadow: 0 0 0 8px rgba(243,114,127,0); }
-    100% { box-shadow: 0 0 0 0 rgba(243,114,127,0); }
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  /* Share page animations */
-  @keyframes shareReveal {
-    from { opacity: 0; transform: translateY(24px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes statPulse {
-    0%, 100% { transform: scale(1); }
-    50%      { transform: scale(1.08); }
-  }
-  @keyframes barShimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-  @keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-16px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes refreshPulse {
-    0%, 100% { opacity: 0.3; transform: scale(1); }
-    50%      { opacity: 1; transform: scale(1.4); }
-  }
-
-  .card-hover {
-    transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
-  }
-  .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: rgba(0,0,0,0.5) 0px 8px 24px;
-    background: #252525 !important;
-  }
-  .sb-link {
-    transition: background 0.12s, color 0.12s;
-  }
-  .sb-link:hover {
-    background: rgba(255,255,255,0.08) !important;
-    color: #ffffff !important;
-  }
-
-  /* Mobile responsive */
-  @media (max-width: 768px) {
-    .layout-sidebar {
-      position: fixed !important;
-      left: -240px;
-      top: 0;
-      bottom: 0;
-      z-index: 200;
-      transition: left 0.25s ease;
-      box-shadow: none;
-    }
-    .layout-sidebar.open {
-      left: 0 !important;
-      box-shadow: 4px 0 24px rgba(0,0,0,0.6);
-    }
-    .layout-main {
-      margin-left: 0 !important;
-    }
-    .mobile-overlay {
-      display: block !important;
-    }
-    .mobile-menu-btn {
-      display: flex !important;
-    }
-    .page-content {
-      padding: 16px 12px !important;
-    }
-  }
-  @media (min-width: 769px) {
-    .mobile-overlay { display: none !important; }
-    .mobile-menu-btn { display: none !important; }
-  }
-`
+import './styles/global.css'
 
 const SB_BG     = DARK.bgAlt
 const SB_TEXT   = DARK.textMid
@@ -492,7 +376,6 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <style>{GLOBAL_CSS}</style>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Overview />} />
