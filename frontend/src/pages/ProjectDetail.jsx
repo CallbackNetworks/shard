@@ -128,6 +128,7 @@ export default function ProjectDetail() {
   const [newCycle, setNewCycle] = useState({ name: '', description: '', status: 'draft', start_date: '', end_date: '' })
   const [showAgentInstr, setShowAgentInstr] = useState(false)
   const [agentInstr, setAgentInstr] = useState('')
+  const [repoUrl, setRepoUrl] = useState('')
   const [agentInstrDirty, setAgentInstrDirty] = useState(false)
 
   const { data: project, isLoading } = useQuery({
@@ -189,7 +190,7 @@ export default function ProjectDetail() {
   })
 
   const saveAgentInstrMut = useMutation({
-    mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null }),
+    mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null, repo_url: repoUrl || null }),
     onSuccess: () => { invalidate(); setAgentInstrDirty(false) },
   })
 
@@ -335,7 +336,7 @@ export default function ProjectDetail() {
               onDeleteLabel={labelId => deleteLabelMut.mutate(labelId)}
             />
             <button
-              onClick={() => { setShowAgentInstr(v => !v); if (!agentInstrDirty) setAgentInstr(project.agent_instructions || '') }}
+              onClick={() => { setShowAgentInstr(v => !v); if (!agentInstrDirty) { setAgentInstr(project.agent_instructions || ''); setRepoUrl(project.repo_url || '') } }}
               className={`${s.agentBtn} ${showAgentInstr ? s.agentBtnActive : s.agentBtnInactive}`}
             >
               <Bot size={12} /> Agent
@@ -363,6 +364,14 @@ export default function ProjectDetail() {
             <div className={s.agentInstrDesc}>
               Instructions for AI agents working on this project. Agents can read these via the API.
             </div>
+            <input
+              type="text"
+              value={repoUrl}
+              onChange={e => { setRepoUrl(e.target.value); setAgentInstrDirty(true) }}
+              placeholder="Repository URL (optional), e.g. https://github.com/user/repo"
+              className={s.agentInstrTextarea}
+              style={{ marginBottom: 8, height: 'auto', minHeight: 'unset', padding: '8px 10px' }}
+            />
             <textarea
               value={agentInstr}
               onChange={e => { setAgentInstr(e.target.value); setAgentInstrDirty(true) }}
@@ -380,7 +389,7 @@ export default function ProjectDetail() {
                   {saveAgentInstrMut.isPending ? 'Saving...' : 'Save'}
                 </button>
                 <button
-                  onClick={() => { setAgentInstr(project.agent_instructions || ''); setAgentInstrDirty(false) }}
+                  onClick={() => { setAgentInstr(project.agent_instructions || ''); setRepoUrl(project.repo_url || ''); setAgentInstrDirty(false) }}
                   className={s.agentInstrCancelBtn}
                 >
                   Cancel

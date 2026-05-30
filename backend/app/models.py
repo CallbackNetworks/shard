@@ -23,6 +23,7 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
     agent_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     tasks: Mapped[list["Task"]] = relationship(
         "Task", back_populates="project", cascade="all, delete-orphan", foreign_keys="Task.project_id"

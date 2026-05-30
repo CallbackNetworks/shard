@@ -8,9 +8,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project
+from app.models import ApiKey, Project, Task
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
-from app.schemas import AgentContextOut, AgentProjectInfo
+from app.schemas import AgentContextOut, AgentProjectInfo, AgentProjectTaskInfo
 
 sub_router = APIRouter()
 
@@ -34,16 +34,40 @@ def api_agent_context(
         query = query.filter(Project.id == api_key.project_id)
     projects = query.order_by(Project.created_at.desc()).all()
 
+    priority_order = {"high": 0, "medium": 1, "low": 2}
+
     project_infos = []
     for p in projects:
         label_names = [lb.name for lb in p.labels if lb.type == "label"]
+
+        active = [
+            t for t in p.tasks
+            if t.status in ("todo", "in_progress") and t.parent_id is None
+        ]
+        active.sort(key=lambda t: (
+            0 if t.status == "in_progress" else 1,
+            priority_order.get(t.priority, 2),
+        ))
+        active_task_infos = [
+            AgentProjectTaskInfo(
+                id=t.id,
+                title=t.title,
+                status=t.status,
+                priority=t.priority,
+                due_date=t.due_date,
+            )
+            for t in active[:10]
+        ]
+
         project_infos.append(
             AgentProjectInfo(
                 id=p.id,
                 name=p.name,
                 status=p.status,
+                repo_url=p.repo_url,
                 agent_instructions=p.agent_instructions,
                 label_names=label_names,
+                active_tasks=active_task_infos,
             )
         )
 

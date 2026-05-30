@@ -75,6 +75,7 @@ class ProjectCreate(BaseModel):
     name: str = Field(description="Project name")
     description: str | None = Field(None, description="Optional project description")
     agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
+    repo_url: str | None = Field(None, description="Repository URL linked to this project")
 
 
 class ProjectUpdate(BaseModel):
@@ -82,6 +83,7 @@ class ProjectUpdate(BaseModel):
     description: str | None = Field(None, description="New project description")
     status: Literal["active", "archived"] | None = Field(None, description="Project status: 'active' or 'archived'")
     agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
+    repo_url: str | None = Field(None, description="Repository URL linked to this project")
 
 
 class ProjectOut(BaseModel):
@@ -91,6 +93,7 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     status: str
+    repo_url: str | None = None
     created_at: datetime
     updated_at: datetime
     progress: float = 0.0
@@ -697,12 +700,22 @@ class SummaryOut(BaseModel):
     recent_activity: list[ActivitySummaryItem]
 
 
+class AgentProjectTaskInfo(BaseModel):
+    id: str
+    title: str
+    status: str
+    priority: str
+    due_date: datetime | None = None
+
+
 class AgentProjectInfo(BaseModel):
     id: str
     name: str
     status: str
+    repo_url: str | None = None
     agent_instructions: str | None = None
     label_names: list[str] = []
+    active_tasks: list[AgentProjectTaskInfo] = []
 
 
 class AgentContextOut(BaseModel):
