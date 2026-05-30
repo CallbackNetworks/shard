@@ -135,6 +135,26 @@ export const retryDelivery = (deliveryId) =>
   api.post(`/deliveries/${deliveryId}/retry`).then(r => r.data)
 export const purgeDeliveries = (olderThanDays = 30) =>
   api.delete('/deliveries', { params: { older_than_days: olderThanDays } })
+export const bulkRetryDeliveries = (integrationId) =>
+  api.post(`/integrations/${integrationId}/retry-all`).then(r => r.data)
+export const getIntegrationHealth = (integrationId) =>
+  api.get(`/integrations/${integrationId}/health`).then(r => r.data)
+
+// Integration templates
+export const getIntegrationTemplates = () =>
+  api.get('/integrations/templates').then(r => r.data)
+export const getIntegrationTemplate = (templateId) =>
+  api.get(`/integrations/templates/${templateId}`).then(r => r.data)
+
+// Webhook events (build history)
+export const getWebhookEvents = (taskId, params = {}) =>
+  api.get(`/webhook/events/${taskId}`, { params }).then(r => r.data)
+
+// CI/CD pipeline triggers
+export const triggerGitHubWorkflow = (data) => api.post('/cicd/trigger/github', data).then(r => r.data)
+export const triggerGitLabPipeline = (data) => api.post('/cicd/trigger/gitlab', data).then(r => r.data)
+export const triggerJenkinsBuild = (data) => api.post('/cicd/trigger/jenkins', data).then(r => r.data)
+export const triggerGenericPipeline = (data) => api.post('/cicd/trigger/generic', data).then(r => r.data)
 
 // Recurrence
 export const getRecurrence = (projectId, taskId) =>

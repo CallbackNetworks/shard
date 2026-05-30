@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot } from 'lucide-react'
+import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { regenerateToken } from '../api/client'
 import { PRIORITY, STATUS_MAP } from '../constants/theme'
@@ -10,6 +10,7 @@ import CommentsPanel from './CommentsPanel'
 import DependenciesPanel from './DependenciesPanel'
 import RecurrencePanel from './RecurrencePanel'
 import AttachmentsPanel from './AttachmentsPanel'
+import BuildHistoryPanel from './BuildHistoryPanel'
 import MarkdownPreview from './MarkdownPreview'
 
 export default function IssueRow({
@@ -27,6 +28,7 @@ export default function IssueRow({
   const [showDeps, setShowDeps] = useState(false)
   const [showRecurrence, setShowRecurrence] = useState(false)
   const [showAttachments, setShowAttachments] = useState(false)
+  const [showBuildHistory, setShowBuildHistory] = useState(false)
 
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -250,6 +252,10 @@ export default function IssueRow({
               style={{ background: showAttachments ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showAttachments ? '#1ed760' : '#b3b3b3', padding: '2px 5px', borderRadius: 4 }}>
               <Paperclip size={12} />
             </button>
+            <button onClick={(e) => { e.stopPropagation(); setShowBuildHistory(v => !v) }} title="Build History"
+              style={{ background: showBuildHistory ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showBuildHistory ? '#1ed760' : '#b3b3b3', padding: '2px 5px', borderRadius: 4 }}>
+              <Activity size={12} />
+            </button>
             <button onClick={copyWebhook} title="Copy webhook URL" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b3b3b3', padding: '2px 5px', borderRadius: 4 }}>
               <Link2 size={12} />
             </button>
@@ -316,6 +322,18 @@ export default function IssueRow({
       {/* Attachments panel */}
       {showAttachments && (
         <AttachmentsPanel projectId={projectId} taskId={task.id} depth={depth} />
+      )}
+
+      {/* Build history panel */}
+      {showBuildHistory && (
+        <div style={{
+          paddingLeft: 16 + depth * 20 + 36, paddingRight: 16,
+          paddingTop: 8, paddingBottom: 10,
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          background: 'rgba(255,255,255,0.02)',
+        }}>
+          <BuildHistoryPanel taskId={task.id} />
+        </div>
       )}
 
       {/* Inline subtask creation form */}

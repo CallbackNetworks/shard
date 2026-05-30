@@ -150,6 +150,7 @@ class TaskOut(BaseModel):
     assigned_agent_key_id: str | None = None
     assigned_agent_name: str | None = None
     callback_token: str
+    webhook_secret: str | None = None
     start_date: datetime | None
     due_date: datetime | None
     time_estimate: int | None = None
@@ -217,12 +218,31 @@ class WebhookCallback(BaseModel):
     message: str | None = Field(None, description="Optional status message from CI/CD pipeline")
 
 
+class WebhookEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    task_id: str
+    provider: str
+    event_type: str | None
+    status: str
+    message: str | None
+    commit_sha: str | None
+    branch: str | None
+    build_url: str | None
+    build_number: str | None
+    build_duration_ms: int | None
+    triggered_by: str | None
+    test_summary: dict | None
+    created_at: datetime
+
+
 # --- Integration ---
 
 
 class IntegrationCreate(BaseModel):
     name: str
-    type: Literal["jenkins", "drone", "generic", "email", "webhook"]
+    type: Literal["jenkins", "drone", "generic", "email", "webhook", "github", "gitlab", "bitbucket", "circleci"]
     url: str = ""
     secret: str | None = None
     project_id: str | None = None
@@ -230,11 +250,15 @@ class IntegrationCreate(BaseModel):
     active: bool = True
     email_to: str | None = None
     email_subject_prefix: str | None = "[TODO Platform]"
+    custom_headers: dict | None = None
+    auth_type: Literal["bearer", "basic", "api_key", "none"] | None = "bearer"
+    auth_config: dict | None = None
+    template_id: str | None = None
 
 
 class IntegrationUpdate(BaseModel):
     name: str | None = None
-    type: Literal["jenkins", "drone", "generic", "email", "webhook"] | None = None
+    type: Literal["jenkins", "drone", "generic", "email", "webhook", "github", "gitlab", "bitbucket", "circleci"] | None = None
     url: str | None = None
     secret: str | None = None
     project_id: str | None = None
@@ -242,6 +266,10 @@ class IntegrationUpdate(BaseModel):
     active: bool | None = None
     email_to: str | None = None
     email_subject_prefix: str | None = None
+    custom_headers: dict | None = None
+    auth_type: Literal["bearer", "basic", "api_key", "none"] | None = None
+    auth_config: dict | None = None
+    template_id: str | None = None
 
 
 class IntegrationOut(BaseModel):
@@ -258,6 +286,10 @@ class IntegrationOut(BaseModel):
     created_at: datetime
     email_to: str | None = None
     email_subject_prefix: str | None = None
+    custom_headers: dict | None = None
+    auth_type: str | None = None
+    auth_config: dict | None = None
+    template_id: str | None = None
     smtp_warning: str | None = None
 
 

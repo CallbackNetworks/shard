@@ -51,6 +51,7 @@ class Task(Base):
     )
     priority: Mapped[str] = mapped_column(SAEnum("low", "medium", "high", name="task_priority"), default="medium")
     callback_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
+    webhook_secret: Mapped[str | None] = mapped_column(String(128), nullable=True)
     assignee: Mapped[str | None] = mapped_column(String(255), nullable=True)
     assigned_agent_key_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True
@@ -162,9 +163,7 @@ class Integration(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    type: Mapped[str] = mapped_column(
-        SAEnum("jenkins", "drone", "generic", "email", "webhook", name="integration_type"), nullable=False
-    )
+    type: Mapped[str] = mapped_column(String(50), nullable=False, default="generic")
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # null = global
@@ -174,6 +173,13 @@ class Integration(Base):
     # email-specific fields
     email_to: Mapped[str | None] = mapped_column(Text, nullable=True)  # comma-separated recipients
     email_subject_prefix: Mapped[str | None] = mapped_column(String(255), nullable=True, default="[TODO Platform]")
+    # Phase 3: custom headers & auth
+    custom_headers: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {"X-Custom": "value"}
+    auth_type: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, default="bearer"
+    )  # bearer, basic, api_key, none
+    auth_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # auth-type-specific config
+    template_id: Mapped[str | None] = mapped_column(String(50), nullable=True)  # integration template used
 
 
 class Identity(Base):
@@ -400,6 +406,32 @@ class Notification(Base):
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     task_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
+
+
+class WebhookEvent(Base):
+    """Record of each inbound CI/CD webhook received for a task (build history)."""
+
+    __tablename__ = "webhook_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    task_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, default="generic")
+    event_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    build_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    build_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    build_duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    triggered_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    test_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    raw_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    task: Mapped["Task"] = relationship("Task", foreign_keys=[task_id])
 
 
 class WorkflowRule(Base):

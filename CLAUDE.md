@@ -61,7 +61,7 @@ docker compose up --build
 - `database.py` — `SessionLocal`, `Base`, `get_db` dependency
 
 **Current models** (all in `models.py`):
-`Project`, `Task`, `Label`, `TaskLabel`, `Cycle`, `CycleTask`, `Integration`, `Identity`, `ProjectIdentity`, `ActivityLog`, `ApiKey`, `Comment`, `TaskDependency`, `RecurrenceRule`, `WebhookDelivery`, `AssistantConversation`, `AssistantMessage`, `WorkflowRule`, `Attachment`, `TaskTemplate`
+`Project`, `Task`, `Label`, `TaskLabel`, `Cycle`, `CycleTask`, `Integration`, `Identity`, `ProjectIdentity`, `ActivityLog`, `ApiKey`, `Comment`, `TaskDependency`, `RecurrenceRule`, `WebhookDelivery`, `WebhookEvent`, `AssistantConversation`, `AssistantMessage`, `WorkflowRule`, `Attachment`, `TaskTemplate`, `Notification`
 
 **Schema migrations**: Alembic is set up with `render_as_batch=True` for SQLite compatibility. Migration scripts are in `backend/migrations/versions/`. Legacy `ALTER TABLE` blocks remain in `main.py` lifespan for backward compat. For **new** schema changes, use Alembic:
 ```bash
@@ -79,9 +79,10 @@ docker compose exec backend sh -c "cd /app && alembic upgrade head"
 | `cycles.py` | `/projects/{id}/cycles` | Sprint management |
 | `comments.py` | `/projects/{id}/tasks/{tid}/comments` | |
 | `recurring.py` | `/projects/{id}/tasks/{tid}/recurrence` | GET/POST/PATCH/DELETE |
-| `webhooks.py` | `/webhook/callback/{token}` | Inbound CI/CD; calls `fire_notifications()` |
-| `webhook_logs.py` | `/integrations/{id}/deliveries`, `/deliveries/{id}` | Delivery logs + retry |
-| `integrations.py` | `/integrations` | Outbound notification config |
+| `webhooks.py` | `/webhook/callback/{token}`, `/webhook/events/{task_id}` | Inbound CI/CD with auto-detection; build history; signature verification |
+| `webhook_logs.py` | `/integrations/{id}/deliveries`, `/deliveries/{id}`, `/integrations/{id}/health` | Delivery logs + retry + bulk retry + health stats |
+| `integrations.py` | `/integrations`, `/integrations/templates` | Outbound notification config + CI/CD templates |
+| `cicd.py` | `/cicd/trigger/{provider}` | Trigger CI/CD pipelines (GitHub, GitLab, Jenkins, generic) |
 | `identities.py` | `/identities` | Multi-identity + share tokens |
 | `search.py` | `/search?q=&project_id=` | Tasks + projects, case-insensitive LIKE |
 | `analytics.py` | `/analytics/{overview,heatmap,burndown,velocity,status-trend,cycle-burndown}` | Aggregation endpoints |
@@ -111,6 +112,12 @@ docker compose exec backend sh -c "cd /app && alembic upgrade head"
 **Scheduler** (`services/scheduler.py`): asyncio loop, ticks every 3600 s. Runs four checks: due-date reminders (`task.due_soon`/`task.overdue`), recurring task generation, failed webhook retries, and daily summary email (sent once per day at `SUMMARY_HOUR` UTC to all email-type integrations).
 
 **LLM assistant** (`services/llm.py` + `services/assistant_tools.py`): provider-agnostic. `get_provider()` reads `LLM_PROVIDER` env var and returns `ClaudeProvider`, `OpenAIProvider`, or `StubProvider`. Tools: `get_summary`, `list_tasks`, `create_task`, `update_task`, `create_subtask`, `manage_labels`, `analyze_workload`, `search`, `get_activity`. Frontend has prompt templates (Summary, Overdue, Workload, Recent, Plan today) shown as quick-action buttons in empty conversations.
+
+**CI/CD adapters** (`services/cicd_adapters.py`): auto-detects CI/CD provider from request headers (GitHub, GitLab, Jenkins, Drone, Bitbucket) and normalizes payloads to a common format with status, commit_sha, branch, build_url, build_duration_ms, triggered_by, etc. Used by `webhooks.py` for inbound callbacks.
+
+**CI/CD triggers** (`services/cicd_trigger.py`): triggers pipelines on external CI/CD platforms (GitHub workflow_dispatch, GitLab pipeline trigger, Jenkins build, generic webhook).
+
+**Integration templates** (`services/integration_templates.py`): predefined configurations for popular CI/CD platforms with setup instructions, default events, and example payloads. Served via `/integrations/templates`.
 
 ## Frontend architecture (`frontend/src/`)
 

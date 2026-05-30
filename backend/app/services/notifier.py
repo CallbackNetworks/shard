@@ -28,20 +28,54 @@ def _compute_progress(project: Project) -> tuple[int, int, float]:
 
 def _build_headers(integration: Integration, body_bytes: bytes | None = None) -> dict[str, str]:
     headers = {"Content-Type": "application/json"}
+
+    # Authentication based on auth_type (new) or legacy type-based logic
+    auth_type = getattr(integration, "auth_type", None) or "bearer"
+    auth_config = getattr(integration, "auth_config", None) or {}
+
     if integration.type == "webhook":
         # HMAC-SHA256 signature (GitHub-style): X-Signature: sha256=<hex>
         if integration.secret and body_bytes is not None:
             sig = hmac.new(integration.secret.encode(), body_bytes, hashlib.sha256).hexdigest()
             headers["X-Signature"] = f"sha256={sig}"
             headers["X-Hub-Signature-256"] = f"sha256={sig}"
+    elif auth_type == "basic":
+        # Basic auth from auth_config: {"username": "...", "password": "..."}
+        import base64
+
+        username = auth_config.get("username", "")
+        password = auth_config.get("password", "") or integration.secret or ""
+        creds = base64.b64encode(f"{username}:{password}".encode()).decode()
+        headers["Authorization"] = f"Basic {creds}"
+    elif auth_type == "api_key":
+        # API key: configurable header name and value
+        header_name = auth_config.get("header_name", "X-API-Key")
+        header_value = auth_config.get("header_value", "") or integration.secret or ""
+        headers[header_name] = header_value
+    elif auth_type == "none":
+        pass  # No auth
     else:
+        # Default: bearer token (legacy behavior)
         if integration.secret:
             headers["Authorization"] = f"Bearer {integration.secret}"
-        if integration.type == "drone":
-            headers["X-Drone-Event"] = "custom"
-            headers["X-Drone-Source"] = "todo-platform"
-        elif integration.type == "jenkins":
-            headers["X-Jenkins-Source"] = "todo-platform"
+
+    # Type-specific headers
+    if integration.type == "drone":
+        headers["X-Drone-Event"] = "custom"
+        headers["X-Drone-Source"] = "todo-platform"
+    elif integration.type == "jenkins":
+        headers["X-Jenkins-Source"] = "todo-platform"
+    elif integration.type == "github":
+        headers["X-GitHub-Source"] = "todo-platform"
+    elif integration.type == "gitlab":
+        headers["X-GitLab-Source"] = "todo-platform"
+
+    # Custom headers (user-defined key-value pairs)
+    custom_headers = getattr(integration, "custom_headers", None)
+    if custom_headers and isinstance(custom_headers, dict):
+        for key, value in custom_headers.items():
+            headers[str(key)] = str(value)
+
     headers["X-Todo-Platform-Event"] = "notification"
     return headers
 

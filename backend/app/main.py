@@ -18,6 +18,7 @@ from app.routers import (
     api_keys,
     assistant,
     attachments,
+    cicd,
     comments,
     cycles,
     decisions,
@@ -119,6 +120,18 @@ async def lifespan(app: FastAPI):
             conn.execute(text("ALTER TABLE tasks ADD COLUMN progress_pct INTEGER"))
         if "agent_notes" not in task_cols:
             conn.execute(text("ALTER TABLE tasks ADD COLUMN agent_notes TEXT"))
+        # Migrate task webhook_secret
+        if "webhook_secret" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN webhook_secret VARCHAR(128)"))
+        # Migrate integration new fields for custom headers & auth
+        if "custom_headers" not in intg_cols:
+            conn.execute(text("ALTER TABLE integrations ADD COLUMN custom_headers JSON"))
+        if "auth_type" not in intg_cols:
+            conn.execute(text("ALTER TABLE integrations ADD COLUMN auth_type VARCHAR(20) DEFAULT 'bearer'"))
+        if "auth_config" not in intg_cols:
+            conn.execute(text("ALTER TABLE integrations ADD COLUMN auth_config JSON"))
+        if "template_id" not in intg_cols:
+            conn.execute(text("ALTER TABLE integrations ADD COLUMN template_id VARCHAR(50)"))
         conn.commit()
 
     # Start background scheduler for due date reminders
@@ -238,6 +251,7 @@ app.include_router(assistant.router)
 app.include_router(templates.router)
 app.include_router(attachments.router)
 app.include_router(notifications.router)
+app.include_router(cicd.router)
 app.include_router(ws_router.router)
 
 
