@@ -14,7 +14,7 @@ import BoardView from '../components/BoardView'
 import TableView from '../components/TableView'
 import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
-import { BRAND, LABEL_PALETTE, SHADOW_LG, INSET_SHADOW } from '../constants/theme'
+import { BRAND, LABEL_PALETTE, SHADOW_LG, INSET_SHADOW, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 
 function LabelChip({ label, onRemove }) {
@@ -47,7 +47,7 @@ function LabelManager({ labels, onCreateLabel, onDeleteLabel }) {
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
           padding: '6px 14px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)',
-          background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff',
+          background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text,
           textTransform: 'uppercase', letterSpacing: '1px',
         }}
       >
@@ -56,10 +56,10 @@ function LabelManager({ labels, onCreateLabel, onDeleteLabel }) {
       {open && (
         <div style={{
           position: 'absolute', zIndex: 50, top: '100%', right: 0, marginTop: 4,
-          background: '#181818', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+          background: DARK.surface, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
           boxShadow: SHADOW_LG, padding: 14, minWidth: 260,
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ffffff', marginBottom: 10 }}>Project Labels</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: DARK.text, marginBottom: 10 }}>Project Labels</div>
           {labels.length === 0 && (
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>No labels yet.</div>
           )}
@@ -83,7 +83,7 @@ function LabelManager({ labels, onCreateLabel, onDeleteLabel }) {
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Label name"
-              style={{ flex: 1, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
+              style={{ flex: 1, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: DARK.text }}
             />
           </div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -289,7 +289,7 @@ export default function ProjectDetail() {
   const tabStyle = (t) => ({
     padding: '10px 16px', fontSize: 14, fontWeight: tab === t ? 700 : 400,
     border: 'none', background: 'none', cursor: 'pointer',
-    color: tab === t ? '#ffffff' : '#b3b3b3',
+    color: tab === t ? DARK.text : DARK.textMid,
     borderBottom: tab === t ? `2px solid ${BRAND}` : '2px solid transparent',
     marginBottom: -1, transition: 'color 0.15s',
   })
@@ -300,18 +300,18 @@ export default function ProjectDetail() {
   }
 
   if (isLoading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#b3b3b3', background: '#121212' }}>
-      <div style={{ width: 18, height: 18, border: `2px solid #1ed760`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 10 }} />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: DARK.textMid, background: DARK.bgAlt }}>
+      <div style={{ width: 18, height: 18, border: `2px solid ${DARK.success}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 10 }} />
       Loading…
     </div>
   )
 
-  if (!project) return <div style={{ padding: 32, color: '#f3727f', background: '#121212' }}>Project not found</div>
+  if (!project) return <div style={{ padding: 32, color: DARK.danger, background: DARK.bgAlt }}>Project not found</div>
 
   const identColor = project.identities?.[0]?.color || BRAND
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', background: '#121212', color: '#ffffff' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', background: DARK.bgAlt, color: DARK.text }}>
       {/* Header */}
       <div style={{ padding: isMobile ? '12px 12px 0' : '16px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.015)' }}>
         <button
@@ -339,11 +339,11 @@ export default function ProjectDetail() {
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3, flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{project.name}</h1>
+              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: DARK.text }}>{project.name}</h1>
               <span style={{
                 fontSize: 10, padding: '2px 9px', borderRadius: 9999, fontWeight: 600,
                 background: project.status === 'archived' ? 'rgba(255,255,255,0.06)' : 'rgba(30,215,96,0.1)',
-                color: project.status === 'archived' ? '#b3b3b3' : '#1ed760',
+                color: project.status === 'archived' ? DARK.textMid : DARK.success,
                 border: `1px solid ${project.status === 'archived' ? 'rgba(255,255,255,0.08)' : 'rgba(30,215,96,0.3)'}`,
                 textTransform: 'capitalize', letterSpacing: '0.05em',
               }}>
@@ -364,7 +364,7 @@ export default function ProjectDetail() {
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{project.done_tasks}/{project.total_tasks} done</div>
               <div style={{ width: 90, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
-                <div style={{ height: '100%', width: `${project.progress}%`, background: '#1ed760', borderRadius: 2, transition: 'width 0.3s' }} />
+                <div style={{ height: '100%', width: `${project.progress}%`, background: DARK.success, borderRadius: 2, transition: 'width 0.3s' }} />
               </div>
             </div>
             <LabelManager
@@ -378,7 +378,7 @@ export default function ProjectDetail() {
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '6px 14px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)',
                 background: showAgentInstr ? 'rgba(129,140,248,0.15)' : 'transparent',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text,
                 textTransform: 'uppercase', letterSpacing: '1px',
               }}
             >
@@ -386,7 +386,7 @@ export default function ProjectDetail() {
             </button>
             <button
               onClick={() => archiveMut.mutate()}
-              style={{ padding: '7px 16px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px' }}
+              style={{ padding: '7px 16px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}
             >
               {project.status === 'archived' ? 'Unarchive' : 'Archive'}
             </button>
@@ -395,7 +395,7 @@ export default function ProjectDetail() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '7px 18px', borderRadius: 9999, border: 'none',
-                background: '#1ed760',
+                background: DARK.success,
                 color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 textTransform: 'uppercase', letterSpacing: '1.4px',
                 boxShadow: 'rgba(0,0,0,0.3) 0px 4px 8px',
@@ -411,7 +411,7 @@ export default function ProjectDetail() {
             background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.2)',
             borderRadius: 10, padding: 16, marginBottom: 16,
           }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '1px' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: DARK.info, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '1px' }}>
               Agent Instructions
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
@@ -423,7 +423,7 @@ export default function ProjectDetail() {
               placeholder="e.g. Use conventional commit style for task titles. Always create subtasks for multi-step work."
               rows={4}
               style={{
-                width: '100%', background: 'rgba(0,0,0,0.3)', color: '#ffffff',
+                width: '100%', background: 'rgba(0,0,0,0.3)', color: DARK.text,
                 border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6,
                 padding: '8px 10px', fontSize: 13, fontFamily: 'monospace',
                 resize: 'vertical', outline: 'none', boxSizing: 'border-box',
@@ -436,7 +436,7 @@ export default function ProjectDetail() {
                   disabled={saveAgentInstrMut.isPending}
                   style={{
                     padding: '5px 14px', borderRadius: 6, border: 'none',
-                    background: '#818cf8', color: '#000', fontSize: 12, fontWeight: 700,
+                    background: DARK.info, color: '#000', fontSize: 12, fontWeight: 700,
                     cursor: 'pointer',
                   }}
                 >
@@ -498,8 +498,8 @@ export default function ProjectDetail() {
                 <button key={f} onClick={() => setFilter(f)} style={{
                   padding: '4px 14px', borderRadius: 9999, fontSize: 13, cursor: 'pointer', fontWeight: filter === f ? 700 : 400,
                   border: filter === f ? 'none' : '1px solid rgba(255,255,255,0.15)',
-                  background: filter === f ? '#1f1f1f' : 'transparent',
-                  color: filter === f ? '#ffffff' : '#b3b3b3',
+                  background: filter === f ? DARK.elevated : 'transparent',
+                  color: filter === f ? DARK.text : DARK.textMid,
                   transition: 'all 0.15s',
                 }}>
                   {f === 'all' ? 'All' : f === 'in_progress' ? 'In Progress' : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -514,14 +514,14 @@ export default function ProjectDetail() {
                     padding: '5px 12px', borderRadius: 9999, fontSize: 12, cursor: 'pointer',
                     border: activeFilterCount > 0 ? '1px solid rgba(30,215,96,0.4)' : '1px solid rgba(255,255,255,0.15)',
                     background: activeFilterCount > 0 ? 'rgba(30,215,96,0.08)' : 'transparent',
-                    color: activeFilterCount > 0 ? '#1ed760' : '#b3b3b3',
+                    color: activeFilterCount > 0 ? DARK.success : DARK.textMid,
                     fontWeight: 600,
                   }}
                 >
                   <SlidersHorizontal size={12} />
                   Filter
                   {activeFilterCount > 0 && (
-                    <span style={{ background: '#1ed760', color: '#000', borderRadius: 9999, fontSize: 9, padding: '1px 5px', fontWeight: 700 }}>
+                    <span style={{ background: DARK.success, color: '#000', borderRadius: 9999, fontSize: 9, padding: '1px 5px', fontWeight: 700 }}>
                       {activeFilterCount}
                     </span>
                   )}
@@ -533,8 +533,8 @@ export default function ProjectDetail() {
                   style={{
                     padding: '6px 14px', borderRadius: 9999, fontSize: 13,
                     border: 'none', outline: 'none',
-                    background: '#1f1f1f',
-                    color: '#ffffff', width: 160,
+                    background: DARK.elevated,
+                    color: DARK.text, width: 160,
                     boxShadow: INSET_SHADOW,
                   }}
                 />
@@ -554,24 +554,24 @@ export default function ProjectDetail() {
               }}>
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filters:</span>
                 <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterPriority !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none' }}>
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterPriority !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
                   <option value="all">Priority: All</option>
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
                 <select value={filterLabel} onChange={e => setFilterLabel(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterLabel !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none' }}>
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterLabel !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
                   <option value="all">Label: All</option>
                   {labels.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
                 </select>
                 <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterAssignee !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none' }}>
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterAssignee !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
                   <option value="all">Assignee: All</option>
                   {assignees.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
                 <select value={filterDue} onChange={e => setFilterDue(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterDue !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none' }}>
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterDue !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
                   <option value="all">Due: All</option>
                   <option value="overdue">Overdue</option>
                   <option value="this_week">This week</option>
@@ -579,7 +579,7 @@ export default function ProjectDetail() {
                 </select>
                 {agentNames.length > 0 && (
                   <select value={filterAgent} onChange={e => setFilterAgent(e.target.value)}
-                    style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterAgent !== 'all' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.05)', color: filterAgent !== 'all' ? '#818cf8' : '#ffffff', outline: 'none' }}>
+                    style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterAgent !== 'all' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.05)', color: filterAgent !== 'all' ? DARK.info : DARK.text, outline: 'none' }}>
                     <option value="all">Agent: All</option>
                     {agentNames.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
@@ -587,7 +587,7 @@ export default function ProjectDetail() {
                 {activeFilterCount > 0 && (
                   <button
                     onClick={() => { setFilterPriority('all'); setFilterLabel('all'); setFilterAssignee('all'); setFilterDue('all'); setFilterAgent('all') }}
-                    style={{ padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(243,114,127,0.3)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: '#f3727f', fontWeight: 600 }}
+                    style={{ padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(243,114,127,0.3)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.danger, fontWeight: 600 }}
                   >
                     Clear all
                   </button>

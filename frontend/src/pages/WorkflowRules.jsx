@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, Zap, GitMerge } from 'lucide-react'
 import axios from 'axios'
+import { DARK } from '../constants/theme'
 
 const _api = axios.create({ baseURL: '' })
 _api.interceptors.request.use(cfg => {
@@ -38,13 +39,13 @@ const ACTION_TYPES = [
 
 const inp = {
   background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 6, padding: '5px 10px', fontSize: 12, color: '#ffffff', outline: 'none',
+  borderRadius: 6, padding: '5px 10px', fontSize: 12, color: DARK.text, outline: 'none',
 }
 const btn = (variant = 'default') => ({
   border: 'none', borderRadius: 9999, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-  ...(variant === 'primary' ? { background: '#1ed760', color: '#000' }
-    : variant === 'danger' ? { background: 'rgba(243,114,127,0.12)', color: '#f3727f', border: '1px solid rgba(243,114,127,0.2)' }
-    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#b3b3b3' }),
+  ...(variant === 'primary' ? { background: DARK.success, color: '#000' }
+    : variant === 'danger' ? { background: 'rgba(243,114,127,0.12)', color: DARK.danger, border: '1px solid rgba(243,114,127,0.2)' }
+    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: DARK.textMid }),
 })
 
 function ConditionRow({ cond, onChange, onRemove }) {
@@ -98,7 +99,7 @@ function RuleModal({ initial, onSave, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: '#10111e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 28, width: '90vw', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}>
-        <h2 style={{ fontWeight: 700, marginBottom: 20, color: '#ffffff', fontSize: 16 }}>{initial ? 'Edit' : 'New'} Workflow Rule</h2>
+        <h2 style={{ fontWeight: 700, marginBottom: 20, color: DARK.text, fontSize: 16 }}>{initial ? 'Edit' : 'New'} Workflow Rule</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</div>
@@ -136,7 +137,7 @@ function RuleModal({ initial, onSave, onClose }) {
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Project ID (optional, leave blank for global)</div>
             <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder="(all projects)" style={{ ...inp, width: '100%' }} />
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#b3b3b3', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} />
             Active
           </label>
@@ -191,7 +192,7 @@ export default function WorkflowRules() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', margin: 0 }}>Workflow Rules</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: DARK.text, margin: 0 }}>Workflow Rules</h1>
           <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: 4, fontSize: 13 }}>Automate task actions with if-this-then-that rules</p>
         </div>
         <button onClick={() => setModal({ mode: 'create' })} style={{ ...btn('primary'), display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -203,8 +204,8 @@ export default function WorkflowRules() {
         <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Loading…</div>
       ) : rules.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.2)', animation: 'fadeIn 0.4s ease' }}>
-          <GitMerge size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: '#818cf8' }} />
-          <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{t('rules.empty')}</p>
+          <GitMerge size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: DARK.info }} />
+          <p style={{ fontSize: 16, fontWeight: 700, color: DARK.text }}>{t('rules.empty')}</p>
           <p style={{ marginTop: 6, fontSize: 13 }}>{t('rules.emptyHint')}</p>
           <button
             onClick={() => setModal({ mode: 'create' })}
@@ -226,18 +227,18 @@ export default function WorkflowRules() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 600, fontSize: 14, color: '#ffffff' }}>{rule.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: DARK.text }}>{rule.name}</span>
                     <span style={{
                       fontSize: 10, padding: '1px 8px', borderRadius: 999, fontWeight: 600,
                       background: rule.active ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
-                      color: rule.active ? '#1ed760' : '#6b7280',
+                      color: rule.active ? DARK.success : '#6b7280',
                     }}>{rule.active ? 'active' : 'paused'}</span>
                     {rule.run_count > 0 && (
                       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>ran {rule.run_count}×</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
-                    <span style={{ background: 'rgba(30,215,96,0.1)', color: '#1ed760', borderRadius: 6, padding: '2px 8px' }}>
+                    <span style={{ background: 'rgba(30,215,96,0.1)', color: DARK.success, borderRadius: 6, padding: '2px 8px' }}>
                       when: {TRIGGER_LABELS[rule.trigger] || rule.trigger}
                     </span>
                     {(rule.conditions || []).map((c, i) => (
@@ -246,7 +247,7 @@ export default function WorkflowRules() {
                       </span>
                     ))}
                     {(rule.actions || []).map((a, i) => (
-                      <span key={i} style={{ background: 'rgba(52,211,153,0.1)', color: '#1ed760', borderRadius: 6, padding: '2px 8px' }}>
+                      <span key={i} style={{ background: 'rgba(52,211,153,0.1)', color: DARK.success, borderRadius: 6, padding: '2px 8px' }}>
                         → {a.type}: {a.value}
                       </span>
                     ))}
@@ -286,7 +287,7 @@ export default function WorkflowRules() {
                   <span style={{
                     fontSize: 11, padding: '2px 8px', borderRadius: 6,
                     background: testResults[rule.id].would_fire ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.05)',
-                    color: testResults[rule.id].would_fire ? '#1ed760' : 'rgba(255,255,255,0.3)',
+                    color: testResults[rule.id].would_fire ? DARK.success : 'rgba(255,255,255,0.3)',
                   }}>
                     {testResults[rule.id].would_fire
                       ? `Would fire ${testResults[rule.id].actions?.length} action(s)`

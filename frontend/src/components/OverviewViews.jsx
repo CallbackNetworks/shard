@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { DARK } from '../constants/theme'
 
 export const FONT = '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif'
 export const BG   = '#121212'
@@ -106,7 +107,7 @@ export function TabBtn({ label, active, onClick }) {
     <button onClick={onClick} style={{
       background: active ? 'rgba(30,215,96,0.1)' : 'transparent',
       border: 'none',
-      borderTop: `2px solid ${active ? '#1ed760' : 'transparent'}`,
+      borderTop: `2px solid ${active ? DARK.success : 'transparent'}`,
       cursor: 'pointer',
       padding: '8px 18px',
       fontSize: 10, fontWeight: 800, letterSpacing: '0.16em',
@@ -137,7 +138,7 @@ function GlassRow({ children, accentColor, style = {} }) {
       {/* Left accent bar */}
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
-        background: accentColor || '#1ed760',
+        background: accentColor || DARK.success,
         clipPath: PARA_L(0),
       }} />
       {children}

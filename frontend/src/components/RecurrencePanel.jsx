@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { setRecurrence, updateRecurrence, removeRecurrence } from '../api/client'
+import { DARK } from '../constants/theme'
 
 export default function RecurrencePanel({ projectId, task, depth }) {
   const { t } = useTranslation()
@@ -22,7 +23,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
   }
 
   const padLeft = 16 + depth * 20 + 36
-  const inputStyle = { padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none' }
+  const inputStyle = { padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }
 
   return (
     <div style={{
@@ -35,14 +36,14 @@ export default function RecurrencePanel({ projectId, task, depth }) {
         {t('recurrence.title')}
       </div>
       {task.recurrence ? (
-        <div style={{ fontSize: 12, color: '#b3b3b3' }}>
+        <div style={{ fontSize: 12, color: DARK.textMid }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <span style={{ color: '#1ed760', fontWeight: 600 }}>
+            <span style={{ color: DARK.success, fontWeight: 600 }}>
               {t('recurrence.repeats', { frequency: task.recurrence.frequency === 'interval'
                 ? `every ${task.recurrence.interval_value} day(s)`
                 : task.recurrence.frequency })}
             </span>
-            <span style={{ color: task.recurrence.active ? '#1ed760' : '#b3b3b3', fontSize: 10 }}>
+            <span style={{ color: task.recurrence.active ? DARK.success : DARK.textMid, fontSize: 10 }}>
               {task.recurrence.active ? t('recurrence.active') : t('recurrence.paused')}
             </span>
           </div>
@@ -58,7 +59,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
                 await updateRecurrence(projectId, task.id, { active: !task.recurrence.active })
                 qc.invalidateQueries({ queryKey: ['project', projectId] })
               }}
-              style={{ padding: '4px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#1ed760', textTransform: 'uppercase', letterSpacing: '1px' }}
+              style={{ padding: '4px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.success, textTransform: 'uppercase', letterSpacing: '1px' }}
             >
               {task.recurrence.active ? t('pause') : t('resume')}
             </button>
@@ -68,7 +69,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
                 await removeRecurrence(projectId, task.id)
                 qc.invalidateQueries({ queryKey: ['project', projectId] })
               }}
-              style={{ padding: '4px 14px', border: '1px solid rgba(243,114,127,0.4)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#f3727f', textTransform: 'uppercase', letterSpacing: '1px' }}
+              style={{ padding: '4px 14px', border: '1px solid rgba(243,114,127,0.4)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.danger, textTransform: 'uppercase', letterSpacing: '1px' }}
             >
               {t('remove')}
             </button>
@@ -104,7 +105,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
           </div>
           <button
             onClick={handleCreate}
-            style={{ padding: '4px 16px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}
+            style={{ padding: '4px 16px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}
           >
             {t('recurrence.setRecurrence')}
           </button>

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Bot, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { getAgentSummary } from '../api/client'
-import { STATUS_MAP, PRIORITY } from '../constants/theme'
+import { DARK, STATUS_MAP, PRIORITY } from '../constants/theme'
 
 function StatusBar({ counts }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
@@ -49,16 +49,16 @@ function AgentCard({ agent, index }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           border: `1px solid ${agent.active ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.1)'}`,
         }}>
-          <Bot size={14} color={agent.active ? '#818cf8' : '#6b7280'} />
+          <Bot size={14} color={agent.active ? DARK.info : '#6b7280'} />
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#ffffff' }}>{agent.agent_name}</span>
+            <span style={{ fontWeight: 600, fontSize: 13, color: DARK.text }}>{agent.agent_name}</span>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 9999,
               background: agent.active ? 'rgba(30,215,96,0.1)' : 'rgba(255,255,255,0.05)',
-              color: agent.active ? '#1ed760' : '#6b7280',
+              color: agent.active ? DARK.success : '#6b7280',
             }}>
               {agent.active ? t('agent.active') : t('agent.inactive')}
             </span>
@@ -149,7 +149,7 @@ export default function AgentTasksPanel() {
   return (
     <div style={{ marginBottom: 32 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <Bot size={14} color="#818cf8" />
+        <Bot size={14} color={DARK.info} />
         <span style={{ fontWeight: 700, fontSize: 14 }}>{t('agent.workload')}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

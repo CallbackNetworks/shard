@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, X, BarChart3, Copy, GitCompareArrows } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { BRAND, STATUS_MAP, BTN_SM } from '../constants/theme'
+import { DARK, BRAND, STATUS_MAP, BTN_SM } from '../constants/theme'
 import { duplicateCycle, compareCycles } from '../api/client'
 import axios from 'axios'
 
@@ -130,22 +130,22 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input value={editData.name} onChange={e => setEditData(p => ({ ...p, name: e.target.value }))}
-              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
+              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: DARK.text }} />
             <select value={editData.status} onChange={e => setEditData(p => ({ ...p, status: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }}>
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: DARK.surface, color: DARK.text }}>
               <option value="draft">{t('cycle.draft')}</option>
               <option value="active">{t('active')}</option>
               <option value="completed">{t('cycle.completed')}</option>
             </select>
             <input type="date" value={editData.start_date} onChange={e => setEditData(p => ({ ...p, start_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: DARK.surface, color: DARK.text }} />
             <span style={{ color: 'rgba(255,255,255,0.25)', alignSelf: 'center' }}>→</span>
             <input type="date" value={editData.end_date} onChange={e => setEditData(p => ({ ...p, end_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: DARK.surface, color: DARK.text }} />
           </div>
           <input value={editData.description} onChange={e => setEditData(p => ({ ...p, description: e.target.value }))}
             placeholder={t('cycle.descriptionPlaceholder')}
-            style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }} />
+            style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: DARK.text }} />
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={saveEdit} style={{ ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700 }}>{t('save')}</button>
             <button onClick={() => setEditing(false)} style={BTN_SM}>{t('cancel')}</button>
@@ -156,7 +156,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff' }}>{cycle.name}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: DARK.text }}>{cycle.name}</span>
                 <span style={{
                   fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
                   background: sColor + '22', color: sColor, border: `1px solid ${sColor}44`,
@@ -223,7 +223,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                   onClick={() => { setShowCompare(v => !v); setCompareData(null) }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 4,
-                    fontSize: 11, color: showCompare ? '#539df5' : 'rgba(255,255,255,0.35)',
+                    fontSize: 11, color: showCompare ? DARK.info : 'rgba(255,255,255,0.35)',
                     background: showCompare ? 'rgba(83,157,245,0.1)' : 'none',
                     border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
                     padding: '3px 10px', cursor: 'pointer', fontWeight: 500,
@@ -245,7 +245,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                 <select
                   value={compareTarget}
                   onChange={e => { setCompareTarget(e.target.value); setCompareData(null) }}
-                  style={{ padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 11, background: '#181818', color: '#fff' }}
+                  style={{ padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 11, background: DARK.surface, color: '#fff' }}
                 >
                   <option value="">{t('cycle.selectCycle')}</option>
                   {allCycles.filter(c => c.id !== cycle.id).map(c => (
@@ -262,7 +262,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                   }}
                   style={{
                     padding: '4px 12px', border: 'none', borderRadius: 6,
-                    background: compareTarget ? '#539df5' : 'rgba(255,255,255,0.06)',
+                    background: compareTarget ? DARK.info : 'rgba(255,255,255,0.06)',
                     color: compareTarget ? '#000' : 'rgba(255,255,255,0.3)',
                     fontSize: 11, fontWeight: 600, cursor: compareTarget ? 'pointer' : 'default',
                   }}
@@ -281,7 +281,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                   <span style={{ fontSize: 11, color: STATUS_MAP[t.status]?.color || '#94a3b8', fontWeight: 500, minWidth: 70 }}>
                     {STATUS_MAP[t.status]?.label || t.status}
                   </span>
-                  <span style={{ flex: 1, fontSize: 12, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                  <span style={{ flex: 1, fontSize: 12, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                   <button onClick={() => onRemoveTask(cycle.id, t.id)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', padding: '1px 3px' }}>
                     <X size={11} />
@@ -299,12 +299,12 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
             {t('cycle.addIssues')}
           </button>
           {showTaskPicker && (
-            <div style={{ marginTop: 8, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, background: '#181818', maxHeight: 180, overflowY: 'auto' }}>
+            <div style={{ marginTop: 8, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, background: DARK.surface, maxHeight: 180, overflowY: 'auto' }}>
               {availableTasks.length === 0
                 ? <div style={{ padding: '10px 12px', fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>{t('cycle.allIssuesInCycle')}</div>
                 : availableTasks.map(t => (
                   <button key={t.id} onClick={() => { onAddTask(cycle.id, t.id); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, color: '#ffffff', cursor: 'pointer' }}>
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, color: DARK.text, cursor: 'pointer' }}>
                     {t.title}
                   </button>
                 ))
@@ -332,7 +332,7 @@ export default function CyclePanel({
   return (
     <div style={{ padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#ffffff' }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: DARK.text }}>
           {t('cycle.title')}
         </h2>
         <button
@@ -354,29 +354,29 @@ export default function CyclePanel({
               value={newCycle.name}
               onChange={e => setNewCycle(p => ({ ...p, name: e.target.value }))}
               placeholder={t('cycle.namePlaceholder')}
-              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
+              style={{ flex: '1 1 180px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: DARK.text }}
             />
             <select value={newCycle.status} onChange={e => setNewCycle(p => ({ ...p, status: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }}>
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: DARK.surface, color: DARK.text }}>
               <option value="draft">{t('cycle.draft')}</option>
               <option value="active">{t('active')}</option>
               <option value="completed">{t('cycle.completed')}</option>
             </select>
             <input type="date" value={newCycle.start_date} onChange={e => setNewCycle(p => ({ ...p, start_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: DARK.surface, color: DARK.text }} />
             <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>→</span>
             <input type="date" value={newCycle.end_date} onChange={e => setNewCycle(p => ({ ...p, end_date: e.target.value }))}
-              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: '#181818', color: '#ffffff' }} />
+              style={{ padding: '6px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: DARK.surface, color: DARK.text }} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={newCycle.description}
               onChange={e => setNewCycle(p => ({ ...p, description: e.target.value }))}
               placeholder={t('cycle.descriptionPlaceholder')}
-              style={{ flex: 1, padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
+              style={{ flex: 1, padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: DARK.text }}
             />
             <button onClick={() => setShowCycleForm(false)}
-              style={{ padding: '6px 12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: '#ffffff', fontSize: 12, cursor: 'pointer' }}>
+              style={{ padding: '6px 12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: DARK.text, fontSize: 12, cursor: 'pointer' }}>
               {t('cancel')}
             </button>
             <button

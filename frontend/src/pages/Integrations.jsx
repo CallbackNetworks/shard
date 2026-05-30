@@ -8,7 +8,7 @@ import {
   getIntegrationTemplate, getIntegrationHealth, bulkRetryDeliveries,
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
-import { BRAND, BTN_PRIMARY, BTN_GHOST, BTN_SM } from '../constants/theme'
+import { BRAND, BTN_PRIMARY, BTN_GHOST, BTN_SM, DARK } from '../constants/theme'
 
 const TYPE_ICONS = {
   jenkins: '⚙️', drone: '🚁', generic: '🔗', email: '📧', webhook: '🪝',
@@ -27,19 +27,19 @@ const INPUT_STYLE = {
   display: 'block', width: '100%', marginTop: 4,
   border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
   padding: '8px 12px', fontSize: 14,
-  background: 'rgba(255,255,255,0.05)', color: '#ffffff',
+  background: 'rgba(255,255,255,0.05)', color: DARK.text,
 }
-const SELECT_STYLE = { ...INPUT_STYLE, background: '#181818' }
-const LABEL_STYLE = { fontSize: 13, fontWeight: 600, color: '#ffffff' }
+const SELECT_STYLE = { ...INPUT_STYLE, background: DARK.surface }
+const LABEL_STYLE = { fontSize: 13, fontWeight: 600, color: DARK.text }
 
 /* ── Delivery Detail Modal ── */
 function DeliveryDetailModal({ delivery, onClose, onRetry }) {
   const { t } = useTranslation()
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 24, width: '90vw', maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
+      <div style={{ background: DARK.surface, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 24, width: '90vw', maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontWeight: 700, color: '#ffffff', margin: 0 }}>Delivery Detail</h3>
+          <h3 style={{ fontWeight: 700, color: DARK.text, margin: 0 }}>Delivery Detail</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}><X size={16} /></button>
         </div>
         <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -60,12 +60,12 @@ function DeliveryDetailModal({ delivery, onClose, onRetry }) {
           {delivery.response_body && (
             <div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Response Body</div>
-              <pre style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px 10px', color: '#b3b3b3', fontSize: 11, whiteSpace: 'pre-wrap', margin: 0, maxHeight: 120, overflow: 'auto' }}>{delivery.response_body}</pre>
+              <pre style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px 10px', color: DARK.textMid, fontSize: 11, whiteSpace: 'pre-wrap', margin: 0, maxHeight: 120, overflow: 'auto' }}>{delivery.response_body}</pre>
             </div>
           )}
           <div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Payload</div>
-            <pre style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px 10px', color: '#b3b3b3', fontSize: 11, whiteSpace: 'pre-wrap', margin: 0, maxHeight: 180, overflow: 'auto' }}>{JSON.stringify(delivery.payload, null, 2)}</pre>
+            <pre style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px 10px', color: DARK.textMid, fontSize: 11, whiteSpace: 'pre-wrap', margin: 0, maxHeight: 180, overflow: 'auto' }}>{JSON.stringify(delivery.payload, null, 2)}</pre>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -83,7 +83,7 @@ function Row({ label, value, mono, color }) {
   return (
     <div style={{ display: 'flex', gap: 10 }}>
       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 80, paddingTop: 1 }}>{label}</span>
-      <span style={{ color: color || '#b3b3b3', fontFamily: mono ? 'monospace' : 'inherit', fontSize: 12, wordBreak: 'break-all' }}>{String(value)}</span>
+      <span style={{ color: color || DARK.textMid, fontFamily: mono ? 'monospace' : 'inherit', fontSize: 12, wordBreak: 'break-all' }}>{String(value)}</span>
     </div>
   )
 }
@@ -180,12 +180,12 @@ function DeliveryLog({ integrationId }) {
           {/* Filters Row */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
             <select value={filterEvent} onChange={e => setFilterEvent(e.target.value)}
-              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#181818', color: '#b3b3b3' }}>
+              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: DARK.surface, color: DARK.textMid }}>
               <option value="">{t('integrations.allEvents')}</option>
               {ALL_EVENTS.map(ev => <option key={ev} value={ev}>{ev}</option>)}
             </select>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#181818', color: '#b3b3b3' }}>
+              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: DARK.surface, color: DARK.textMid }}>
               <option value="">{t('integrations.allStatuses')}</option>
               {['success', 'failed', 'dead', 'pending'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -214,7 +214,7 @@ function DeliveryLog({ integrationId }) {
                     </span>
                     {['failed', 'dead'].includes(d.status) && (
                       <button onClick={(e) => { e.stopPropagation(); retryMut.mutate(d.id) }}
-                        style={{ fontSize: 10, padding: '1px 6px', border: '1px solid rgba(79,70,229,0.4)', borderRadius: 4, background: 'rgba(79,70,229,0.1)', color: '#1ed760', cursor: 'pointer' }}>
+                        style={{ fontSize: 10, padding: '1px 6px', border: '1px solid rgba(79,70,229,0.4)', borderRadius: 4, background: 'rgba(79,70,229,0.1)', color: DARK.success, cursor: 'pointer' }}>
                         {t('retry')}
                       </button>
                     )}
@@ -243,9 +243,9 @@ function TemplatePicker({ onSelect, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 28, width: '90vw', maxWidth: 560 }}>
+      <div style={{ background: DARK.surface, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 28, width: '90vw', maxWidth: 560 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontWeight: 700, color: '#ffffff', margin: 0 }}>{t('integrations.fromTemplate')}</h2>
+          <h2 style={{ fontWeight: 700, color: DARK.text, margin: 0 }}>{t('integrations.fromTemplate')}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}><X size={16} /></button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
@@ -278,12 +278,12 @@ function SetupModal({ templateId, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 24, width: '90vw', maxWidth: 640, maxHeight: '80vh', overflowY: 'auto' }}>
+      <div style={{ background: DARK.surface, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 24, width: '90vw', maxWidth: 640, maxHeight: '80vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontWeight: 700, color: '#ffffff', margin: 0 }}>{template.name} - {t('integrations.templateSetup')}</h3>
+          <h3 style={{ fontWeight: 700, color: DARK.text, margin: 0 }}>{template.name} - {t('integrations.templateSetup')}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}><X size={16} /></button>
         </div>
-        <div style={{ fontSize: 13, color: '#b3b3b3', whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+        <div style={{ fontSize: 13, color: DARK.textMid, whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
           {template.setup_instructions?.split('```').map((block, i) =>
             i % 2 === 0
               ? <span key={i}>{block}</span>
@@ -320,7 +320,7 @@ function CustomHeadersEditor({ headers, onChange }) {
 
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>{t('integrations.customHeaders')}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: DARK.text, marginBottom: 6 }}>{t('integrations.customHeaders')}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {entries.map(([k, v], i) => (
           <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -367,9 +367,9 @@ function IntegrationModal({ initial, onSave, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#181818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 28, width: '90vw', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: DARK.surface, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 28, width: '90vw', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontWeight: 700, color: '#ffffff', margin: 0 }}>{initial ? t('integrations.editDialog') : t('integrations.newDialog')}</h2>
+          <h2 style={{ fontWeight: 700, color: DARK.text, margin: 0 }}>{initial ? t('integrations.editDialog') : t('integrations.newDialog')}</h2>
           {form.template_id && (
             <button onClick={() => setShowSetup(form.template_id)}
               style={{ ...BTN_GHOST, fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -470,7 +470,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
                 <label key={ev} style={{
                   display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
                   background: form.events.includes(ev) ? 'rgba(30,215,96,0.12)' : 'rgba(255,255,255,0.05)',
-                  color: form.events.includes(ev) ? '#1ed760' : 'rgba(255,255,255,0.4)',
+                  color: form.events.includes(ev) ? DARK.success : 'rgba(255,255,255,0.4)',
                   borderRadius: 999, padding: '4px 12px', fontSize: 13,
                   border: form.events.includes(ev) ? '1px solid rgba(30,215,96,0.3)' : '1px solid rgba(255,255,255,0.08)',
                 }}>
@@ -482,7 +482,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
           </div>
 
           {/* Active */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#ffffff' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: DARK.text }}>
             <input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} />
             Active
           </label>
@@ -558,7 +558,7 @@ export default function Integrations() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('integrations.title')}</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: DARK.text }}>{t('integrations.title')}</h1>
           <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('integrations.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -575,7 +575,7 @@ export default function Integrations() {
       {integrations.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.2)', animation: 'fadeIn 0.4s ease' }}>
           <Zap size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: BRAND }} />
-          <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{t('integrations.empty')}</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: DARK.text }}>{t('integrations.empty')}</p>
           <p style={{ marginTop: 6, fontSize: 13 }}>{t('integrations.emptyHint')}</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16 }}>
             <button onClick={() => setTemplatePicker(true)}
@@ -592,7 +592,7 @@ export default function Integrations() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {integrations.map((intg, intgIdx) => (
             <div key={intg.id} style={{
-              background: '#181818', border: '1px solid rgba(255,255,255,0.08)',
+              background: DARK.surface, border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 12, padding: '16px 20px',
               animation: 'fadeUpIn 0.35s ease forwards',
               animationDelay: `${intgIdx * 0.06}s`,
@@ -602,13 +602,13 @@ export default function Integrations() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 18 }}>{TYPE_ICONS[intg.type] || '🔗'}</span>
-                    <span style={{ fontWeight: 600, fontSize: 15, color: '#ffffff' }}>{intg.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: 15, color: DARK.text }}>{intg.name}</span>
                     <span style={{
                       background: intg.active ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
-                      color: intg.active ? '#1ed760' : '#6b7280',
+                      color: intg.active ? DARK.success : '#6b7280',
                       borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600
                     }}>{intg.active ? 'active' : 'inactive'}</span>
-                    <span style={{ background: 'rgba(30,215,96,0.12)', color: '#1ed760', borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{intg.type}</span>
+                    <span style={{ background: 'rgba(30,215,96,0.12)', color: DARK.success, borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{intg.type}</span>
                     {intg.auth_type && intg.auth_type !== 'bearer' && (
                       <span style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', borderRadius: 999, padding: '2px 8px', fontSize: 11 }}>{intg.auth_type}</span>
                     )}
@@ -620,7 +620,7 @@ export default function Integrations() {
                   {intg.project_id && <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, marginTop: 2 }}>Project: {intg.project_id}</p>}
                   <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                     {intg.events.map(ev => (
-                      <span key={ev} style={{ background: 'rgba(52,211,153,0.1)', color: '#1ed760', borderRadius: 999, padding: '2px 8px', fontSize: 12 }}>{ev}</span>
+                      <span key={ev} style={{ background: 'rgba(52,211,153,0.1)', color: DARK.success, borderRadius: 999, padding: '2px 8px', fontSize: 12 }}>{ev}</span>
                     ))}
                   </div>
                   {/* Health stats */}
@@ -634,7 +634,7 @@ export default function Integrations() {
                     </button>
                   )}
                   <button onClick={() => testMut.mutate(intg.id)}
-                    style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#1ed760', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
+                    style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: DARK.success, borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
                     {testMut.isPending ? t('testing') : t('test')}
                   </button>
                   <button onClick={() => setModal({ mode: 'edit', data: {
@@ -643,13 +643,13 @@ export default function Integrations() {
                     auth_type: intg.auth_type || 'bearer', auth_config: intg.auth_config || {},
                     custom_headers: intg.custom_headers || {},
                   }})}
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#b3b3b3', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>{t('edit')}</button>
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: DARK.textMid, borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>{t('edit')}</button>
                   <button onClick={() => deleteMut.mutate(intg.id)}
                     style={{ background: 'none', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>{t('delete')}</button>
                 </div>
               </div>
               {testResults[intg.id] && (
-                <div style={{ marginTop: 10, background: testResults[intg.id].success ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: testResults[intg.id].success ? '#1ed760' : '#f87171' }}>
+                <div style={{ marginTop: 10, background: testResults[intg.id].success ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: testResults[intg.id].success ? DARK.success : '#f87171' }}>
                   {testResults[intg.id].success
                     ? t('integrations.testSent', { code: testResults[intg.id].status_code })
                     : t('integrations.testFailed', { error: testResults[intg.id].error })

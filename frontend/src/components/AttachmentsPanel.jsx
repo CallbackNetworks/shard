@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { X, Paperclip, Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getAttachments, uploadAttachment, deleteAttachment, getAttachmentUrl } from '../api/client'
+import { DARK } from '../constants/theme'
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
@@ -64,7 +65,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
             padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)',
-            background: 'transparent', fontSize: 11, cursor: 'pointer', color: '#b3b3b3', fontWeight: 600,
+            background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.textMid, fontWeight: 600,
           }}
         >
           <Paperclip size={10} /> {uploading ? t('attachments.uploading') : t('attachments.addFile')}
@@ -83,7 +84,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
               border: '1px solid rgba(255,255,255,0.07)',
             }}>
               <Paperclip size={11} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 12, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ flex: 1, fontSize: 12, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {f.filename}
               </span>
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>
@@ -92,7 +93,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
               <a
                 href={getAttachmentUrl(projectId, taskId, f.id)}
                 download
-                style={{ display: 'flex', color: '#1ed760', padding: '2px' }}
+                style={{ display: 'flex', color: DARK.success, padding: '2px' }}
               >
                 <Download size={11} />
               </a>

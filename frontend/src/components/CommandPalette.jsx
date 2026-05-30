@@ -4,13 +4,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash } from 'lucide-react'
 import { getProjects, getIdentities, search } from '../api/client'
-import { SHADOW_LG } from '../constants/theme'
+import { SHADOW_LG, DARK } from '../constants/theme'
 
 const BACKDROP = 'rgba(0,0,0,0.8)'
-const PANEL_BG = '#181818'
-const BORDER   = 'rgba(255,255,255,0.08)'
-const ACCENT   = '#1ed760'
-const ITEM_HOVER = 'rgba(255,255,255,0.08)'
+const PANEL_BG = DARK.surface
+const BORDER   = DARK.border
+const ACCENT   = DARK.success
+const ITEM_HOVER = DARK.active
 
 const STATIC_COMMANDS = [
   { id: 'nav-dashboard',    labelKey: 'nav.myIssues',      section: 'Navigation', icon: <LayoutGrid size={14}/>, path: '/app' },
@@ -62,7 +62,7 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
       </span>
       <span style={{
         flex: 1, fontSize: 13, fontWeight: 500,
-        color: isActive ? '#ffffff' : '#b3b3b3',
+        color: isActive ? DARK.text : DARK.textMid,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {item.label}
@@ -254,7 +254,7 @@ export default function CommandPalette({ open, onClose }) {
             placeholder={t('palette.placeholder')}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              color: '#ffffff', fontSize: 15, fontWeight: 400,
+              color: DARK.text, fontSize: 15, fontWeight: 400,
               '::placeholder': { color: 'rgba(255,255,255,0.2)' },
             }}
           />

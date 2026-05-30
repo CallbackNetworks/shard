@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { MessageCircle, X, Plus, Send, ChevronDown, Wrench, Loader } from 'lucide-react'
 import axios from 'axios'
-import { INSET_SHADOW, SHADOW_LG } from '../constants/theme'
+import { INSET_SHADOW, SHADOW_LG, DARK } from '../constants/theme'
 
 const _api = axios.create({ baseURL: '' })
 _api.interceptors.request.use(cfg => {
@@ -26,13 +26,13 @@ const PROMPT_TEMPLATES = [
   { labelKey: 'assistant.promptDecisions', prompt: "Analyze my projects and identify key decisions that have been made or should be recorded. For each decision, create a decision record with context, the decision itself, and consequences. Tag relevant tasks with the decision labels." },
 ]
 
-const PANEL_BG   = '#181818'
-const BORDER     = 'rgba(255,255,255,0.08)'
-const ACCENT     = '#1ed760'
+const PANEL_BG   = DARK.surface
+const BORDER     = DARK.border
+const ACCENT     = DARK.success
 const inp = {
-  background: '#1f1f1f', border: 'none',
+  background: DARK.elevated, border: 'none',
   boxShadow: INSET_SHADOW,
-  borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#ffffff',
+  borderRadius: 8, padding: '8px 12px', fontSize: 13, color: DARK.text,
   outline: 'none', width: '100%', resize: 'none',
 }
 
@@ -42,7 +42,7 @@ function ToolBlock({ name, result }) {
     <div style={{ background: 'rgba(30,215,96,0.06)', border: `1px solid rgba(30,215,96,0.15)`, borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
       <button
         onClick={() => setOpen(v => !v)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', color: '#1ed760', fontSize: 11 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', color: DARK.success, fontSize: 11 }}
       >
         <Wrench size={10} />
         <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>{name}</span>
@@ -71,9 +71,9 @@ function MessageBubble({ msg }) {
       {msg.content && (
         <div style={{
           maxWidth: '85%', padding: '8px 12px', borderRadius: 10, fontSize: 13, lineHeight: 1.6,
-          background: isUser ? `rgba(30,215,96,0.15)` : '#1f1f1f',
+          background: isUser ? `rgba(30,215,96,0.15)` : DARK.elevated,
           border: `1px solid ${isUser ? 'rgba(30,215,96,0.3)' : BORDER}`,
-          color: '#ffffff',
+          color: DARK.text,
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
           {msg.content}
@@ -97,7 +97,7 @@ function StreamingMessage({ events }) {
       {text && (
         <div style={{
           maxWidth: '85%', padding: '8px 12px', borderRadius: 10, fontSize: 13, lineHeight: 1.6,
-          background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}`, color: '#ffffff',
+          background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}`, color: DARK.text,
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
           {text}
@@ -229,7 +229,7 @@ export default function AssistantPanel() {
         style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
           width: 48, height: 48, borderRadius: '50%',
-          background: '#1ed760',
+          background: DARK.success,
           border: 'none', cursor: 'pointer', color: '#000',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: SHADOW_LG,
@@ -254,10 +254,10 @@ export default function AssistantPanel() {
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: `1px solid ${BORDER}` }}>
-        <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1ed760', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: DARK.success, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <MessageCircle size={14} color="#000" />
         </div>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {currentConv?.title || t('assistant.title')}
         </span>
         <button onClick={() => setShowConvList(v => !v)} title={t('assistant.conversations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
@@ -273,13 +273,13 @@ export default function AssistantPanel() {
 
       {/* Conversation list dropdown */}
       {showConvList && (
-        <div style={{ position: 'absolute', top: 52, right: 0, width: '100%', background: '#1f1f1f', border: `1px solid ${BORDER}`, borderRadius: '0 0 8px 8px', zIndex: 10, maxHeight: 240, overflowY: 'auto', boxShadow: SHADOW_LG }}>
-          <div style={{ padding: '8px 10px', borderBottom: `1px solid ${BORDER}`, position: 'sticky', top: 0, background: '#1f1f1f' }}>
+        <div style={{ position: 'absolute', top: 52, right: 0, width: '100%', background: DARK.elevated, border: `1px solid ${BORDER}`, borderRadius: '0 0 8px 8px', zIndex: 10, maxHeight: 240, overflowY: 'auto', boxShadow: SHADOW_LG }}>
+          <div style={{ padding: '8px 10px', borderBottom: `1px solid ${BORDER}`, position: 'sticky', top: 0, background: DARK.elevated }}>
             <input
               value={convSearch}
               onChange={e => setConvSearch(e.target.value)}
               placeholder={t('assistant.searchConversations')}
-              style={{ width: '100%', padding: '5px 8px', border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 11, background: 'rgba(255,255,255,0.05)', color: '#fff', outline: 'none' }}
+              style={{ width: '100%', padding: '5px 8px', border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 11, background: DARK.hover, color: DARK.text, outline: 'none' }}
             />
           </div>
           {conversations.length === 0 ? (
@@ -290,7 +290,7 @@ export default function AssistantPanel() {
               onClick={() => { setConvId(c.id); setShowConvList(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer', background: c.id === convId ? 'rgba(30,215,96,0.1)' : 'transparent' }}
             >
-              <span style={{ flex: 1, fontSize: 12, color: '#b3b3b3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
+              <span style={{ flex: 1, fontSize: 12, color: DARK.textMid, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
               <button
                 onClick={(e) => { e.stopPropagation(); deleteMut.mutate(c.id) }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(248,113,113,0.5)', padding: 0, display: 'flex', flexShrink: 0 }}
@@ -308,7 +308,7 @@ export default function AssistantPanel() {
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.2)' }}>
             <MessageCircle size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
             <p style={{ fontSize: 13 }}>{t('assistant.noConversations')}</p>
-            <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: '#1ed760', border: 'none', borderRadius: 9999, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
+            <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: DARK.success, border: 'none', borderRadius: 9999, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
               {t('assistant.newChat')}
             </button>
           </div>
@@ -364,7 +364,7 @@ export default function AssistantPanel() {
             disabled={!input.trim() || streaming || !convId}
             style={{
               padding: '8px 12px', border: 'none', borderRadius: '50%',
-              background: '#1ed760',
+              background: DARK.success,
               color: '#000', cursor: 'pointer', display: 'flex', alignItems: 'center',
               opacity: (!input.trim() || streaming || !convId) ? 0.4 : 1,
               flexShrink: 0,

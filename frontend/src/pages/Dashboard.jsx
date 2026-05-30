@@ -107,7 +107,7 @@ function ProjectCard({ project, onDelete, index }) {
           background: project.status === 'archived'
             ? 'rgba(255,255,255,0.06)'
             : 'rgba(30,215,96,0.1)',
-          color: project.status === 'archived' ? DARK.textMid : '#1ed760',
+          color: project.status === 'archived' ? DARK.textMid : DARK.success,
           border: `1px solid ${project.status === 'archived' ? 'rgba(255,255,255,0.08)' : 'rgba(30,215,96,0.3)'}`,
           textTransform: 'capitalize', letterSpacing: '0.05em',
         }}>
@@ -121,7 +121,7 @@ function ProjectCard({ project, onDelete, index }) {
       {/* Stats row */}
       <div style={{ display: 'flex', alignItems: 'center', marginTop: 12, gap: 12 }}>
         <div style={{ display: 'flex', gap: 12, flex: 1 }}>
-          <span style={{ fontSize: 11, color: '#1ed760', fontWeight: 500 }}>
+          <span style={{ fontSize: 11, color: DARK.success, fontWeight: 500 }}>
             ✓ {project.done_tasks}
           </span>
           <span style={{ fontSize: 11, color: DARK.textMid }}>
@@ -130,7 +130,7 @@ function ProjectCard({ project, onDelete, index }) {
         </div>
         <span style={{
           fontSize: 13, fontWeight: 700,
-          color: pct === 100 ? '#1ed760' : '#b3b3b3',
+          color: pct === 100 ? DARK.success : DARK.textMid,
         }}>
           {pct}%
         </span>
@@ -322,25 +322,25 @@ function StatCards({ projects, activities }) {
     {
       label: t('dashboard.totalTasks'),
       value: totalTasks,
-      color: '#ffffff',
+      color: DARK.text,
       delay: 0,
     },
     {
       label: t('dashboard.completedToday'),
       value: completedToday,
-      color: '#1ed760',
+      color: DARK.success,
       delay: 0.06,
     },
     {
       label: t('dashboard.overdueCount'),
       value: overdueTasks,
-      color: overdueTasks > 0 ? '#f87171' : '#ffffff',
+      color: overdueTasks > 0 ? '#f87171' : DARK.text,
       delay: 0.12,
     },
     {
       label: t('dashboard.completionRate'),
       value: `${completionRate}%`,
-      color: completionRate === 100 ? BRAND : '#ffffff',
+      color: completionRate === 100 ? BRAND : DARK.text,
       delay: 0.18,
       sparkline: true,
     },
@@ -412,12 +412,12 @@ function DueSoonPanel({ projects }) {
         }}
       >
         <Clock size={13} color="#ffa42b" />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', flex: 1, textAlign: 'left' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: DARK.text, flex: 1, textAlign: 'left' }}>
           {t('dashboard.dueSoon')}
         </span>
         <span style={{
           fontSize: 10, padding: '1px 7px', borderRadius: 9999, fontWeight: 700,
-          background: 'rgba(255,164,43,0.15)', color: '#ffa42b',
+          background: 'rgba(255,164,43,0.15)', color: DARK.warning,
           border: '1px solid rgba(255,164,43,0.3)',
         }}>
           {dueSoonTasks.length}
@@ -602,7 +602,7 @@ function GettingStarted({ onNewProject, isMobile }) {
   return (
     <div style={{ animation: 'fadeIn 0.4s ease', padding: '20px 0' }}>
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#ffffff', marginBottom: 6 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: DARK.text, marginBottom: 6 }}>
           {t('dashboard.gettingStarted')}
         </div>
         <div style={{ fontSize: 13, color: DARK.textMid }}>{t('dashboard.createFirstProject')}</div>
@@ -634,7 +634,7 @@ function GettingStarted({ onNewProject, isMobile }) {
             }}>
               {step.num}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>{step.title}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: DARK.text, marginBottom: 6 }}>{step.title}</div>
             <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5 }}>{step.desc}</div>
             {step.action}
           </div>
@@ -646,12 +646,12 @@ function GettingStarted({ onNewProject, isMobile }) {
 
 /* ── Input style helper ───────────────────────────────────────────── */
 const inputStyle = {
-  background: '#1f1f1f',
+  background: DARK.elevated,
   border: 'none',
   borderRadius: 4,
   padding: '10px 14px',
   fontSize: 14,
-  color: '#ffffff',
+  color: DARK.text,
   outline: 'none',
   boxShadow: INSET_SHADOW,
 }
@@ -700,7 +700,7 @@ export default function Dashboard() {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '10px 16px', border: 'none', background: 'none',
     cursor: 'pointer', fontSize: 14, fontWeight: tab === key ? 700 : 400,
-    color: tab === key ? '#ffffff' : DARK.textMid,
+    color: tab === key ? DARK.text : DARK.textMid,
     borderBottom: tab === key ? `2px solid ${BRAND}` : '2px solid transparent',
     marginBottom: -1, transition: 'color 0.15s',
   })
@@ -709,9 +709,9 @@ export default function Dashboard() {
     btn: {
       display: 'flex', alignItems: 'center', gap: 5,
       padding: '6px 16px', borderRadius: 9999, cursor: 'pointer', fontSize: 13, fontWeight: filter === key ? 700 : 400,
-      background: filter === key ? '#1f1f1f' : 'transparent',
+      background: filter === key ? DARK.elevated : 'transparent',
       border: filter === key ? 'none' : '1px solid rgba(255,255,255,0.15)',
-      color: filter === key ? '#ffffff' : DARK.textMid,
+      color: filter === key ? DARK.text : DARK.textMid,
       transition: 'all 0.15s',
     },
   })
@@ -728,9 +728,9 @@ export default function Dashboard() {
       }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: DARK.textMid, marginBottom: 2 }}>{greeting}</div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.title')}</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: DARK.text }}>{t('dashboard.title')}</h1>
           <div style={{ fontSize: 12, color: DARK.textDim, marginTop: 2 }}>
-            <span style={{ color: '#1ed760', fontWeight: 600 }}>{active.length}</span> {t('active')} ·{' '}
+            <span style={{ color: DARK.success, fontWeight: 600 }}>{active.length}</span> {t('active')} ·{' '}
             <span style={{ color: DARK.textMid }}>{archived.length}</span> {t('archived')}
           </div>
         </div>
@@ -770,7 +770,7 @@ export default function Dashboard() {
               style={{ ...inputStyle, flex: '2 1 280px' }} />
             <button onClick={() => setShowForm(false)} style={{
               padding: '8px 20px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999,
-              background: 'transparent', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#ffffff',
+              background: 'transparent', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: DARK.text,
               textTransform: 'uppercase', letterSpacing: '1.4px',
             }}>{t('cancel')}</button>
             <button disabled={!name.trim() || createMut.isPending} onClick={() => createMut.mutate()} style={{
@@ -814,7 +814,7 @@ export default function Dashboard() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <User size={14} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.activeWork')}</h2>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: DARK.text }}>{t('dashboard.activeWork')}</h2>
               </div>
               <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
                 <MyWorkSection projects={projects} />
@@ -823,7 +823,7 @@ export default function Dashboard() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <Activity size={14} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.recentActivity')}</h2>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: DARK.text }}>{t('dashboard.recentActivity')}</h2>
               </div>
               <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
                 <ActivityFeed activities={activities} />
@@ -857,7 +857,7 @@ export default function Dashboard() {
             {displayed.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 60, color: DARK.textDim, animation: 'fadeIn 0.4s ease' }}>
                 <FolderOpen size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: BRAND }} />
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{t('dashboard.noProjectsEmpty')}</p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: DARK.text }}>{t('dashboard.noProjectsEmpty')}</p>
                 <p style={{ marginTop: 6, fontSize: 13 }}>{t('dashboard.createFirstProject')}</p>
               </div>
             ) : (

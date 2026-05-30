@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
-import { SHADOW_LG, INSET_SHADOW } from '../constants/theme'
+import { SHADOW_LG, INSET_SHADOW, DARK } from '../constants/theme'
 
 const FONT = "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif"
 
@@ -31,7 +31,7 @@ export default function Login() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#121212',
+      background: DARK.bgAlt,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -75,7 +75,7 @@ export default function Login() {
       {/* Form panel */}
       <div style={{
         width: '90vw', maxWidth: 340, position: 'relative', zIndex: 1,
-        background: '#181818',
+        background: DARK.surface,
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 12,
         padding: '40px 36px',
@@ -87,7 +87,7 @@ export default function Login() {
         <div style={{ marginBottom: 36, textAlign: 'center' }}>
           <div style={{
             width: 42, height: 42, borderRadius: '50%', margin: '0 auto 16px',
-            background: '#1ed760',
+            background: DARK.success,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, fontWeight: 900, color: '#000',
             boxShadow: '0 0 24px rgba(30,215,96,0.4)',
@@ -110,7 +110,7 @@ export default function Login() {
               autoFocus
               style={{
                 width: '100%',
-                background: '#1f1f1f',
+                background: DARK.elevated,
                 border: 'none',
                 boxShadow: error
                   ? 'rgb(18,18,18) 0px 1px 0px, rgb(243,114,127) 0px 0px 0px 1px inset'
@@ -119,7 +119,7 @@ export default function Login() {
                 outline: 'none',
                 padding: '12px 16px',
                 fontSize: 13,
-                color: '#ffffff',
+                color: DARK.text,
                 fontFamily: FONT,
                 boxSizing: 'border-box',
                 letterSpacing: '0.1em',
@@ -131,7 +131,7 @@ export default function Login() {
           {error && (
             <div style={{
               fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
-              color: '#f3727f', marginBottom: 12, textAlign: 'center',
+              color: DARK.danger, marginBottom: 12, textAlign: 'center',
               animation: 'fadeUpIn 0.2s ease',
             }}>
               {t('login.incorrectPassword').toUpperCase()}
@@ -143,7 +143,7 @@ export default function Login() {
             disabled={!password || loading}
             style={{
               width: '100%',
-              background: password && !loading ? '#1ed760' : 'rgba(255,255,255,0.06)',
+              background: password && !loading ? DARK.success : 'rgba(255,255,255,0.06)',
               border: 'none',
               borderRadius: 9999,
               color: password && !loading ? '#000' : 'rgba(255,255,255,0.2)',

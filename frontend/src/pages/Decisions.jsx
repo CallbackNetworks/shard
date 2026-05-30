@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { GitFork, Plus, Trash2, Edit2, X, Download, Check, XCircle, Bot, User } from 'lucide-react'
 import { getDecisions, getProjects, createLabel, updateLabel, deleteLabel, exportDecision } from '../api/client'
+import { DARK } from '../constants/theme'
 
 const STATUS_COLORS = {
   proposed: { bg: 'rgba(129,140,248,0.15)', color: '#818cf8', border: '1px dashed #818cf8' },
@@ -17,7 +18,7 @@ const inp = {
   borderRadius: 6,
   padding: '5px 10px',
   fontSize: 12,
-  color: '#ffffff',
+  color: DARK.text,
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
@@ -31,12 +32,12 @@ const btn = (variant = 'default') => ({
   fontSize: 12,
   fontWeight: 700,
   ...(variant === 'primary'
-    ? { background: '#1ed760', color: '#000' }
+    ? { background: DARK.success, color: '#000' }
     : variant === 'danger'
-    ? { background: 'rgba(243,114,127,0.12)', color: '#f3727f', border: '1px solid rgba(243,114,127,0.2)' }
+    ? { background: 'rgba(243,114,127,0.12)', color: DARK.danger, border: '1px solid rgba(243,114,127,0.2)' }
     : variant === 'accept'
     ? { background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }
-    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#b3b3b3' }),
+    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: DARK.textMid }),
 })
 
 const TEMPLATE_DESC = `## Context\n\n\n## Decision\n\n\n## Consequences\n`
@@ -185,7 +186,7 @@ function DecisionCard({ decision, projectName, onAccept, onReject, onEdit, onDel
           <button onClick={() => onEdit(decision)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
             <Edit2 size={13} />
           </button>
-          <button onClick={() => onDelete(decision)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f3727f', padding: 4 }}>
+          <button onClick={() => onDelete(decision)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.danger, padding: 4 }}>
             <Trash2 size={13} />
           </button>
         </div>
@@ -298,7 +299,7 @@ export default function Decisions() {
             {pendingCount > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999,
-                background: 'rgba(129,140,248,0.2)', color: '#818cf8',
+                background: 'rgba(129,140,248,0.2)', color: DARK.info,
               }}>
                 {t('decisions.pendingReview', { count: pendingCount })}
               </span>
@@ -341,8 +342,8 @@ export default function Decisions() {
           textAlign: 'center', padding: 64, color: '#4b5563', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12,
           animation: 'fadeIn 0.4s ease',
         }}>
-          <GitFork size={36} style={{ marginBottom: 14, opacity: 0.3, display: 'block', margin: '0 auto 14px', color: '#818cf8' }} />
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>{t('decisions.empty')}</div>
+          <GitFork size={36} style={{ marginBottom: 14, opacity: 0.3, display: 'block', margin: '0 auto 14px', color: DARK.info }} />
+          <div style={{ fontSize: 16, fontWeight: 700, color: DARK.text, marginBottom: 6 }}>{t('decisions.empty')}</div>
           <div style={{ fontSize: 13, marginBottom: 16 }}>{t('decisions.emptyHint')}</div>
           <button onClick={() => setShowForm(true)} style={btn('primary')}>
             {t('decisions.new')}

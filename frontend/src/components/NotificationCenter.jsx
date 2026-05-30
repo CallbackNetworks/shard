@@ -7,6 +7,7 @@ import {
   getNotifications, getUnreadCount,
   markNotificationRead, markAllNotificationsRead, dismissNotification,
 } from '../api/client'
+import { DARK } from '../constants/theme'
 
 const TYPE_ICON = {
   'task.done': <CheckCircle2 size={13} style={{ color: '#4ade80' }} />,
@@ -97,8 +98,8 @@ export default function NotificationCenter() {
         onClick={() => setOpen(v => !v)}
         style={{
           position: 'relative',
-          background: open ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          background: open ? 'rgba(255,255,255,0.1)' : DARK.hover,
+          border: `1px solid ${DARK.border}`,
           borderRadius: '50%',
           width: 34, height: 34,
           cursor: 'pointer',
@@ -116,7 +117,7 @@ export default function NotificationCenter() {
             borderRadius: '50%', fontSize: 9, fontWeight: 700,
             width: 16, height: 16,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid #07080f',
+            border: `1px solid ${DARK.bg}`,
           }}>
             {unread > 9 ? '9+' : unread}
           </span>
@@ -140,7 +141,7 @@ export default function NotificationCenter() {
               {unread > 0 && (
                 <button
                   onClick={() => markAll.mutate()}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#818cf8', fontSize: 11, padding: '2px 6px', borderRadius: 4 }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.info, fontSize: 11, padding: '2px 6px', borderRadius: 4 }}
                   title={t('notifications.markAllRead')}
                 >
                   <Check size={11} style={{ verticalAlign: 'middle' }} /> {t('notifications.markAllRead')}
@@ -175,13 +176,13 @@ export default function NotificationCenter() {
                     {TYPE_ICON[n.type] || <Bell size={13} style={{ color: '#6b7280' }} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: n.read ? '#6b7280' : '#ffffff', lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 12, color: n.read ? '#6b7280' : DARK.text, lineHeight: 1.4 }}>
                       {n.message}
                     </div>
                     <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>{timeAgo(n.created_at, t)}</div>
                   </div>
                   {!n.read && (
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#818cf8', flexShrink: 0, marginTop: 4 }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: DARK.info, flexShrink: 0, marginTop: 4 }} />
                   )}
                   <button
                     onClick={e => { e.stopPropagation(); dismiss.mutate(n.id) }}

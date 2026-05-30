@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getTemplates, getApiKeys } from '../api/client'
-import { BRAND, INSET_SHADOW } from '../constants/theme'
+import { BRAND, INSET_SHADOW, DARK } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
 
 const input = {
-  background: '#1f1f1f', border: 'none', borderRadius: 4,
-  padding: '7px 10px', fontSize: 13, outline: 'none', color: '#ffffff',
+  background: DARK.elevated, border: 'none', borderRadius: 4,
+  padding: '7px 10px', fontSize: 13, outline: 'none', color: DARK.text,
   boxShadow: INSET_SHADOW,
 }
 
@@ -34,13 +34,13 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
   if (!showForm) return null
 
   return (
-    <div style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${DARK.border}` }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {templates.length > 0 && (
           <select
             defaultValue=""
             onChange={e => { if (e.target.value) applyTemplate(e.target.value); e.target.value = '' }}
-            style={{ ...input, fontSize: 11, color: '#b3b3b3' }}
+            style={{ ...input, fontSize: 11, color: DARK.textMid }}
           >
             <option value="" disabled>{t('taskCreate.templatePlaceholder')}</option>
             {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -70,7 +70,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
           <select
             value={newTask.assigned_agent_key_id || ''}
             onChange={e => setNewTask(p => ({ ...p, assigned_agent_key_id: e.target.value || null }))}
-            style={{ ...input, fontSize: 11, color: newTask.assigned_agent_key_id ? '#818cf8' : '#b3b3b3' }}
+            style={{ ...input, fontSize: 11, color: newTask.assigned_agent_key_id ? DARK.info : DARK.textMid }}
           >
             <option value="">{t('agent.none')}</option>
             {activeKeys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
@@ -78,11 +78,11 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
         )}
         <input type="date" value={newTask.start_date} onChange={e => setNewTask(p => ({ ...p, start_date: e.target.value }))}
           style={{ ...input }} />
-        <span style={{ color: '#b3b3b3', fontSize: 12 }}>→</span>
+        <span style={{ color: DARK.textMid, fontSize: 12 }}>→</span>
         <input type="date" value={newTask.due_date} onChange={e => setNewTask(p => ({ ...p, due_date: e.target.value }))}
           style={{ ...input }} />
         <button onClick={onCancel}
-          style={{ padding: '7px 16px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', color: '#ffffff', fontSize: 12, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          style={{ padding: '7px 16px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', color: DARK.text, fontSize: 12, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px' }}>
           {t('cancel')}
         </button>
         <button
@@ -108,7 +108,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
       <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {labels.length > 0 && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#b3b3b3' }}>Labels:</span>
+            <span style={{ fontSize: 11, color: DARK.textMid }}>Labels:</span>
             {labels.map(lb => {
               const selected = newTask.selectedLabels.includes(lb.id)
               return (
@@ -123,7 +123,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
                   style={{
                     fontSize: 11, padding: '2px 8px', borderRadius: 9999, fontWeight: 600, cursor: 'pointer',
                     background: selected ? lb.color + '22' : 'transparent',
-                    color: selected ? lb.color : '#b3b3b3',
+                    color: selected ? lb.color : DARK.textMid,
                     border: selected ? `1px solid ${lb.color}44` : '1px solid rgba(255,255,255,0.1)',
                   }}
                 >

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DARK } from '../constants/theme'
 
 const STATUS_COLORS = {
   todo: 'rgba(255,255,255,0.08)',
@@ -44,14 +45,14 @@ export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
 
   return (
     <div style={{
-      background: '#181818', borderRadius: 8, padding: '14px 16px',
+      background: DARK.surface, borderRadius: 8, padding: '14px 16px',
       boxShadow: 'rgba(0,0,0,0.3) 0px 4px 8px',
       display: 'flex', flexDirection: 'column', gap: 10
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1 }}>
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#ffffff' }}>{task.title}</span>
-          {task.description && <p style={{ color: '#b3b3b3', fontSize: 13, marginTop: 4, marginBottom: 0 }}>{task.description}</p>}
+          <span style={{ fontWeight: 700, fontSize: 15, color: DARK.text }}>{task.title}</span>
+          {task.description && <p style={{ color: DARK.textMid, fontSize: 13, marginTop: 4, marginBottom: 0 }}>{task.description}</p>}
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {badge(task.priority, PRIORITY_COLORS[task.priority], PRIORITY_TEXT[task.priority])}
@@ -67,7 +68,7 @@ export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
           style={{
             fontSize: 13, fontWeight: 600, borderRadius: 9999,
             border: '1px solid rgba(255,255,255,0.15)', padding: '4px 12px',
-            cursor: 'pointer', background: '#1f1f1f', color: '#ffffff',
+            cursor: 'pointer', background: DARK.elevated, color: DARK.text,
           }}
         >
           <option value="todo">todo</option>
@@ -80,8 +81,8 @@ export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
           onClick={copyToken}
           style={{
             fontSize: 12, fontWeight: 700,
-            background: '#1f1f1f', border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 9999, padding: '4px 14px', cursor: 'pointer', color: '#ffffff',
+            background: DARK.elevated, border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 9999, padding: '4px 14px', cursor: 'pointer', color: DARK.text,
             textTransform: 'uppercase', letterSpacing: '1px',
           }}
         >{copied ? 'Copied!' : 'Copy Webhook'}</button>
@@ -91,15 +92,15 @@ export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
           style={{
             fontSize: 12, fontWeight: 700, background: 'none',
             border: '1px solid rgba(243,114,127,0.4)', borderRadius: 9999,
-            padding: '4px 14px', cursor: 'pointer', color: '#f3727f', marginLeft: 'auto',
+            padding: '4px 14px', cursor: 'pointer', color: DARK.danger, marginLeft: 'auto',
             textTransform: 'uppercase', letterSpacing: '1px',
           }}
         >Delete</button>
       </div>
 
       <div style={{
-        fontSize: 11, color: '#b3b3b3', fontFamily: 'monospace',
-        background: '#1f1f1f', borderRadius: 4, padding: '6px 10px', wordBreak: 'break-all',
+        fontSize: 11, color: DARK.textMid, fontFamily: 'monospace',
+        background: DARK.elevated, borderRadius: 4, padding: '6px 10px', wordBreak: 'break-all',
       }}>
         POST /webhook/callback/{task.callback_token}
       </div>

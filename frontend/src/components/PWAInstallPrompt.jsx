@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, X } from 'lucide-react'
+import { DARK } from '../constants/theme'
 
 const DISMISSED_KEY = 'pwa-install-dismissed'
 
@@ -56,14 +57,14 @@ export default function PWAInstallPrompt() {
       animation: 'fadeUpIn 0.3s ease forwards',
       maxWidth: 'calc(100vw - 32px)',
     }}>
-      <Download size={16} style={{ color: '#818cf8', flexShrink: 0 }} />
+      <Download size={16} style={{ color: DARK.info, flexShrink: 0 }} />
       <span style={{ fontSize: 13, color: '#e2e8f0', whiteSpace: 'nowrap' }}>
         {t('pwa.installPrompt', 'Install TODO Platform for quick access')}
       </span>
       <button
         onClick={handleInstall}
         style={{
-          background: '#818cf8',
+          background: DARK.info,
           color: '#fff',
           border: 'none',
           borderRadius: 6,

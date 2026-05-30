@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
+import { DARK } from '../constants/theme'
 
 const PRIORITIES = ['low', 'medium', 'high']
 
@@ -18,7 +19,7 @@ const inp = {
   borderRadius: 6,
   padding: '5px 10px',
   fontSize: 12,
-  color: '#ffffff',
+  color: DARK.text,
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
@@ -32,10 +33,10 @@ const btn = (variant = 'default') => ({
   fontSize: 12,
   fontWeight: 700,
   ...(variant === 'primary'
-    ? { background: '#1ed760', color: '#000' }
+    ? { background: DARK.success, color: '#000' }
     : variant === 'danger'
-    ? { background: 'rgba(243,114,127,0.12)', color: '#f3727f', border: '1px solid rgba(243,114,127,0.2)' }
-    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#b3b3b3' }),
+    ? { background: 'rgba(243,114,127,0.12)', color: DARK.danger, border: '1px solid rgba(243,114,127,0.2)' }
+    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: DARK.textMid }),
 })
 
 const EMPTY_FORM = { name: '', description: '', priority: 'medium', subtasks: [], label_names: [] }
@@ -130,7 +131,7 @@ function TemplateForm({ initial, onSave, onClose }) {
                 background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginBottom: 4,
               }}>
                 <span style={{ flex: 1, fontSize: 12 }}>{s.title}</span>
-                <button onClick={() => removeSubtask(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f3727f', padding: 0 }}>
+                <button onClick={() => removeSubtask(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.danger, padding: 0 }}>
                   <X size={11} />
                 </button>
               </div>
@@ -153,10 +154,10 @@ function TemplateForm({ initial, onSave, onClose }) {
               {form.label_names.map(l => (
                 <span key={l} style={{
                   display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-                  background: 'rgba(129,140,248,0.15)', borderRadius: 9999, fontSize: 11, color: '#818cf8',
+                  background: 'rgba(129,140,248,0.15)', borderRadius: 9999, fontSize: 11, color: DARK.info,
                 }}>
                   {l}
-                  <button onClick={() => removeLabel(l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#818cf8', padding: 0, lineHeight: 1 }}>
+                  <button onClick={() => removeLabel(l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.info, padding: 0, lineHeight: 1 }}>
                     <X size={10} />
                   </button>
                 </span>
@@ -188,7 +189,7 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
       background: '#0f1117', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 16,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <FileText size={14} style={{ color: '#818cf8', marginTop: 2, flexShrink: 0 }} />
+        <FileText size={14} style={{ color: DARK.info, marginTop: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 600, fontSize: 13 }}>{tpl.name}</span>
@@ -217,7 +218,7 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
                 {tpl.label_names.map(l => (
                   <span key={l} style={{
                     padding: '1px 6px', borderRadius: 9999, fontSize: 10,
-                    background: 'rgba(129,140,248,0.12)', color: '#818cf8',
+                    background: 'rgba(129,140,248,0.12)', color: DARK.info,
                   }}>{l}</span>
                 ))}
               </div>
@@ -235,7 +236,7 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
           <button onClick={() => onEdit(tpl)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
             <Edit2 size={13} />
           </button>
-          <button onClick={() => onDelete(tpl.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f3727f', padding: 4 }}>
+          <button onClick={() => onDelete(tpl.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.danger, padding: 4 }}>
             <Trash2 size={13} />
           </button>
         </div>
@@ -296,8 +297,8 @@ export default function Templates() {
           textAlign: 'center', padding: 64, color: '#4b5563', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12,
           animation: 'fadeIn 0.4s ease',
         }}>
-          <FileText size={36} style={{ marginBottom: 14, opacity: 0.3, display: 'block', margin: '0 auto 14px', color: '#818cf8' }} />
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>{t('templates.empty')}</div>
+          <FileText size={36} style={{ marginBottom: 14, opacity: 0.3, display: 'block', margin: '0 auto 14px', color: DARK.info }} />
+          <div style={{ fontSize: 16, fontWeight: 700, color: DARK.text, marginBottom: 6 }}>{t('templates.empty')}</div>
           <div style={{ fontSize: 13, marginBottom: 16 }}>{t('templates.emptyHint')}</div>
           <button onClick={() => setShowForm(true)} style={{ ...btn('primary') }}>
             {t('templates.new')}

@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { INSET_SHADOW } from '../constants/theme'
+import { INSET_SHADOW, DARK } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
 import { getApiKeys } from '../api/client'
 
 const darkInput = {
-  background: '#1f1f1f',
+  background: DARK.elevated,
   border: 'none',
   boxShadow: INSET_SHADOW,
   borderRadius: 4, padding: '6px 10px', fontSize: 12,
-  color: '#ffffff', outline: 'none',
+  color: DARK.text, outline: 'none',
 }
 
 export default function TaskEditForm({ task, depth, onSave, onCancel }) {
@@ -46,7 +46,7 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
   }
 
   return (
-    <div style={{ paddingLeft: depth * 24, background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ paddingLeft: depth * 24, background: 'rgba(255,255,255,0.03)', borderBottom: `1px solid ${DARK.border}` }}>
       <div style={{ padding: '10px 16px' }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input
@@ -86,7 +86,7 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
             <select
               value={editData.assigned_agent_key_id}
               onChange={e => setEditData(p => ({ ...p, assigned_agent_key_id: e.target.value }))}
-              style={{ ...darkInput, fontSize: 11, color: editData.assigned_agent_key_id ? '#818cf8' : '#b3b3b3' }}
+              style={{ ...darkInput, fontSize: 11, color: editData.assigned_agent_key_id ? DARK.info : DARK.textMid }}
             >
               <option value="">{t('agent.none')}</option>
               {activeKeys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
@@ -102,8 +102,8 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
           />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button onClick={onCancel} style={{ padding: '5px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
-          <button onClick={handleSave} style={{ padding: '5px 16px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('save')}</button>
+          <button onClick={onCancel} style={{ padding: '5px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
+          <button onClick={handleSave} style={{ padding: '5px 16px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('save')}</button>
         </div>
       </div>
     </div>

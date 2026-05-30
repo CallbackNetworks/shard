@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { DARK } from '../constants/theme'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -23,7 +24,7 @@ export default class ErrorBoundary extends Component {
           alignItems: 'center',
           justifyContent: 'center',
           height: '100vh',
-          background: '#07080f',
+          background: DARK.bg,
           color: '#e2e8f0',
           gap: 16,
           padding: 24,
@@ -39,7 +40,7 @@ export default class ErrorBoundary extends Component {
             style={{
               marginTop: 8,
               padding: '8px 20px',
-              background: '#818cf8',
+              background: DARK.info,
               color: '#fff',
               border: 'none',
               borderRadius: 6,

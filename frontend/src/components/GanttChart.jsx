@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { STATUS_MAP } from '../constants/theme'
+import { DARK, STATUS_MAP } from '../constants/theme'
 const STATUS_COLOR = Object.fromEntries(Object.entries(STATUS_MAP).map(([k, v]) => [k, v.color]))
 
 const TASK_NAME_W = 220
@@ -104,7 +104,7 @@ export default function GanttChart({ tasks }) {
               padding: '3px 10px', borderRadius: 9999, fontSize: 11, cursor: 'pointer',
               border: zoom === i ? 'none' : '1px solid rgba(255,255,255,0.15)',
               background: zoom === i ? 'rgba(30,215,96,0.12)' : 'transparent',
-              color: zoom === i ? '#1ed760' : '#b3b3b3',
+              color: zoom === i ? DARK.success : DARK.textMid,
               fontWeight: zoom === i ? 700 : 400,
             }}
           >
@@ -116,7 +116,7 @@ export default function GanttChart({ tasks }) {
       {/* Header */}
       <div style={{
         display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)',
-        position: 'sticky', top: 0, background: '#121212', zIndex: 2,
+        position: 'sticky', top: 0, background: DARK.bgAlt, zIndex: 2,
       }}>
         <div style={{
           width: TASK_NAME_W, minWidth: TASK_NAME_W, flexShrink: 0,
@@ -201,7 +201,7 @@ export default function GanttChart({ tasks }) {
                   padding: '0 16px', display: 'flex', alignItems: 'center',
                   borderRight: '1px solid rgba(255,255,255,0.05)',
                 }}>
-                  <span style={{ fontSize: 13, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 13, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {task.title}
                   </span>
                 </div>

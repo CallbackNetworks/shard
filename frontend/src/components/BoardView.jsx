@@ -17,7 +17,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { STATUS_COLS, PRIORITY, SHADOW_SM, SHADOW_LG } from '../constants/theme'
+import { STATUS_COLS, PRIORITY, SHADOW_SM, SHADOW_LG, DARK } from '../constants/theme'
 
 function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOverlay }) {
   const { t } = useTranslation()
@@ -28,7 +28,7 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
   return (
     <>
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 4, fontFamily: 'monospace' }}>{issueId}</div>
-      <div style={{ fontSize: 13, color: '#ffffff', lineHeight: 1.4, marginBottom: 6, fontWeight: 400 }}>{task.title}</div>
+      <div style={{ fontSize: 13, color: DARK.text, lineHeight: 1.4, marginBottom: 6, fontWeight: 400 }}>{task.title}</div>
       {task.description && (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4, marginBottom: 6 }}>
           {task.description.length > 80 ? task.description.slice(0, 80) + '\u2026' : task.description}
@@ -49,7 +49,7 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(129,140,248,0.12)', color: '#818cf8',
+            background: 'rgba(129,140,248,0.12)', color: DARK.info,
             border: '1px solid rgba(129,140,248,0.25)',
           }}>
             <Bot size={9} />
@@ -81,7 +81,7 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
               value={task.status}
               onChange={e => onUpdate(task.id, { status: e.target.value })}
               onClick={e => e.stopPropagation()}
-              style={{ fontSize: 11, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '2px 4px', background: '#1f1f1f', color: '#ffffff' }}
+              style={{ fontSize: 11, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '2px 4px', background: DARK.elevated, color: DARK.text }}
             >
               <option value="todo">{t('todo')}</option>
               <option value="in_progress">{t('inProgress')}</option>
@@ -114,7 +114,7 @@ function SortableBoardCard({ task, projectCode, onUpdate, onDelete }) {
   } = useSortable({ id: task.id, data: { task } })
 
   const style = {
-    background: '#181818',
+    background: DARK.surface,
     borderRadius: 8,
     padding: '10px 12px',
     cursor: 'grab',
@@ -156,7 +156,7 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
     <div key={colKey} style={{ width: 258, minWidth: 258, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', marginBottom: 2 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: colColor }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#ffffff' }}>{translatedLabel}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: DARK.text }}>{translatedLabel}</span>
         <span style={{ marginLeft: 'auto', fontSize: 11, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)', padding: '1px 6px', borderRadius: 10 }}>
           {tasks.length}
         </span>
@@ -288,7 +288,7 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onRe
       <DragOverlay dropAnimation={null}>
         {activeTask && (
           <div style={{
-            background: '#181818', borderRadius: 8,
+            background: DARK.surface, borderRadius: 8,
             padding: '10px 12px', width: 258,
             boxShadow: '0 12px 28px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1)',
             transform: 'rotate(2deg)',

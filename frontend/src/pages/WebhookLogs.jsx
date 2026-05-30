@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { RefreshCw, ChevronDown, ChevronUp, ScrollText, Trash2 } from 'lucide-react'
 import { getAllDeliveries, getIntegrations, retryDelivery, purgeDeliveries } from '../api/client'
+import { DARK } from '../constants/theme'
 
 const STATUS_COLORS = {
   success: '#4ade80',
@@ -13,14 +14,14 @@ const STATUS_COLORS = {
 
 const btn = (variant = 'default') => ({
   border: 'none', borderRadius: 9999, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-  ...(variant === 'primary' ? { background: '#1ed760', color: '#000' }
-    : variant === 'danger' ? { background: 'rgba(243,114,127,0.12)', color: '#f3727f', border: '1px solid rgba(243,114,127,0.2)' }
-    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#b3b3b3' }),
+  ...(variant === 'primary' ? { background: DARK.success, color: '#000' }
+    : variant === 'danger' ? { background: 'rgba(243,114,127,0.12)', color: DARK.danger, border: '1px solid rgba(243,114,127,0.2)' }
+    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: DARK.textMid }),
 })
 
 const sel = {
   background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 6, padding: '5px 10px', fontSize: 12, color: '#ffffff', outline: 'none',
+  borderRadius: 6, padding: '5px 10px', fontSize: 12, color: DARK.text, outline: 'none',
 }
 
 function DeliveryRow({ delivery, integrationMap }) {
@@ -111,7 +112,7 @@ function DeliveryRow({ delivery, integrationMap }) {
 }
 
 const tdStyle = {
-  padding: '8px 12px', fontSize: 12, color: '#ffffff',
+  padding: '8px 12px', fontSize: 12, color: DARK.text,
   borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'middle',
 }
 

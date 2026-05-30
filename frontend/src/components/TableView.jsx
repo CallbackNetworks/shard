@@ -15,7 +15,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { BRAND, PRIORITY, STATUS_MAP } from '../constants/theme'
+import { DARK, BRAND, PRIORITY, STATUS_MAP } from '../constants/theme'
 
 function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
   const { t } = useTranslation()
@@ -42,7 +42,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           onChange={e => onUpdate(task.id, { status: e.target.value })}
           style={{
             fontSize: 11, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
-            padding: '2px 6px', background: '#181818', color: STATUS_MAP[task.status]?.color || '#ffffff',
+            padding: '2px 6px', background: DARK.surface, color: STATUS_MAP[task.status]?.color || DARK.text,
           }}
         >
           <option value="todo">{t('todo')}</option>
@@ -57,8 +57,8 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           onChange={e => onUpdate(task.id, { priority: e.target.value })}
           style={{
             fontSize: 11, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
-            padding: '2px 6px', background: '#181818',
-            color: PRIORITY[task.priority]?.color || '#ffffff',
+            padding: '2px 6px', background: DARK.surface,
+            color: PRIORITY[task.priority]?.color || DARK.text,
           }}
         >
           <option value="high">{t('high')}</option>
@@ -69,7 +69,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
       <td style={{ ...tdStyle, maxWidth: 320 }}>
         <span style={{
           textDecoration: task.status === 'done' ? 'line-through' : 'none',
-          color: task.status === 'done' ? 'rgba(255,255,255,0.25)' : '#ffffff',
+          color: task.status === 'done' ? 'rgba(255,255,255,0.25)' : DARK.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
         }}>
           {task.title}
@@ -83,7 +83,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           style={{
             width: 80, fontSize: 11, border: '1px solid transparent', borderRadius: 4,
             padding: '2px 6px', background: 'transparent', outline: 'none',
-            color: task.assignee ? '#ffffff' : 'rgba(255,255,255,0.15)',
+            color: task.assignee ? DARK.text : 'rgba(255,255,255,0.15)',
           }}
           onFocus={e => { e.target.style.borderColor = 'rgba(255,255,255,0.15)'; e.target.style.background = 'rgba(255,255,255,0.05)' }}
           onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent' }}
@@ -104,7 +104,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(129,140,248,0.12)', color: '#818cf8',
+            background: 'rgba(129,140,248,0.12)', color: DARK.info,
             border: '1px solid rgba(129,140,248,0.25)', whiteSpace: 'nowrap',
           }}>
             <Bot size={9} />
@@ -124,7 +124,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
       </td>
       <td style={tdStyle}>
         {task.due_date
-          ? <span style={{ whiteSpace: 'nowrap', color: '#ffffff' }}>
+          ? <span style={{ whiteSpace: 'nowrap', color: DARK.text }}>
               {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
             </span>
           : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
@@ -185,7 +185,7 @@ export default function TableView({ tasks, projectId, labels, cycles, onUpdate, 
   })
 
   const tdStyle = {
-    padding: '5px 10px', fontSize: 12, color: '#ffffff',
+    padding: '5px 10px', fontSize: 12, color: DARK.text,
     borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'middle',
   }
 

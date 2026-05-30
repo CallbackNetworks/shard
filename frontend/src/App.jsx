@@ -22,7 +22,7 @@ import Overview from './pages/Overview'
 import ShareView from './pages/ShareView'
 import Login from './pages/Login'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { BRAND, INSET_SHADOW } from './constants/theme'
+import { BRAND, INSET_SHADOW, DARK } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
 
 const GLOBAL_CSS = `
@@ -142,10 +142,10 @@ const GLOBAL_CSS = `
   }
 `
 
-const SB_BG     = '#121212'
-const SB_TEXT   = '#b3b3b3'
-const SB_ACTIVE = '#1f1f1f'
-const SB_BORDER = 'rgba(255,255,255,0.08)'
+const SB_BG     = DARK.bgAlt
+const SB_TEXT   = DARK.textMid
+const SB_ACTIVE = DARK.elevated
+const SB_BORDER = DARK.border
 
 function Sidebar({ onOpenPalette }) {
   const location = useLocation()
@@ -186,7 +186,7 @@ function Sidebar({ onOpenPalette }) {
     display: 'flex', alignItems: 'center', gap: 8,
     padding: '6px 12px', borderRadius: 4, textDecoration: 'none',
     fontSize: 14, fontWeight: isActive(path) ? 700 : 400, margin: '1px 6px',
-    color: isActive(path) ? '#ffffff' : SB_TEXT,
+    color: isActive(path) ? DARK.text : SB_TEXT,
     background: isActive(path) ? SB_ACTIVE : 'transparent',
   })
 
@@ -196,7 +196,7 @@ function Sidebar({ onOpenPalette }) {
       display: 'flex', alignItems: 'center', gap: 8,
       padding: '4px 12px 4px 28px', borderRadius: 4, textDecoration: 'none',
       fontSize: 14, fontWeight: on ? 700 : 400, margin: '1px 6px', overflow: 'hidden',
-      color: on ? '#ffffff' : SB_TEXT,
+      color: on ? DARK.text : SB_TEXT,
       background: on ? SB_ACTIVE : 'transparent',
       transition: 'background 0.12s, color 0.12s',
     }
@@ -227,7 +227,7 @@ function Sidebar({ onOpenPalette }) {
           fontSize: 13, fontWeight: 900, color: '#000',
           boxShadow: `0 0 16px rgba(30,215,96,0.4)`,
         }}>T</div>
-        <span style={{ color: '#ffffff', fontWeight: 700, fontSize: 14, letterSpacing: '0.01em' }}>
+        <span style={{ color: DARK.text, fontWeight: 700, fontSize: 14, letterSpacing: '0.01em' }}>
           TODO Platform
         </span>
       </div>
@@ -238,20 +238,20 @@ function Sidebar({ onOpenPalette }) {
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           margin: '10px 12px', padding: '8px 14px', borderRadius: 9999,
-          background: '#1f1f1f', border: 'none',
+          background: DARK.elevated, border: 'none',
           cursor: 'pointer', width: 'calc(100% - 24px)',
-          color: '#b3b3b3', fontSize: 13,
+          color: DARK.textMid, fontSize: 13,
           transition: 'background 0.12s',
           boxShadow: INSET_SHADOW,
         }}
         onMouseEnter={e => e.currentTarget.style.background = '#282828'}
-        onMouseLeave={e => e.currentTarget.style.background = '#1f1f1f'}
+        onMouseLeave={e => e.currentTarget.style.background = DARK.elevated}
       >
         <Search size={12} />
         <span style={{ flex: 1, textAlign: 'left' }}>{t('search')}</span>
         <kbd style={{
           padding: '1px 6px', borderRadius: 3, fontSize: 10,
-          background: 'rgba(255,255,255,0.1)', color: '#b3b3b3',
+          background: 'rgba(255,255,255,0.1)', color: DARK.textMid,
         }}>⌘K</kbd>
       </button>
 
@@ -388,7 +388,7 @@ function Sidebar({ onOpenPalette }) {
               padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
               fontSize: 11, fontWeight: i18n.language === code ? 700 : 400,
               background: i18n.language === code ? SB_ACTIVE : 'transparent',
-              color: i18n.language === code ? '#ffffff' : 'rgba(255,255,255,0.3)',
+              color: i18n.language === code ? DARK.text : 'rgba(255,255,255,0.3)',
               border: i18n.language === code
                 ? `1px solid rgba(255,255,255,0.18)`
                 : '1px solid transparent',
@@ -438,7 +438,7 @@ function Layout() {
     <div style={{
       display: 'flex', height: '100vh',
       fontFamily: "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif",
-      fontSize: 14, background: '#121212',
+      fontSize: 14, background: DARK.bgAlt,
     }}>
       {/* Mobile hamburger */}
       <button
@@ -447,7 +447,7 @@ function Layout() {
         style={{
           display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 210,
           width: 36, height: 36, borderRadius: 8, border: 'none',
-          background: 'rgba(255,255,255,0.1)', color: '#ffffff', cursor: 'pointer',
+          background: 'rgba(255,255,255,0.1)', color: DARK.text, cursor: 'pointer',
           alignItems: 'center', justifyContent: 'center', fontSize: 18,
         }}
       >
@@ -467,7 +467,7 @@ function Layout() {
       <div className={`layout-sidebar${sidebarOpen ? ' open' : ''}`}>
         <Sidebar onOpenPalette={openPalette} />
       </div>
-      <main className="layout-main" style={{ flex: 1, overflow: 'auto', background: '#121212' }}>
+      <main className="layout-main" style={{ flex: 1, overflow: 'auto', background: DARK.bgAlt }}>
         <Routes>
           <Route index element={<Dashboard />} />
           <Route path="projects/:id" element={<ProjectDetail />} />

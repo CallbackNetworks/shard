@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getComments, createComment, deleteComment } from '../api/client'
+import { DARK } from '../constants/theme'
 
 export default function CommentsPanel({ projectId, taskId, depth }) {
   const { t } = useTranslation()
@@ -55,7 +56,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
           {comments.map(c => (
             <div key={c.id} style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#1ed760' }}>{c.author || t('comments.anonymous')}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: DARK.success }}>{c.author || t('comments.anonymous')}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
                     {new Date(c.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -65,7 +66,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                   </button>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: '#b3b3b3', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{c.body}</div>
+              <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{c.body}</div>
             </div>
           ))}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
@@ -74,7 +75,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                 value={author}
                 onChange={e => setAuthor(e.target.value)}
                 placeholder={t('comments.yourName')}
-                style={{ width: 140, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, outline: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff' }}
+                style={{ width: 140, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, outline: 'none', background: 'rgba(255,255,255,0.05)', color: DARK.text }}
               />
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -84,9 +85,9 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                 onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleAdd() }}
                 placeholder={t('comments.addComment')}
                 rows={2}
-                style={{ flex: 1, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', resize: 'vertical', minHeight: 40 }}
+                style={{ flex: 1, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: 'rgba(255,255,255,0.05)', color: DARK.text, resize: 'vertical', minHeight: 40 }}
               />
-              <button onClick={handleAdd} disabled={!body.trim()} style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: '#1ed760', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, alignSelf: 'flex-end', opacity: body.trim() ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('comments.post')}</button>
+              <button onClick={handleAdd} disabled={!body.trim()} style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, alignSelf: 'flex-end', opacity: body.trim() ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('comments.post')}</button>
             </div>
           </div>
         </>
