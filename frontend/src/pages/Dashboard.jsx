@@ -5,35 +5,31 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity } from '../api/client'
 import AgentTasksPanel from '../components/AgentTasksPanel'
-import { BRAND, STATUS_MAP, PRIORITY, DARK, SHADOW_SM, INSET_SHADOW } from '../constants/theme'
+import { BRAND, STATUS_MAP, PRIORITY, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
+import s from './Dashboard.module.css'
 
 /* ── Shimmer progress bar ─────────────────────────────────────────── */
 function GlowBar({ done, inProgress, failed, total }) {
   if (total === 0) return (
-    <div style={{ height: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 2 }} />
+    <div className={s.glowBarEmpty} />
   )
   const pDone = (done / total) * 100
   const pProg = (inProgress / total) * 100
   const pFail = (failed / total) * 100
   return (
-    <div style={{ height: 3, borderRadius: 2, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', position: 'relative' }}>
-      <div style={{ display: 'flex', height: '100%', position: 'absolute', inset: 0 }}>
+    <div className={s.glowBarTrack}>
+      <div className={s.glowBarInner}>
         {pDone > 0 && (
-          <div style={{
-            width: `${pDone}%`, height: '100%',
+          <div className={s.glowBarDone} style={{
+            width: `${pDone}%`,
             background: STATUS_MAP.done.color,
-            position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
-              animation: 'shimmerSlide 2.4s ease infinite',
-            }} />
+            <div className={s.glowBarShimmer} />
           </div>
         )}
-        {pProg > 0 && <div style={{ width: `${pProg}%`, height: '100%', background: STATUS_MAP.in_progress.color, opacity: 0.8 }} />}
-        {pFail > 0 && <div style={{ width: `${pFail}%`, height: '100%', background: STATUS_MAP.failed.color, opacity: 0.8 }} />}
+        {pProg > 0 && <div className={s.glowBarProgress} style={{ width: `${pProg}%`, background: STATUS_MAP.in_progress.color }} />}
+        {pFail > 0 && <div className={s.glowBarFailed} style={{ width: `${pFail}%`, background: STATUS_MAP.failed.color }} />}
       </div>
     </div>
   )
@@ -52,65 +48,36 @@ function ProjectCard({ project, onDelete, index }) {
 
   return (
     <div
-      className="card-hover"
+      className={`card-hover ${s.projectCard}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => navigate(`/app/projects/${project.id}`)}
-      style={{
-        background: DARK.surface,
-        borderRadius: 8,
-        padding: '18px 20px',
-        cursor: 'pointer',
-        position: 'relative',
-        overflow: 'hidden',
-        animation: `fadeUpIn 0.35s ease forwards`,
-        animationDelay: `${index * 0.055}s`,
-        opacity: 0,
-        boxShadow: SHADOW_SM,
-      }}
+      style={{ animationDelay: `${index * 0.055}s` }}
     >
       {/* Subtle gradient top accent */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+      <div className={s.projectCardAccent} style={{
         background: `linear-gradient(90deg, transparent, ${identColor}66, transparent)`,
       }} />
 
       {/* Card header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
-        <div style={{
-          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+      <div className={s.cardHeader}>
+        <div className={s.cardAvatar} style={{
           background: `linear-gradient(135deg, ${identColor}cc, ${identColor}66)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 800, fontSize: 14,
           boxShadow: `0 0 12px ${identColor}44`,
         }}>
           {project.name.charAt(0).toUpperCase()}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 14, fontWeight: 600, color: DARK.text, marginBottom: 3,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
+        <div className={s.cardInfo}>
+          <div className={s.cardTitle}>
             {project.name}
           </div>
           {project.description && (
-            <div style={{
-              fontSize: 12, color: DARK.textMid,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
+            <div className={s.cardDescription}>
               {project.description}
             </div>
           )}
         </div>
-        <span style={{
-          fontSize: 10, padding: '2px 9px', borderRadius: 9999, fontWeight: 600, flexShrink: 0,
-          background: project.status === 'archived'
-            ? 'rgba(255,255,255,0.06)'
-            : 'rgba(30,215,96,0.1)',
-          color: project.status === 'archived' ? DARK.textMid : DARK.success,
-          border: `1px solid ${project.status === 'archived' ? 'rgba(255,255,255,0.08)' : 'rgba(30,215,96,0.3)'}`,
-          textTransform: 'capitalize', letterSpacing: '0.05em',
-        }}>
+        <span className={`${s.statusBadge} ${project.status === 'archived' ? s.statusBadgeArchived : s.statusBadgeActive}`}>
           {project.status === 'archived' ? t('archived') : t('active')}
         </span>
       </div>
@@ -119,17 +86,16 @@ function ProjectCard({ project, onDelete, index }) {
       <GlowBar total={project.total_tasks} done={project.done_tasks} inProgress={inProgress} failed={failed} />
 
       {/* Stats row */}
-      <div style={{ display: 'flex', alignItems: 'center', marginTop: 12, gap: 12 }}>
-        <div style={{ display: 'flex', gap: 12, flex: 1 }}>
-          <span style={{ fontSize: 11, color: DARK.success, fontWeight: 500 }}>
+      <div className={s.statsRow}>
+        <div className={s.statsLeft}>
+          <span className={s.statsDone}>
             ✓ {project.done_tasks}
           </span>
-          <span style={{ fontSize: 11, color: DARK.textMid }}>
+          <span className={s.statsRemaining}>
             ○ {project.total_tasks - project.done_tasks} {t('dashboard.left')}
           </span>
         </div>
-        <span style={{
-          fontSize: 13, fontWeight: 700,
+        <span className={s.statsPercent} style={{
           color: pct === 100 ? DARK.success : DARK.textMid,
         }}>
           {pct}%
@@ -140,12 +106,7 @@ function ProjectCard({ project, onDelete, index }) {
               e.stopPropagation()
               if (confirm(`Delete "${project.name}"?`)) onDelete(project.id)
             }}
-            style={{
-              background: 'none', border: '1px solid rgba(248,113,113,0.3)',
-              cursor: 'pointer', color: '#f87171', fontSize: 11,
-              padding: '2px 8px', borderRadius: 5,
-              transition: 'background 0.15s',
-            }}
+            className={s.deleteBtn}
           >
             {t('delete')}
           </button>
@@ -181,7 +142,7 @@ function ActivityFeed({ activities }) {
   const { t } = useTranslation()
   if (!activities || activities.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '28px 0', color: DARK.textDim, fontSize: 12 }}>
+      <div className={s.activityEmpty}>
         {t('dashboard.noActivityYet')}
       </div>
     )
@@ -191,20 +152,14 @@ function ActivityFeed({ activities }) {
       {activities.map((a, i) => {
         const color = ACTION_COLORS[a.action] || DARK.textMid
         return (
-          <div key={a.id || i} style={{
-            display: 'flex', gap: 10, padding: '8px 0',
+          <div key={a.id || i} className={s.activityItem} style={{
             borderBottom: i < activities.length - 1 ? `1px solid ${DARK.border}` : 'none',
-            animation: `fadeIn 0.3s ease forwards`,
             animationDelay: `${i * 0.04}s`,
-            opacity: 0,
           }}>
-            <div style={{
-              width: 5, height: 5, borderRadius: '50%', background: color,
-              marginTop: 7, flexShrink: 0, boxShadow: `0 0 6px ${color}88`,
-            }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5 }}>{a.detail}</div>
-              <div style={{ fontSize: 10, color: DARK.textDim, marginTop: 2, display: 'flex', gap: 8 }}>
+            <div className={s.activityDot} style={{ background: color, boxShadow: `0 0 6px ${color}88` }} />
+            <div className={s.activityContent}>
+              <div className={s.activityDetail}>{a.detail}</div>
+              <div className={s.activityMeta}>
                 {a.actor && <span>{a.actor}</span>}
                 <span>{t('dashboard.timeAgo', { time: timeAgo(a.created_at) })}</span>
               </div>
@@ -227,33 +182,27 @@ function TaskRow({ t: task, i, total, onClick }) {
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      className={`${s.taskRow} ${overdue ? s.taskRowOverdue : ''} ${!overdue && hov ? s.taskRowHover : ''}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
-        background: overdue ? 'rgba(248,113,113,0.06)' : hov ? 'rgba(255,255,255,0.05)' : 'transparent',
         borderBottom: i < total - 1 ? `1px solid ${DARK.border}` : 'none',
-        borderLeft: overdue ? '2px solid #f87171' : '2px solid transparent',
-        transition: 'background 0.12s',
       }}
     >
-      <div style={{ width: 7, height: 7, borderRadius: '50%', background: sc, flexShrink: 0, boxShadow: `0 0 5px ${sc}66` }} />
-      <span style={{ fontSize: 11, color: pc, flexShrink: 0, width: 10 }}>
+      <div className={s.taskStatusDot} style={{ background: sc, boxShadow: `0 0 5px ${sc}66` }} />
+      <span className={s.taskPriorityIcon} style={{ color: pc }}>
         {PRIORITY[task.priority]?.icon}
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 12, color: task.status === 'done' ? DARK.textDim : DARK.textMid,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      <div className={s.taskTitleWrap}>
+        <div className={s.taskTitle} style={{
+          color: task.status === 'done' ? DARK.textDim : DARK.textMid,
           textDecoration: task.status === 'done' ? 'line-through' : 'none',
         }}>
           {task.title}
         </div>
       </div>
-      <span style={{ fontSize: 10, color: DARK.textDim, flexShrink: 0 }}>{task.projectName}</span>
+      <span className={s.taskProject}>{task.projectName}</span>
       {task.due_date && (
-        <span style={{
-          fontSize: 10, color: overdue ? '#f87171' : DARK.textDim,
-          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3,
+        <span className={s.taskDueDate} style={{
+          color: overdue ? '#f87171' : DARK.textDim,
         }}>
           <Clock size={9} />
           {new Date(task.due_date).toLocaleDateString()}
@@ -286,7 +235,7 @@ function Sparkline({ activities }) {
     `${(i / 6) * 76 + 2},${22 - (v / maxVal) * 20}`
   ).join(' ')
   return (
-    <svg width={80} height={24} style={{ display: 'block', marginTop: 6 }}>
+    <svg width={80} height={24} className={s.sparkline}>
       <polyline
         points={points}
         fill="none"
@@ -347,27 +296,15 @@ function StatCards({ projects, activities }) {
   ]
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-      gap: 10,
-      padding: '0 24px 16px',
-    }}>
+    <div className={s.statCardsGrid}>
       {cards.map((card, idx) => (
         <div
           key={idx}
-          style={{
-            background: DARK.surface,
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 8,
-            padding: '14px 16px',
-            animation: 'fadeUpIn 0.35s ease forwards',
-            animationDelay: `${card.delay}s`,
-            opacity: 0,
-          }}
+          className={s.statCard}
+          style={{ animationDelay: `${card.delay}s` }}
         >
-          <div style={{ fontSize: 11, color: DARK.textDim, marginBottom: 4 }}>{card.label}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: card.color }}>{card.value}</div>
+          <div className={s.statCardLabel}>{card.label}</div>
+          <div className={s.statCardValue} style={{ color: card.color }}>{card.value}</div>
           {card.sparkline && <Sparkline activities={activities} />}
         </div>
       ))}
@@ -392,41 +329,23 @@ function DueSoonPanel({ projects }) {
   if (dueSoonTasks.length === 0) return null
 
   return (
-    <div style={{
-      background: DARK.surface,
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 8,
-      marginBottom: 16,
-      overflow: 'hidden',
-      animation: 'fadeUpIn 0.3s ease forwards',
-      animationDelay: '0.1s',
-      opacity: 0,
-    }}>
+    <div className={s.dueSoonPanel}>
       <button
         onClick={() => setCollapsed(v => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          width: '100%', padding: '10px 14px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: DARK.textMid,
-        }}
+        className={s.dueSoonToggle}
       >
         <Clock size={13} color="#ffa42b" />
-        <span style={{ fontSize: 13, fontWeight: 600, color: DARK.text, flex: 1, textAlign: 'left' }}>
+        <span className={s.dueSoonTitle}>
           {t('dashboard.dueSoon')}
         </span>
-        <span style={{
-          fontSize: 10, padding: '1px 7px', borderRadius: 9999, fontWeight: 700,
-          background: 'rgba(255,164,43,0.15)', color: DARK.warning,
-          border: '1px solid rgba(255,164,43,0.3)',
-        }}>
+        <span className={s.dueSoonCount}>
           {dueSoonTasks.length}
         </span>
         {collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
       </button>
 
       {!collapsed && (
-        <div style={{ maxHeight: 180, overflowY: 'auto', padding: '0 4px 8px' }}>
+        <div className={s.dueSoonList}>
           {dueSoonTasks.map((task, i) => (
             <TaskRow
               key={task.id}
@@ -453,23 +372,20 @@ function IdentityGroup({ ident, tasks, navigate }) {
       borderLeft: `3px solid ${ident.color}`,
       paddingLeft: 10,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <div style={{
-          width: 18, height: 18, borderRadius: 5, background: ident.color, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 9, color: '#fff', fontWeight: 800,
+      <div className={s.identityGroupHeader}>
+        <div className={s.identityGroupAvatar} style={{
+          background: ident.color,
           boxShadow: `0 0 8px ${ident.color}66`,
         }}>
           {ident.avatar || ident.name.charAt(0)}
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: ident.color }}>{ident.name}</span>
-        <span style={{
-          fontSize: 10, padding: '1px 6px', borderRadius: 9999, fontWeight: 700,
+        <span className={s.identityGroupName} style={{ color: ident.color }}>{ident.name}</span>
+        <span className={s.identityGroupBadge} style={{
           background: `${ident.color}22`, color: ident.color,
         }}>
           {tasks.filter(task => task.status !== 'done').length}
         </span>
-        <span style={{ fontSize: 10, color: DARK.textDim }}>
+        <span className={s.identityGroupOpen}>
           {t('dashboard.open')}
         </span>
       </div>
@@ -480,10 +396,7 @@ function IdentityGroup({ ident, tasks, navigate }) {
       {tasks.length > 8 && !showAll && (
         <button
           onClick={() => setShowAll(true)}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: BRAND, fontSize: 11, padding: '4px 10px', marginTop: 4,
-          }}
+          className={s.identityShowMore}
         >
           {t('dashboard.showMore', { count: tasks.length - 8 })}
         </button>
@@ -529,7 +442,7 @@ function MyWorkSection({ projects }) {
 
   if (identityGroups.length === 0 && ungroupedTasks.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '20px 0', color: DARK.textDim, fontSize: 12 }}>
+      <div className={s.myWorkEmpty}>
         {t('dashboard.noActiveTasks')}
       </div>
     )
@@ -538,14 +451,14 @@ function MyWorkSection({ projects }) {
   const hasIdentities = identityGroups.length > 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div className={s.myWorkList}>
       {identityGroups.map(({ identity: ident, tasks }) => (
         <IdentityGroup key={ident.id} ident={ident} tasks={tasks} navigate={navigate} />
       ))}
       {ungroupedTasks.length > 0 && (
         <div>
           {hasIdentities && (
-            <div style={{ fontSize: 11, fontWeight: 600, color: DARK.textDim, marginBottom: 8 }}>{t('dashboard.other')}</div>
+            <div className={s.otherLabel}>{t('dashboard.other')}</div>
           )}
           {ungroupedTasks.slice(0, 8).map((task, i) => (
             <TaskRow key={task.id} t={task} i={i} total={Math.min(ungroupedTasks.length, 8)}
@@ -569,11 +482,7 @@ function GettingStarted({ onNewProject, isMobile }) {
       gradient: 'linear-gradient(135deg, #818cf8, #4f46e5)',
       action: <button
         onClick={onNewProject}
-        style={{
-          marginTop: 10, padding: '7px 16px', border: 'none', borderRadius: 9999,
-          background: BRAND, color: '#000', fontSize: 12, fontWeight: 700,
-          cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px',
-        }}
+        className={s.stepActionBtn}
       >
         <Plus size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />
         {t('dashboard.newProject')}
@@ -600,60 +509,31 @@ function GettingStarted({ onNewProject, isMobile }) {
   ]
 
   return (
-    <div style={{ animation: 'fadeIn 0.4s ease', padding: '20px 0' }}>
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: DARK.text, marginBottom: 6 }}>
+    <div className={s.gettingStartedWrap}>
+      <div className={s.gettingStartedHeader}>
+        <div className={s.gettingStartedTitle}>
           {t('dashboard.gettingStarted')}
         </div>
-        <div style={{ fontSize: 13, color: DARK.textMid }}>{t('dashboard.createFirstProject')}</div>
+        <div className={s.gettingStartedSubtitle}>{t('dashboard.createFirstProject')}</div>
       </div>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
-        gap: 14,
-      }}>
+      <div className={`${s.stepsGrid} ${isMobile ? s.stepsGridMobile : s.stepsGridDesktop}`}>
         {steps.map((step, i) => (
           <div
             key={step.num}
-            style={{
-              background: DARK.surface,
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10,
-              padding: '20px 16px',
-              animation: 'fadeUpIn 0.35s ease forwards',
-              animationDelay: `${i * 0.08}s`,
-              opacity: 0,
-            }}
+            className={s.stepCard}
+            style={{ animationDelay: `${i * 0.08}s` }}
           >
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: step.gradient,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, fontWeight: 800, color: '#fff',
-              marginBottom: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            }}>
+            <div className={s.stepNumber} style={{ background: step.gradient }}>
               {step.num}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: DARK.text, marginBottom: 6 }}>{step.title}</div>
-            <div style={{ fontSize: 12, color: DARK.textMid, lineHeight: 1.5 }}>{step.desc}</div>
+            <div className={s.stepTitle}>{step.title}</div>
+            <div className={s.stepDesc}>{step.desc}</div>
             {step.action}
           </div>
         ))}
       </div>
     </div>
   )
-}
-
-/* ── Input style helper ───────────────────────────────────────────── */
-const inputStyle = {
-  background: DARK.elevated,
-  border: 'none',
-  borderRadius: 4,
-  padding: '10px 14px',
-  fontSize: 14,
-  color: DARK.text,
-  outline: 'none',
-  boxShadow: INSET_SHADOW,
 }
 
 /* ── Dashboard ────────────────────────────────────────────────────── */
@@ -696,55 +576,23 @@ export default function Dashboard() {
     ? t('dashboard.goodAfternoon')
     : t('dashboard.goodEvening')
 
-  const tabStyle = (key) => ({
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '10px 16px', border: 'none', background: 'none',
-    cursor: 'pointer', fontSize: 14, fontWeight: tab === key ? 700 : 400,
-    color: tab === key ? DARK.text : DARK.textMid,
-    borderBottom: tab === key ? `2px solid ${BRAND}` : '2px solid transparent',
-    marginBottom: -1, transition: 'color 0.15s',
-  })
-
-  const filterBtn = (key) => ({
-    btn: {
-      display: 'flex', alignItems: 'center', gap: 5,
-      padding: '6px 16px', borderRadius: 9999, cursor: 'pointer', fontSize: 13, fontWeight: filter === key ? 700 : 400,
-      background: filter === key ? DARK.elevated : 'transparent',
-      border: filter === key ? 'none' : '1px solid rgba(255,255,255,0.15)',
-      color: filter === key ? DARK.text : DARK.textMid,
-      transition: 'all 0.15s',
-    },
-  })
-
   const isEmptyState = projects.length === 0 && activities.length === 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: DARK.bg, color: DARK.text }}>
+    <div className={s.dashboardRoot}>
       {/* Header */}
-      <div style={{
-        padding: '18px 24px', borderBottom: `1px solid ${DARK.border}`,
-        display: 'flex', alignItems: 'center', gap: 16,
-        background: 'rgba(255,255,255,0.015)',
-      }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, color: DARK.textMid, marginBottom: 2 }}>{greeting}</div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: DARK.text }}>{t('dashboard.title')}</h1>
-          <div style={{ fontSize: 12, color: DARK.textDim, marginTop: 2 }}>
-            <span style={{ color: DARK.success, fontWeight: 600 }}>{active.length}</span> {t('active')} ·{' '}
-            <span style={{ color: DARK.textMid }}>{archived.length}</span> {t('archived')}
+      <div className={s.header}>
+        <div className={s.headerContent}>
+          <div className={s.headerGreeting}>{greeting}</div>
+          <h1 className={s.headerTitle}>{t('dashboard.title')}</h1>
+          <div className={s.headerStats}>
+            <span className={s.headerStatsActive}>{active.length}</span> {t('active')} ·{' '}
+            <span className={s.headerStatsArchived}>{archived.length}</span> {t('archived')}
           </div>
         </div>
         <button
           onClick={() => setShowForm(v => !v)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '10px 24px', borderRadius: 9999, border: 'none',
-            background: BRAND,
-            color: '#000', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            textTransform: 'uppercase', letterSpacing: '1.4px',
-            boxShadow: 'rgba(0,0,0,0.3) 0px 4px 8px',
-            transition: 'transform 0.1s, background 0.1s',
-          }}
+          className={s.newProjectBtn}
           onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#1fdf64' }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
         >
@@ -754,31 +602,19 @@ export default function Dashboard() {
 
       {/* Create form */}
       {showForm && (
-        <div style={{
-          padding: '12px 24px',
-          background: 'rgba(255,255,255,0.025)',
-          borderBottom: `1px solid ${DARK.border}`,
-          animation: 'fadeUpIn 0.2s ease forwards',
-        }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className={s.createForm}>
+          <div className={s.createFormRow}>
             <input autoFocus placeholder={t('dashboard.projectNamePlaceholder')} value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && name.trim() && createMut.mutate()}
-              style={{ ...inputStyle, flex: '1 1 200px' }} />
+              className={`${s.inputField} ${s.inputName}`} />
             <input placeholder={t('dashboard.descriptionPlaceholder')} value={desc}
               onChange={e => setDesc(e.target.value)}
-              style={{ ...inputStyle, flex: '2 1 280px' }} />
-            <button onClick={() => setShowForm(false)} style={{
-              padding: '8px 20px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999,
-              background: 'transparent', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: DARK.text,
-              textTransform: 'uppercase', letterSpacing: '1.4px',
-            }}>{t('cancel')}</button>
-            <button disabled={!name.trim() || createMut.isPending} onClick={() => createMut.mutate()} style={{
-              padding: '8px 22px', border: 'none', borderRadius: 9999,
-              background: BRAND, color: '#000', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              opacity: !name.trim() ? 0.45 : 1, transition: 'opacity 0.15s',
-              textTransform: 'uppercase', letterSpacing: '1.4px',
-            }}>
+              className={`${s.inputField} ${s.inputDesc}`} />
+            <button onClick={() => setShowForm(false)} className={s.cancelBtn}>{t('cancel')}</button>
+            <button disabled={!name.trim() || createMut.isPending} onClick={() => createMut.mutate()}
+              className={s.createBtn}
+              style={{ opacity: !name.trim() ? 0.45 : 1 }}>
               {createMut.isPending ? t('creating') : t('create')}
             </button>
           </div>
@@ -791,41 +627,42 @@ export default function Dashboard() {
       )}
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 0, padding: '0 24px', borderBottom: `1px solid ${DARK.border}` }}>
+      <div className={s.tabBar}>
         {[
           { key: 'projects', label: t('nav.projects'), icon: <FolderOpen size={13} /> },
           { key: 'mywork',   label: t('dashboard.myWork'),  icon: <User size={13} /> },
         ].map(tabItem => (
-          <button key={tabItem.key} onClick={() => setTab(tabItem.key)} style={tabStyle(tabItem.key)}>
+          <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+            className={`${s.tabBtn} ${tab === tabItem.key ? s.tabBtnActive : s.tabBtnInactive}`}>
             {tabItem.icon}{tabItem.label}
           </button>
         ))}
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? 12 : 24 }}>
+      <div className={`${s.contentArea} ${isMobile ? s.contentPadMobile : s.contentPadDesktop}`}>
         {isLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: DARK.textMid }}>
-            <div style={{ width: 18, height: 18, border: `2px solid ${BRAND}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 10, flexShrink: 0 }} />
+          <div className={s.loadingWrap}>
+            <div className={s.loadingSpinner} />
             {t('loading')}
           </div>
         ) : tab === 'mywork' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 24, alignItems: 'start' }}>
+          <div className={`${s.myWorkGrid} ${isMobile ? s.myWorkGridMobile : s.myWorkGridDesktop}`}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div className={s.sectionHeader}>
                 <User size={14} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: DARK.text }}>{t('dashboard.activeWork')}</h2>
+                <h2 className={s.sectionTitle}>{t('dashboard.activeWork')}</h2>
               </div>
-              <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
+              <div className={s.sectionPanel}>
                 <MyWorkSection projects={projects} />
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div className={s.sectionHeader}>
                 <Activity size={14} color={BRAND} />
-                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: DARK.text }}>{t('dashboard.recentActivity')}</h2>
+                <h2 className={s.sectionTitle}>{t('dashboard.recentActivity')}</h2>
               </div>
-              <div style={{ background: DARK.surface, borderRadius: 8, padding: '12px 14px', boxShadow: SHADOW_SM }}>
+              <div className={s.sectionPanel}>
                 <ActivityFeed activities={activities} />
               </div>
             </div>
@@ -841,27 +678,28 @@ export default function Dashboard() {
             <DueSoonPanel projects={projects} />
 
             {/* Filter buttons */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+            <div className={s.filterRow}>
               {[
                 { key: 'active',   label: t('active'),   icon: <FolderOpen size={11} />, count: active.length },
                 { key: 'archived', label: t('archived'), icon: <Archive size={11} />,    count: archived.length },
                 { key: 'all',      label: t('all'),      icon: null,                     count: projects.length },
               ].map(f => (
-                <button key={f.key} onClick={() => setFilter(f.key)} style={filterBtn(f.key).btn}>
+                <button key={f.key} onClick={() => setFilter(f.key)}
+                  className={`${s.filterBtn} ${filter === f.key ? s.filterBtnActive : s.filterBtnInactive}`}>
                   {f.icon}{f.label}
-                  <span style={{ fontSize: 10, opacity: 0.7 }}>{f.count}</span>
+                  <span className={s.filterCount}>{f.count}</span>
                 </button>
               ))}
             </div>
 
             {displayed.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: DARK.textDim, animation: 'fadeIn 0.4s ease' }}>
-                <FolderOpen size={36} style={{ margin: '0 auto 14px', opacity: 0.3, display: 'block', color: BRAND }} />
-                <p style={{ fontSize: 16, fontWeight: 700, color: DARK.text }}>{t('dashboard.noProjectsEmpty')}</p>
-                <p style={{ marginTop: 6, fontSize: 13 }}>{t('dashboard.createFirstProject')}</p>
+              <div className={s.emptyState}>
+                <FolderOpen size={36} className={s.emptyIcon} />
+                <p className={s.emptyTitle}>{t('dashboard.noProjectsEmpty')}</p>
+                <p className={s.emptySubtitle}>{t('dashboard.createFirstProject')}</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+              <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
                 {displayed.map((p, i) => (
                   <ProjectCard key={p.id} project={p} index={i} onDelete={id => deleteMut.mutate(id)} />
                 ))}

@@ -1,0 +1,820 @@
+/* ── GlowBar ─────────────────────────────────────────────────────── */
+.glowBarEmpty {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+}
+
+.glowBarTrack {
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.glowBarInner {
+  display: flex;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+.glowBarDone {
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.glowBarShimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  animation: shimmerSlide 2.4s ease infinite;
+}
+
+.glowBarProgress {
+  height: 100%;
+  opacity: 0.8;
+}
+
+.glowBarFailed {
+  height: 100%;
+  opacity: 0.8;
+}
+
+/* ── ProjectCard ─────────────────────────────────────────────────── */
+.projectCard {
+  background: #181818;
+  border-radius: 8px;
+  padding: 18px 20px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  animation: fadeUpIn 0.35s ease forwards;
+  opacity: 0;
+  box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 8px;
+}
+
+.projectCardAccent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cardAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.cardInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardDescription {
+  font-size: 12px;
+  color: #b3b3b3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBadge {
+  font-size: 10px;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  font-weight: 600;
+  flex-shrink: 0;
+  text-transform: capitalize;
+  letter-spacing: 0.05em;
+}
+
+.statusBadgeActive {
+  background: rgba(30, 215, 96, 0.1);
+  color: #1ed760;
+  border: 1px solid rgba(30, 215, 96, 0.3);
+}
+
+.statusBadgeArchived {
+  background: rgba(255, 255, 255, 0.06);
+  color: #b3b3b3;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.statsRow {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+  gap: 12px;
+}
+
+.statsLeft {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+}
+
+.statsDone {
+  font-size: 11px;
+  color: #1ed760;
+  font-weight: 500;
+}
+
+.statsRemaining {
+  font-size: 11px;
+  color: #b3b3b3;
+}
+
+.statsPercent {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.deleteBtn {
+  background: none;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  cursor: pointer;
+  color: #f87171;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  transition: background 0.15s;
+}
+
+/* ── ActivityFeed ────────────────────────────────────────────────── */
+.activityEmpty {
+  text-align: center;
+  padding: 28px 0;
+  color: #4d4d4d;
+  font-size: 12px;
+}
+
+.activityItem {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  animation: fadeIn 0.3s ease forwards;
+  opacity: 0;
+}
+
+.activityDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+
+.activityContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.activityDetail {
+  font-size: 12px;
+  color: #b3b3b3;
+  line-height: 1.5;
+}
+
+.activityMeta {
+  font-size: 10px;
+  color: #4d4d4d;
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── TaskRow ─────────────────────────────────────────────────────── */
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-left: 2px solid transparent;
+}
+
+.taskRowOverdue {
+  background: rgba(248, 113, 113, 0.06);
+  border-left: 2px solid #f87171;
+}
+
+.taskRowHover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.taskStatusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.taskPriorityIcon {
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 10px;
+}
+
+.taskTitleWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.taskTitle {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskProject {
+  font-size: 10px;
+  color: #4d4d4d;
+  flex-shrink: 0;
+}
+
+.taskDueDate {
+  font-size: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ── Sparkline ───────────────────────────────────────────────────── */
+.sparkline {
+  display: block;
+  margin-top: 6px;
+}
+
+/* ── StatCards ────────────────────────────────────────────────────── */
+.statCardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 0 24px 16px;
+}
+
+.statCard {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 14px 16px;
+  animation: fadeUpIn 0.35s ease forwards;
+  opacity: 0;
+}
+
+.statCardLabel {
+  font-size: 11px;
+  color: #4d4d4d;
+  margin-bottom: 4px;
+}
+
+.statCardValue {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+/* ── DueSoonPanel ────────────────────────────────────────────────── */
+.dueSoonPanel {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  animation: fadeUpIn 0.3s ease forwards;
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+
+.dueSoonToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #b3b3b3;
+}
+
+.dueSoonTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  flex: 1;
+  text-align: left;
+}
+
+.dueSoonCount {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-weight: 700;
+  background: rgba(255, 164, 43, 0.15);
+  color: #ffa42b;
+  border: 1px solid rgba(255, 164, 43, 0.3);
+}
+
+.dueSoonList {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0 4px 8px;
+}
+
+/* ── IdentityGroup ───────────────────────────────────────────────── */
+.identityGroupAvatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  font-weight: 800;
+}
+
+.identityGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.identityGroupName {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.identityGroupBadge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-weight: 700;
+}
+
+.identityGroupOpen {
+  font-size: 10px;
+  color: #4d4d4d;
+}
+
+.identityShowMore {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1ed760;
+  font-size: 11px;
+  padding: 4px 10px;
+  margin-top: 4px;
+}
+
+/* ── MyWorkSection ───────────────────────────────────────────────── */
+.myWorkEmpty {
+  text-align: center;
+  padding: 20px 0;
+  color: #4d4d4d;
+  font-size: 12px;
+}
+
+.myWorkList {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.otherLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4d4d4d;
+  margin-bottom: 8px;
+}
+
+/* ── GettingStarted ──────────────────────────────────────────────── */
+.gettingStartedWrap {
+  animation: fadeIn 0.4s ease;
+  padding: 20px 0;
+}
+
+.gettingStartedHeader {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.gettingStartedTitle {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.gettingStartedSubtitle {
+  font-size: 13px;
+  color: #b3b3b3;
+}
+
+.stepsGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.stepsGridDesktop {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.stepsGridMobile {
+  grid-template-columns: 1fr;
+}
+
+.stepCard {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 20px 16px;
+  animation: fadeUpIn 0.35s ease forwards;
+  opacity: 0;
+}
+
+.stepNumber {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.stepTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.stepDesc {
+  font-size: 12px;
+  color: #b3b3b3;
+  line-height: 1.5;
+}
+
+.stepActionBtn {
+  margin-top: 10px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 9999px;
+  background: #1ed760;
+  color: #000;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ── Input style ─────────────────────────────────────────────────── */
+.inputField {
+  background: #1f1f1f;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #ffffff;
+  outline: none;
+  box-shadow: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
+}
+
+/* ── Dashboard layout ────────────────────────────────────────────── */
+.dashboardRoot {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #07080f;
+  color: #ffffff;
+}
+
+.header {
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.headerContent {
+  flex: 1;
+}
+
+.headerGreeting {
+  font-size: 12px;
+  color: #b3b3b3;
+  margin-bottom: 2px;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.headerStats {
+  font-size: 12px;
+  color: #4d4d4d;
+  margin-top: 2px;
+}
+
+.headerStatsActive {
+  color: #1ed760;
+  font-weight: 600;
+}
+
+.headerStatsArchived {
+  color: #b3b3b3;
+}
+
+.newProjectBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border-radius: 9999px;
+  border: none;
+  background: #1ed760;
+  color: #000;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  box-shadow: rgba(0, 0, 0, 0.3) 0px 4px 8px;
+  transition: transform 0.1s, background 0.1s;
+}
+
+/* ── Create form ─────────────────────────────────────────────────── */
+.createForm {
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.025);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  animation: fadeUpIn 0.2s ease forwards;
+}
+
+.createFormRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inputName {
+  flex: 1 1 200px;
+}
+
+.inputDesc {
+  flex: 2 1 280px;
+}
+
+.cancelBtn {
+  padding: 8px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+}
+
+.createBtn {
+  padding: 8px 22px;
+  border: none;
+  border-radius: 9999px;
+  background: #1ed760;
+  color: #000;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tabBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: -1px;
+  transition: color 0.15s;
+}
+
+.tabBtnActive {
+  font-weight: 700;
+  color: #ffffff;
+  border-bottom: 2px solid #1ed760;
+}
+
+.tabBtnInactive {
+  font-weight: 400;
+  color: #b3b3b3;
+  border-bottom: 2px solid transparent;
+}
+
+/* ── Content area ────────────────────────────────────────────────── */
+.contentArea {
+  flex: 1;
+  overflow: auto;
+}
+
+.contentPadDesktop {
+  padding: 24px;
+}
+
+.contentPadMobile {
+  padding: 12px;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────── */
+.loadingWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #b3b3b3;
+}
+
+.loadingSpinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #1ed760;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+/* ── My Work tab layout ──────────────────────────────────────────── */
+.myWorkGrid {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+
+.myWorkGridDesktop {
+  grid-template-columns: 1fr 300px;
+}
+
+.myWorkGridMobile {
+  grid-template-columns: 1fr;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sectionPanel {
+  background: #181818;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 8px;
+}
+
+/* ── Filter buttons ──────────────────────────────────────────────── */
+.filterRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.filterBtnActive {
+  font-weight: 700;
+  background: #1f1f1f;
+  border: none;
+  color: #ffffff;
+}
+
+.filterBtnInactive {
+  font-weight: 400;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #b3b3b3;
+}
+
+.filterCount {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+.emptyState {
+  text-align: center;
+  padding: 60px;
+  color: #4d4d4d;
+  animation: fadeIn 0.4s ease;
+}
+
+.emptyIcon {
+  margin: 0 auto 14px;
+  opacity: 0.3;
+  display: block;
+  color: #1ed760;
+}
+
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.emptySubtitle {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+/* ── Project grid ────────────────────────────────────────────────── */
+.projectGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.projectGridDesktop {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.projectGridMobile {
+  grid-template-columns: 1fr;
+}
