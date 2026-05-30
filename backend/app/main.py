@@ -132,6 +132,47 @@ async def lifespan(app: FastAPI):
             conn.execute(text("ALTER TABLE integrations ADD COLUMN auth_config JSON"))
         if "template_id" not in intg_cols:
             conn.execute(text("ALTER TABLE integrations ADD COLUMN template_id VARCHAR(50)"))
+        # Create FTS5 virtual table for full-text search (external content)
+        existing_tables = {t for t in inspect(engine).get_table_names()}
+        if "tasks_fts" not in existing_tables:
+            conn.execute(
+                text(
+                    "CREATE VIRTUAL TABLE tasks_fts USING fts5("
+                    "task_id UNINDEXED, title, description"
+                    ")"
+                )
+            )
+            # Populate with existing data
+            conn.execute(
+                text(
+                    "INSERT INTO tasks_fts(task_id, title, description) "
+                    "SELECT id, title, COALESCE(description, '') FROM tasks"
+                )
+            )
+        # Always recreate triggers in case schema changed
+        for trig in ("tasks_fts_insert", "tasks_fts_update", "tasks_fts_delete"):
+            conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
+        conn.execute(
+            text(
+                "CREATE TRIGGER tasks_fts_insert AFTER INSERT ON tasks BEGIN "
+                "INSERT INTO tasks_fts(task_id, title, description) "
+                "VALUES (new.id, new.title, COALESCE(new.description, '')); END"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE TRIGGER tasks_fts_update AFTER UPDATE OF title, description ON tasks BEGIN "
+                "DELETE FROM tasks_fts WHERE task_id = old.id; "
+                "INSERT INTO tasks_fts(task_id, title, description) "
+                "VALUES (new.id, new.title, COALESCE(new.description, '')); END"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE TRIGGER tasks_fts_delete AFTER DELETE ON tasks BEGIN "
+                "DELETE FROM tasks_fts WHERE task_id = old.id; END"
+            )
+        )
         conn.commit()
 
     # Start background scheduler for due date reminders

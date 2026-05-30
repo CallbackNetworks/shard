@@ -1,10 +1,14 @@
+import logging
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Project, Task
 from app.schemas import LabelOut, TaskOut
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -29,14 +33,34 @@ def search(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Full-text search across tasks and projects using case-insensitive LIKE matching."""
-    pattern = f"%{q}%"
+    """Full-text search across tasks and projects. Uses FTS5 when available, falls back to LIKE."""
+    # Try FTS5 first for task search
+    tasks = []
+    used_fts = False
+    try:
+        fts_query = text(
+            "SELECT task_id FROM tasks_fts WHERE tasks_fts MATCH :q ORDER BY rank LIMIT :lim OFFSET :off"
+        )
+        fts_rows = db.execute(fts_query, {"q": q, "lim": limit, "off": offset}).fetchall()
+        task_ids = [r[0] for r in fts_rows]
+        if task_ids:
+            task_query = db.query(Task).filter(Task.id.in_(task_ids))
+            if project_id:
+                task_query = task_query.filter(Task.project_id == project_id)
+            tasks = task_query.all()
+            # Preserve FTS rank order
+            id_order = {tid: i for i, tid in enumerate(task_ids)}
+            tasks.sort(key=lambda t: id_order.get(t.id, 0))
+        used_fts = True
+    except Exception:
+        logger.debug("FTS5 unavailable, falling back to LIKE search")
 
-    # Search tasks
-    task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
-    if project_id:
-        task_query = task_query.filter(Task.project_id == project_id)
-    tasks = task_query.order_by(Task.updated_at.desc()).offset(offset).limit(limit).all()
+    if not used_fts:
+        pattern = f"%{q}%"
+        task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
+        if project_id:
+            task_query = task_query.filter(Task.project_id == project_id)
+        tasks = task_query.order_by(Task.updated_at.desc()).offset(offset).limit(limit).all()
 
     # Search projects (only if no project_id filter)
     projects = []
