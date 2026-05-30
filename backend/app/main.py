@@ -23,6 +23,7 @@ from app.routers import (
     cycles,
     decisions,
     external_api,
+    goals,
     identities,
     integrations,
     labels,
@@ -216,6 +217,7 @@ app.include_router(saved_filters.router)
 app.include_router(attachments.router)
 app.include_router(notifications.router)
 app.include_router(cicd.router)
+app.include_router(goals.router)
 app.include_router(ws_router.router)
 
 
