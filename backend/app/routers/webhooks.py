@@ -169,7 +169,7 @@ async def webhook_callback(
 
     # Run workflow rules on status change
     if prev_status != normalized["status"]:
-        run_rules(db, "task.status_changed", task, {"old_status": prev_status, "_rule_depth": 1})
+        await run_rules(db, "task.status_changed", task, {"old_status": prev_status, "_rule_depth": 1})
 
     # If all tasks are done, also fire project.complete
     project: Project = task.project

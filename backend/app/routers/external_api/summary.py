@@ -56,10 +56,14 @@ def api_summary(
         done = 0
         in_progress = 0
         failed = 0
+        todo = 0
         overdue = 0
         active_tasks = []
+        todo_tasks = []
         assignees_set = set()
         next_due = None
+
+        priority_order = {"high": 0, "medium": 1, "low": 2}
 
         for t in tasks:
             if t.status == "done":
@@ -68,6 +72,18 @@ def api_summary(
                 in_progress += 1
             elif t.status == "failed":
                 failed += 1
+            elif t.status == "todo":
+                todo += 1
+                todo_tasks.append(
+                    {
+                        "id": t.id,
+                        "title": t.title,
+                        "status": t.status,
+                        "priority": t.priority,
+                        "assignee": t.assignee,
+                        "due_date": t.due_date.isoformat() if t.due_date else None,
+                    }
+                )
 
             is_overdue = t.due_date and t.due_date < now and t.status not in ("done", "failed")
             if is_overdue:
@@ -100,6 +116,9 @@ def api_summary(
         total_done_all += done
         total_overdue += overdue
 
+        # Sort todo tasks by priority (high first) and take top 10
+        todo_tasks.sort(key=lambda x: priority_order.get(x["priority"], 2))
+
         project_summaries.append(
             {
                 "id": p.id,
@@ -110,10 +129,12 @@ def api_summary(
                 "done": done,
                 "in_progress": in_progress,
                 "failed": failed,
+                "todo": todo,
                 "overdue": overdue,
                 "next_due": next_due.isoformat() if next_due else None,
                 "assignees": list(assignees_set),
                 "active_tasks": active_tasks,
+                "todo_tasks": todo_tasks[:10],
             }
         )
 

@@ -656,10 +656,12 @@ class ProjectSummaryItem(BaseModel):
     done: int
     in_progress: int
     failed: int
+    todo: int = 0
     overdue: int
     next_due: str | None = Field(description="ISO 8601 date of next upcoming deadline")
     assignees: list[str]
     active_tasks: list[ActiveTaskSummary]
+    todo_tasks: list[ActiveTaskSummary] = []
 
 
 class IdentitySummaryItem(BaseModel):

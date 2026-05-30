@@ -73,10 +73,14 @@ async def _get_summary() -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _list_tasks(project_id: str, status: str | None = None) -> str:
+async def _list_tasks(
+    project_id: str, status: str | None = None, priority: str | None = None
+) -> str:
     params = {}
     if status:
         params["status_filter"] = status
+    if priority:
+        params["priority"] = priority
     result = await _get(f"/projects/{project_id}/tasks", params=params)
     return json.dumps(result) if not isinstance(result, str) else result
 
@@ -258,7 +262,7 @@ TOOL_DEFINITIONS = [
     ),
     types.Tool(
         name="list_tasks",
-        description="List tasks for a project, optionally filtered by status.",
+        description="List tasks for a project, optionally filtered by status and/or priority.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -267,6 +271,11 @@ TOOL_DEFINITIONS = [
                     "type": "string",
                     "enum": ["todo", "in_progress", "done", "failed"],
                     "description": "Filter by status",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                    "description": "Filter by priority",
                 },
             },
             "required": ["project_id"],
@@ -464,7 +473,7 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
         if name == "get_summary":
             result = await _get_summary()
         elif name == "list_tasks":
-            result = await _list_tasks(args["project_id"], args.get("status"))
+            result = await _list_tasks(args["project_id"], args.get("status"), args.get("priority"))
         elif name == "create_task":
             result = await _create_task(
                 project_id=args["project_id"],
