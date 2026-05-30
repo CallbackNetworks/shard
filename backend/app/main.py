@@ -18,6 +18,7 @@ from app.routers import (
     api_keys,
     assistant,
     attachments,
+    bulk,
     cicd,
     comments,
     cycles,
@@ -151,6 +152,7 @@ _AUTH_BYPASS = (
     "/health",
     "/webhook/",
     "/share/",
+    "/ical/",
     "/docs",
     "/openapi.json",
     "/redoc",
@@ -218,6 +220,7 @@ app.include_router(attachments.router)
 app.include_router(notifications.router)
 app.include_router(cicd.router)
 app.include_router(goals.router)
+app.include_router(bulk.router)
 app.include_router(ws_router.router)
 
 
