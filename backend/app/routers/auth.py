@@ -1,5 +1,5 @@
-import hashlib
 import os
+import secrets
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -8,16 +8,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
 
-
-def _make_token(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+# In-memory session store — tokens are lost on restart (re-login required).
+_active_tokens: set[str] = set()
 
 
 def verify_token(token: str) -> bool:
     """Returns True if token is valid (or auth is not configured)."""
     if not AUTH_PASSWORD:
         return True
-    return token == _make_token(AUTH_PASSWORD)
+    return token in _active_tokens
 
 
 class LoginRequest(BaseModel):
@@ -30,7 +29,17 @@ def login(body: LoginRequest):
         return {"token": "no-auth", "auth_required": False}
     if body.password != AUTH_PASSWORD:
         raise HTTPException(status_code=401, detail="Incorrect password")
-    return {"token": _make_token(body.password), "auth_required": True}
+    token = secrets.token_hex(32)
+    _active_tokens.add(token)
+    return {"token": token, "auth_required": True}
+
+
+@router.post("/logout")
+def logout(request: Request):
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header.removeprefix("Bearer ").strip()
+    _active_tokens.discard(token)
+    return {"ok": True}
 
 
 @router.get("/me")
