@@ -39,7 +39,7 @@ async def trigger_github_workflow(
         if resp.status_code == 204:
             return {"success": True, "message": f"Workflow {workflow_id} triggered on {ref}"}
         return {"success": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         return {"success": False, "error": str(exc)}
 
 
@@ -67,7 +67,7 @@ async def trigger_gitlab_pipeline(
             data = resp.json()
             return {"success": True, "pipeline_id": data.get("id"), "web_url": data.get("web_url")}
         return {"success": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         return {"success": False, "error": str(exc)}
 
 
@@ -101,7 +101,7 @@ async def trigger_jenkins_build(
             location = resp.headers.get("location", "")
             return {"success": True, "queue_url": location}
         return {"success": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         return {"success": False, "error": str(exc)}
 
 
@@ -125,5 +125,5 @@ async def trigger_generic_webhook(
             "status_code": resp.status_code,
             "body": resp.text[:500],
         }
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         return {"success": False, "error": str(exc)}

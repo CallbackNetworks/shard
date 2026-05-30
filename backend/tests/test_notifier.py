@@ -5,6 +5,7 @@ import hmac
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from app.models import Integration, Notification, Project, Task, WebhookDelivery
@@ -185,7 +186,7 @@ class TestDispatchWebhook:
     async def test_failure_creates_failed_delivery_with_retry(self, db, integration):
         with patch("app.services.notifier.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
-            mock_instance.post.side_effect = Exception("Connection refused")
+            mock_instance.post.side_effect = httpx.ConnectError("Connection refused")
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=False)
             mock_client.return_value = mock_instance
@@ -210,7 +211,7 @@ class TestDispatchWebhook:
 
         with patch("app.services.notifier.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
-            mock_instance.post.side_effect = Exception("Timeout")
+            mock_instance.post.side_effect = httpx.ReadTimeout("Timeout")
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=False)
             mock_client.return_value = mock_instance

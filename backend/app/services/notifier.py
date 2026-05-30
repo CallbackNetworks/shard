@@ -123,7 +123,7 @@ async def _dispatch_webhook(
             return True
         else:
             raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         delivery.error = str(exc)[:500]
         if delivery.attempt >= MAX_ATTEMPTS:
             delivery.status = "dead"
@@ -277,5 +277,5 @@ async def fire_test_notification(integration: Integration) -> dict:
                 headers=_build_headers(integration, body_bytes),
             )
         return {"success": True, "status_code": resp.status_code, "body": resp.text[:200]}
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         return {"success": False, "error": str(exc)}

@@ -46,7 +46,7 @@ def send_email(to_addresses: list[str], subject: str, html_body: str, text_body:
         server.quit()
         logger.info("Email sent to %s: %s", to_addresses, subject)
         return True
-    except Exception as exc:
+    except (smtplib.SMTPException, OSError) as exc:
         logger.warning("Failed to send email to %s: %s", to_addresses, exc)
         return False
 
