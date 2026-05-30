@@ -14,20 +14,19 @@ import BoardView from '../components/BoardView'
 import TableView from '../components/TableView'
 import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
-import { BRAND, LABEL_PALETTE, SHADOW_LG, INSET_SHADOW, DARK } from '../constants/theme'
+import { BRAND, LABEL_PALETTE } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
+import s from './ProjectDetail.module.css'
 
 function LabelChip({ label, onRemove }) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 11, padding: '2px 8px', borderRadius: 12, fontWeight: 500,
+    <span className={s.labelChip} style={{
       background: label.color + '22', color: label.color,
       border: `1px solid ${label.color}44`,
     }}>
       {label.name}
       {onRemove && (
-        <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: label.color, padding: 0, lineHeight: 1, display: 'flex' }}>
+        <button onClick={onRemove} className={s.labelChipRemoveBtn} style={{ color: label.color }}>
           <X size={10} />
         </button>
       )}
@@ -44,57 +43,46 @@ function LabelManager({ labels, onCreateLabel, onDeleteLabel }) {
     <div>
       <button
         onClick={() => setOpen(v => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '6px 14px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)',
-          background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text,
-          textTransform: 'uppercase', letterSpacing: '1px',
-        }}
+        className={s.labelManagerToggle}
       >
         <Tag size={12} /> Labels ({labels.length})
       </button>
       {open && (
-        <div style={{
-          position: 'absolute', zIndex: 50, top: '100%', right: 0, marginTop: 4,
-          background: DARK.surface, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
-          boxShadow: SHADOW_LG, padding: 14, minWidth: 260,
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: DARK.text, marginBottom: 10 }}>Project Labels</div>
+        <div className={s.labelManagerDropdown}>
+          <div className={s.labelManagerTitle}>Project Labels</div>
           {labels.length === 0 && (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>No labels yet.</div>
+            <div className={s.labelManagerEmpty}>No labels yet.</div>
           )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
+          <div className={s.labelManagerList}>
             {labels.map(lb => (
-              <span key={lb.id} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 11, padding: '2px 8px', borderRadius: 12, fontWeight: 500,
+              <span key={lb.id} className={s.labelManagerLabelChip} style={{
                 background: lb.color + '22', color: lb.color, border: `1px solid ${lb.color}44`,
               }}>
                 {lb.name}
-                <button onClick={() => onDeleteLabel(lb.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: lb.color, padding: 0, lineHeight: 1, display: 'flex' }}>
+                <button onClick={() => onDeleteLabel(lb.id)} className={s.labelManagerDeleteBtn} style={{ color: lb.color }}>
                   <X size={10} />
                 </button>
               </span>
             ))}
           </div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>New label</div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+          <div className={s.labelManagerNewLabel}>New label</div>
+          <div className={s.labelManagerInputRow}>
             <input
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Label name"
-              style={{ flex: 1, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: DARK.text }}
+              className={s.labelManagerInput}
             />
           </div>
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div className={s.labelManagerPalette}>
             {LABEL_PALETTE.map(c => (
               <button
                 key={c}
                 onClick={() => setNewColor(c)}
+                className={s.labelManagerColorBtn}
                 style={{
-                  width: 20, height: 20, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
+                  background: c,
                   outline: newColor === c ? `2px solid ${c}` : '2px solid transparent',
-                  outlineOffset: 2,
                 }}
               />
             ))}
@@ -102,12 +90,8 @@ function LabelManager({ labels, onCreateLabel, onDeleteLabel }) {
           <button
             disabled={!newName.trim()}
             onClick={() => { if (newName.trim()) { onCreateLabel({ name: newName.trim(), color: newColor }); setNewName('') } }}
-            style={{
-              width: '100%', padding: '8px 0', border: 'none', borderRadius: 9999,
-              background: BRAND, color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              textTransform: 'uppercase', letterSpacing: '1.4px',
-              opacity: newName.trim() ? 1 : 0.5,
-            }}
+            className={s.labelManagerCreateBtn}
+            style={{ opacity: newName.trim() ? 1 : 0.5 }}
           >
             Create Label
           </button>
@@ -286,85 +270,63 @@ export default function ProjectDetail() {
     ? applyFilters(searchFiltered)
     : applyFilters(topTasks)
 
-  const tabStyle = (t) => ({
-    padding: '10px 16px', fontSize: 14, fontWeight: tab === t ? 700 : 400,
-    border: 'none', background: 'none', cursor: 'pointer',
-    color: tab === t ? DARK.text : DARK.textMid,
-    borderBottom: tab === t ? `2px solid ${BRAND}` : '2px solid transparent',
-    marginBottom: -1, transition: 'color 0.15s',
-  })
-
   const openQuickAdd = () => {
     setShowForm(true)
     setTab('issues')
   }
 
   if (isLoading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: DARK.textMid, background: DARK.bgAlt }}>
-      <div style={{ width: 18, height: 18, border: `2px solid ${DARK.success}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginRight: 10 }} />
+    <div className={s.loadingWrapper}>
+      <div className={s.loadingSpinner} />
       Loading…
     </div>
   )
 
-  if (!project) return <div style={{ padding: 32, color: DARK.danger, background: DARK.bgAlt }}>Project not found</div>
+  if (!project) return <div className={s.notFound}>Project not found</div>
 
   const identColor = project.identities?.[0]?.color || BRAND
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', background: DARK.bgAlt, color: DARK.text }}>
+    <div className={s.container}>
       {/* Header */}
-      <div style={{ padding: isMobile ? '12px 12px 0' : '16px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.015)' }}>
+      <div className={`${s.header} ${isMobile ? s.headerMobile : s.headerDesktop}`}>
         <button
           onClick={() => navigate('/app')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'rgba(255,255,255,0.3)', fontSize: 12, padding: 0, marginBottom: 14,
-            transition: 'color 0.15s',
-          }}
+          className={s.backBtn}
         >
           <ArrowLeft size={12} /> My Issues
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+        <div className={s.headerRow}>
+          <div className={s.projectIcon} style={{
             background: `linear-gradient(135deg, ${identColor}cc, ${identColor}66)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 800, fontSize: 15,
             boxShadow: `0 0 14px ${identColor}44`,
           }}>
             {project.name.charAt(0).toUpperCase()}
           </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3, flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: DARK.text }}>{project.name}</h1>
-              <span style={{
-                fontSize: 10, padding: '2px 9px', borderRadius: 9999, fontWeight: 600,
-                background: project.status === 'archived' ? 'rgba(255,255,255,0.06)' : 'rgba(30,215,96,0.1)',
-                color: project.status === 'archived' ? DARK.textMid : DARK.success,
-                border: `1px solid ${project.status === 'archived' ? 'rgba(255,255,255,0.08)' : 'rgba(30,215,96,0.3)'}`,
-                textTransform: 'capitalize', letterSpacing: '0.05em',
-              }}>
+          <div className={s.projectInfo}>
+            <div className={s.projectNameRow}>
+              <h1 className={s.projectName}>{project.name}</h1>
+              <span className={`${s.statusBadge} ${project.status === 'archived' ? s.statusArchived : s.statusActive}`}>
                 {project.status === 'archived' ? 'Archived' : 'Active'}
               </span>
             </div>
             {project.description && (
-              <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.38)' }}>{project.description}</p>
+              <p className={s.projectDescription}>{project.description}</p>
             )}
             {labels.length > 0 && (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+              <div className={s.projectLabels}>
                 {labels.map(lb => <LabelChip key={lb.id} label={lb} />)}
               </div>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap', position: 'relative' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{project.done_tasks}/{project.total_tasks} done</div>
-              <div style={{ width: 90, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
-                <div style={{ height: '100%', width: `${project.progress}%`, background: DARK.success, borderRadius: 2, transition: 'width 0.3s' }} />
+          <div className={s.headerActions}>
+            <div className={s.progressInfo}>
+              <div className={s.progressText}>{project.done_tasks}/{project.total_tasks} done</div>
+              <div className={s.progressBarTrack}>
+                <div className={s.progressBarFill} style={{ width: `${project.progress}%` }} />
               </div>
             </div>
             <LabelManager
@@ -374,32 +336,19 @@ export default function ProjectDetail() {
             />
             <button
               onClick={() => { setShowAgentInstr(v => !v); if (!agentInstrDirty) setAgentInstr(project.agent_instructions || '') }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '6px 14px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)',
-                background: showAgentInstr ? 'rgba(129,140,248,0.15)' : 'transparent',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text,
-                textTransform: 'uppercase', letterSpacing: '1px',
-              }}
+              className={`${s.agentBtn} ${showAgentInstr ? s.agentBtnActive : s.agentBtnInactive}`}
             >
               <Bot size={12} /> Agent
             </button>
             <button
               onClick={() => archiveMut.mutate()}
-              style={{ padding: '7px 16px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}
+              className={s.archiveBtn}
             >
               {project.status === 'archived' ? 'Unarchive' : 'Archive'}
             </button>
             <button
               onClick={() => setShowForm(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '7px 18px', borderRadius: 9999, border: 'none',
-                background: DARK.success,
-                color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                textTransform: 'uppercase', letterSpacing: '1.4px',
-                boxShadow: 'rgba(0,0,0,0.3) 0px 4px 8px',
-              }}
+              className={s.newIssueBtn}
             >
               <Plus size={13} /> New Issue
             </button>
@@ -407,14 +356,11 @@ export default function ProjectDetail() {
         </div>
 
         {showAgentInstr && (
-          <div style={{
-            background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.2)',
-            borderRadius: 10, padding: 16, marginBottom: 16,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: DARK.info, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div className={s.agentInstrPanel}>
+            <div className={s.agentInstrTitle}>
               Agent Instructions
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+            <div className={s.agentInstrDesc}>
               Instructions for AI agents working on this project. Agents can read these via the API.
             </div>
             <textarea
@@ -422,33 +368,20 @@ export default function ProjectDetail() {
               onChange={e => { setAgentInstr(e.target.value); setAgentInstrDirty(true) }}
               placeholder="e.g. Use conventional commit style for task titles. Always create subtasks for multi-step work."
               rows={4}
-              style={{
-                width: '100%', background: 'rgba(0,0,0,0.3)', color: DARK.text,
-                border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6,
-                padding: '8px 10px', fontSize: 13, fontFamily: 'monospace',
-                resize: 'vertical', outline: 'none', boxSizing: 'border-box',
-              }}
+              className={s.agentInstrTextarea}
             />
             {agentInstrDirty && (
-              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+              <div className={s.agentInstrActions}>
                 <button
                   onClick={() => saveAgentInstrMut.mutate()}
                   disabled={saveAgentInstrMut.isPending}
-                  style={{
-                    padding: '5px 14px', borderRadius: 6, border: 'none',
-                    background: DARK.info, color: '#000', fontSize: 12, fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
+                  className={s.agentInstrSaveBtn}
                 >
                   {saveAgentInstrMut.isPending ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   onClick={() => { setAgentInstr(project.agent_instructions || ''); setAgentInstrDirty(false) }}
-                  style={{
-                    padding: '5px 14px', borderRadius: 6,
-                    border: '1px solid rgba(255,255,255,0.15)', background: 'transparent',
-                    color: '#fff', fontSize: 12, cursor: 'pointer',
-                  }}
+                  className={s.agentInstrCancelBtn}
                 >
                   Cancel
                 </button>
@@ -458,16 +391,16 @@ export default function ProjectDetail() {
         )}
 
         {/* Tabs */}
-        <div style={{ display: 'flex' }}>
-          <button style={tabStyle('issues')} onClick={() => setTab('issues')}>Issues</button>
-          <button style={tabStyle('board')} onClick={() => setTab('board')}>Board</button>
-          <button style={tabStyle('timeline')} onClick={() => setTab('timeline')}>Timeline</button>
-          <button style={tabStyle('table')} onClick={() => setTab('table')}>Table</button>
-          <button style={tabStyle('cycles')} onClick={() => setTab('cycles')}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className={s.tabRow}>
+          <button className={`${s.tab} ${tab === 'issues' ? s.tabActive : ''}`} onClick={() => setTab('issues')}>Issues</button>
+          <button className={`${s.tab} ${tab === 'board' ? s.tabActive : ''}`} onClick={() => setTab('board')}>Board</button>
+          <button className={`${s.tab} ${tab === 'timeline' ? s.tabActive : ''}`} onClick={() => setTab('timeline')}>Timeline</button>
+          <button className={`${s.tab} ${tab === 'table' ? s.tabActive : ''}`} onClick={() => setTab('table')}>Table</button>
+          <button className={`${s.tab} ${tab === 'cycles' ? s.tabActive : ''}`} onClick={() => setTab('cycles')}>
+            <span className={s.cycleTabContent}>
               <Zap size={12} /> Cycles
               {cycles.filter(c => c.status === 'active').length > 0 && (
-                <span style={{ background: BRAND, color: '#000', borderRadius: 9999, fontSize: 9, padding: '1px 6px', fontWeight: 700 }}>
+                <span className={s.cycleActiveBadge}>
                   {cycles.filter(c => c.status === 'active').length}
                 </span>
               )}
@@ -488,40 +421,27 @@ export default function ProjectDetail() {
       />
 
       {/* Tab content */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div className={s.tabContent}>
 
         {/* Issues */}
         {tab === 'issues' && (
           <div>
-            <div style={{ display: 'flex', gap: 4, padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
+            <div className={s.filterBar}>
               {!searchQ && ['all', 'todo', 'in_progress', 'done', 'failed'].map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{
-                  padding: '4px 14px', borderRadius: 9999, fontSize: 13, cursor: 'pointer', fontWeight: filter === f ? 700 : 400,
-                  border: filter === f ? 'none' : '1px solid rgba(255,255,255,0.15)',
-                  background: filter === f ? DARK.elevated : 'transparent',
-                  color: filter === f ? DARK.text : DARK.textMid,
-                  transition: 'all 0.15s',
-                }}>
+                <button key={f} onClick={() => setFilter(f)} className={`${s.filterBtn} ${filter === f ? s.filterBtnActive : s.filterBtnInactive}`}>
                   {f === 'all' ? 'All' : f === 'in_progress' ? 'In Progress' : f.charAt(0).toUpperCase() + f.slice(1)}
-                  {' '}<span style={{ fontSize: 11, opacity: 0.7 }}>{f === 'all' ? topTasks.length : topTasks.filter(t => t.status === f).length}</span>
+                  {' '}<span className={s.filterCount}>{f === 'all' ? topTasks.length : topTasks.filter(t => t.status === f).length}</span>
                 </button>
               ))}
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className={s.filterRight}>
                 <button
                   onClick={() => setShowFilters(v => !v)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '5px 12px', borderRadius: 9999, fontSize: 12, cursor: 'pointer',
-                    border: activeFilterCount > 0 ? '1px solid rgba(30,215,96,0.4)' : '1px solid rgba(255,255,255,0.15)',
-                    background: activeFilterCount > 0 ? 'rgba(30,215,96,0.08)' : 'transparent',
-                    color: activeFilterCount > 0 ? DARK.success : DARK.textMid,
-                    fontWeight: 600,
-                  }}
+                  className={`${s.advancedFilterBtn} ${activeFilterCount > 0 ? s.advancedFilterActive : s.advancedFilterInactive}`}
                 >
                   <SlidersHorizontal size={12} />
                   Filter
                   {activeFilterCount > 0 && (
-                    <span style={{ background: DARK.success, color: '#000', borderRadius: 9999, fontSize: 9, padding: '1px 5px', fontWeight: 700 }}>
+                    <span className={s.activeFilterBadge}>
                       {activeFilterCount}
                     </span>
                   )}
@@ -530,16 +450,10 @@ export default function ProjectDetail() {
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
                   placeholder="Search issues\u2026"
-                  style={{
-                    padding: '6px 14px', borderRadius: 9999, fontSize: 13,
-                    border: 'none', outline: 'none',
-                    background: DARK.elevated,
-                    color: DARK.text, width: 160,
-                    boxShadow: INSET_SHADOW,
-                  }}
+                  className={s.searchInput}
                 />
                 {searchQ && (
-                  <button onClick={() => setSearchQ('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 0, display: 'flex' }}>
+                  <button onClick={() => setSearchQ('')} className={s.clearSearchBtn}>
                     {'\u2715'}
                   </button>
                 )}
@@ -548,30 +462,27 @@ export default function ProjectDetail() {
 
             {/* Advanced filter bar */}
             {showFilters && (
-              <div style={{
-                display: 'flex', gap: 8, padding: '8px 16px', flexWrap: 'wrap', alignItems: 'center',
-                borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)',
-              }}>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filters:</span>
+              <div className={s.advancedFilterBar}>
+                <span className={s.advancedFilterLabel}>Filters:</span>
                 <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterPriority !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
+                  className={`${s.filterSelect} ${filterPriority !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
                   <option value="all">Priority: All</option>
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
                 <select value={filterLabel} onChange={e => setFilterLabel(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterLabel !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
+                  className={`${s.filterSelect} ${filterLabel !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
                   <option value="all">Label: All</option>
                   {labels.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
                 </select>
                 <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterAssignee !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
+                  className={`${s.filterSelect} ${filterAssignee !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
                   <option value="all">Assignee: All</option>
                   {assignees.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
                 <select value={filterDue} onChange={e => setFilterDue(e.target.value)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterDue !== 'all' ? 'rgba(30,215,96,0.08)' : 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }}>
+                  className={`${s.filterSelect} ${filterDue !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
                   <option value="all">Due: All</option>
                   <option value="overdue">Overdue</option>
                   <option value="this_week">This week</option>
@@ -579,7 +490,7 @@ export default function ProjectDetail() {
                 </select>
                 {agentNames.length > 0 && (
                   <select value={filterAgent} onChange={e => setFilterAgent(e.target.value)}
-                    style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.12)', background: filterAgent !== 'all' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.05)', color: filterAgent !== 'all' ? DARK.info : DARK.text, outline: 'none' }}>
+                    className={`${s.filterSelect} ${filterAgent !== 'all' ? s.filterSelectAgent : s.filterSelectAgentDefault}`}>
                     <option value="all">Agent: All</option>
                     {agentNames.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
@@ -587,7 +498,7 @@ export default function ProjectDetail() {
                 {activeFilterCount > 0 && (
                   <button
                     onClick={() => { setFilterPriority('all'); setFilterLabel('all'); setFilterAssignee('all'); setFilterDue('all'); setFilterAgent('all') }}
-                    style={{ padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(243,114,127,0.3)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.danger, fontWeight: 600 }}
+                    className={s.clearAllFiltersBtn}
                   >
                     Clear all
                   </button>
@@ -596,21 +507,18 @@ export default function ProjectDetail() {
             )}
 
             {filteredTopTasks.length > 0 && (
-              <div style={{
-                display: 'flex', alignItems: 'center', padding: '0 16px', height: 28, gap: 8,
-                borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)',
-              }}>
-                <span style={{ width: 12 }} /><span style={{ width: 22 }} /><span style={{ width: 14 }} />
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', minWidth: 64 }}>ID</span>
-                <span style={{ flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>Title</span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', minWidth: 70 }}>Due date</span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', minWidth: 60 }}>Priority</span>
-                <span style={{ width: 88 }} />
+              <div className={s.tableHeader}>
+                <span className={s.colSpacer12} /><span className={s.colSpacer22} /><span className={s.colSpacer14} />
+                <span className={`${s.colHeader} ${s.colHeaderId}`}>ID</span>
+                <span className={`${s.colHeader} ${s.colHeaderTitle}`}>Title</span>
+                <span className={`${s.colHeader} ${s.colHeaderDue}`}>Due date</span>
+                <span className={`${s.colHeader} ${s.colHeaderPriority}`}>Priority</span>
+                <span className={s.colSpacer88} />
               </div>
             )}
 
             {filteredTopTasks.length === 0 ? (
-              <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+              <div className={s.emptyState}>
                 {filter === 'all'
                   ? 'No issues yet. Click "+ New Issue" to create one.'
                   : `No issues with status "${filter === 'in_progress' ? 'In Progress' : filter}".`}
@@ -640,8 +548,8 @@ export default function ProjectDetail() {
         {/* Timeline */}
         {tab === 'timeline' && (
           <div>
-            <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.01)' }}>
-              Set <strong style={{ color: 'rgba(255,255,255,0.5)' }}>start date</strong> and <strong style={{ color: 'rgba(255,255,255,0.5)' }}>due date</strong> on issues (click ✎ in Issues tab) to see them on the timeline.
+            <div className={s.timelineHint}>
+              Set <strong className={s.timelineHintStrong}>start date</strong> and <strong className={s.timelineHintStrong}>due date</strong> on issues (click ✎ in Issues tab) to see them on the timeline.
             </div>
             <GanttChart tasks={tasks} />
           </div>
@@ -676,17 +584,7 @@ export default function ProjectDetail() {
       <button
         onClick={openQuickAdd}
         title="New Issue"
-        style={{
-          position: 'fixed', bottom: 28, right: 28,
-          width: 48, height: 48, borderRadius: '50%',
-          background: BRAND, color: '#000', border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(94,106,210,0.45)',
-          zIndex: 100,
-          transition: 'transform 0.15s, box-shadow 0.15s',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(94,106,210,0.55)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(94,106,210,0.45)' }}
+        className={s.fab}
       >
         <Plus size={22} />
       </button>
