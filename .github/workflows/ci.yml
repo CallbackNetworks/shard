@@ -34,7 +34,7 @@ jobs:
         run: ruff format --check app/ tests/
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+        run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
 
       - name: Security audit
         run: pip install pip-audit && pip-audit --strict
