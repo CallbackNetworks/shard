@@ -7,7 +7,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -25,7 +25,7 @@ REMINDER_COOLDOWN_HOURS = 23  # don't re-send a reminder within this window
 
 
 async def _check_and_fire(db: Session) -> None:
-    now = datetime.now(UTC)
+    now = datetime.utcnow()
     due_soon_cutoff = now + timedelta(hours=DUE_SOON_WINDOW_HOURS)
     cooldown_cutoff = now - timedelta(hours=REMINDER_COOLDOWN_HOURS)
 
@@ -74,7 +74,7 @@ def _compute_next_run(rule: RecurrenceRule, from_time: datetime) -> datetime:
 
 
 async def _check_recurring(db: Session) -> None:
-    now = datetime.now(UTC)
+    now = datetime.utcnow()
     rules = (
         db.query(RecurrenceRule)
         .filter(
@@ -130,7 +130,7 @@ async def _check_recurring(db: Session) -> None:
 
 
 async def _retry_failed_webhooks(db: Session) -> None:
-    now = datetime.now(UTC)
+    now = datetime.utcnow()
     deliveries = (
         db.query(WebhookDelivery)
         .filter(
@@ -153,7 +153,7 @@ _last_summary_date: str | None = None
 async def _send_daily_summary(db: Session) -> None:
     """Generate and send a daily summary email to all email-type integrations."""
     global _last_summary_date
-    now = datetime.now(UTC)
+    now = datetime.utcnow()
     today_str = now.strftime("%Y-%m-%d")
 
     # Only send once per day, at or after the configured hour
