@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -40,10 +41,25 @@ def search(
     # Search projects (only if no project_id filter)
     projects = []
     if not project_id:
-        proj_query = db.query(Project).filter((Project.name.ilike(pattern)) | (Project.description.ilike(pattern)))
-        for p in proj_query.limit(20).all():
-            total = len(p.tasks)
-            done = sum(1 for t in p.tasks if t.status == "done")
+        total_sq = (
+            select(func.count(Task.id))
+            .where(Task.project_id == Project.id)
+            .correlate(Project)
+            .scalar_subquery()
+            .label("total_tasks")
+        )
+        done_sq = (
+            select(func.count(Task.id))
+            .where(Task.project_id == Project.id, Task.status == "done")
+            .correlate(Project)
+            .scalar_subquery()
+            .label("done_tasks")
+        )
+        proj_query = (
+            db.query(Project, total_sq, done_sq)
+            .filter((Project.name.ilike(pattern)) | (Project.description.ilike(pattern)))
+        )
+        for p, total, done in proj_query.limit(20).all():
             projects.append(
                 {
                     "id": p.id,
