@@ -62,8 +62,11 @@ jobs:
       - name: Lint
         run: npm run lint -- --max-warnings 300
 
+      - name: Run tests
+        run: npx vitest run
+
       - name: Security audit
-        run: npm audit --audit-level=moderate || true
+        run: npm audit --audit-level=moderate
 
       - name: Build
         run: npm run build
