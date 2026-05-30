@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog, Cycle, CycleTask, Project, Task
+from app.services.usage_tracker import tracker
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -190,6 +191,19 @@ def get_cycle_burndown(
             point["ideal"] = round(total - (total * i / (len(result) - 1)), 1)
 
     return result
+
+
+@router.get("/usage")
+def get_usage():
+    """Route-level request stats (in-memory, resets on restart)."""
+    return tracker.snapshot()
+
+
+@router.delete("/usage")
+def reset_usage():
+    """Clear all usage stats."""
+    tracker.reset()
+    return {"status": "cleared"}
 
 
 @router.get("/status-trend")

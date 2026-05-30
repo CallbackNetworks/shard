@@ -42,6 +42,7 @@ from app.routers.auth import router as auth_router
 from app.routers.auth import verify_token
 from app.routers.labels import task_label_router
 from app.services.scheduler import due_date_reminder_loop
+from app.services.usage_tracker import UsageTrackingMiddleware
 
 
 @asynccontextmanager
@@ -259,6 +260,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(UsageTrackingMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
