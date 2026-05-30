@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, X, BarChart3, Copy, GitCompareArrows } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { DARK, BRAND, STATUS_MAP, BTN_SM } from '../constants/theme'
+import { DARK, BRAND, STATUS_MAP } from '../constants/theme'
 import { duplicateCycle, compareCycles } from '../api/client'
 import axios from 'axios'
 
@@ -147,8 +147,8 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
             placeholder={t('cycle.descriptionPlaceholder')}
             style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: DARK.text }} />
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={saveEdit} style={{ ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700 }}>{t('save')}</button>
-            <button onClick={() => setEditing(false)} style={BTN_SM}>{t('cancel')}</button>
+            <button onClick={saveEdit} className="btn-sm" style={{ background: BRAND, color: '#000', border: 'none', fontWeight: 700 }}>{t('save')}</button>
+            <button onClick={() => setEditing(false)} className="btn-sm">{t('cancel')}</button>
           </div>
         </div>
       ) : (
@@ -337,9 +337,10 @@ export default function CyclePanel({
         </h2>
         <button
           onClick={() => setShowCycleForm(v => !v)}
+          className="btn-sm"
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700,
+            background: BRAND, color: '#000', border: 'none', fontWeight: 700,
           }}
         >
           {t('cycle.new')}
@@ -390,8 +391,9 @@ export default function CyclePanel({
                 if (!data.description) delete data.description
                 createCycleMut.mutate(data)
               }}
+              className="btn-sm"
               style={{
-                ...BTN_SM, background: BRAND, color: '#000', border: 'none', fontWeight: 700,
+                background: BRAND, color: '#000', border: 'none', fontWeight: 700,
                 opacity: !newCycle.name ? 0.5 : 1,
               }}
             >

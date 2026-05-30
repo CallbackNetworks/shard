@@ -8,7 +8,7 @@ import {
   getIntegrationTemplate, getIntegrationHealth, bulkRetryDeliveries,
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
-import { BRAND, BTN_PRIMARY, BTN_GHOST, BTN_SM, DARK } from '../constants/theme'
+import { BRAND, DARK } from '../constants/theme'
 import s from './Integrations.module.css'
 
 const TYPE_ICONS = {
@@ -62,9 +62,9 @@ function DeliveryDetailModal({ delivery, onClose, onRetry }) {
         </div>
         <div className={s.modalActions}>
           {['failed', 'dead'].includes(delivery.status) && (
-            <button onClick={() => onRetry(delivery.id)} style={BTN_PRIMARY}>{t('retry')}</button>
+            <button onClick={() => onRetry(delivery.id)} className="btn-primary">{t('retry')}</button>
           )}
-          <button onClick={onClose} style={BTN_GHOST}>{t('cancel')}</button>
+          <button onClick={onClose} className="btn-ghost">{t('cancel')}</button>
         </div>
       </div>
     </div>
@@ -251,7 +251,7 @@ function TemplatePicker({ onSelect, onClose }) {
           ))}
         </div>
         <div className={s.templateFooter}>
-          <button onClick={onClose} style={{ ...BTN_GHOST, fontSize: 13 }}>{t('integrations.orManual')}</button>
+          <button onClick={onClose} className="btn-ghost" style={{ fontSize: 13 }}>{t('integrations.orManual')}</button>
         </div>
       </div>
     </div>
@@ -283,7 +283,7 @@ function SetupModal({ templateId, onClose }) {
           )}
         </div>
         <div className={s.setupFooter}>
-          <button onClick={onClose} style={BTN_GHOST}>{t('close')}</button>
+          <button onClick={onClose} className="btn-ghost">{t('close')}</button>
         </div>
       </div>
     </div>
@@ -328,7 +328,7 @@ function CustomHeadersEditor({ headers, onChange }) {
         ))}
       </div>
       <button onClick={addHeader}
-        style={{ ...BTN_GHOST, fontSize: 12, marginTop: 6, padding: '4px 10px' }}>
+        className="btn-ghost" style={{ fontSize: 12, marginTop: 6, padding: '4px 10px' }}>
         <Plus size={12} style={{ marginRight: 4 }} /> {t('integrations.addHeader')}
       </button>
     </div>
@@ -364,7 +364,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
           <h2 className={s.modalTitle}>{initial ? t('integrations.editDialog') : t('integrations.newDialog')}</h2>
           {form.template_id && (
             <button onClick={() => setShowSetup(form.template_id)}
-              style={{ ...BTN_GHOST, fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+              className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
               <BookOpen size={12} /> {t('integrations.viewSetup')}
             </button>
           )}
@@ -475,8 +475,8 @@ function IntegrationModal({ initial, onSave, onClose }) {
         </div>
         <div className={s.formActions}>
           <button onClick={() => onSave(form)} disabled={!form.name || (form.type !== 'email' && !form.url) || (form.type === 'email' && !form.email_to)}
-            style={BTN_PRIMARY}>{t('save')}</button>
-          <button onClick={onClose} style={BTN_GHOST}>{t('cancel')}</button>
+            className="btn-primary">{t('save')}</button>
+          <button onClick={onClose} className="btn-ghost">{t('cancel')}</button>
         </div>
       </div>
       {showSetup && <SetupModal templateId={showSetup} onClose={() => setShowSetup(null)} />}
@@ -549,10 +549,10 @@ export default function Integrations() {
         </div>
         <div className={s.headerButtons}>
           <button onClick={() => setTemplatePicker(true)}
-            style={BTN_GHOST} className={s.flexCenter}>
+            className={`btn-ghost ${s.flexCenter}`}>
             <BookOpen size={14} /> {t('integrations.fromTemplate')}
           </button>
-          <button onClick={() => setModal({ mode: 'create' })} style={BTN_PRIMARY}>
+          <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
             {t('integrations.new')}
           </button>
         </div>
@@ -565,11 +565,11 @@ export default function Integrations() {
           <p className={s.emptyHint}>{t('integrations.emptyHint')}</p>
           <div className={s.emptyActions}>
             <button onClick={() => setTemplatePicker(true)}
-              style={BTN_GHOST} className={s.inlineFlex}>
+              className={`btn-ghost ${s.inlineFlex}`}>
               <BookOpen size={14} /> {t('integrations.fromTemplate')}
             </button>
             <button onClick={() => setModal({ mode: 'create' })}
-              style={BTN_PRIMARY} className={s.inlineFlex}>
+              className={`btn-primary ${s.inlineFlex}`}>
               {t('integrations.new')}
             </button>
           </div>

@@ -80,6 +80,87 @@ input, select, button, textarea { font-family: inherit; }
   color: #ffffff !important;
 }
 
+/* ── Shared button styles ── */
+.btn-primary {
+  background: #1ed760;
+  color: #000;
+  border: none;
+  border-radius: 9999px;
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.85; }
+
+.btn-ghost {
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 9999px;
+  padding: 10px 22px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.05); }
+
+.btn-sm {
+  background: rgba(255,255,255,0.08);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-sm:hover { background: rgba(255,255,255,0.12); }
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+.btn-icon:hover { background: rgba(255,255,255,0.08); }
+
+/* ── Shared input styles ── */
+.input {
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  font-size: 13px;
+  background: rgba(255,255,255,0.05);
+  color: #ffffff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: rgba(255,255,255,0.2); }
+
+/* ── Shared badge styles ── */
+.badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Shared panel styles ── */
+.panel {
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .layout-sidebar {

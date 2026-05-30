@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, AlertTriangle, X, Key } from 'lucide-react'
 import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects } from '../api/client'
-import { BRAND, BTN_PRIMARY, BTN_GHOST } from '../constants/theme'
+import { BRAND } from '../constants/theme'
 
 const SCOPES = ['read', 'write', 'admin']
 
@@ -110,7 +110,7 @@ export default function ApiKeys() {
                 {copiedId === 'new' ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
-            <button onClick={() => setNewKey(null)} style={{ ...BTN_PRIMARY, width: '100%', justifyContent: 'center' }}>
+            <button onClick={() => setNewKey(null)} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
               {t('apiKeys.savedConfirm')}
             </button>
           </div>
@@ -121,7 +121,7 @@ export default function ApiKeys() {
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('apiKeys.title')}</h1>
           <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('apiKeys.subtitle')}</p>
         </div>
-        <button onClick={() => setShowCreate(true)} style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => setShowCreate(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {t('apiKeys.new')}
         </button>
       </div>
@@ -161,8 +161,8 @@ export default function ApiKeys() {
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button onClick={handleCreate} disabled={!form.name || form.scopes.length === 0}
-              style={{ ...BTN_PRIMARY, opacity: (!form.name || form.scopes.length === 0) ? 0.4 : 1 }}>{t('create')}</button>
-            <button onClick={() => setShowCreate(false)} style={BTN_GHOST}>{t('cancel')}</button>
+              className="btn-primary" style={{ opacity: (!form.name || form.scopes.length === 0) ? 0.4 : 1 }}>{t('create')}</button>
+            <button onClick={() => setShowCreate(false)} className="btn-ghost">{t('cancel')}</button>
           </div>
         </div>
       )}
@@ -174,7 +174,7 @@ export default function ApiKeys() {
           <p style={{ marginTop: 6, fontSize: 13 }}>{t('apiKeys.emptyHint')}</p>
           <button
             onClick={() => setShowCreate(true)}
-            style={{ marginTop: 16, ...BTN_PRIMARY, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            className="btn-primary" style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
             {t('apiKeys.new')}
           </button>
