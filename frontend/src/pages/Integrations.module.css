@@ -1,0 +1,757 @@
+/* ── Shared / Reusable ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlayDark {
+  composes: overlay;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+}
+
+.overlayDarker {
+  composes: overlay;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 100;
+}
+
+.modalPanel {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 24px;
+  width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modalPanelNarrow {
+  composes: modalPanel;
+  max-width: 560px;
+}
+
+.modalPanelWide {
+  composes: modalPanel;
+  max-width: 640px;
+}
+
+.modalPanelForm {
+  composes: modalPanel;
+  padding: 28px;
+  max-width: 520px;
+  max-height: 90vh;
+}
+
+.modalPanelTemplate {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 28px;
+  width: 90vw;
+  max-width: 560px;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modalHeaderLarge {
+  composes: modalHeader;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── DeliveryDetailModal ── */
+
+.deliveryDetailBody {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailLabel {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.errorPre {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #fca5a5;
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.responsePre {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #b3b3b3;
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.payloadPre {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #b3b3b3;
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.modalActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ── Row ── */
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.rowLabel {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 80px;
+  padding-top: 1px;
+}
+
+.rowValue {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.rowValueMono {
+  composes: rowValue;
+  font-family: monospace;
+}
+
+/* ── HealthStats ── */
+
+.healthStats {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.healthLatency {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.healthLastSuccess {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.healthDead {
+  color: #ef4444;
+}
+
+/* ── DeliveryLog ── */
+
+.deliveryLogWrapper {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+}
+
+.deliveryToggleBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  padding: 0;
+}
+
+.refreshBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.2);
+  padding: 0 2px;
+  display: flex;
+}
+
+.deliveryContent {
+  margin-top: 8px;
+}
+
+.filtersRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.filterSelect {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #181818;
+  color: #b3b3b3;
+}
+
+.bulkRetryBtn {
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid rgba(79, 70, 229, 0.4);
+  border-radius: 6px;
+  background: rgba(79, 70, 229, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.noDeliveries {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.2);
+  padding: 4px 0;
+}
+
+.deliveryList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.deliveryRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.deliveryDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.deliveryEvent {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  flex: 1;
+}
+
+.deliveryStatusCode {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.deliveryDate {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.retryBtn {
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid rgba(79, 70, 229, 0.4);
+  border-radius: 4px;
+  background: rgba(79, 70, 229, 0.1);
+  color: #1ed760;
+  cursor: pointer;
+}
+
+/* ── TemplatePicker ── */
+
+.templateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.templateCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 14px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.templateIcon {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+
+.templateName {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+}
+
+.templateDesc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 4px;
+}
+
+.templateFooter {
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* ── SetupModal ── */
+
+.setupBody {
+  font-size: 13px;
+  color: #b3b3b3;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+.setupCodeBlock {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #e0e0e0;
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.setupFooter {
+  margin-top: 16px;
+}
+
+/* ── CustomHeadersEditor ── */
+
+.headersTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.headersColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.headerRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.headerKeyInput {
+  width: 40%;
+  margin-top: 0;
+}
+
+.headerValueInput {
+  flex: 1;
+  margin-top: 0;
+}
+
+.removeHeaderBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.3);
+  padding: 4px;
+}
+
+/* ── IntegrationModal (Form) ── */
+
+.formColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.inputStyle {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.selectStyle {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  background: #181818;
+  color: #ffffff;
+}
+
+.labelStyle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.hmacInfo {
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #60a5fa;
+}
+
+.eventsGrid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.eventChipActive {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  background: rgba(30, 215, 96, 0.12);
+  color: #1ed760;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  border: 1px solid rgba(30, 215, 96, 0.3);
+}
+
+.eventChipInactive {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.activeLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #ffffff;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* ── Main Page ── */
+
+.pageContent {
+  padding: 32px 40px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.pageSubtitle {
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 4px;
+}
+
+.headerButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.loadingText {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* ── Empty State ── */
+
+.emptyState {
+  text-align: center;
+  padding: 60px;
+  color: rgba(255, 255, 255, 0.2);
+  animation: fadeIn 0.4s ease;
+}
+
+.emptyIcon {
+  margin: 0 auto 14px;
+  opacity: 0.3;
+  display: block;
+}
+
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.emptyHint {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.emptyActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* ── Integration Card List ── */
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px 20px;
+  opacity: 0;
+  animation: fadeUpIn 0.35s ease forwards;
+}
+
+.cardBody {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardTypeIcon {
+  font-size: 18px;
+}
+
+.cardName {
+  font-weight: 600;
+  font-size: 15px;
+  color: #ffffff;
+}
+
+.badgeActive {
+  background: rgba(34, 197, 94, 0.15);
+  color: #1ed760;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeInactive {
+  background: rgba(255, 255, 255, 0.07);
+  color: #6b7280;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeType {
+  background: rgba(30, 215, 96, 0.12);
+  color: #1ed760;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeAuth {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.cardUrl {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.cardUrlMono {
+  composes: cardUrl;
+  font-family: monospace;
+}
+
+.cardProjectId {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.eventTags {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.eventTag {
+  background: rgba(52, 211, 153, 0.1);
+  color: #1ed760;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.cardActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.setupBtn {
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.testBtn {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: #1ed760;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.editBtn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #b3b3b3;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.deleteBtn {
+  background: none;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.testResultSuccess {
+  margin-top: 10px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #1ed760;
+}
+
+.testResultFailed {
+  margin-top: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #f87171;
+}
+
+/* ── Buttons with inline-flex ── */
+
+.inlineFlex {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flexCenter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
