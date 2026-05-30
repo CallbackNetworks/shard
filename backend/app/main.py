@@ -29,6 +29,7 @@ from app.routers import (
     notifications,
     projects,
     recurring,
+    saved_filters,
     search,
     share,
     tasks,
@@ -211,6 +212,7 @@ app.include_router(analytics.router)
 app.include_router(workflow_rules.router)
 app.include_router(assistant.router)
 app.include_router(templates.router)
+app.include_router(saved_filters.router)
 app.include_router(attachments.router)
 app.include_router(notifications.router)
 app.include_router(cicd.router)
