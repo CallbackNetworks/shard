@@ -7,6 +7,9 @@ body { margin: 0; background: #121212; font-family: 'SpotifyMixUI', 'Helvetica N
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 input, select, button, textarea { font-family: inherit; }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 @keyframes fadeUpIn {
   from { opacity: 0; transform: translateY(14px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0)   scale(1); }

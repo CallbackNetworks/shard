@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Link, useLocation, Routes, Route, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -8,23 +8,39 @@ import CommandPalette from './components/CommandPalette'
 import AssistantPanel from './components/AssistantPanel'
 import NotificationCenter from './components/NotificationCenter'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
-import Dashboard from './pages/Dashboard'
-import ProjectDetail from './pages/ProjectDetail'
-import Integrations from './pages/Integrations'
-import ApiKeys from './pages/ApiKeys'
-import Identities from './pages/Identities'
-import Analytics from './pages/Analytics'
-import WorkflowRules from './pages/WorkflowRules'
-import Templates from './pages/Templates'
-import WebhookLogs from './pages/WebhookLogs'
-import Decisions from './pages/Decisions'
-import Overview from './pages/Overview'
-import ShareView from './pages/ShareView'
-import Login from './pages/Login'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { BRAND, INSET_SHADOW, DARK } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
 import './styles/global.css'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
+const Integrations = lazy(() => import('./pages/Integrations'))
+const ApiKeys = lazy(() => import('./pages/ApiKeys'))
+const Identities = lazy(() => import('./pages/Identities'))
+const Analytics = lazy(() => import('./pages/Analytics'))
+const WorkflowRules = lazy(() => import('./pages/WorkflowRules'))
+const Templates = lazy(() => import('./pages/Templates'))
+const WebhookLogs = lazy(() => import('./pages/WebhookLogs'))
+const Decisions = lazy(() => import('./pages/Decisions'))
+const Overview = lazy(() => import('./pages/Overview'))
+const ShareView = lazy(() => import('./pages/ShareView'))
+const Login = lazy(() => import('./pages/Login'))
+
+function LoadingSpinner() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100%', width: '100%', color: DARK.textMid, fontSize: 13,
+    }}>
+      <div style={{
+        width: 20, height: 20, border: `2px solid ${DARK.border}`,
+        borderTopColor: BRAND, borderRadius: '50%',
+        animation: 'spin 0.6s linear infinite',
+      }} />
+    </div>
+  )
+}
 
 const SB_BG     = DARK.bgAlt
 const SB_TEXT   = DARK.textMid
@@ -352,18 +368,20 @@ function Layout() {
         <Sidebar onOpenPalette={openPalette} />
       </div>
       <main className="layout-main" style={{ flex: 1, overflow: 'auto', background: DARK.bgAlt }}>
-        <Routes>
-          <Route index element={<Dashboard />} />
-          <Route path="projects/:id" element={<ProjectDetail />} />
-          <Route path="integrations" element={<Integrations />} />
-          <Route path="api-keys" element={<ApiKeys />} />
-          <Route path="identities" element={<Identities />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="workflow-rules" element={<WorkflowRules />} />
-          <Route path="decisions" element={<Decisions />} />
-          <Route path="templates" element={<Templates />} />
-          <Route path="webhook-logs" element={<WebhookLogs />} />
-        </Routes>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route index element={<Dashboard />} />
+            <Route path="projects/:id" element={<ProjectDetail />} />
+            <Route path="integrations" element={<Integrations />} />
+            <Route path="api-keys" element={<ApiKeys />} />
+            <Route path="identities" element={<Identities />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="workflow-rules" element={<WorkflowRules />} />
+            <Route path="decisions" element={<Decisions />} />
+            <Route path="templates" element={<Templates />} />
+            <Route path="webhook-logs" element={<WebhookLogs />} />
+          </Routes>
+        </Suspense>
       </main>
       <CommandPalette open={paletteOpen} onClose={closePalette} />
       <NotificationCenter />
@@ -377,12 +395,14 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Overview />} />
-          <Route path="/share/:token" element={<ShareView />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/app/*" element={<Layout />} />
-        </Routes>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route path="/" element={<Overview />} />
+            <Route path="/share/:token" element={<ShareView />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/app/*" element={<Layout />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   )
