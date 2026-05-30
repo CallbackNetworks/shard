@@ -45,96 +45,12 @@ from app.services.scheduler import due_date_reminder_loop
 from app.services.usage_tracker import UsageTrackingMiddleware
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    # Migrate: add columns if they don't exist yet
+def _ensure_fts(engine_):
+    """Create FTS5 virtual table and sync triggers for full-text task search."""
     from sqlalchemy import inspect, text
 
-    with engine.connect() as conn:
-        task_cols = {c["name"] for c in inspect(engine).get_columns("tasks")}
-        for col in ("start_date", "due_date"):
-            if col not in task_cols:
-                conn.execute(text(f"ALTER TABLE tasks ADD COLUMN {col} DATETIME"))
-        if "parent_id" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN parent_id VARCHAR(36) REFERENCES tasks(id)"))
-        if "assignee" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN assignee VARCHAR(255)"))
-        # Migrate integration email fields
-        intg_cols = {c["name"] for c in inspect(engine).get_columns("integrations")}
-        if "email_to" not in intg_cols:
-            conn.execute(text("ALTER TABLE integrations ADD COLUMN email_to TEXT"))
-        if "email_subject_prefix" not in intg_cols:
-            conn.execute(
-                text("ALTER TABLE integrations ADD COLUMN email_subject_prefix VARCHAR(255) DEFAULT '[TODO Platform]'")
-            )
-        # Migrate identity share_token
-        import uuid as _uuid
-
-        identity_cols = {c["name"] for c in inspect(engine).get_columns("identities")}
-        if "share_token" not in identity_cols:
-            conn.execute(text("ALTER TABLE identities ADD COLUMN share_token VARCHAR(36)"))
-            rows = conn.execute(text("SELECT id FROM identities")).fetchall()
-            for (row_id,) in rows:
-                conn.execute(
-                    text("UPDATE identities SET share_token = :t WHERE id = :id"),
-                    {"t": str(_uuid.uuid4()), "id": row_id},
-                )
-        # Migrate identity share PIN and expiry
-        if "share_pin_hash" not in identity_cols:
-            conn.execute(text("ALTER TABLE identities ADD COLUMN share_pin_hash VARCHAR(128)"))
-        if "share_expires_at" not in identity_cols:
-            conn.execute(text("ALTER TABLE identities ADD COLUMN share_expires_at DATETIME"))
-        # Migrate task reminder_sent_at
-        if "reminder_sent_at" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN reminder_sent_at DATETIME"))
-        # Migrate time tracking fields
-        if "time_estimate" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN time_estimate INTEGER"))
-        if "time_spent" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN time_spent INTEGER"))
-        if "position" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN position INTEGER DEFAULT 0 NOT NULL"))
-        # Migrate API keys to hashed storage
-        import hashlib as _hashlib
-
-        api_key_cols = {c["name"] for c in inspect(engine).get_columns("api_keys")}
-        if "key_hash" not in api_key_cols:
-            conn.execute(text("ALTER TABLE api_keys ADD COLUMN key_hash VARCHAR(64)"))
-        if "key_last4" not in api_key_cols:
-            conn.execute(text("ALTER TABLE api_keys ADD COLUMN key_last4 VARCHAR(8)"))
-        # Migrate existing plaintext keys to hashes
-        rows = conn.execute(text("SELECT id, key FROM api_keys WHERE key IS NOT NULL AND key_hash IS NULL")).fetchall()
-        for row_id, raw_key in rows:
-            key_hash = _hashlib.sha256(raw_key.encode()).hexdigest()
-            key_last4 = raw_key[-4:]
-            conn.execute(
-                text("UPDATE api_keys SET key_hash=:h, key_last4=:l4 WHERE id=:id"),
-                {"h": key_hash, "l4": key_last4, "id": row_id},
-            )
-        # Migrate project agent_instructions
-        proj_cols = {c["name"] for c in inspect(engine).get_columns("projects")}
-        if "agent_instructions" not in proj_cols:
-            conn.execute(text("ALTER TABLE projects ADD COLUMN agent_instructions TEXT"))
-        # Migrate task progress fields
-        if "progress_pct" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN progress_pct INTEGER"))
-        if "agent_notes" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN agent_notes TEXT"))
-        # Migrate task webhook_secret
-        if "webhook_secret" not in task_cols:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN webhook_secret VARCHAR(128)"))
-        # Migrate integration new fields for custom headers & auth
-        if "custom_headers" not in intg_cols:
-            conn.execute(text("ALTER TABLE integrations ADD COLUMN custom_headers JSON"))
-        if "auth_type" not in intg_cols:
-            conn.execute(text("ALTER TABLE integrations ADD COLUMN auth_type VARCHAR(20) DEFAULT 'bearer'"))
-        if "auth_config" not in intg_cols:
-            conn.execute(text("ALTER TABLE integrations ADD COLUMN auth_config JSON"))
-        if "template_id" not in intg_cols:
-            conn.execute(text("ALTER TABLE integrations ADD COLUMN template_id VARCHAR(50)"))
-        # Create FTS5 virtual table for full-text search (external content)
-        existing_tables = {t for t in inspect(engine).get_table_names()}
+    with engine_.connect() as conn:
+        existing_tables = set(inspect(engine_).get_table_names())
         if "tasks_fts" not in existing_tables:
             conn.execute(
                 text(
@@ -143,14 +59,12 @@ async def lifespan(app: FastAPI):
                     ")"
                 )
             )
-            # Populate with existing data
             conn.execute(
                 text(
                     "INSERT INTO tasks_fts(task_id, title, description) "
                     "SELECT id, title, COALESCE(description, '') FROM tasks"
                 )
             )
-        # Always recreate triggers in case schema changed
         for trig in ("tasks_fts_insert", "tasks_fts_update", "tasks_fts_delete"):
             conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
         conn.execute(
@@ -176,7 +90,12 @@ async def lifespan(app: FastAPI):
         )
         conn.commit()
 
-    # Start background scheduler for due date reminders
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    _ensure_fts(engine)
+
     _scheduler_task = asyncio.create_task(due_date_reminder_loop())
     yield
     _scheduler_task.cancel()
