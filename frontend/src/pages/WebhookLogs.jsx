@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { RefreshCw, ChevronDown, ChevronUp, ScrollText, Trash2 } from 'lucide-react'
 import { getAllDeliveries, getIntegrations, retryDelivery, purgeDeliveries } from '../api/client'
 import { DARK } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 
 const STATUS_COLORS = {
   success: '#4ade80',
@@ -24,7 +25,7 @@ const sel = {
   borderRadius: 6, padding: '5px 10px', fontSize: 12, color: DARK.text, outline: 'none',
 }
 
-function DeliveryRow({ delivery, integrationMap }) {
+function DeliveryRow({ delivery, integrationMap, isMobile }) {
   const [expanded, setExpanded] = useState(false)
   const qc = useQueryClient()
   const { t } = useTranslation()
@@ -76,7 +77,7 @@ function DeliveryRow({ delivery, integrationMap }) {
       {expanded && (
         <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
           <td colSpan={7} style={{ padding: '8px 16px 16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase' }}>{t('webhookLogs.requestUrl')}</div>
                 <div style={{ fontSize: 11, color: '#9ca3af', wordBreak: 'break-all' }}>{delivery.request_url}</div>
@@ -125,6 +126,8 @@ const thStyle = {
 export default function WebhookLogs() {
   const qc = useQueryClient()
   const { t } = useTranslation()
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const [statusFilter, setStatusFilter] = useState('')
   const [integrationFilter, setIntegrationFilter] = useState('')
   const [offset, setOffset] = useState(0)
@@ -153,10 +156,10 @@ export default function WebhookLogs() {
   })
 
   return (
-    <div style={{ padding: 28, maxWidth: 1100, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+    <div style={{ padding: isMobile ? '20px 16px' : 28, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', marginBottom: 20, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t('webhookLogs.title')}</h1>
+          <h1 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: 0 }}>{t('webhookLogs.title')}</h1>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
             {t('webhookLogs.subtitle')}
           </div>
@@ -214,7 +217,7 @@ export default function WebhookLogs() {
               </thead>
               <tbody>
                 {deliveries.map(d => (
-                  <DeliveryRow key={d.id} delivery={d} integrationMap={integrationMap} />
+                  <DeliveryRow key={d.id} delivery={d} integrationMap={integrationMap} isMobile={isMobile} />
                 ))}
               </tbody>
             </table>

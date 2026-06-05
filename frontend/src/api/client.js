@@ -217,6 +217,10 @@ export const exportTasksCsv = (projectId) =>
 export const importTasks = (projectId, data) =>
   api.post(`/projects/${projectId}/tasks/import`, data).then(r => r.data)
 
+// Settings
+export const getSettings = () => api.get('/settings').then(r => r.data)
+export const changePassword = (data) => api.post('/settings/change-password', data).then(r => r.data)
+
 // Share (public, no auth — uses plain axios to avoid the auth interceptor)
 export const getShareData = (token) => axios.get(`/share/identity/${token}`, { withCredentials: true }).then(r => r.data)
 export const rotateShareToken = (identityId) => api.post(`/identities/${identityId}/rotate-share-token`).then(r => r.data)

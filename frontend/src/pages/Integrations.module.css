@@ -509,11 +509,22 @@
   padding: 32px 40px;
 }
 
+.pageContentMobile {
+  padding: 20px 16px;
+}
+
 .pageHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+}
+
+.pageHeaderMobile {
+  composes: pageHeader;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .pageTitle {
@@ -590,6 +601,12 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+}
+
+.cardBodyMobile {
+  composes: cardBody;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .cardTitleRow {

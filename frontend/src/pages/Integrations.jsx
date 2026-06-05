@@ -9,6 +9,7 @@ import {
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Integrations.module.css'
 
 const TYPE_ICONS = {
@@ -487,6 +488,8 @@ function IntegrationModal({ initial, onSave, onClose }) {
 /* ── Main Page ── */
 export default function Integrations() {
   const { t } = useTranslation()
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   const { data: integrations = [], isLoading } = useQuery({ queryKey: ['integrations'], queryFn: getIntegrations })
   const [modal, setModal] = useState(null)
@@ -537,12 +540,12 @@ export default function Integrations() {
   if (isLoading) return <p className={s.loadingText}>{t('loading')}</p>
 
   return (
-    <div className={`page-content ${s.pageContent}`}>
+    <div className={`page-content ${isMobile ? s.pageContentMobile : s.pageContent}`}>
       {modal && <IntegrationModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
       {templatePicker && <TemplatePicker onSelect={handleTemplateSelect} onClose={() => setTemplatePicker(false)} />}
       {setupModal && <SetupModal templateId={setupModal} onClose={() => setSetupModal(null)} />}
 
-      <div className={s.pageHeader}>
+      <div className={isMobile ? s.pageHeaderMobile : s.pageHeader}>
         <div>
           <h1 className={s.pageTitle}>{t('integrations.title')}</h1>
           <p className={s.pageSubtitle}>{t('integrations.subtitle')}</p>
@@ -579,7 +582,7 @@ export default function Integrations() {
           {integrations.map((intg, intgIdx) => (
             <div key={intg.id} className={s.card}
               style={{ animationDelay: `${intgIdx * 0.06}s` }}>
-              <div className={s.cardBody}>
+              <div className={isMobile ? s.cardBodyMobile : s.cardBody}>
                 <div>
                   <div className={s.cardTitleRow}>
                     <span className={s.cardTypeIcon}>{TYPE_ICONS[intg.type] || '🔗'}</span>

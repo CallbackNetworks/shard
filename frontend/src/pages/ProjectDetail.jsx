@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, Calendar, CheckSquare, Save, Bookmark } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, Calendar, CheckSquare, Save, Bookmark, Rss, Copy, Check } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -137,6 +137,7 @@ export default function ProjectDetail() {
   const [selectedTasks, setSelectedTasks] = useState(new Set())
   const [showImport, setShowImport] = useState(false)
   const [importJson, setImportJson] = useState('')
+  const [copiedIcal, setCopiedIcal] = useState(false)
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -362,6 +363,19 @@ export default function ProjectDetail() {
                 <div className={s.progressBarFill} style={{ width: `${project.progress}%` }} />
               </div>
             </div>
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/ical/${id}.ics`
+                navigator.clipboard.writeText(url)
+                setCopiedIcal(true)
+                setTimeout(() => setCopiedIcal(false), 2000)
+              }}
+              className={s.archiveBtn}
+              title="Copy iCal subscribe URL"
+            >
+              {copiedIcal ? <Check size={12} /> : <Rss size={12} />}
+              {copiedIcal ? 'Copied!' : 'iCal'}
+            </button>
             <LabelManager
               labels={labels}
               onCreateLabel={data => createLabelMut.mutate(data)}

@@ -24,6 +24,9 @@ const Templates = lazy(() => import('./pages/Templates'))
 const WebhookLogs = lazy(() => import('./pages/WebhookLogs'))
 const Decisions = lazy(() => import('./pages/Decisions'))
 const Goals = lazy(() => import('./pages/Goals'))
+const Activity = lazy(() => import('./pages/Activity'))
+const Assistant = lazy(() => import('./pages/Assistant'))
+const Settings = lazy(() => import('./pages/Settings'))
 const Overview = lazy(() => import('./pages/Overview'))
 const ShareView = lazy(() => import('./pages/ShareView'))
 const Login = lazy(() => import('./pages/Login'))
@@ -129,6 +132,9 @@ function Layout() {
             <Route path="goals" element={<Goals />} />
             <Route path="templates" element={<Templates />} />
             <Route path="webhook-logs" element={<WebhookLogs />} />
+            <Route path="activity" element={<Activity />} />
+            <Route path="assistant" element={<Assistant />} />
+            <Route path="settings" element={<Settings />} />
           </Routes>
         </Suspense>
       </main>

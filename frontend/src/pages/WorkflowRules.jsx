@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, Zap, GitMerge } from 'lucide-react'
 import axios from 'axios'
 import { DARK } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 
 const _api = axios.create({ baseURL: '' })
 _api.interceptors.request.use(cfg => {
@@ -153,6 +154,8 @@ function RuleModal({ initial, onSave, onClose }) {
 
 export default function WorkflowRules() {
   const { t } = useTranslation()
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   const { data: rules = [], isLoading } = useQuery({ queryKey: ['workflow-rules'], queryFn: getRules })
   const [modal, setModal] = useState(null)
@@ -187,12 +190,12 @@ export default function WorkflowRules() {
   const TRIGGER_LABELS = Object.fromEntries(TRIGGERS.map(t => [t.value, t.label]))
 
   return (
-    <div className="page-content" style={{ padding: '32px 40px' }}>
+    <div className="page-content" style={{ padding: isMobile ? '20px 16px' : '32px 40px' }}>
       {modal && <RuleModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-start', marginBottom: isMobile ? 20 : 28, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: DARK.text, margin: 0 }}>Workflow Rules</h1>
+          <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight: 700, color: DARK.text, margin: 0 }}>Workflow Rules</h1>
           <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: 4, fontSize: 13 }}>Automate task actions with if-this-then-that rules</p>
         </div>
         <button onClick={() => setModal({ mode: 'create' })} style={{ ...btn('primary'), display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -253,7 +256,7 @@ export default function WorkflowRules() {
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 12 }}>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: isMobile ? 0 : 12, marginTop: isMobile ? 8 : 0, flexWrap: 'wrap' }}>
                   <button
                     onClick={() => toggleMut.mutate({ id: rule.id, active: !rule.active })}
                     style={{ ...btn(), fontSize: 11 }}

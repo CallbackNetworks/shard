@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, AlertTriangle, X, Key } from 'lucide-react'
 import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects } from '../api/client'
 import { BRAND } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 
 const SCOPES = ['read', 'write', 'admin']
 
@@ -22,6 +23,8 @@ const METHOD_STYLE = {
 
 export default function ApiKeys() {
   const { t } = useTranslation()
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   const { data: apiKeys = [], isLoading } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys })
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
@@ -75,7 +78,7 @@ export default function ApiKeys() {
   if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div className="page-content" style={{ padding: '32px 40px' }}>
+    <div className="page-content" style={{ padding: isMobile ? '20px 16px' : '32px 40px' }}>
       {/* Show-once modal for newly created key */}
       {newKey && (
         <div style={{
@@ -116,9 +119,9 @@ export default function ApiKeys() {
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff' }}>{t('apiKeys.title')}</h1>
+          <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight: 700, color: '#ffffff' }}>{t('apiKeys.title')}</h1>
           <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('apiKeys.subtitle')}</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -189,10 +192,10 @@ export default function ApiKeys() {
               animationDelay: `${akIdx * 0.06}s`,
               opacity: 0,
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 15, color: '#ffffff' }}>{ak.name}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, color: '#ffffff' }}>{ak.name}</span>
                     <span style={{
                       background: ak.active ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.06)',
                       color: ak.active ? '#1ed760' : 'rgba(255,255,255,0.35)',

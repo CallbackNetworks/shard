@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart2, TrendingUp, Activity, Flame } from 'lucide-react'
 import { getProjects, getCycles } from '../api/client'
+import useBreakpoint from '../hooks/useBreakpoint'
 import axios from 'axios'
 
 const _api = axios.create({ baseURL: '' })
@@ -282,6 +283,8 @@ function Section({ title, icon, children, delay, summary }) {
 
 export default function Analytics() {
   const { t } = useTranslation()
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedCycleId, setSelectedCycleId] = useState('')
   const [trendDays, setTrendDays] = useState(30)
@@ -304,9 +307,9 @@ export default function Analytics() {
   }
 
   return (
-    <div className="page-content" style={{ padding: '32px 40px' }}>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', margin: 0 }}>{t('analytics.title')}</h1>
+    <div className="page-content" style={{ padding: isMobile ? '20px 16px' : '32px 40px' }}>
+      <div style={{ marginBottom: isMobile ? 20 : 28 }}>
+        <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight: 700, color: '#ffffff', margin: 0 }}>{t('analytics.title')}</h1>
         <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: 4, fontSize: 13 }}>{t('analytics.subtitle')}</p>
       </div>
 

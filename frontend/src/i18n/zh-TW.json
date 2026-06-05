@@ -378,6 +378,9 @@
   "assistant.promptPlanToday": "今日計畫",
   "assistant.promptPlanTodayText": "Based on my current tasks, suggest what I should focus on today. Prioritize overdue and high-priority items.",
   "assistant.promptDecisions": "分析決策",
+  "assistant.selectConversation": "選擇對話",
+  "assistant.selectOrCreate": "選擇對話或開始新對話",
+  "assistant.startPrompt": "或試試快速提示：",
 
   "cycle.title": "衝刺 / Sprint",
   "cycle.new": "+ 新增衝刺",
@@ -551,5 +554,31 @@
   "shortcuts.goGoals": "前往目標",
 
   "issue.pin": "釘選",
-  "issue.unpin": "取消釘選"
+  "issue.unpin": "取消釘選",
+
+  "nav.activity": "活動紀錄",
+  "nav.assistant": "AI 助理",
+  "nav.settings": "設定",
+
+  "activity.title": "活動紀錄",
+  "activity.allProjects": "所有專案",
+  "activity.noActivity": "尚無活動紀錄",
+
+  "settings.title": "設定",
+  "settings.systemStatus": "系統狀態",
+  "settings.authentication": "身份驗證",
+  "settings.email": "電子郵件 (SMTP)",
+  "settings.summaryHour": "每日摘要時間",
+  "settings.enabled": "已啟用",
+  "settings.disabled": "已停用",
+  "settings.configured": "已設定",
+  "settings.notConfigured": "未設定",
+  "settings.aiAssistant": "AI 助理",
+  "settings.provider": "提供者",
+  "settings.model": "模型",
+  "settings.changePassword": "變更密碼",
+  "settings.currentPassword": "目前密碼",
+  "settings.newPassword": "新密碼",
+  "settings.updatePassword": "更新密碼",
+  "settings.passwordChanged": "密碼已變更，正在重新導向至登入頁面..."
 }

@@ -378,6 +378,10 @@
   "assistant.promptPlanToday": "Plan today",
   "assistant.promptPlanTodayText": "Based on my current tasks, suggest what I should focus on today. Prioritize overdue and high-priority items.",
   "assistant.promptDecisions": "Analyze Decisions",
+  "assistant.selectConversation": "Select a conversation",
+  "assistant.selectOrCreate": "Select a conversation or start a new one",
+  "assistant.startPrompt": "Or try a quick prompt:",
+  "assistant.noMatches": "No matches",
 
   "cycle.title": "Cycles / Sprints",
   "cycle.new": "+ New Cycle",
@@ -551,5 +555,31 @@
   "shortcuts.goGoals": "Go to goals",
 
   "issue.pin": "Pin",
-  "issue.unpin": "Unpin"
+  "issue.unpin": "Unpin",
+
+  "nav.activity": "Activity",
+  "nav.assistant": "Assistant",
+  "nav.settings": "Settings",
+
+  "activity.title": "Activity Log",
+  "activity.allProjects": "All Projects",
+  "activity.noActivity": "No activity found",
+
+  "settings.title": "Settings",
+  "settings.systemStatus": "System Status",
+  "settings.authentication": "Authentication",
+  "settings.email": "Email (SMTP)",
+  "settings.summaryHour": "Daily Summary Hour",
+  "settings.enabled": "Enabled",
+  "settings.disabled": "Disabled",
+  "settings.configured": "Configured",
+  "settings.notConfigured": "Not Configured",
+  "settings.aiAssistant": "AI Assistant",
+  "settings.provider": "Provider",
+  "settings.model": "Model",
+  "settings.changePassword": "Change Password",
+  "settings.currentPassword": "Current password",
+  "settings.newPassword": "New password",
+  "settings.updatePassword": "Update Password",
+  "settings.passwordChanged": "Password changed. Redirecting to login..."
 }

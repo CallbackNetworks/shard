@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText, Target } from 'lucide-react'
+import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText, Target, Activity, MessageCircle, Settings2 } from 'lucide-react'
 import { getProjects, getIdentities } from '../api/client'
 import { BRAND, INSET_SHADOW, DARK } from '../constants/theme'
 
@@ -131,6 +131,9 @@ export default function Sidebar({ onOpenPalette }) {
           { to: '/app/decisions', icon: <GitFork size={13} />, labelKey: 'nav.decisions' },
           { to: '/app/templates', icon: <FileText size={13} />, labelKey: 'nav.templates' },
           { to: '/app/webhook-logs', icon: <ScrollText size={13} />, labelKey: 'nav.webhookLogs' },
+          { to: '/app/activity', icon: <Activity size={13} />, labelKey: 'nav.activity' },
+          { to: '/app/assistant', icon: <MessageCircle size={13} />, labelKey: 'nav.assistant' },
+          { to: '/app/settings', icon: <Settings2 size={13} />, labelKey: 'nav.settings' },
         ].map(({ to, icon, labelKey }) => (
           <Link key={to} to={to} className="sb-link" style={navLinkStyle(to)}>
             {icon}{t(labelKey)}

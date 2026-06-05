@@ -33,6 +33,7 @@ from app.routers import (
     recurring,
     saved_filters,
     search,
+    settings,
     share,
     tasks,
     templates,
@@ -221,6 +222,7 @@ app.include_router(notifications.router)
 app.include_router(cicd.router)
 app.include_router(goals.router)
 app.include_router(bulk.router)
+app.include_router(settings.router)
 app.include_router(ws_router.router)
 
 

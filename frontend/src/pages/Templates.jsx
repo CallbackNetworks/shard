@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
 import { DARK } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 
 const PRIORITIES = ['low', 'medium', 'high']
 
@@ -75,7 +76,7 @@ function TemplateForm({ initial, onSave, onClose }) {
     }}>
       <div style={{
         background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-        padding: 24, width: 520, maxHeight: '85vh', overflow: 'auto',
+        padding: 24, width: 520, maxWidth: '95vw', maxHeight: '85vh', overflow: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <span style={{ fontWeight: 700, fontSize: 14 }}>
@@ -247,6 +248,8 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
 
 export default function Templates() {
   const { t } = useTranslation()
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
@@ -277,10 +280,10 @@ export default function Templates() {
   }
 
   return (
-    <div style={{ padding: 28, maxWidth: 800, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+    <div style={{ padding: isMobile ? '20px 16px' : 28, maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', marginBottom: 24, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t('templates.title')}</h1>
+          <h1 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: 0 }}>{t('templates.title')}</h1>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
             {t('templates.subtitle')}
           </div>

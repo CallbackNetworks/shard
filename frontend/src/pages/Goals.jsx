@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, X, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
 import { BRAND, DARK, INSET_SHADOW } from '../constants/theme'
+import useBreakpoint from '../hooks/useBreakpoint'
 
 const STATUS_COLORS = {
   active:    { bg: 'rgba(83,157,245,0.12)', color: DARK.info },
@@ -79,7 +80,7 @@ function GoalForm({ projects, initial, onSave, onClose }) {
     }}>
       <div style={{
         background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-        padding: 24, width: 520, maxHeight: '85vh', overflow: 'auto',
+        padding: 24, width: 520, maxWidth: '95vw', maxHeight: '85vh', overflow: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <span style={{ fontWeight: 700, fontSize: 14 }}>
@@ -335,7 +336,7 @@ function StatusTabs({ active, onChange, counts }) {
   ]
 
   return (
-    <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+    <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
       {tabs.map(tab => {
         const isActive = active === tab.key
         const count = tab.key === '' ? counts.all : counts[tab.key] || 0
@@ -373,6 +374,8 @@ function StatusTabs({ active, onChange, counts }) {
 /* ── Main Goals Page ── */
 export default function Goals() {
   const { t } = useTranslation()
+  const bp = useBreakpoint()
+  const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
@@ -434,11 +437,11 @@ export default function Goals() {
   }
 
   return (
-    <div style={{ padding: 28, maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '20px 16px' : 28, maxWidth: 800, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', marginBottom: 24, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: DARK.text }}>{t('goals.title')}</h1>
+          <h1 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: 0, color: DARK.text }}>{t('goals.title')}</h1>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
             {t('goals.subtitle')}
           </div>
