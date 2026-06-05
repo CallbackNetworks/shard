@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { DARK } from '../constants/theme'
+import { createTask } from '../api/client'
 
 export const FONT = '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif'
 export const BG   = '#121212'
@@ -15,6 +17,96 @@ const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 1
 const PARA_L = (px = 14) => `polygon(${px}px 0, 100% 0, 100% 100%, 0 100%)`
 // Full parallelogram (both sides)
 const PARA   = (px = 10) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
+
+function relativeTime(dateStr) {
+  if (!dateStr) return ''
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  const hours = Math.floor(mins / 60)
+  const days = Math.floor(hours / 24)
+  if (days > 30) return `${Math.floor(days / 30)}mo ago`
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  if (mins > 0) return `${mins}m ago`
+  return 'just now'
+}
+
+const PINNED_KEY = 'overview_pinned_projects'
+
+export function getPinnedIds() {
+  try { return JSON.parse(localStorage.getItem(PINNED_KEY) || '[]') } catch { return [] }
+}
+
+export function togglePin(projectId) {
+  const ids = getPinnedIds()
+  const next = ids.includes(projectId) ? ids.filter(id => id !== projectId) : [...ids, projectId].slice(-3)
+  localStorage.setItem(PINNED_KEY, JSON.stringify(next))
+  return next
+}
+
+/* ── QuickAddTask — inline task creator on project cards ── */
+function QuickAddTask({ projectId }) {
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState('')
+  const qc = useQueryClient()
+  const addMut = useMutation({
+    mutationFn: (data) => createTask(projectId, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); setTitle(''); setOpen(false) },
+  })
+  const submit = useCallback(() => {
+    if (!title.trim()) return
+    addMut.mutate({ title: title.trim(), priority: 'medium' })
+  }, [title, addMut])
+
+  if (!open) {
+    return (
+      <button onClick={(e) => { e.stopPropagation(); setOpen(true) }} style={{
+        background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+        color: DIM, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '2px 8px',
+        letterSpacing: '0.08em', fontFamily: FONT,
+      }}>+ TASK</button>
+    )
+  }
+
+  return (
+    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      <input
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setOpen(false) }}
+        placeholder="Task title..."
+        autoFocus
+        style={{
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 4, padding: '3px 8px', fontSize: 11, color: HI, outline: 'none',
+          width: 160, fontFamily: FONT,
+        }}
+      />
+      <button onClick={submit} disabled={!title.trim()} style={{
+        background: DARK.success, border: 'none', borderRadius: 4, color: '#000',
+        fontSize: 10, fontWeight: 800, padding: '4px 8px', cursor: 'pointer',
+        opacity: title.trim() ? 1 : 0.4,
+      }}>ADD</button>
+      <button onClick={() => setOpen(false)} style={{
+        background: 'none', border: 'none', color: DIM, fontSize: 12, cursor: 'pointer', padding: '2px 4px',
+      }}>✕</button>
+    </div>
+  )
+}
+
+/* ── PinButton ── */
+function PinButton({ projectId, pinned, onToggle }) {
+  const isPinned = pinned.includes(projectId)
+  return (
+    <button onClick={(e) => { e.stopPropagation(); onToggle(projectId) }} title={isPinned ? 'Unpin' : 'Pin to top'} style={{
+      background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px',
+      color: isPinned ? '#f0b429' : DIM, fontSize: 12, lineHeight: 1,
+      transition: 'color 0.15s',
+    }}>
+      {isPinned ? '★' : '☆'}
+    </button>
+  )
+}
 
 function formatMinutes(mins) {
   if (mins == null) return null
@@ -160,7 +252,7 @@ function GlassRow({ children, accentColor, style = {} }) {
 }
 
 /* ── ViewProgress ──────────────────────────────────────────────────── */
-export function ViewProgress({ projects }) {
+export function ViewProgress({ projects, pinned, onTogglePin }) {
   return (
     <div style={{ paddingTop: 8 }}>
       {projects.map(p => {
@@ -175,6 +267,7 @@ export function ViewProgress({ projects }) {
           <GlassRow key={p.id} accentColor={color}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <PinButton projectId={p.id} pinned={pinned} onToggle={onTogglePin} />
                 <span style={{
                   fontSize: 12, fontWeight: 800, color: HI, letterSpacing: '0.06em',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -184,7 +277,10 @@ export function ViewProgress({ projects }) {
                 </span>
                 {overdue > 0 && <Label color="#ff5533">⚠ {overdue} overdue</Label>}
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', fontVariantNumeric: 'tabular-nums' }}>
+                  {relativeTime(p.updated_at)}
+                </span>
                 <span style={{ fontSize: 24, fontWeight: 900, color, letterSpacing: '-0.04em', lineHeight: 1 }}>
                   {pct}<span style={{ fontSize: 11, fontWeight: 500, color: DIM }}>%</span>
                 </span>
@@ -199,7 +295,10 @@ export function ViewProgress({ projects }) {
                 {p.description}
               </div>
             )}
-            <Bar pct={pct} color={color} height={6} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1 }}><Bar pct={pct} color={color} height={6} /></div>
+              <QuickAddTask projectId={p.id} />
+            </div>
           </GlassRow>
         )
       })}
@@ -208,7 +307,7 @@ export function ViewProgress({ projects }) {
 }
 
 /* ── ViewHealth ────────────────────────────────────────────────────── */
-export function ViewHealth({ projects }) {
+export function ViewHealth({ projects, pinned, onTogglePin }) {
   return (
     <div style={{ paddingTop: 8 }}>
       <div style={{ display: 'flex', gap: 20, paddingBottom: 14, marginBottom: 4 }}>
@@ -230,10 +329,14 @@ export function ViewHealth({ projects }) {
         return (
           <GlassRow key={p.id} accentColor={color}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: HI, letterSpacing: '0.06em', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.name}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <PinButton projectId={p.id} pinned={pinned} onToggle={onTogglePin} />
+                <span style={{ fontSize: 12, fontWeight: 800, color: HI, letterSpacing: '0.06em', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.name}
+                </span>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', fontVariantNumeric: 'tabular-nums' }}>{relativeTime(p.updated_at)}</span>
                 <span style={{ fontSize: 11, color: DIM }}>{total} tasks</span>
                 <Label color={color}>{uLabel}</Label>
               </div>

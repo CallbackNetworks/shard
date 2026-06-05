@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getProjects, getIdentities, getIdentityProjects } from '../api/client'
 import {
@@ -6,6 +6,7 @@ import {
   urgencyScore, urgencyColor,
   Bar, TabBtn,
   ViewProgress, ViewHealth, ViewTasks, ViewCompare,
+  getPinnedIds, togglePin,
 } from '../components/OverviewViews'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
@@ -82,9 +83,22 @@ export default function Overview() {
     enabled: !!identityId,
   })
 
+  const [pinned, setPinned] = useState(() => getPinnedIds())
+
+  const handleTogglePin = useCallback((projectId) => {
+    const next = togglePin(projectId)
+    setPinned(next)
+  }, [])
+
   const isLoading = identityId ? loadingIdentity : loadingAll
   const rawProjects = identityId ? identityProjects : allProjects
-  const active = rawProjects.filter(p => p.status === 'active')
+  const activeUnsorted = rawProjects.filter(p => p.status === 'active')
+  // Pinned projects float to top
+  const active = [...activeUnsorted].sort((a, b) => {
+    const aPin = pinned.includes(a.id) ? 0 : 1
+    const bPin = pinned.includes(b.id) ? 0 : 1
+    return aPin - bPin
+  })
 
   const currentIdentity = identities.find(i => i.id === identityId) || null
 
@@ -240,8 +254,8 @@ export default function Overview() {
               {identityId ? 'No active projects for this identity' : 'No active projects'}
             </div>
           )}
-          {!isLoading && active.length > 0 && view === 'progress' && <ViewProgress projects={active} />}
-          {!isLoading && active.length > 0 && view === 'health'   && <ViewHealth   projects={active} />}
+          {!isLoading && active.length > 0 && view === 'progress' && <ViewProgress projects={active} pinned={pinned} onTogglePin={handleTogglePin} />}
+          {!isLoading && active.length > 0 && view === 'health'   && <ViewHealth   projects={active} pinned={pinned} onTogglePin={handleTogglePin} />}
           {!isLoading && active.length > 0 && view === 'tasks'    && <ViewTasks    projects={active} />}
           {!isLoading && active.length > 0 && view === 'compare'  && <ViewCompare  projects={active} />}
         </div>
