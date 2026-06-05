@@ -248,6 +248,30 @@ async def _report_progress(
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _list_projects(status: str | None = None) -> str:
+    params = {}
+    if status:
+        params["status"] = status
+    result = await _get("/projects", params=params)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _create_project(
+    name: str,
+    description: str | None = None,
+) -> str:
+    body: dict = {"name": name}
+    if description:
+        body["description"] = description
+    result = await _post("/projects", body)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _delete_task(project_id: str, task_id: str) -> str:
+    result = await _delete(f"/projects/{project_id}/tasks/{task_id}")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 # ── MCP tool registry ────────────────────────────────────────────────
 
 TOOL_DEFINITIONS = [
@@ -458,6 +482,45 @@ TOOL_DEFINITIONS = [
             "required": ["project_id", "task_id"],
         },
     ),
+    types.Tool(
+        name="list_projects",
+        description="List all projects, optionally filtered by status (active/archived).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "archived"],
+                    "description": "Filter by project status",
+                },
+            },
+            "required": [],
+        },
+    ),
+    types.Tool(
+        name="create_project",
+        description="Create a new project.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Project name (required)"},
+                "description": {"type": "string", "description": "Project description"},
+            },
+            "required": ["name"],
+        },
+    ),
+    types.Tool(
+        name="delete_task",
+        description="Permanently delete a task from a project.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID (required)"},
+                "task_id": {"type": "string", "description": "Task ID (required)"},
+            },
+            "required": ["project_id", "task_id"],
+        },
+    ),
 ]
 
 
@@ -537,6 +600,18 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
                 progress_pct=args.get("progress_pct"),
                 agent_notes=args.get("agent_notes"),
                 comment=args.get("comment"),
+            )
+        elif name == "list_projects":
+            result = await _list_projects(args.get("status"))
+        elif name == "create_project":
+            result = await _create_project(
+                name=args["name"],
+                description=args.get("description"),
+            )
+        elif name == "delete_task":
+            result = await _delete_task(
+                project_id=args["project_id"],
+                task_id=args["task_id"],
             )
         else:
             result = f"Unknown tool: {name}"
