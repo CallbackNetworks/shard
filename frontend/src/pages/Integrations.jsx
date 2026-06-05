@@ -16,7 +16,13 @@ const TYPE_ICONS = {
   jenkins: '⚙️', drone: '🚁', generic: '🔗', email: '📧', webhook: '🪝',
   github: '', gitlab: '🦊', bitbucket: '🪣', circleci: '⭕',
 }
-const ALL_EVENTS = ['task.done', 'task.failed', 'task.in_progress', 'task.created', 'project.complete', 'task.due_soon', 'task.overdue']
+const EVENT_GROUPS = {
+  task: ['task.created', 'task.status_changed', 'task.done', 'task.failed', 'task.in_progress', 'task.assigned', 'task.deleted', 'task.due_soon', 'task.overdue'],
+  project: ['project.created', 'project.complete', 'project.archived'],
+  other: ['comment.created', 'rule.triggered'],
+}
+const ALL_EVENTS = [...EVENT_GROUPS.task, ...EVENT_GROUPS.project, ...EVENT_GROUPS.other]
+const CRITICAL_EVENTS = ['task.done', 'task.failed', 'task.overdue', 'project.complete']
 
 const STATUS_COLORS = {
   success: { bg: 'rgba(52,211,153,0.1)',  color: '#1ed760', dot: '#22c55e' },
@@ -458,14 +464,37 @@ function IntegrationModal({ initial, onSave, onClose }) {
 
           {/* Events */}
           <div className={s.labelStyle}>{t('integrations.events')}
-            <div className={s.eventsGrid}>
-              {ALL_EVENTS.map(ev => (
-                <label key={ev} className={form.events.includes(ev) ? s.eventChipActive : s.eventChipInactive}>
-                  <input type="checkbox" checked={form.events.includes(ev)} onChange={() => toggleEvent(ev)} style={{ cursor: 'pointer' }} />
-                  {ev}
-                </label>
-              ))}
+            {/* Quick presets */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, marginTop: 4 }}>
+              <button type="button" onClick={() => set('events', [...ALL_EVENTS])}
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                {t('integrations.allEvents')}
+              </button>
+              <button type="button" onClick={() => set('events', [...CRITICAL_EVENTS])}
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', color: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? '#ef4444' : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                {t('integrations.criticalOnly')}
+              </button>
+              <button type="button" onClick={() => set('events', [])}
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: DARK.textDim, cursor: 'pointer', fontWeight: 600 }}>
+                {t('integrations.clearAll')}
+              </button>
             </div>
+            {/* Grouped events */}
+            {Object.entries(EVENT_GROUPS).map(([group, events]) => (
+              <div key={group} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  {t(`integrations.eventGroup.${group}`)}
+                </div>
+                <div className={s.eventsGrid}>
+                  {events.map(ev => (
+                    <label key={ev} className={form.events.includes(ev) ? s.eventChipActive : s.eventChipInactive}>
+                      <input type="checkbox" checked={form.events.includes(ev)} onChange={() => toggleEvent(ev)} style={{ cursor: 'pointer' }} />
+                      {ev.split('.').pop()}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Active */}
