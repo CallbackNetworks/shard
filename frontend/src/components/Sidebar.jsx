@@ -73,7 +73,7 @@ export default function Sidebar({ onOpenPalette }) {
   }
 
   return (
-    <div style={{
+    <aside aria-label="Sidebar navigation" style={{
       width: 220, minWidth: 220, background: SB_BG, height: '100vh',
       display: 'flex', flexDirection: 'column', borderRight: `1px solid ${SB_BORDER}`,
       overflow: 'hidden', userSelect: 'none',
@@ -98,6 +98,7 @@ export default function Sidebar({ onOpenPalette }) {
       {/* Search button */}
       <button
         onClick={onOpenPalette}
+        aria-label={t('search')}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           margin: '10px 12px', padding: '8px 14px', borderRadius: 9999,
@@ -119,7 +120,7 @@ export default function Sidebar({ onOpenPalette }) {
       </button>
 
       {/* Nav links */}
-      <div style={{ padding: '8px 0', borderBottom: `1px solid ${SB_BORDER}` }}>
+      <nav aria-label="Main navigation" style={{ padding: '8px 0', borderBottom: `1px solid ${SB_BORDER}` }}>
         {[
           { to: '/app', icon: <LayoutGrid size={13} />, labelKey: 'nav.myIssues' },
           { to: '/app/identities', icon: <Users size={13} />, labelKey: 'nav.identities' },
@@ -135,7 +136,8 @@ export default function Sidebar({ onOpenPalette }) {
           { to: '/app/assistant', icon: <MessageCircle size={13} />, labelKey: 'nav.assistant' },
           { to: '/app/settings', icon: <Settings2 size={13} />, labelKey: 'nav.settings' },
         ].map(({ to, icon, labelKey }) => (
-          <Link key={to} to={to} className="sb-link" style={navLinkStyle(to)}>
+          <Link key={to} to={to} className="sb-link" style={navLinkStyle(to)}
+            aria-current={isActive(to) ? 'page' : undefined}>
             {icon}{t(labelKey)}
           </Link>
         ))}
@@ -143,13 +145,13 @@ export default function Sidebar({ onOpenPalette }) {
           style={{ ...navLinkStyle('/status-noop'), color: SB_TEXT, borderLeft: '2px solid transparent' }}>
           <ExternalLink size={13} />{t('nav.statusPage')}
         </a>
-      </div>
+      </nav>
 
       {/* Project tree */}
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 0', minHeight: 0 }}>
         {identities.length > 0 && (
           <>
-            <button onClick={() => setIdentitiesOpen(v => !v)} style={sectionHeader}>
+            <button onClick={() => setIdentitiesOpen(v => !v)} style={sectionHeader} aria-expanded={identitiesOpen}>
               {identitiesOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
               {t('nav.byIdentity')}
             </button>
@@ -195,7 +197,7 @@ export default function Sidebar({ onOpenPalette }) {
           </>
         )}
 
-        <button onClick={() => setProjectsOpen(v => !v)} style={{
+        <button onClick={() => setProjectsOpen(v => !v)} aria-expanded={projectsOpen} style={{
           ...sectionHeader, marginTop: identities.length > 0 ? 8 : 0,
         }}>
           {projectsOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
@@ -251,6 +253,7 @@ export default function Sidebar({ onOpenPalette }) {
           <button
             key={code}
             onClick={() => i18n.changeLanguage(code)}
+            aria-pressed={i18n.language === code}
             style={{
               padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
               fontSize: 11, fontWeight: i18n.language === code ? 700 : 400,
@@ -266,6 +269,6 @@ export default function Sidebar({ onOpenPalette }) {
           </button>
         ))}
       </div>
-    </div>
+    </aside>
   )
 }

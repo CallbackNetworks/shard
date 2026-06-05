@@ -6,6 +6,7 @@ import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../ap
 import { useToast } from '../context/ToastContext'
 import { BRAND, DARK, INSET_SHADOW } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
+import useFocusTrap from '../hooks/useFocusTrap'
 
 const STATUS_COLORS = {
   active:    { bg: 'rgba(83,157,245,0.12)', color: DARK.info },
@@ -42,6 +43,7 @@ const btn = (variant = 'default') => ({
 /* ── Goal Form Modal ── */
 function GoalForm({ projects, initial, onSave, onClose }) {
   const { t } = useTranslation()
+  const trapRef = useFocusTrap(onClose)
   const [form, setForm] = useState(initial ? {
     title: initial.title,
     description: initial.description || '',
@@ -74,12 +76,12 @@ function GoalForm({ projects, initial, onSave, onClose }) {
   }
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-label={initial ? t('goals.editTitle') : t('goals.createTitle')} style={{
       position: 'fixed', inset: 0, zIndex: 300,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.6)',
     }}>
-      <div style={{
+      <div ref={trapRef} style={{
         background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
         padding: 24, width: 520, maxWidth: '95vw', maxHeight: '85vh', overflow: 'auto',
       }}>

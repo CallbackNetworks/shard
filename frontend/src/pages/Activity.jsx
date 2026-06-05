@@ -136,12 +136,13 @@ export default function Activity() {
       </div>
 
       {/* Action type chips */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div role="group" aria-label="Filter by type" style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
         {ACTION_GROUPS.map(g => (
           <button
             key={g.key}
             onClick={() => { setActionFilter(g.key); setPage(0) }}
             style={chip(actionFilter === g.key)}
+            aria-pressed={actionFilter === g.key}
           >
             {g.label}
           </button>

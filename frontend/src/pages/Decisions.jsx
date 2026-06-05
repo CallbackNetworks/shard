@@ -5,6 +5,7 @@ import { GitFork, Plus, Trash2, Edit2, X, Download, Check, XCircle, Bot, User } 
 import { getDecisions, getProjects, createLabel, updateLabel, deleteLabel, exportDecision } from '../api/client'
 import { DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
+import useFocusTrap from '../hooks/useFocusTrap'
 
 const STATUS_COLORS = {
   proposed: { bg: 'rgba(129,140,248,0.15)', color: '#818cf8', border: '1px dashed #818cf8' },
@@ -45,6 +46,7 @@ const TEMPLATE_DESC = `## Context\n\n\n## Decision\n\n\n## Consequences\n`
 
 function DecisionForm({ projects, initial, onSave, onClose }) {
   const { t } = useTranslation()
+  const trapRef = useFocusTrap(onClose)
   const [form, setForm] = useState(initial ? {
     name: initial.name,
     description: initial.description || '',
@@ -60,12 +62,12 @@ function DecisionForm({ projects, initial, onSave, onClose }) {
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-label={initial ? t('decisions.editTitle') : t('decisions.createTitle')} style={{
       position: 'fixed', inset: 0, zIndex: 300,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.6)',
     }}>
-      <div style={{
+      <div ref={trapRef} style={{
         background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
         padding: 24, width: 560, maxWidth: '95vw', maxHeight: '85vh', overflow: 'auto',
       }}>

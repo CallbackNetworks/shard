@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { DARK } from '../constants/theme'
+import useFocusTrap from '../hooks/useFocusTrap'
 import useBreakpoint from '../hooks/useBreakpoint'
 
 const PRIORITIES = ['low', 'medium', 'high']
@@ -45,6 +46,7 @@ const EMPTY_FORM = { name: '', description: '', priority: 'medium', subtasks: []
 
 function TemplateForm({ initial, onSave, onClose }) {
   const { t } = useTranslation()
+  const trapRef = useFocusTrap(onClose)
   const [form, setForm] = useState(initial || EMPTY_FORM)
   const [subtaskInput, setSubtaskInput] = useState('')
   const [labelInput, setLabelInput] = useState('')
@@ -70,12 +72,12 @@ function TemplateForm({ initial, onSave, onClose }) {
   const removeLabel = (label) => set('label_names', form.label_names.filter(l => l !== label))
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-label={initial ? t('templates.editDialog') : t('templates.newDialog')} style={{
       position: 'fixed', inset: 0, zIndex: 300,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.6)',
     }}>
-      <div style={{
+      <div ref={trapRef} style={{
         background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
         padding: 24, width: 520, maxWidth: '95vw', maxHeight: '85vh', overflow: 'auto',
       }}>

@@ -93,10 +93,25 @@ function Layout() {
       fontFamily: "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif",
       fontSize: 14, background: DARK.bgAlt,
     }}>
+      {/* Skip to content link */}
+      <a
+        href="#main-content"
+        className="skip-to-content"
+        style={{
+          position: 'absolute', left: -9999, top: 'auto', width: 1, height: 1,
+          overflow: 'hidden', zIndex: 9999,
+        }}
+        onFocus={e => Object.assign(e.target.style, { left: 8, top: 8, width: 'auto', height: 'auto', padding: '8px 16px', background: BRAND, color: '#000', borderRadius: 6, fontWeight: 700, fontSize: 13 })}
+        onBlur={e => Object.assign(e.target.style, { left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' })}
+      >
+        Skip to content
+      </a>
       {/* Mobile hamburger */}
       <button
         className="mobile-menu-btn"
         onClick={() => setSidebarOpen(v => !v)}
+        aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={sidebarOpen}
         style={{
           display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 210,
           width: 36, height: 36, borderRadius: 8, border: 'none',
@@ -110,6 +125,7 @@ function Layout() {
       <div
         className="mobile-overlay"
         onClick={() => setSidebarOpen(false)}
+        role="presentation"
         style={{
           display: 'none', position: 'fixed', inset: 0, zIndex: 190,
           background: sidebarOpen ? 'rgba(0,0,0,0.5)' : 'transparent',
@@ -120,7 +136,7 @@ function Layout() {
       <div className={`layout-sidebar${sidebarOpen ? ' open' : ''}`}>
         <Sidebar onOpenPalette={openPalette} />
       </div>
-      <main className="layout-main" style={{ flex: 1, overflow: 'auto', background: DARK.bgAlt }}>
+      <main id="main-content" className="layout-main" role="main" style={{ flex: 1, overflow: 'auto', background: DARK.bgAlt }}>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
             <Route index element={<Dashboard />} />
