@@ -68,6 +68,8 @@
   "nav.byIdentity": "依身份",
   "nav.noProjectsYet": "尚無專案",
   "nav.language": "語言",
+  "nav.lightMode": "切換為淺色模式",
+  "nav.darkMode": "切換為深色模式",
 
   "dashboard.title": "我的任務",
   "dashboard.newProject": "新增專案",

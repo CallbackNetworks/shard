@@ -81,6 +81,32 @@ export const PRIORITY = {
   low:    { label: 'Low',    color: '#b3b3b3', bg: 'rgba(179,179,179,0.12)', icon: '▼' },
 }
 
+// ── Light mode palette ──
+export const LIGHT = {
+  bg:        '#f5f5f7',
+  bgAlt:     '#ffffff',
+  surface:   '#ffffff',
+  elevated:  '#f0f0f2',
+  overlay:   '#e8e8ea',
+  text:      '#1a1a1a',
+  textMid:   '#555555',
+  textDim:   '#999999',
+  textFaint: 'rgba(0,0,0,0.25)',
+  border:    'rgba(0,0,0,0.08)',
+  borderMid: 'rgba(0,0,0,0.12)',
+  borderStrong: 'rgba(0,0,0,0.2)',
+  hover:     'rgba(0,0,0,0.04)',
+  active:    'rgba(0,0,0,0.06)',
+  danger:    '#dc2626',
+  dangerBg:  'rgba(220,38,38,0.1)',
+  warning:   '#d97706',
+  warningBg: 'rgba(217,119,6,0.1)',
+  success:   '#16a34a',
+  successBg: 'rgba(22,163,74,0.1)',
+  info:      '#2563eb',
+  infoBg:    'rgba(37,99,235,0.1)',
+}
+
 // ── Label color palette ──
 export const LABEL_PALETTE = [
   '#1ed760', '#f3727f', '#ffa42b', '#539df5', '#b3b3b3',

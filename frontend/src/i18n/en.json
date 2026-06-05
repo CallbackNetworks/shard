@@ -68,6 +68,8 @@
   "nav.byIdentity": "By Identity",
   "nav.noProjectsYet": "No projects yet",
   "nav.language": "Language",
+  "nav.lightMode": "Switch to light mode",
+  "nav.darkMode": "Switch to dark mode",
 
   "dashboard.title": "My Issues",
   "dashboard.newProject": "New Project",

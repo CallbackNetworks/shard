@@ -9,6 +9,7 @@ import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp'
 import Sidebar from './components/Sidebar'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
+import { ThemeProvider, useTheme } from './context/ThemeContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { BRAND, DARK } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
@@ -50,6 +51,7 @@ function LoadingSpinner() {
 
 function Layout() {
   const { isAuthenticated, authRequired, isLoading } = useAuth()
+  const { theme } = useTheme()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
@@ -91,7 +93,8 @@ function Layout() {
     <div style={{
       display: 'flex', height: '100vh',
       fontFamily: "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif",
-      fontSize: 14, background: DARK.bgAlt,
+      fontSize: 14, background: theme.bgAlt,
+      color: theme.text,
     }}>
       {/* Skip to content link */}
       <a
@@ -115,7 +118,7 @@ function Layout() {
         style={{
           display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 210,
           width: 36, height: 36, borderRadius: 8, border: 'none',
-          background: 'rgba(255,255,255,0.1)', color: DARK.text, cursor: 'pointer',
+          background: theme.hover, color: theme.text, cursor: 'pointer',
           alignItems: 'center', justifyContent: 'center', fontSize: 18,
         }}
       >
@@ -136,7 +139,7 @@ function Layout() {
       <div className={`layout-sidebar${sidebarOpen ? ' open' : ''}`}>
         <Sidebar onOpenPalette={openPalette} />
       </div>
-      <main id="main-content" className="layout-main" role="main" style={{ flex: 1, overflow: 'auto', background: DARK.bgAlt }}>
+      <main id="main-content" className="layout-main" role="main" style={{ flex: 1, overflow: 'auto', background: theme.bgAlt }}>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
             <Route index element={<Dashboard />} />
@@ -170,18 +173,20 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <AuthProvider>
-          <ToastProvider>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/" element={<Overview />} />
-                <Route path="/share/:token" element={<ShareView />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/app/*" element={<Layout />} />
-              </Routes>
-            </Suspense>
-          </ToastProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <Suspense fallback={<LoadingSpinner />}>
+                <Routes>
+                  <Route path="/" element={<Overview />} />
+                  <Route path="/share/:token" element={<ShareView />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/app/*" element={<Layout />} />
+                </Routes>
+              </Suspense>
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>
   )

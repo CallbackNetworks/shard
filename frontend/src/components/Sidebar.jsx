@@ -2,16 +2,17 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText, Target, Activity, MessageCircle, Settings2 } from 'lucide-react'
+import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText, Target, Activity, MessageCircle, Settings2, Sun, Moon } from 'lucide-react'
 import { getProjects, getIdentities } from '../api/client'
 import { BRAND, INSET_SHADOW, DARK } from '../constants/theme'
-
-const SB_BG     = DARK.bgAlt
-const SB_TEXT   = DARK.textMid
-const SB_ACTIVE = DARK.elevated
-const SB_BORDER = DARK.border
+import { useTheme } from '../context/ThemeContext'
 
 export default function Sidebar({ onOpenPalette }) {
+  const { theme, mode, toggle: toggleTheme } = useTheme()
+  const SB_BG     = theme.bgAlt
+  const SB_TEXT   = theme.textMid
+  const SB_ACTIVE = theme.elevated
+  const SB_BORDER = theme.border
   const location = useLocation()
   const { t, i18n } = useTranslation()
   const [projectsOpen, setProjectsOpen] = useState(true)
@@ -49,7 +50,7 @@ export default function Sidebar({ onOpenPalette }) {
     display: 'flex', alignItems: 'center', gap: 8,
     padding: '6px 12px', borderRadius: 4, textDecoration: 'none',
     fontSize: 14, fontWeight: isActive(path) ? 700 : 400, margin: '1px 6px',
-    color: isActive(path) ? DARK.text : SB_TEXT,
+    color: isActive(path) ? theme.text : SB_TEXT,
     background: isActive(path) ? SB_ACTIVE : 'transparent',
   })
 
@@ -59,7 +60,7 @@ export default function Sidebar({ onOpenPalette }) {
       display: 'flex', alignItems: 'center', gap: 8,
       padding: '4px 12px 4px 28px', borderRadius: 4, textDecoration: 'none',
       fontSize: 14, fontWeight: on ? 700 : 400, margin: '1px 6px', overflow: 'hidden',
-      color: on ? DARK.text : SB_TEXT,
+      color: on ? theme.text : SB_TEXT,
       background: on ? SB_ACTIVE : 'transparent',
       transition: 'background 0.12s, color 0.12s',
     }
@@ -68,7 +69,7 @@ export default function Sidebar({ onOpenPalette }) {
   const sectionHeader = {
     display: 'flex', alignItems: 'center', gap: 4,
     padding: '3px 12px', width: '100%', background: 'none', border: 'none',
-    cursor: 'pointer', color: 'rgba(255,255,255,0.25)', fontSize: 10, fontWeight: 700,
+    cursor: 'pointer', color: theme.textFaint, fontSize: 10, fontWeight: 700,
     textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2,
   }
 
@@ -90,7 +91,7 @@ export default function Sidebar({ onOpenPalette }) {
           fontSize: 13, fontWeight: 900, color: '#000',
           boxShadow: `0 0 16px rgba(30,215,96,0.4)`,
         }}>T</div>
-        <span style={{ color: DARK.text, fontWeight: 700, fontSize: 14, letterSpacing: '0.01em' }}>
+        <span style={{ color: theme.text, fontWeight: 700, fontSize: 14, letterSpacing: '0.01em' }}>
           TODO Platform
         </span>
       </div>
@@ -102,20 +103,20 @@ export default function Sidebar({ onOpenPalette }) {
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           margin: '10px 12px', padding: '8px 14px', borderRadius: 9999,
-          background: DARK.elevated, border: 'none',
+          background: theme.elevated, border: 'none',
           cursor: 'pointer', width: 'calc(100% - 24px)',
-          color: DARK.textMid, fontSize: 13,
+          color: theme.textMid, fontSize: 13,
           transition: 'background 0.12s',
           boxShadow: INSET_SHADOW,
         }}
-        onMouseEnter={e => e.currentTarget.style.background = '#282828'}
-        onMouseLeave={e => e.currentTarget.style.background = DARK.elevated}
+        onMouseEnter={e => e.currentTarget.style.background = theme.overlay}
+        onMouseLeave={e => e.currentTarget.style.background = theme.elevated}
       >
         <Search size={12} />
         <span style={{ flex: 1, textAlign: 'left' }}>{t('search')}</span>
         <kbd style={{
           padding: '1px 6px', borderRadius: 3, fontSize: 10,
-          background: 'rgba(255,255,255,0.1)', color: DARK.textMid,
+          background: theme.hover, color: theme.textMid,
         }}>⌘K</kbd>
       </button>
 
@@ -240,13 +241,27 @@ export default function Sidebar({ onOpenPalette }) {
         )}
       </div>
 
-      {/* Language switcher */}
+      {/* Theme & Language */}
       <div style={{
         borderTop: `1px solid ${SB_BORDER}`,
         padding: '10px 16px',
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
       }}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flex: 1, letterSpacing: '0.04em' }}>
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          aria-label={mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
+          title={mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
+          style={{
+            padding: '4px 6px', borderRadius: 5, cursor: 'pointer',
+            background: SB_ACTIVE, border: `1px solid ${SB_BORDER}`,
+            color: theme.text, display: 'flex', alignItems: 'center',
+            transition: 'all 0.15s',
+          }}
+        >
+          {mode === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+        </button>
+        <span style={{ fontSize: 11, color: theme.textDim, flex: 1, letterSpacing: '0.04em' }}>
           {t('nav.language')}
         </span>
         {[{ code: 'en', label: 'EN' }, { code: 'zh-TW', label: '中文' }].map(({ code, label }) => (
@@ -258,9 +273,9 @@ export default function Sidebar({ onOpenPalette }) {
               padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
               fontSize: 11, fontWeight: i18n.language === code ? 700 : 400,
               background: i18n.language === code ? SB_ACTIVE : 'transparent',
-              color: i18n.language === code ? DARK.text : 'rgba(255,255,255,0.3)',
+              color: i18n.language === code ? theme.text : theme.textDim,
               border: i18n.language === code
-                ? `1px solid rgba(255,255,255,0.18)`
+                ? `1px solid ${theme.borderMid}`
                 : '1px solid transparent',
               transition: 'all 0.15s',
             }}

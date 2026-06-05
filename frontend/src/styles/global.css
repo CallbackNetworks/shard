@@ -1,10 +1,15 @@
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; background: #121212; font-family: 'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif; }
+body { margin: 0; background: #121212; font-family: 'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif; transition: background 0.2s, color 0.2s; }
 ::selection { background: rgba(30,215,96,0.3); color: #ffffff; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+/* Light mode scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+[data-theme="light"] ::selection { background: rgba(30,215,96,0.3); color: #000000; }
 input, select, button, textarea { font-family: inherit; }
 
 @keyframes spin {
@@ -162,6 +167,38 @@ input, select, button, textarea { font-family: inherit; }
 .panel {
   border-bottom: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.02);
+}
+
+/* ── Light mode overrides ── */
+[data-theme="light"] .card-hover:hover {
+  box-shadow: rgba(0,0,0,0.12) 0px 8px 24px;
+  background: #f0f0f2 !important;
+}
+[data-theme="light"] .sb-link:hover {
+  background: rgba(0,0,0,0.06) !important;
+  color: #1a1a1a !important;
+}
+[data-theme="light"] .btn-ghost {
+  color: #1a1a1a;
+  border-color: rgba(0,0,0,0.12);
+}
+[data-theme="light"] .btn-ghost:hover { background: rgba(0,0,0,0.04); }
+[data-theme="light"] .btn-sm {
+  background: rgba(0,0,0,0.06);
+  color: #1a1a1a;
+  border-color: rgba(0,0,0,0.08);
+}
+[data-theme="light"] .btn-sm:hover { background: rgba(0,0,0,0.1); }
+[data-theme="light"] .btn-icon:hover { background: rgba(0,0,0,0.06); }
+[data-theme="light"] .input {
+  border-color: rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.03);
+  color: #1a1a1a;
+}
+[data-theme="light"] .input:focus { border-color: rgba(0,0,0,0.25); }
+[data-theme="light"] .panel {
+  border-bottom-color: rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.02);
 }
 
 /* Mobile responsive */
