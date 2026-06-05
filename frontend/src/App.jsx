@@ -8,6 +8,8 @@ import OfflineIndicator from './components/OfflineIndicator'
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp'
 import Sidebar from './components/Sidebar'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
+import ErrorBoundary from './components/ErrorBoundary'
 import { BRAND, DARK } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
@@ -150,17 +152,21 @@ function Layout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Suspense fallback={<LoadingSpinner />}>
-          <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/share/:token" element={<ShareView />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/app/*" element={<Layout />} />
-          </Routes>
-        </Suspense>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/" element={<Overview />} />
+                <Route path="/share/:token" element={<ShareView />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/app/*" element={<Layout />} />
+              </Routes>
+            </Suspense>
+          </ToastProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }

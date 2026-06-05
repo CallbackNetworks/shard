@@ -581,5 +581,25 @@
   "settings.currentPassword": "Current password",
   "settings.newPassword": "New password",
   "settings.updatePassword": "Update Password",
-  "settings.passwordChanged": "Password changed. Redirecting to login..."
+  "settings.passwordChanged": "Password changed. Redirecting to login...",
+
+  "goals.created": "Goal created",
+  "goals.updated": "Goal updated",
+  "goals.deleted": "Goal deleted",
+
+  "apiKeys.createdSuccess": "API key created",
+  "apiKeys.updatedSuccess": "API key updated",
+  "apiKeys.deletedSuccess": "API key deleted",
+
+  "integrations.createdSuccess": "Integration created",
+  "integrations.updatedSuccess": "Integration updated",
+  "integrations.deletedSuccess": "Integration deleted",
+
+  "rules.createdSuccess": "Rule created",
+  "rules.updatedSuccess": "Rule updated",
+  "rules.deletedSuccess": "Rule deleted",
+
+  "templates.createdSuccess": "Template created",
+  "templates.updatedSuccess": "Template updated",
+  "templates.deletedSuccess": "Template deleted"
 }

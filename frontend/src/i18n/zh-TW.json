@@ -580,5 +580,25 @@
   "settings.currentPassword": "目前密碼",
   "settings.newPassword": "新密碼",
   "settings.updatePassword": "更新密碼",
-  "settings.passwordChanged": "密碼已變更，正在重新導向至登入頁面..."
+  "settings.passwordChanged": "密碼已變更，正在重新導向至登入頁面...",
+
+  "goals.created": "目標已建立",
+  "goals.updated": "目標已更新",
+  "goals.deleted": "目標已刪除",
+
+  "apiKeys.createdSuccess": "API 金鑰已建立",
+  "apiKeys.updatedSuccess": "API 金鑰已更新",
+  "apiKeys.deletedSuccess": "API 金鑰已刪除",
+
+  "integrations.createdSuccess": "整合已建立",
+  "integrations.updatedSuccess": "整合已更新",
+  "integrations.deletedSuccess": "整合已刪除",
+
+  "rules.createdSuccess": "規則已建立",
+  "rules.updatedSuccess": "規則已更新",
+  "rules.deletedSuccess": "規則已刪除",
+
+  "templates.createdSuccess": "範本已建立",
+  "templates.updatedSuccess": "範本已更新",
+  "templates.deletedSuccess": "範本已刪除"
 }

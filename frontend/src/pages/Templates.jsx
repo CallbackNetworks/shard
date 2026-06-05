@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
+import { useToast } from '../context/ToastContext'
 import { DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 
@@ -248,6 +249,7 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
 
 export default function Templates() {
   const { t } = useTranslation()
+  const { addToast } = useToast()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
@@ -262,17 +264,17 @@ export default function Templates() {
 
   const create = useMutation({
     mutationFn: createTemplate,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setShowForm(false) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setShowForm(false); addToast(t('templates.createdSuccess'), 'success') },
   })
 
   const edit = useMutation({
     mutationFn: ({ id, data }) => updateTemplate(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setEditTarget(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setEditTarget(null); addToast(t('templates.updatedSuccess'), 'success') },
   })
 
   const remove = useMutation({
     mutationFn: deleteTemplate,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['templates'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); addToast(t('templates.deletedSuccess'), 'success') },
   })
 
   const handleDelete = (id) => {

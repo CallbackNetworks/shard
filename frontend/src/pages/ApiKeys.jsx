@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, AlertTriangle, X, Key } from 'lucide-react'
 import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects } from '../api/client'
+import { useToast } from '../context/ToastContext'
 import { BRAND } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 
@@ -33,6 +34,7 @@ export default function ApiKeys() {
   const [copiedId, setCopiedId] = useState(null)
   const [newKey, setNewKey] = useState(null)   // full key shown once after creation
 
+  const { addToast } = useToast()
   const invalidate = () => qc.invalidateQueries({ queryKey: ['api-keys'] })
 
   const createMut = useMutation({
@@ -41,18 +43,19 @@ export default function ApiKeys() {
       invalidate()
       setShowCreate(false)
       setForm({ name: '', project_id: '', scopes: ['read', 'write'] })
-      setNewKey(data.key)    // store full key to show in modal once
+      setNewKey(data.key)
+      addToast(t('apiKeys.createdSuccess'), 'success')
     }
   })
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => updateApiKey(id, data),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); addToast(t('apiKeys.updatedSuccess'), 'success') },
   })
 
   const deleteMut = useMutation({
     mutationFn: deleteApiKey,
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); addToast(t('apiKeys.deletedSuccess'), 'success') },
   })
 
   const toggleScope = (scope) => {

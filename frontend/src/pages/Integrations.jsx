@@ -503,9 +503,9 @@ export default function Integrations() {
     if (data?.smtp_warning) globalAddToast(data.smtp_warning, 'warning')
   }
 
-  const createMut = useMutation({ mutationFn: createIntegration, onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data) } })
-  const updateMut = useMutation({ mutationFn: ({ id, data }) => updateIntegration(id, data), onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data) } })
-  const deleteMut = useMutation({ mutationFn: deleteIntegration, onSuccess: invalidate })
+  const createMut = useMutation({ mutationFn: createIntegration, onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data); globalAddToast(t('integrations.createdSuccess'), 'success') } })
+  const updateMut = useMutation({ mutationFn: ({ id, data }) => updateIntegration(id, data), onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data); globalAddToast(t('integrations.updatedSuccess'), 'success') } })
+  const deleteMut = useMutation({ mutationFn: deleteIntegration, onSuccess: () => { invalidate(); globalAddToast(t('integrations.deletedSuccess'), 'success') } })
   const testMut = useMutation({ mutationFn: testIntegration, onSuccess: (data, id) => setTestResults(r => ({ ...r, [id]: data })) })
 
   const handleSave = (form) => {

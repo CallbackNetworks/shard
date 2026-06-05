@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, X, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
+import { useToast } from '../context/ToastContext'
 import { BRAND, DARK, INSET_SHADOW } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 
@@ -377,6 +378,7 @@ export default function Goals() {
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
+  const { addToast } = useToast()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
@@ -407,17 +409,17 @@ export default function Goals() {
 
   const createMut = useMutation({
     mutationFn: createGoal,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); setShowForm(false) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); setShowForm(false); addToast(t('goals.created'), 'success') },
   })
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => updateGoal(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); setEditTarget(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); setEditTarget(null); addToast(t('goals.updated'), 'success') },
   })
 
   const deleteMut = useMutation({
     mutationFn: deleteGoal,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['goals'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); addToast(t('goals.deleted'), 'success') },
   })
 
   const handleSave = (form) => {

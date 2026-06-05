@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { globalAddToast } from '../context/ToastContext'
 
 const api = axios.create({ baseURL: '' })
 
@@ -8,13 +9,39 @@ api.interceptors.request.use(config => {
   return config
 })
 
+/**
+ * Parse Pydantic 422 validation errors into a readable message.
+ */
+export function parse422(err) {
+  const detail = err.response?.data?.detail
+  if (!Array.isArray(detail)) {
+    if (typeof detail === 'string') return detail
+    return err.response?.data?.message || err.message || 'Validation error'
+  }
+  return detail
+    .map(d => {
+      const field = (d.loc || []).filter(l => l !== 'body').join('.')
+      return field ? `${field}: ${d.msg}` : d.msg
+    })
+    .join('; ')
+}
+
 api.interceptors.response.use(null, err => {
   if (err.response?.status === 401 && window.location.pathname !== '/' && window.location.pathname !== '/login') {
-    // Only auto-logout for user-initiated requests, not background refetches
     const isBackgroundRefetch = err.config?._isBackgroundRefetch
     if (!isBackgroundRefetch) {
       localStorage.removeItem('auth_token')
       window.location.href = '/login'
+    }
+  }
+  // Show toast for 422 validation errors and 4xx/5xx server errors
+  if (err.response && !err.config?._isBackgroundRefetch && !err.config?._silent) {
+    const status = err.response.status
+    if (status === 422) {
+      globalAddToast(parse422(err), 'error')
+    } else if (status >= 400 && status !== 401) {
+      const msg = err.response.data?.detail || err.response.data?.message || `Error ${status}`
+      globalAddToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error')
     }
   }
   return Promise.reject(err)
