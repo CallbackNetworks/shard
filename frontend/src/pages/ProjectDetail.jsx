@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, Calendar, CheckSquare, Save, Bookmark, Rss, Copy, Check } from 'lucide-react'
@@ -294,10 +294,11 @@ export default function ProjectDetail() {
 
   const activeFilterCount = [filterPriority, filterLabel, filterAssignee, filterDue, filterAgent].filter(f => f !== 'all').length
 
-  const searchFiltered = searchQ.trim()
+  const deferredSearch = useDeferredValue(searchQ)
+  const searchFiltered = deferredSearch.trim()
     ? tasks.filter(t =>
-        t.title.toLowerCase().includes(searchQ.toLowerCase()) ||
-        (t.description || '').toLowerCase().includes(searchQ.toLowerCase())
+        t.title.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+        (t.description || '').toLowerCase().includes(deferredSearch.toLowerCase())
       )
     : null
   const filteredTopTasks = searchFiltered

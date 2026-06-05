@@ -1,6 +1,7 @@
+import { memo } from 'react'
 import { PRIORITY } from '../constants/theme'
 
-export function PriorityIcon({ priority }) {
+export const PriorityIcon = memo(function PriorityIcon({ priority }) {
   const icons = { high: '\u25B2', medium: '\u25A0', low: '\u25BC' }
   const c = PRIORITY[priority] || PRIORITY.medium
   return (
@@ -8,9 +9,9 @@ export function PriorityIcon({ priority }) {
       {icons[priority] || '\u25A0'}
     </span>
   )
-}
+})
 
-export function StatusIcon({ status }) {
+export const StatusIcon = memo(function StatusIcon({ status }) {
   const size = 14
   if (status === 'done') return (
     <svg width={size} height={size} viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
@@ -36,9 +37,9 @@ export function StatusIcon({ status }) {
       <circle cx="7" cy="7" r="5.5" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3.5 2" />
     </svg>
   )
-}
+})
 
-export function LabelChip({ label }) {
+export const LabelChip = memo(function LabelChip({ label }) {
   const isDecision = label.type === 'decision'
   const isDashed = isDecision && label.decision_status === 'proposed'
   return (
@@ -58,4 +59,4 @@ export function LabelChip({ label }) {
       {label.name}
     </span>
   )
-}
+})

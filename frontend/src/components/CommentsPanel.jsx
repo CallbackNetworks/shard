@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useState, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getComments, createComment, deleteComment, getIdentities } from '../api/client'
@@ -16,35 +16,47 @@ function renderMentions(text) {
 
 export default function CommentsPanel({ projectId, taskId, depth }) {
   const { t } = useTranslation()
-  const [comments, setComments] = useState([])
-  const [loading, setLoading] = useState(false)
   const [body, setBody] = useState('')
   const [author, setAuthor] = useState('')
   const [showMentions, setShowMentions] = useState(false)
-  const [identities, setIdentities] = useState([])
   const textareaRef = useRef(null)
   const qc = useQueryClient()
 
-  useEffect(() => {
-    setLoading(true)
-    getComments(projectId, taskId)
-      .then(setComments)
-      .finally(() => setLoading(false))
-    getIdentities().then(setIdentities).catch(() => {})
-  }, [projectId, taskId])
+  const { data: comments = [], isLoading: loading } = useQuery({
+    queryKey: ['comments', projectId, taskId],
+    queryFn: () => getComments(projectId, taskId),
+  })
 
-  const handleAdd = async () => {
+  const { data: identities = [] } = useQuery({
+    queryKey: ['identities'],
+    queryFn: getIdentities,
+    staleTime: 30000,
+  })
+
+  const addMut = useMutation({
+    mutationFn: (data) => createComment(projectId, taskId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comments', projectId, taskId] })
+      qc.invalidateQueries({ queryKey: ['project', projectId] })
+      setBody('')
+    },
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (commentId) => deleteComment(projectId, taskId, commentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comments', projectId, taskId] })
+      qc.invalidateQueries({ queryKey: ['project', projectId] })
+    },
+  })
+
+  const handleAdd = () => {
     if (!body.trim()) return
-    const c = await createComment(projectId, taskId, { author: author || null, body: body.trim() })
-    setComments(prev => [...prev, c])
-    setBody('')
-    qc.invalidateQueries({ queryKey: ['project', projectId] })
+    addMut.mutate({ author: author || null, body: body.trim() })
   }
 
-  const handleDelete = async (commentId) => {
-    await deleteComment(projectId, taskId, commentId)
-    setComments(prev => prev.filter(c => c.id !== commentId))
-    qc.invalidateQueries({ queryKey: ['project', projectId] })
+  const handleDelete = (commentId) => {
+    deleteMut.mutate(commentId)
   }
 
   const padLeft = 16 + depth * 20 + 36

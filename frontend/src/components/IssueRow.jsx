@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -13,7 +13,7 @@ import AttachmentsPanel from './AttachmentsPanel'
 import BuildHistoryPanel from './BuildHistoryPanel'
 import MarkdownPreview from './MarkdownPreview'
 
-export default function IssueRow({
+export default memo(function IssueRow({
   task, projectId, projectCode, onUpdate, onDelete,
   showProject, projectName, onCreateSubtask,
   allTasks = [], depth = 0,
@@ -396,4 +396,4 @@ export default function IssueRow({
       ))}
     </>
   )
-}
+})
