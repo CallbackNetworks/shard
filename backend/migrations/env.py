@@ -28,6 +28,10 @@ if os.environ.get("DATABASE_URL"):
 target_metadata = Base.metadata
 
 
+def _is_sqlite(url: str) -> bool:
+    return url.startswith("sqlite")
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode — generate SQL without a DB connection."""
     url = config.get_main_option("sqlalchemy.url")
@@ -36,7 +40,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        render_as_batch=True,  # Required for SQLite ALTER TABLE support
+        render_as_batch=_is_sqlite(url),
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -49,11 +53,12 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    url = config.get_main_option("sqlalchemy.url")
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            render_as_batch=True,  # Required for SQLite ALTER TABLE support
+            render_as_batch=_is_sqlite(url),
         )
         with context.begin_transaction():
             context.run_migrations()

@@ -9,6 +9,14 @@ All services run in Docker with hot-reload. **Never install Python packages or N
 ```bash
 docker compose up --build   # first run or after changing requirements.txt / package.json
 docker compose up           # subsequent runs (hot-reload active)
+
+# With PostgreSQL:
+docker compose --profile postgres up --build
+# Set in .env: DATABASE_URL=postgresql+psycopg://todo:todo_dev@postgres:5432/todo_platform
+
+# With MySQL:
+docker compose --profile mysql up --build
+# Set in .env: DATABASE_URL=mysql+pymysql://todo:todo_dev@mysql:3306/todo_platform
 ```
 
 - Backend API + Swagger UI: http://localhost:8000/docs
@@ -40,6 +48,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up
 
 | Variable | Purpose |
 |----------|---------|
+| `DATABASE_URL` | Database connection string (default `sqlite:///./todo_platform.db`). Supports `sqlite`, `postgresql+psycopg`, `mysql+pymysql` |
+| `DB_POOL_SIZE` | Connection pool size for PostgreSQL/MySQL (default `5`) |
+| `DB_MAX_OVERFLOW` | Max overflow connections for PostgreSQL/MySQL (default `10`) |
+| `DB_POOL_TIMEOUT` | Pool timeout in seconds for PostgreSQL/MySQL (default `30`) |
+| `DB_SSL_MODE` | SSL mode for PostgreSQL cloud connections (e.g. `require`) |
 | `AUTH_PASSWORD` | Password-protect `/app`; leave empty for no auth |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_USE_TLS` | Email notifications |
 | `LLM_PROVIDER` | `claude` \| `openai` \| `stub` (default `stub`) |

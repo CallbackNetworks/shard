@@ -46,59 +46,16 @@ from app.routers.auth import router as auth_router
 from app.routers.auth import verify_token
 from app.routers.labels import task_label_router
 from app.services.scheduler import due_date_reminder_loop
+from app.services.search_backend import get_search_backend
 from app.services.usage_tracker import UsageTrackingMiddleware
-
-
-def _ensure_fts(engine_):
-    """Create FTS5 virtual table and sync triggers for full-text task search."""
-    from sqlalchemy import inspect, text
-
-    with engine_.connect() as conn:
-        existing_tables = set(inspect(engine_).get_table_names())
-        if "tasks_fts" not in existing_tables:
-            conn.execute(
-                text(
-                    "CREATE VIRTUAL TABLE tasks_fts USING fts5("
-                    "task_id UNINDEXED, title, description"
-                    ")"
-                )
-            )
-            conn.execute(
-                text(
-                    "INSERT INTO tasks_fts(task_id, title, description) "
-                    "SELECT id, title, COALESCE(description, '') FROM tasks"
-                )
-            )
-        for trig in ("tasks_fts_insert", "tasks_fts_update", "tasks_fts_delete"):
-            conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
-        conn.execute(
-            text(
-                "CREATE TRIGGER tasks_fts_insert AFTER INSERT ON tasks BEGIN "
-                "INSERT INTO tasks_fts(task_id, title, description) "
-                "VALUES (new.id, new.title, COALESCE(new.description, '')); END"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE TRIGGER tasks_fts_update AFTER UPDATE OF title, description ON tasks BEGIN "
-                "DELETE FROM tasks_fts WHERE task_id = old.id; "
-                "INSERT INTO tasks_fts(task_id, title, description) "
-                "VALUES (new.id, new.title, COALESCE(new.description, '')); END"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE TRIGGER tasks_fts_delete AFTER DELETE ON tasks BEGIN "
-                "DELETE FROM tasks_fts WHERE task_id = old.id; END"
-            )
-        )
-        conn.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    _ensure_fts(engine)
+    search_backend = get_search_backend()
+    search_backend.ensure_index(engine)
+    app.state.search_backend = search_backend
 
     _scheduler_task = asyncio.create_task(due_date_reminder_loop())
     yield

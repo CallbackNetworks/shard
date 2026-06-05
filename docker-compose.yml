@@ -8,7 +8,11 @@ services:
       - backend_venv:/app/.venv   # named volume protects the installed venv
       - backend_data:/app/data    # persist SQLite database
     environment:
-      - DATABASE_URL=sqlite:////app/data/todo_platform.db
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/todo_platform.db}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - DB_SSL_MODE=${DB_SSL_MODE:-}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
@@ -70,10 +74,54 @@ services:
     networks:
       - app-network
 
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-todo_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-todo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  mysql:
+    image: mysql:8.0
+    profiles: ["mysql"]
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-todo_platform}
+      MYSQL_USER: ${MYSQL_USER:-todo}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-todo_dev}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
 volumes:
   backend_venv:
   backend_data:
   frontend_modules:
+  postgres_data:
+  mysql_data:
 
 networks:
   app-network:

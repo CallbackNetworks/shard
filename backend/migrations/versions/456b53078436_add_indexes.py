@@ -34,9 +34,15 @@ _INDEXES = [
 
 def upgrade() -> None:
     for idx_name, table, column in _INDEXES:
-        op.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({column})")
+        try:
+            op.create_index(idx_name, table, [column])
+        except Exception:
+            pass  # Index already exists
 
 
 def downgrade() -> None:
-    for idx_name, _table, _column in _INDEXES:
-        op.execute(f"DROP INDEX IF EXISTS {idx_name}")
+    for idx_name, table, _column in _INDEXES:
+        try:
+            op.drop_index(idx_name, table_name=table)
+        except Exception:
+            pass  # Index does not exist

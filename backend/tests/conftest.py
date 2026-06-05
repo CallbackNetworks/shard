@@ -9,16 +9,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db
+from app.database import Base, get_db, get_dialect
 from app.main import app
 from app.models import Identity, Project, ProjectIdentity
 from app.services.pin_utils import hash_pin
 
-_test_engine = create_engine(
-    "sqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
+_dialect = get_dialect(TEST_DATABASE_URL)
+
+_engine_kwargs: dict = {}
+if _dialect == "sqlite":
+    _engine_kwargs = {
+        "connect_args": {"check_same_thread": False},
+        "poolclass": StaticPool,
+    }
+else:
+    _engine_kwargs = {"pool_pre_ping": True}
+
+_test_engine = create_engine(TEST_DATABASE_URL, **_engine_kwargs)
 
 
 @pytest.fixture()

@@ -1,7 +1,7 @@
 import logging
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, func, select, text
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -27,33 +27,26 @@ def _enrich_task(task) -> dict:
 
 @router.get("")
 def search(
+    request: Request,
     q: str = Query(..., min_length=1, description="Search query"),
     project_id: str | None = Query(None, description="Limit to a specific project"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Full-text search across tasks and projects. Uses FTS5 when available, falls back to LIKE."""
-    # Try FTS5 first for task search
+    """Full-text search across tasks and projects. Uses FTS when available, falls back to LIKE."""
+    search_backend = request.app.state.search_backend
+    task_ids, used_fts = search_backend.search_tasks(db, q, project_id, limit, offset)
+
     tasks = []
-    used_fts = False
-    try:
-        fts_query = text(
-            "SELECT task_id FROM tasks_fts WHERE tasks_fts MATCH :q ORDER BY rank LIMIT :lim OFFSET :off"
-        )
-        fts_rows = db.execute(fts_query, {"q": q, "lim": limit, "off": offset}).fetchall()
-        task_ids = [r[0] for r in fts_rows]
-        if task_ids:
-            task_query = db.query(Task).filter(Task.id.in_(task_ids))
-            if project_id:
-                task_query = task_query.filter(Task.project_id == project_id)
-            tasks = task_query.all()
-            # Preserve FTS rank order
-            id_order = {tid: i for i, tid in enumerate(task_ids)}
-            tasks.sort(key=lambda t: id_order.get(t.id, 0))
-        used_fts = True
-    except Exception:
-        logger.debug("FTS5 unavailable, falling back to LIKE search")
+    if used_fts and task_ids:
+        task_query = db.query(Task).filter(Task.id.in_(task_ids))
+        if project_id:
+            task_query = task_query.filter(Task.project_id == project_id)
+        tasks = task_query.all()
+        # Preserve FTS rank order
+        id_order = {tid: i for i, tid in enumerate(task_ids)}
+        tasks.sort(key=lambda t: id_order.get(t.id, 0))
 
     if not used_fts:
         pattern = f"%{q}%"
@@ -79,9 +72,8 @@ def search(
             .scalar_subquery()
             .label("done_tasks")
         )
-        proj_query = (
-            db.query(Project, total_sq, done_sq)
-            .filter((Project.name.ilike(pattern)) | (Project.description.ilike(pattern)))
+        proj_query = db.query(Project, total_sq, done_sq).filter(
+            (Project.name.ilike(pattern)) | (Project.description.ilike(pattern))
         )
         for p, total, done in proj_query.limit(20).all():
             projects.append(
