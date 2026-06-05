@@ -1,4 +1,23 @@
 /**
+ * Format minutes as human-readable duration ("1h 30m", "45m").
+ */
+export function formatMinutes(mins) {
+  if (mins == null) return null
+  if (mins < 60) return `${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
+
+/**
+ * Format a date string as short date ("Jun 5").
+ */
+export function formatDate(dateStr) {
+  if (!dateStr) return null
+  return new Date(dateStr).toLocaleDateString('en', { month: 'short', day: 'numeric' })
+}
+
+/**
  * Format a date string as relative time ("2h ago", "in 3d").
  * Returns null if dateStr is falsy.
  */

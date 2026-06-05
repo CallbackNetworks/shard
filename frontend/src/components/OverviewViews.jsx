@@ -16,6 +16,19 @@ const PARA_L = (px = 14) => `polygon(${px}px 0, 100% 0, 100% 100%, 0 100%)`
 // Full parallelogram (both sides)
 const PARA   = (px = 10) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 
+function formatMinutes(mins) {
+  if (mins == null) return null
+  if (mins < 60) return `${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return null
+  return new Date(dateStr).toLocaleDateString('en', { month: 'short', day: 'numeric' })
+}
+
 export function urgencyScore(project) {
   const tasks = project.tasks || []
   if (!tasks.length) return 0
@@ -178,6 +191,14 @@ export function ViewProgress({ projects }) {
                 <span style={{ fontSize: 11, color: DIM }}>{done}/{total}</span>
               </div>
             </div>
+            {p.description && (
+              <div style={{
+                fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500,
+              }}>
+                {p.description}
+              </div>
+            )}
             <Bar pct={pct} color={color} height={6} />
           </GlassRow>
         )
@@ -217,6 +238,14 @@ export function ViewHealth({ projects }) {
                 <Label color={color}>{uLabel}</Label>
               </div>
             </div>
+            {p.description && (
+              <div style={{
+                fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500,
+              }}>
+                {p.description}
+              </div>
+            )}
             <StackedBar done={done} active={active} failed={failed} total={total} height={12} />
             <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
               {[['#22c55e', done, 'done'], ['#38bdf8', active, 'active'], ['#f87171', failed, 'failed']].map(([c, n, l]) => (
@@ -239,10 +268,12 @@ const PRI_COLOR    = { high: '#f87171', medium: '#f0b429', low: '#1ed760' }
 
 export function ViewTasks({ projects }) {
   const [open, setOpen] = useState({})
+  const [expandedTask, setExpandedTask] = useState(null)
   return (
     <div style={{ paddingTop: 8 }}>
       {projects.map(p => {
-        const tasks  = p.tasks || []
+        const allTasks = p.tasks || []
+        const topTasks = allTasks.filter(t => !t.parent_id)
         const isOpen = open[p.id] !== false
         const u      = urgencyScore(p)
         const color  = urgencyColor(u)
@@ -262,48 +293,178 @@ export function ViewTasks({ projects }) {
               }}
             >
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: color }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 10, color: DIM }}>{isOpen ? '▾' : '▸'}</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: HI, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{p.name}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 10, color: DIM }}>{isOpen ? '▾' : '▸'}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: HI, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{p.name}</span>
+                </div>
+                {p.description && (
+                  <div style={{
+                    fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2, marginLeft: 20,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500,
+                  }}>
+                    {p.description}
+                  </div>
+                )}
               </div>
-              <span style={{ fontSize: 11, color: DIM }}>{tasks.length} tasks</span>
+              <span style={{ fontSize: 11, color: DIM, flexShrink: 0 }}>{topTasks.length} tasks</span>
             </div>
             {/* Task rows */}
-            {isOpen && tasks.map((t, i) => {
+            {isOpen && topTasks.map((t, i) => {
               const sc = STATUS_COLOR[t.status] || DIM
               const isOverdue = t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()
+              const isExpanded = expandedTask === t.id
+              const subtasks = allTasks.filter(sub => sub.parent_id === t.id)
+              const hasDetail = t.description || t.progress_pct != null || t.start_date ||
+                t.time_estimate || t.time_spent || subtasks.length > 0 ||
+                (t.blocked_by && t.blocked_by.length > 0) || (t.blocking && t.blocking.length > 0)
               return (
-                <div key={t.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '8px 20px 8px 32px',
-                  background: i % 2 === 0 ? 'rgba(255,255,255,0.008)' : 'transparent',
-                  borderLeft: `2px solid ${sc}22`,
-                }}>
-                  <span style={{
-                    width: 8, height: 8, flexShrink: 0,
-                    background: sc,
-                    clipPath: PARA(3),
-                  }} />
-                  <span style={{
-                    flex: 1, fontSize: 12,
-                    color: t.status === 'done' ? 'rgba(255,255,255,0.2)' : MID,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    textDecoration: t.status === 'done' ? 'line-through' : 'none',
-                  }}>
-                    {t.title}
-                  </span>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-                    {isOverdue && <Label color="#ff5533">OVERDUE</Label>}
-                    <span style={{ fontSize: 10, fontWeight: 700, color: PRI_COLOR[t.priority] || DIM, letterSpacing: '0.06em' }}>
-                      {(t.priority || '').toUpperCase()}
-                    </span>
+                <div key={t.id}>
+                  <div
+                    onClick={hasDetail ? () => setExpandedTask(isExpanded ? null : t.id) : undefined}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '8px 20px 8px 32px',
+                      background: i % 2 === 0 ? 'rgba(255,255,255,0.008)' : 'transparent',
+                      borderLeft: `2px solid ${sc}22`,
+                      cursor: hasDetail ? 'pointer' : 'default',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    {hasDetail && (
+                      <span style={{ fontSize: 9, color: DIM, flexShrink: 0, width: 8 }}>
+                        {isExpanded ? '▾' : '▸'}
+                      </span>
+                    )}
                     <span style={{
-                      fontSize: 10, fontWeight: 700, color: sc, letterSpacing: '0.06em',
-                      minWidth: 48, textAlign: 'right',
+                      width: 8, height: 8, flexShrink: 0,
+                      background: sc,
+                      clipPath: PARA(3),
+                    }} />
+                    <span style={{
+                      flex: 1, fontSize: 12,
+                      color: t.status === 'done' ? 'rgba(255,255,255,0.2)' : MID,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      textDecoration: t.status === 'done' ? 'line-through' : 'none',
                     }}>
-                      {STATUS_LABEL[t.status] || t.status}
+                      {t.title}
                     </span>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+                      {isOverdue && <Label color="#ff5533">OVERDUE</Label>}
+                      <span style={{ fontSize: 10, fontWeight: 700, color: PRI_COLOR[t.priority] || DIM, letterSpacing: '0.06em' }}>
+                        {(t.priority || '').toUpperCase()}
+                      </span>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, color: sc, letterSpacing: '0.06em',
+                        minWidth: 48, textAlign: 'right',
+                      }}>
+                        {STATUS_LABEL[t.status] || t.status}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Expanded detail panel */}
+                  {isExpanded && (
+                    <div style={{
+                      padding: '10px 20px 12px 52px',
+                      background: 'rgba(255,255,255,0.015)',
+                      borderLeft: `2px solid ${sc}33`,
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    }}>
+                      {t.description && (
+                        <div style={{
+                          fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, marginBottom: 8,
+                        }}>
+                          {t.description.length > 200 ? t.description.slice(0, 200) + '...' : t.description}
+                        </div>
+                      )}
+
+                      {/* Metadata row */}
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: 11 }}>
+                        {t.start_date && (
+                          <span style={{ color: DIM }}>Start: <span style={{ color: MID }}>{formatDate(t.start_date)}</span></span>
+                        )}
+                        {t.due_date && (
+                          <span style={{ color: DIM }}>Due: <span style={{ color: isOverdue ? '#ff5533' : MID }}>{formatDate(t.due_date)}</span></span>
+                        )}
+                        {t.progress_pct != null && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 60 }}>
+                              <Bar pct={t.progress_pct} color={sc} height={3} bg="rgba(255,255,255,0.06)" />
+                            </span>
+                            <span style={{ color: MID, fontSize: 11 }}>{t.progress_pct}%</span>
+                          </span>
+                        )}
+                        {(t.time_estimate || t.time_spent) && (
+                          <span style={{ color: DIM }}>
+                            Time: <span style={{ color: MID }}>{formatMinutes(t.time_spent || 0)}</span>
+                            {t.time_estimate && <span> / {formatMinutes(t.time_estimate)} est</span>}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Subtask list */}
+                      {subtasks.length > 0 && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{
+                            fontSize: 9, fontWeight: 800, letterSpacing: '0.14em',
+                            textTransform: 'uppercase', color: DIM, marginBottom: 4,
+                          }}>
+                            SUBTASKS ({subtasks.length})
+                          </div>
+                          {subtasks.map(s => {
+                            const sColor = STATUS_COLOR[s.status] || DIM
+                            return (
+                              <div key={s.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '3px 0', fontSize: 11,
+                              }}>
+                                <span style={{
+                                  width: 6, height: 6, flexShrink: 0,
+                                  background: sColor, clipPath: PARA(2),
+                                }} />
+                                <span style={{
+                                  flex: 1, color: s.status === 'done' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.45)',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  textDecoration: s.status === 'done' ? 'line-through' : 'none',
+                                }}>
+                                  {s.title}
+                                </span>
+                                <span style={{
+                                  fontSize: 9, fontWeight: 700, color: sColor,
+                                  letterSpacing: '0.06em', flexShrink: 0,
+                                }}>
+                                  {STATUS_LABEL[s.status] || s.status}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Dependencies */}
+                      {(t.blocked_by?.length > 0 || t.blocking?.length > 0) && (
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11 }}>
+                          {t.blocked_by?.length > 0 && (
+                            <span style={{ color: '#ffa42b' }}>
+                              Blocked by: {t.blocked_by.map(id => {
+                                const blocker = allTasks.find(bt => bt.id === id)
+                                return blocker ? blocker.title : id.slice(-8)
+                              }).join(', ')}
+                            </span>
+                          )}
+                          {t.blocking?.length > 0 && (
+                            <span style={{ color: '#38bdf8' }}>
+                              Blocking: {t.blocking.map(id => {
+                                const blocked = allTasks.find(bt => bt.id === id)
+                                return blocked ? blocked.title : id.slice(-8)
+                              }).join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

@@ -76,6 +76,14 @@ def _load_identity(db: Session, token: str) -> Identity | None:
             .selectinload(Task.comments),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
+            .selectinload(Project.tasks)
+            .selectinload(Task.blocked_by_deps),
+            selectinload(Identity.project_identities)
+            .selectinload(ProjectIdentity.project)
+            .selectinload(Project.tasks)
+            .selectinload(Task.blocking_deps),
+            selectinload(Identity.project_identities)
+            .selectinload(ProjectIdentity.project)
             .selectinload(Project.labels),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
@@ -117,27 +125,50 @@ def _build_response(identity: Identity, db: Session):
                     "total_tasks": ct_total,
                     "done_tasks": ct_done,
                     "progress": round(ct_done / ct_total * 100, 1) if ct_total > 0 else 0.0,
+                    "start_date": c.start_date.isoformat() if c.start_date else None,
+                    "end_date": c.end_date.isoformat() if c.end_date else None,
                 }
                 break
 
         comment_count = sum(len(t.comments) for t in tasks)
+
+        task_map = {t.id: t.title for t in tasks}
 
         task_list = []
         for t in tasks:
             if t.parent_id is not None:
                 continue
             t_labels = [{"name": tl.label.name, "color": tl.label.color} for tl in t.task_labels if tl.label]
+            subtask_details = [
+                {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority}
+                for s in t.subtasks
+            ]
+            blocked_by = [
+                {"id": d.depends_on_id, "title": task_map.get(d.depends_on_id, "Unknown")}
+                for d in t.blocked_by_deps
+            ]
+            blocking = [
+                {"id": d.task_id, "title": task_map.get(d.task_id, "Unknown")} for d in t.blocking_deps
+            ]
             task_list.append(
                 {
                     "id": t.id,
                     "title": t.title,
+                    "description": t.description,
                     "status": t.status,
                     "priority": t.priority,
                     "assignee": t.assignee,
+                    "start_date": t.start_date.isoformat() if t.start_date else None,
                     "due_date": t.due_date.isoformat() if t.due_date else None,
+                    "progress_pct": t.progress_pct,
+                    "time_estimate": t.time_estimate,
+                    "time_spent": t.time_spent,
                     "labels": t_labels,
                     "subtask_count": len(t.subtasks),
+                    "subtasks": subtask_details,
                     "comment_count": len(t.comments),
+                    "blocked_by": blocked_by,
+                    "blocking": blocking,
                 }
             )
 
@@ -145,7 +176,9 @@ def _build_response(identity: Identity, db: Session):
             {
                 "id": p.id,
                 "name": p.name,
+                "description": p.description,
                 "status": p.status,
+                "repo_url": p.repo_url,
                 "total_tasks": total,
                 "done_tasks": done,
                 "progress": round(done / total * 100, 1) if total > 0 else 0.0,
