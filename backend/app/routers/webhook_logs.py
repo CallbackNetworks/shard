@@ -1,7 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -107,9 +106,7 @@ def integration_health(
     avg_latency_ms = None
     success_deliveries = [d for d in deliveries if d.status == "success" and d.delivered_at and d.created_at]
     if success_deliveries:
-        total_ms = sum(
-            (d.delivered_at - d.created_at).total_seconds() * 1000 for d in success_deliveries
-        )
+        total_ms = sum((d.delivered_at - d.created_at).total_seconds() * 1000 for d in success_deliveries)
         avg_latency_ms = int(total_ms / len(success_deliveries))
 
     # Dead deliveries (permanently failed)
@@ -124,7 +121,9 @@ def integration_health(
         "dead": dead_count,
         "success_rate": success_rate,
         "avg_latency_ms": avg_latency_ms,
-        "last_success_at": last_success.delivered_at.isoformat() if last_success and last_success.delivered_at else None,
+        "last_success_at": last_success.delivered_at.isoformat()
+        if last_success and last_success.delivered_at
+        else None,
     }
 
 

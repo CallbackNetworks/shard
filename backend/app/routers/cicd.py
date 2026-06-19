@@ -4,7 +4,7 @@ CI/CD integration endpoints:
 - Manage CI/CD sync configurations
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -66,11 +66,18 @@ async def trigger_github(body: GitHubTrigger, task_id: str | None = None, db: Se
         task = db.query(Task).filter(Task.id == task_id).first()
         if task:
             log_activity(
-                db, "cicd.triggered",
-                project_id=task.project_id, task_id=task.id,
+                db,
+                "cicd.triggered",
+                project_id=task.project_id,
+                task_id=task.id,
                 actor="user",
                 detail=f"Triggered GitHub workflow '{body.workflow_id}' on {body.repo}@{body.ref}",
-                meta={"provider": "github", "repo": body.repo, "workflow": body.workflow_id, "success": result.get("success")},
+                meta={
+                    "provider": "github",
+                    "repo": body.repo,
+                    "workflow": body.workflow_id,
+                    "success": result.get("success"),
+                },
             )
             db.commit()
 
@@ -92,8 +99,10 @@ async def trigger_gitlab(body: GitLabTrigger, task_id: str | None = None, db: Se
         task = db.query(Task).filter(Task.id == task_id).first()
         if task:
             log_activity(
-                db, "cicd.triggered",
-                project_id=task.project_id, task_id=task.id,
+                db,
+                "cicd.triggered",
+                project_id=task.project_id,
+                task_id=task.id,
                 actor="user",
                 detail=f"Triggered GitLab pipeline for project {body.project_id}@{body.ref}",
                 meta={"provider": "gitlab", "project_id": body.project_id, "success": result.get("success")},
@@ -117,8 +126,10 @@ async def trigger_jenkins(body: JenkinsTrigger, task_id: str | None = None, db: 
         task = db.query(Task).filter(Task.id == task_id).first()
         if task:
             log_activity(
-                db, "cicd.triggered",
-                project_id=task.project_id, task_id=task.id,
+                db,
+                "cicd.triggered",
+                project_id=task.project_id,
+                task_id=task.id,
                 actor="user",
                 detail=f"Triggered Jenkins build at {body.url}",
                 meta={"provider": "jenkins", "url": body.url, "success": result.get("success")},
@@ -142,8 +153,10 @@ async def trigger_generic(body: GenericTrigger, task_id: str | None = None, db: 
         task = db.query(Task).filter(Task.id == task_id).first()
         if task:
             log_activity(
-                db, "cicd.triggered",
-                project_id=task.project_id, task_id=task.id,
+                db,
+                "cicd.triggered",
+                project_id=task.project_id,
+                task_id=task.id,
                 actor="user",
                 detail=f"Triggered {body.method} {body.url}",
                 meta={"provider": "generic", "url": body.url, "success": result.get("success")},

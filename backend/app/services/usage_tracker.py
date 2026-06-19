@@ -8,7 +8,7 @@ intentional for a personal tool (no extra DB tables needed).
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware

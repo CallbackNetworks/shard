@@ -5,7 +5,6 @@ import pytest
 from app.models import Comment, Label, Project, Task, TaskLabel, WorkflowRule
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
 
-
 # ── _eval_condition ──────────────────────────────────────────────────────
 
 

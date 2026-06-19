@@ -1,8 +1,3 @@
-from unittest.mock import AsyncMock, patch
-
-from app.models import Integration
-
-
 # --- 1. List integrations (empty) ---
 
 

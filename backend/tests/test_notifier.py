@@ -2,7 +2,6 @@
 
 import hashlib
 import hmac
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -11,7 +10,6 @@ import pytest
 from app.models import Integration, Notification, Project, Task, WebhookDelivery
 from app.services.notifier import (
     MAX_ATTEMPTS,
-    RETRY_BACKOFF_MINUTES,
     _build_headers,
     _compute_progress,
     _create_notification,
@@ -19,7 +17,6 @@ from app.services.notifier import (
     fire_notifications,
     retry_delivery,
 )
-
 
 # ── _compute_progress ────────────────────────────────────────────────────
 
@@ -69,8 +66,9 @@ class TestBuildHeaders:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="Hook", type="webhook", url="https://example.com", secret="mysecret",
-                            events=["task.done"], active=True)
+        integ = Integration(
+            name="Hook", type="webhook", url="https://example.com", secret="mysecret", events=["task.done"], active=True
+        )
         db.add(integ)
         db.flush()
 
@@ -85,20 +83,22 @@ class TestBuildHeaders:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="Hook", type="webhook", url="https://example.com", secret=None,
-                            events=["task.done"], active=True)
+        integ = Integration(
+            name="Hook", type="webhook", url="https://example.com", secret=None, events=["task.done"], active=True
+        )
         db.add(integ)
         db.flush()
 
-        headers = _build_headers(integ, b'{}')
+        headers = _build_headers(integ, b"{}")
         assert "X-Signature" not in headers
 
     def test_bearer_auth_default(self, db):
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="I", type="generic", url="https://example.com", secret="tok123",
-                            events=["task.done"], active=True)
+        integ = Integration(
+            name="I", type="generic", url="https://example.com", secret="tok123", events=["task.done"], active=True
+        )
         db.add(integ)
         db.flush()
 
@@ -109,8 +109,9 @@ class TestBuildHeaders:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="D", type="drone", url="https://drone.ci", secret=None,
-                            events=["task.done"], active=True)
+        integ = Integration(
+            name="D", type="drone", url="https://drone.ci", secret=None, events=["task.done"], active=True
+        )
         db.add(integ)
         db.flush()
 
@@ -122,8 +123,9 @@ class TestBuildHeaders:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="C", type="generic", url="https://example.com", secret=None,
-                            events=["task.done"], active=True)
+        integ = Integration(
+            name="C", type="generic", url="https://example.com", secret=None, events=["task.done"], active=True
+        )
         integ.custom_headers = {"X-Custom": "value1"}
         db.add(integ)
         db.flush()
@@ -135,8 +137,7 @@ class TestBuildHeaders:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="I", type="generic", url="https://example.com", secret=None,
-                            events=[], active=True)
+        integ = Integration(name="I", type="generic", url="https://example.com", secret=None, events=[], active=True)
         db.add(integ)
         db.flush()
 
@@ -153,8 +154,9 @@ class TestDispatchWebhook:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="Hook", type="webhook", url="https://example.com/hook",
-                            secret="s", events=["task.done"], active=True)
+        integ = Integration(
+            name="Hook", type="webhook", url="https://example.com/hook", secret="s", events=["task.done"], active=True
+        )
         db.add(integ)
         db.flush()
         return integ
@@ -202,9 +204,13 @@ class TestDispatchWebhook:
     @pytest.mark.asyncio
     async def test_max_attempts_marks_dead(self, db, integration):
         delivery = WebhookDelivery(
-            integration_id=integration.id, event="task.done",
-            payload={}, request_url=integration.url,
-            request_headers={}, attempt=MAX_ATTEMPTS, status="pending",
+            integration_id=integration.id,
+            event="task.done",
+            payload={},
+            request_url=integration.url,
+            request_headers={},
+            attempt=MAX_ATTEMPTS,
+            status="pending",
         )
         db.add(delivery)
         db.flush()
@@ -241,8 +247,9 @@ class TestFireNotifications:
     @pytest.mark.asyncio
     async def test_matching_integration_gets_called(self, db, setup):
         p, t = setup
-        integ = Integration(name="I", type="webhook", url="https://hook.test",
-                            events=["task.done"], active=True, project_id=p.id)
+        integ = Integration(
+            name="I", type="webhook", url="https://hook.test", events=["task.done"], active=True, project_id=p.id
+        )
         db.add(integ)
         db.flush()
 
@@ -258,8 +265,9 @@ class TestFireNotifications:
     @pytest.mark.asyncio
     async def test_non_matching_event_not_called(self, db, setup):
         p, t = setup
-        integ = Integration(name="I", type="webhook", url="https://hook.test",
-                            events=["task.failed"], active=True, project_id=p.id)
+        integ = Integration(
+            name="I", type="webhook", url="https://hook.test", events=["task.failed"], active=True, project_id=p.id
+        )
         db.add(integ)
         db.flush()
 
@@ -271,8 +279,9 @@ class TestFireNotifications:
     @pytest.mark.asyncio
     async def test_inactive_integration_not_queried(self, db, setup):
         p, t = setup
-        integ = Integration(name="I", type="webhook", url="https://hook.test",
-                            events=["task.done"], active=False, project_id=p.id)
+        integ = Integration(
+            name="I", type="webhook", url="https://hook.test", events=["task.done"], active=False, project_id=p.id
+        )
         db.add(integ)
         db.flush()
 
@@ -287,8 +296,9 @@ class TestFireNotifications:
         # No webhook integrations, but should still create notification
         with patch("app.services.notifier._dispatch_webhook", new_callable=AsyncMock):
             # Need at least one matching integration to not return early
-            integ = Integration(name="I", type="webhook", url="https://hook.test",
-                                events=["task.done"], active=True, project_id=p.id)
+            integ = Integration(
+                name="I", type="webhook", url="https://hook.test", events=["task.done"], active=True, project_id=p.id
+            )
             db.add(integ)
             db.flush()
             await fire_notifications(db, t, "task.done")
@@ -340,15 +350,18 @@ class TestRetryDelivery:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="I", type="webhook", url="https://example.com",
-                            events=["task.done"], active=True)
+        integ = Integration(name="I", type="webhook", url="https://example.com", events=["task.done"], active=True)
         db.add(integ)
         db.flush()
 
         delivery = WebhookDelivery(
-            integration_id=integ.id, event="task.done",
-            payload={"event": "task.done"}, request_url=integ.url,
-            request_headers={}, attempt=1, status="failed",
+            integration_id=integ.id,
+            event="task.done",
+            payload={"event": "task.done"},
+            request_url=integ.url,
+            request_headers={},
+            attempt=1,
+            status="failed",
         )
         db.add(delivery)
         db.flush()
@@ -374,9 +387,13 @@ class TestRetryDelivery:
     @pytest.mark.asyncio
     async def test_retry_missing_integration_marks_dead(self, db):
         delivery = WebhookDelivery(
-            integration_id="nonexistent-id", event="task.done",
-            payload={}, request_url="https://example.com",
-            request_headers={}, attempt=1, status="failed",
+            integration_id="nonexistent-id",
+            event="task.done",
+            payload={},
+            request_url="https://example.com",
+            request_headers={},
+            attempt=1,
+            status="failed",
         )
         db.add(delivery)
         db.flush()

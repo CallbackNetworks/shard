@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Project, Task, WebhookEvent
-from app.schemas import TaskOut, WebhookCallback, WebhookEventOut
+from app.schemas import TaskOut, WebhookEventOut
 from app.services.activity import log_activity
 from app.services.cicd_adapters import normalize_webhook_payload
 from app.services.notifier import fire_notifications
@@ -77,7 +77,9 @@ async def webhook_callback(
     callback_token: str,
     request: Request,
     db: Session = Depends(get_db),
-    provider: str | None = Query(None, description="Force CI/CD provider detection (github, gitlab, jenkins, drone, bitbucket)"),
+    provider: str | None = Query(
+        None, description="Force CI/CD provider detection (github, gitlab, jenkins, drone, bitbucket)"
+    ),
 ):
     """
     Inbound CI/CD webhook callback.
@@ -107,8 +109,8 @@ async def webhook_callback(
 
     try:
         body = json.loads(body_bytes) if body_bytes else {}
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
 
     # Normalize the payload through CI/CD adapters
     normalized = normalize_webhook_payload(headers, body, provider_hint=provider)

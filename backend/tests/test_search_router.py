@@ -76,9 +76,7 @@ def test_search_pagination(client, db, sample_project):
     assert len(data["tasks"]) == 2
 
     # Offset by 3, should get remaining 2
-    resp = client.get(
-        "/search", params={"q": "Paginate task", "limit": 10, "offset": 3}
-    )
+    resp = client.get("/search", params={"q": "Paginate task", "limit": 10, "offset": 3})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["tasks"]) == 2

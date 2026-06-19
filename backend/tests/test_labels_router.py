@@ -123,10 +123,14 @@ def test_remove_label_from_task(client, db, sample_project):
     assert r.status_code == 204
 
     # Verify the association is gone in the DB
-    assoc = db.query(TaskLabel).filter(
-        TaskLabel.task_id == task.id,
-        TaskLabel.label_id == label.id,
-    ).first()
+    assoc = (
+        db.query(TaskLabel)
+        .filter(
+            TaskLabel.task_id == task.id,
+            TaskLabel.label_id == label.id,
+        )
+        .first()
+    )
     assert assoc is None
 
 
@@ -141,10 +145,14 @@ def test_delete_label_cascades(client, db, sample_project):
     client.post(_task_label_url(sample_project.id, task.id, label.id))
 
     # Verify the association exists
-    assoc = db.query(TaskLabel).filter(
-        TaskLabel.task_id == task.id,
-        TaskLabel.label_id == label.id,
-    ).first()
+    assoc = (
+        db.query(TaskLabel)
+        .filter(
+            TaskLabel.task_id == task.id,
+            TaskLabel.label_id == label.id,
+        )
+        .first()
+    )
     assert assoc is not None
 
     # Delete the label itself
@@ -153,8 +161,12 @@ def test_delete_label_cascades(client, db, sample_project):
 
     # The task-label association should be gone too
     db.expire_all()
-    assoc = db.query(TaskLabel).filter(
-        TaskLabel.task_id == task.id,
-        TaskLabel.label_id == label.id,
-    ).first()
+    assoc = (
+        db.query(TaskLabel)
+        .filter(
+            TaskLabel.task_id == task.id,
+            TaskLabel.label_id == label.id,
+        )
+        .first()
+    )
     assert assoc is None

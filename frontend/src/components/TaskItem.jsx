@@ -24,7 +24,7 @@ const PRIORITY_TEXT = {
   high: '#f3727f',
 }
 
-export default function TaskItem({ task, projectId, onUpdate, onDelete }) {
+export default function TaskItem({ task, projectId: _projectId, onUpdate, onDelete }) {
   const [copied, setCopied] = useState(false)
 
   const copyToken = (e) => {

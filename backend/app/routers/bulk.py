@@ -58,11 +58,7 @@ async def bulk_update_tasks(
 ):
     project = get_project_or_404(project_id, db)
 
-    tasks = (
-        db.query(Task)
-        .filter(Task.project_id == project_id, Task.id.in_(body.task_ids))
-        .all()
-    )
+    tasks = db.query(Task).filter(Task.project_id == project_id, Task.id.in_(body.task_ids)).all()
 
     updated_ids: list[str] = []
 
@@ -78,19 +74,13 @@ async def bulk_update_tasks(
 
         # Add labels
         for label_id in body.add_label_ids:
-            exists = (
-                db.query(TaskLabel)
-                .filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label_id)
-                .first()
-            )
+            exists = db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label_id).first()
             if not exists:
                 db.add(TaskLabel(task_id=task.id, label_id=label_id))
 
         # Remove labels
         for label_id in body.remove_label_ids:
-            db.query(TaskLabel).filter(
-                TaskLabel.task_id == task.id, TaskLabel.label_id == label_id
-            ).delete()
+            db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label_id).delete()
 
         updated_ids.append(task.id)
 
@@ -145,10 +135,7 @@ def export_tasks(
     get_project_or_404(project_id, db)
 
     tasks = (
-        db.query(Task)
-        .filter(Task.project_id == project_id)
-        .order_by(Task.position.asc(), Task.created_at.asc())
-        .all()
+        db.query(Task).filter(Task.project_id == project_id).order_by(Task.position.asc(), Task.created_at.asc()).all()
     )
 
     rows = []
@@ -267,11 +254,7 @@ def ical_feed(
 ):
     get_project_or_404(project_id, db)
 
-    tasks = (
-        db.query(Task)
-        .filter(Task.project_id == project_id, Task.due_date.isnot(None))
-        .all()
-    )
+    tasks = db.query(Task).filter(Task.project_id == project_id, Task.due_date.isnot(None)).all()
 
     lines = [
         "BEGIN:VCALENDAR",

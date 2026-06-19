@@ -5,10 +5,13 @@ def test_list_templates_empty(client):
 
 
 def test_create_template(client):
-    r = client.post("/templates", json={
-        "name": "Bug report",
-        "priority": "high",
-    })
+    r = client.post(
+        "/templates",
+        json={
+            "name": "Bug report",
+            "priority": "high",
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Bug report"
@@ -19,14 +22,17 @@ def test_create_template(client):
 
 
 def test_create_template_with_subtasks(client):
-    r = client.post("/templates", json={
-        "name": "Feature request",
-        "priority": "medium",
-        "subtasks": [
-            {"title": "Design", "priority": "high"},
-            {"title": "Implement", "priority": "medium"},
-        ],
-    })
+    r = client.post(
+        "/templates",
+        json={
+            "name": "Feature request",
+            "priority": "medium",
+            "subtasks": [
+                {"title": "Design", "priority": "high"},
+                {"title": "Implement", "priority": "medium"},
+            ],
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Feature request"
@@ -37,18 +43,24 @@ def test_create_template_with_subtasks(client):
 
 def test_list_templates_filter_project(client, sample_project):
     # Create a template linked to sample_project
-    r1 = client.post("/templates", json={
-        "name": "Project template",
-        "priority": "low",
-        "project_id": sample_project.id,
-    })
+    r1 = client.post(
+        "/templates",
+        json={
+            "name": "Project template",
+            "priority": "low",
+            "project_id": sample_project.id,
+        },
+    )
     assert r1.status_code == 201
 
     # Create a global template (no project_id)
-    r2 = client.post("/templates", json={
-        "name": "Global template",
-        "priority": "medium",
-    })
+    r2 = client.post(
+        "/templates",
+        json={
+            "name": "Global template",
+            "priority": "medium",
+        },
+    )
     assert r2.status_code == 201
 
     # Filter by project_id returns both project-specific and global templates
@@ -61,10 +73,13 @@ def test_list_templates_filter_project(client, sample_project):
 
 
 def test_update_template(client):
-    r = client.post("/templates", json={
-        "name": "Original name",
-        "priority": "low",
-    })
+    r = client.post(
+        "/templates",
+        json={
+            "name": "Original name",
+            "priority": "low",
+        },
+    )
     assert r.status_code == 201
     tpl_id = r.json()["id"]
 
@@ -74,10 +89,13 @@ def test_update_template(client):
 
 
 def test_delete_template(client):
-    r = client.post("/templates", json={
-        "name": "To delete",
-        "priority": "medium",
-    })
+    r = client.post(
+        "/templates",
+        json={
+            "name": "To delete",
+            "priority": "medium",
+        },
+    )
     assert r.status_code == 201
     tpl_id = r.json()["id"]
 

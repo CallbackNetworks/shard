@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project, Task
+from app.models import ApiKey, Project
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.schemas import AgentContextOut, AgentProjectInfo, AgentProjectTaskInfo
 
@@ -40,14 +40,13 @@ def api_agent_context(
     for p in projects:
         label_names = [lb.name for lb in p.labels if lb.type == "label"]
 
-        active = [
-            t for t in p.tasks
-            if t.status in ("todo", "in_progress") and t.parent_id is None
-        ]
-        active.sort(key=lambda t: (
-            0 if t.status == "in_progress" else 1,
-            priority_order.get(t.priority, 2),
-        ))
+        active = [t for t in p.tasks if t.status in ("todo", "in_progress") and t.parent_id is None]
+        active.sort(
+            key=lambda t: (
+                0 if t.status == "in_progress" else 1,
+                priority_order.get(t.priority, 2),
+            )
+        )
         active_task_infos = [
             AgentProjectTaskInfo(
                 id=t.id,
@@ -75,9 +74,18 @@ def api_agent_context(
 
     return AgentContextOut(
         capabilities=[
-            "projects", "tasks", "subtasks", "labels", "comments",
-            "dependencies", "search", "analytics", "notifications",
-            "webhooks", "workflow-rules", "attachments",
+            "projects",
+            "tasks",
+            "subtasks",
+            "labels",
+            "comments",
+            "dependencies",
+            "search",
+            "analytics",
+            "notifications",
+            "webhooks",
+            "workflow-rules",
+            "attachments",
         ],
         instructions=global_instructions or None,
         conventions={

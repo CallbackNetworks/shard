@@ -172,7 +172,6 @@ export default function GanttChart({ tasks, onUpdateTask }) {
                 </marker>
               </defs>
               {depLines.map((line, i) => {
-                const svgW = 1 // will use % but need to approximate
                 const fromX = `${line.fromLeft}%`
                 const fromY = line.fromRow * ROW_H + ROW_H / 2
                 const toX = `${line.toLeft}%`

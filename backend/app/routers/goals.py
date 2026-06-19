@@ -15,11 +15,7 @@ def _project_progress(db: Session, project_id: str) -> float:
     total = db.query(Task).filter(Task.project_id == project_id, Task.parent_id.is_(None)).count()
     if total == 0:
         return 0.0
-    done = (
-        db.query(Task)
-        .filter(Task.project_id == project_id, Task.parent_id.is_(None), Task.status == "done")
-        .count()
-    )
+    done = db.query(Task).filter(Task.project_id == project_id, Task.parent_id.is_(None), Task.status == "done").count()
     return round(done / total * 100, 1)
 
 

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from app.models import ActivityLog, Comment, Label, Project, Task, TaskLabel
+from app.models import ActivityLog, Label, Project, Task, TaskLabel
 from app.services.assistant_tools import dispatch_tool
 
 
@@ -77,11 +77,15 @@ class TestCreateTask:
     @pytest.mark.asyncio
     async def test_creates_task(self, db, project_with_tasks):
         p, _, _ = project_with_tasks
-        result = await dispatch_tool("create_task", {
-            "project_id": p.id,
-            "title": "New Task",
-            "priority": "medium",
-        }, db)
+        result = await dispatch_tool(
+            "create_task",
+            {
+                "project_id": p.id,
+                "title": "New Task",
+                "priority": "medium",
+            },
+            db,
+        )
         data = json.loads(result)
         assert data["title"] == "New Task"
         assert data["status"] == "todo"
@@ -89,10 +93,14 @@ class TestCreateTask:
 
     @pytest.mark.asyncio
     async def test_create_task_nonexistent_project(self, db):
-        result = await dispatch_tool("create_task", {
-            "project_id": "nonexistent",
-            "title": "Orphan",
-        }, db)
+        result = await dispatch_tool(
+            "create_task",
+            {
+                "project_id": "nonexistent",
+                "title": "Orphan",
+            },
+            db,
+        )
         assert "not found" in result
 
 
@@ -134,20 +142,28 @@ class TestCreateSubtask:
     @pytest.mark.asyncio
     async def test_creates_subtask(self, db, project_with_tasks):
         _, t1, _ = project_with_tasks
-        result = await dispatch_tool("create_subtask", {
-            "parent_task_id": t1.id,
-            "title": "Sub-item",
-        }, db)
+        result = await dispatch_tool(
+            "create_subtask",
+            {
+                "parent_task_id": t1.id,
+                "title": "Sub-item",
+            },
+            db,
+        )
         data = json.loads(result)
         assert data["title"] == "Sub-item"
         assert data["parent_id"] == t1.id
 
     @pytest.mark.asyncio
     async def test_subtask_nonexistent_parent(self, db):
-        result = await dispatch_tool("create_subtask", {
-            "parent_task_id": "nonexistent",
-            "title": "Orphan sub",
-        }, db)
+        result = await dispatch_tool(
+            "create_subtask",
+            {
+                "parent_task_id": "nonexistent",
+                "title": "Orphan sub",
+            },
+            db,
+        )
         assert "not found" in result
 
 
@@ -174,9 +190,7 @@ class TestManageLabels:
         db.add(label)
         db.flush()
 
-        result = await dispatch_tool("manage_labels", {
-            "action": "add", "task_id": t1.id, "label_id": label.id
-        }, db)
+        result = await dispatch_tool("manage_labels", {"action": "add", "task_id": t1.id, "label_id": label.id}, db)
         data = json.loads(result)
         assert data["status"] == "added"
 
@@ -189,9 +203,7 @@ class TestManageLabels:
         db.add(TaskLabel(task_id=t1.id, label_id=label.id))
         db.flush()
 
-        result = await dispatch_tool("manage_labels", {
-            "action": "add", "task_id": t1.id, "label_id": label.id
-        }, db)
+        result = await dispatch_tool("manage_labels", {"action": "add", "task_id": t1.id, "label_id": label.id}, db)
         assert "already" in result.lower()
 
     @pytest.mark.asyncio
@@ -203,9 +215,7 @@ class TestManageLabels:
         db.add(TaskLabel(task_id=t1.id, label_id=label.id))
         db.flush()
 
-        result = await dispatch_tool("manage_labels", {
-            "action": "remove", "task_id": t1.id, "label_id": label.id
-        }, db)
+        result = await dispatch_tool("manage_labels", {"action": "remove", "task_id": t1.id, "label_id": label.id}, db)
         data = json.loads(result)
         assert data["status"] == "removed"
 
@@ -250,10 +260,7 @@ class TestGetActivity:
     @pytest.mark.asyncio
     async def test_returns_activity_entries(self, db, project_with_tasks):
         p, t1, _ = project_with_tasks
-        entry = ActivityLog(
-            project_id=p.id, task_id=t1.id,
-            action="task.created", actor="test", detail="Created task"
-        )
+        entry = ActivityLog(project_id=p.id, task_id=t1.id, action="task.created", actor="test", detail="Created task")
         db.add(entry)
         db.flush()
 

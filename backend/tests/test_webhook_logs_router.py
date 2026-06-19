@@ -126,8 +126,7 @@ def test_list_deliveries_for_integration(client, db):
 
 def test_integration_health(client, db):
     integ = _make_integration(db)
-    _make_delivery(db, integ.id, status="success", status_code=200,
-                   delivered_at=datetime.now(UTC))
+    _make_delivery(db, integ.id, status="success", status_code=200, delivered_at=datetime.now(UTC))
     _make_delivery(db, integ.id, status="failed", status_code=500)
     db.commit()
 

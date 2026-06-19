@@ -1,7 +1,5 @@
 """Tests for CI/CD adapter detection and payload normalization."""
 
-import pytest
-
 from app.services.cicd_adapters import (
     detect_provider,
     normalize_webhook_payload,
@@ -12,7 +10,6 @@ from app.services.cicd_adapters import (
     parse_gitlab,
     parse_jenkins,
 )
-
 
 # ── detect_provider ──────────────────────────────────────────────────────
 

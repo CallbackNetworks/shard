@@ -32,9 +32,7 @@ def test_create_api_key_with_project_scope(client, sample_project):
 
 
 def test_list_shows_key_preview(client):
-    create_resp = client.post(
-        "/api-keys", json={"name": "Preview Key", "scopes": ["read"]}
-    )
+    create_resp = client.post("/api-keys", json={"name": "Preview Key", "scopes": ["read"]})
     assert create_resp.status_code == 201
     raw_key = create_resp.json()["key"]
     last4 = raw_key[-4:]
@@ -49,9 +47,7 @@ def test_list_shows_key_preview(client):
 
 
 def test_update_api_key_deactivate(client):
-    create_resp = client.post(
-        "/api-keys", json={"name": "Active Key", "scopes": ["read", "write"]}
-    )
+    create_resp = client.post("/api-keys", json={"name": "Active Key", "scopes": ["read", "write"]})
     key_id = create_resp.json()["id"]
 
     resp = client.patch(f"/api-keys/{key_id}", json={"active": False})
@@ -60,9 +56,7 @@ def test_update_api_key_deactivate(client):
 
 
 def test_delete_api_key(client):
-    create_resp = client.post(
-        "/api-keys", json={"name": "Doomed Key", "scopes": ["read"]}
-    )
+    create_resp = client.post("/api-keys", json={"name": "Doomed Key", "scopes": ["read"]})
     key_id = create_resp.json()["id"]
 
     resp = client.delete(f"/api-keys/{key_id}")

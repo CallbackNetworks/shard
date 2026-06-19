@@ -140,16 +140,12 @@ def _build_response(identity: Identity, db: Session):
                 continue
             t_labels = [{"name": tl.label.name, "color": tl.label.color} for tl in t.task_labels if tl.label]
             subtask_details = [
-                {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority}
-                for s in t.subtasks
+                {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority} for s in t.subtasks
             ]
             blocked_by = [
-                {"id": d.depends_on_id, "title": task_map.get(d.depends_on_id, "Unknown")}
-                for d in t.blocked_by_deps
+                {"id": d.depends_on_id, "title": task_map.get(d.depends_on_id, "Unknown")} for d in t.blocked_by_deps
             ]
-            blocking = [
-                {"id": d.task_id, "title": task_map.get(d.task_id, "Unknown")} for d in t.blocking_deps
-            ]
+            blocking = [{"id": d.task_id, "title": task_map.get(d.task_id, "Unknown")} for d in t.blocking_deps]
             task_list.append(
                 {
                     "id": t.id,

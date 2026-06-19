@@ -4,6 +4,7 @@
 def _enable_auth(pw="secret123"):
     """Temporarily enable auth with a password."""
     import app.routers.auth as auth_mod
+
     old_pw = auth_mod.AUTH_PASSWORD
     auth_mod.AUTH_PASSWORD = pw
     auth_mod._active_tokens.clear()
@@ -12,6 +13,7 @@ def _enable_auth(pw="secret123"):
 
 def _restore_auth(old_pw):
     import app.routers.auth as auth_mod
+
     auth_mod.AUTH_PASSWORD = old_pw
     auth_mod._active_tokens.clear()
 

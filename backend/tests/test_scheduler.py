@@ -308,15 +308,17 @@ class TestRetryFailedWebhooks:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="I", type="webhook", url="https://example.com",
-                            events=["task.done"], active=True)
+        integ = Integration(name="I", type="webhook", url="https://example.com", events=["task.done"], active=True)
         db.add(integ)
         db.flush()
 
         delivery = WebhookDelivery(
-            integration_id=integ.id, event="task.done",
-            payload={}, request_url=integ.url,
-            request_headers={}, attempt=1,
+            integration_id=integ.id,
+            event="task.done",
+            payload={},
+            request_url=integ.url,
+            request_headers={},
+            attempt=1,
             status="failed",
             next_retry_at=_now() - timedelta(minutes=5),
         )
@@ -334,15 +336,17 @@ class TestRetryFailedWebhooks:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        integ = Integration(name="I", type="webhook", url="https://example.com",
-                            events=["task.done"], active=True)
+        integ = Integration(name="I", type="webhook", url="https://example.com", events=["task.done"], active=True)
         db.add(integ)
         db.flush()
 
         delivery = WebhookDelivery(
-            integration_id=integ.id, event="task.done",
-            payload={}, request_url=integ.url,
-            request_headers={}, attempt=1,
+            integration_id=integ.id,
+            event="task.done",
+            payload={},
+            request_url=integ.url,
+            request_headers={},
+            attempt=1,
             status="failed",
             next_retry_at=_now() + timedelta(hours=1),
         )
@@ -362,18 +366,20 @@ class TestSendDailySummary:
     @pytest.mark.asyncio
     async def test_sends_once_per_day(self, db):
         import app.services.scheduler as sched
+
         sched._last_summary_date = None
 
         p = Project(name="P", status="active")
         db.add(p)
         db.flush()
-        integ = Integration(name="Email", type="email", url="", email_to="test@test.com",
-                            events=[], active=True)
+        integ = Integration(name="Email", type="email", url="", email_to="test@test.com", events=[], active=True)
         db.add(integ)
         db.commit()
 
-        with patch("app.services.scheduler.email_sender") as mock_email, \
-             patch("app.services.scheduler.SUMMARY_HOUR", 0):
+        with (
+            patch("app.services.scheduler.email_sender") as mock_email,
+            patch("app.services.scheduler.SUMMARY_HOUR", 0),
+        ):
             mock_email.send_email.return_value = True
             await _send_daily_summary(db)
             first_call_count = mock_email.send_email.call_count
@@ -385,10 +391,13 @@ class TestSendDailySummary:
     @pytest.mark.asyncio
     async def test_skips_before_summary_hour(self, db):
         import app.services.scheduler as sched
+
         sched._last_summary_date = None
 
-        with patch("app.services.scheduler.SUMMARY_HOUR", 23), \
-             patch("app.services.scheduler.email_sender") as mock_email:
+        with (
+            patch("app.services.scheduler.SUMMARY_HOUR", 23),
+            patch("app.services.scheduler.email_sender") as mock_email,
+        ):
             # Unless current hour >= 23, it should skip
             now = _now()
             if now.hour < 23:

@@ -166,7 +166,10 @@ TOOLS = [
             "properties": {
                 "task_id": {"type": "string", "description": "Task ID to tag"},
                 "decision_label_id": {"type": "string", "description": "Decision label ID to attach"},
-                "reason": {"type": "string", "description": "Explanation of why this task relates to or conflicts with the decision"},
+                "reason": {
+                    "type": "string",
+                    "description": "Explanation of why this task relates to or conflicts with the decision",
+                },
             },
             "required": ["task_id", "decision_label_id", "reason"],
         },
@@ -470,23 +473,36 @@ def _tool_analyze_decisions(db: Session, project_id: str) -> str:
         .all()
     )
     activity_data = [
-        {"action": a.action, "detail": a.detail, "actor": a.actor, "created_at": a.created_at.isoformat() if a.created_at else None}
+        {
+            "action": a.action,
+            "detail": a.detail,
+            "actor": a.actor,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
         for a in activities
     ]
 
     # Comments on tasks in this project
     task_ids = [t.id for t in tasks]
-    comments = db.query(Comment).filter(Comment.task_id.in_(task_ids)).order_by(Comment.created_at.desc()).limit(50).all() if task_ids else []
+    comments = (
+        db.query(Comment).filter(Comment.task_id.in_(task_ids)).order_by(Comment.created_at.desc()).limit(50).all()
+        if task_ids
+        else []
+    )
     comments_data = [
-        {"task_id": c.task_id, "body": (c.body or "")[:300], "author": c.author, "created_at": c.created_at.isoformat() if c.created_at else None}
+        {
+            "task_id": c.task_id,
+            "body": (c.body or "")[:300],
+            "author": c.author,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
         for c in comments
     ]
 
     # Workflow rules
     rules = db.query(WorkflowRule).filter(WorkflowRule.project_id == project_id).all()
     rules_data = [
-        {"name": r.name, "trigger": r.trigger, "conditions": r.conditions, "actions": r.actions}
-        for r in rules
+        {"name": r.name, "trigger": r.trigger, "conditions": r.conditions, "actions": r.actions} for r in rules
     ]
 
     # Existing decisions (to avoid duplicates)

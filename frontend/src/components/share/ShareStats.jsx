@@ -1,4 +1,4 @@
-import { DIM, HI, useCountUp } from '../OverviewViews'
+import { DIM, useCountUp } from '../OverviewViews'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 

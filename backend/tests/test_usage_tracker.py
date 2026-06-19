@@ -16,7 +16,9 @@ class TestNormalizePath:
         assert _normalize_path("/items/42") == "/items/:n"
 
     def test_mixed_segments(self):
-        result = _normalize_path("/projects/a1b2c3d4-e5f6-7890-abcd-ef1234567890/tasks/b2c3d4e5-f6a7-8901-bcde-f12345678901")
+        result = _normalize_path(
+            "/projects/a1b2c3d4-e5f6-7890-abcd-ef1234567890/tasks/b2c3d4e5-f6a7-8901-bcde-f12345678901"
+        )
         assert result == "/projects/:id/tasks/:id"
 
     def test_preserves_non_id_segments(self):
@@ -95,5 +97,6 @@ class TestUsageTracker:
 
     def test_avg_ms_zero_when_no_hits(self):
         from app.services.usage_tracker import RouteStats
+
         stats = RouteStats()
         assert stats.avg_ms == 0.0

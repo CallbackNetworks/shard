@@ -475,9 +475,7 @@ class GoalProject(Base):
     __tablename__ = "goal_projects"
 
     goal_id: Mapped[str] = mapped_column(String(36), ForeignKey("goals.id", ondelete="CASCADE"), primary_key=True)
-    project_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
-    )
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
 
     goal: Mapped["Goal"] = relationship("Goal", back_populates="goal_projects")
     project: Mapped["Project"] = relationship("Project")

@@ -1,5 +1,3 @@
-import { DIM } from '../OverviewViews'
-
 export default function ShareFooter({ generatedAt }) {
   const ts = generatedAt ? new Date(generatedAt).toLocaleString() : ''
 

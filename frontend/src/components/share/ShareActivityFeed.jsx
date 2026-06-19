@@ -60,7 +60,7 @@ function ActivityEntry({ entry, index }) {
   )
 }
 
-export default function ShareActivityFeed({ activity, bp }) {
+export default function ShareActivityFeed({ activity, bp: _bp }) {
   const [ref, visible] = useScrollReveal(0.1)
 
   if (!activity || activity.length === 0) return null

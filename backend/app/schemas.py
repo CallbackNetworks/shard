@@ -76,7 +76,7 @@ class ProjectCreate(BaseModel):
     description: str | None = Field(None, description="Optional project description")
     agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
     repo_url: str | None = Field(None, description="Repository URL linked to this project")
-    wip_limits: dict | None = Field(None, description="WIP limits per status column, e.g. {\"in_progress\": 3}")
+    wip_limits: dict | None = Field(None, description='WIP limits per status column, e.g. {"in_progress": 3}')
 
 
 class ProjectUpdate(BaseModel):
@@ -267,7 +267,9 @@ class IntegrationCreate(BaseModel):
 
 class IntegrationUpdate(BaseModel):
     name: str | None = None
-    type: Literal["jenkins", "drone", "generic", "email", "webhook", "github", "gitlab", "bitbucket", "circleci"] | None = None
+    type: (
+        Literal["jenkins", "drone", "generic", "email", "webhook", "github", "gitlab", "bitbucket", "circleci"] | None
+    ) = None
     url: str | None = None
     secret: str | None = None
     project_id: str | None = None
@@ -751,7 +753,9 @@ class ActivityEntryOut(BaseModel):
 class SavedFilterCreate(BaseModel):
     name: str
     project_id: str | None = None
-    filters: dict = Field(description="Filter criteria: {status[], priority[], label_ids[], assignee, due_before, due_after}")
+    filters: dict = Field(
+        description="Filter criteria: {status[], priority[], label_ids[], assignee, due_before, due_after}"
+    )
 
 
 class SavedFilterUpdate(BaseModel):

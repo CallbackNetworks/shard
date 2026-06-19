@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ToastProvider, useToast, globalAddToast, setGlobalToastFn } from '../ToastContext'
+import { ToastProvider, useToast, globalAddToast } from '../ToastContext'
 
 function TestConsumer() {
   const { addToast } = useToast()

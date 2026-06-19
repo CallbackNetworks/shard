@@ -324,7 +324,9 @@ def parse_bitbucket(headers: dict[str, str], body: dict) -> dict[str, Any]:
 
         target = pipeline.get("target", {})
         if isinstance(target, dict):
-            result["commit_sha"] = target.get("commit", {}).get("hash") if isinstance(target.get("commit"), dict) else None
+            result["commit_sha"] = (
+                target.get("commit", {}).get("hash") if isinstance(target.get("commit"), dict) else None
+            )
             ref = target.get("ref_name") or target.get("selector", {}).get("pattern")
             result["branch"] = ref
 

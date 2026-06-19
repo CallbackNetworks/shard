@@ -3,8 +3,7 @@
 
 def test_websocket_connect_and_disconnect(client):
     """Test basic WebSocket connection lifecycle."""
-    with client.websocket_connect("/ws") as ws:
-        # Connection established; just close it
+    with client.websocket_connect("/ws"):
         pass
     # If we reach here, connect + disconnect succeeded
 
