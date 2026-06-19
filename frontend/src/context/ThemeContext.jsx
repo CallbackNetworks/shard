@@ -35,7 +35,7 @@ export function ThemeProvider({ children }) {
 
   const setMode = useCallback((m) => {
     setModeState(m)
-    try { localStorage.setItem(STORAGE_KEY, m) } catch {}
+    try { localStorage.setItem(STORAGE_KEY, m) } catch { /* storage unavailable */ }
   }, [])
 
   const toggle = useCallback(() => {

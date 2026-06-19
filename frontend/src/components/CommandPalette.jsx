@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash } from 'lucide-react'
-import { getProjects, getIdentities, search } from '../api/client'
+import { getProjects, search } from '../api/client'
 import { SHADOW_LG, DARK } from '../constants/theme'
 
 const BACKDROP = 'rgba(0,0,0,0.8)'

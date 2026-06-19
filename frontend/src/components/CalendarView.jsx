@@ -35,7 +35,7 @@ function formatDateISO(date) {
   return `${y}-${m}-${d}T00:00:00`
 }
 
-export default function CalendarView({ tasks, onUpdateTask, projectId }) {
+export default function CalendarView({ tasks, onUpdateTask, projectId: _projectId }) {
   const { t } = useTranslation()
   const today = new Date()
   const [currentYear, setCurrentYear] = useState(today.getFullYear())

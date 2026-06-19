@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, Mail, Clock, Lock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getSettings, changePassword } from '../api/client'
 import { DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'

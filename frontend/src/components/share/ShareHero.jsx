@@ -1,9 +1,9 @@
-import { FONT, BG, DIM, HI } from '../OverviewViews'
+import { DIM, HI } from '../OverviewViews'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 const PARA = (px = 8) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 
-export default function ShareHero({ identity, summary, now, bp }) {
+export default function ShareHero({ identity, summary: _summary, now, bp }) {
   const color = identity?.color || '#1ed760'
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const dateStr = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })

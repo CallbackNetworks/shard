@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getProjects, getIdentities, getIdentityProjects } from '../api/client'
 import {
   FONT, BG, LINE, DIM, HI,
-  urgencyScore, urgencyColor,
+  urgencyScore,
   Bar, TabBtn,
   ViewProgress, ViewHealth, ViewTasks, ViewCompare,
   getPinnedIds, togglePin,

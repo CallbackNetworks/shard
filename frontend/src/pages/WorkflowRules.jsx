@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Play, X, Zap, GitMerge } from 'lucide-react'
+import { Plus, Trash2, Play, X, GitMerge } from 'lucide-react'
 import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { DARK } from '../constants/theme'

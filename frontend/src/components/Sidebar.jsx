@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText, Target, Activity, MessageCircle, Settings2, Sun, Moon } from 'lucide-react'
 import { getProjects, getIdentities } from '../api/client'
-import { BRAND, INSET_SHADOW, DARK } from '../constants/theme'
+import { BRAND, INSET_SHADOW } from '../constants/theme'
 import { useTheme } from '../context/ThemeContext'
 
 export default function Sidebar({ onOpenPalette }) {

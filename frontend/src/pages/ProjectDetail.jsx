@@ -1,14 +1,14 @@
 import { useState, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, Calendar, CheckSquare, Save, Bookmark, Rss, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
   createCycle, updateCycle, deleteCycle, addTaskToCycle, removeTaskFromCycle,
   reorderTasks,
-  bulkUpdateTasks, exportTasks, exportTasksCsv, importTasks,
-  getSavedFilters, createSavedFilter, deleteSavedFilter,
+  bulkUpdateTasks, exportTasks, importTasks,
+  getSavedFilters, createSavedFilter,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
 import GanttChart from '../components/GanttChart'
@@ -259,11 +259,6 @@ export default function ProjectDetail() {
 
   const saveFilterMut = useMutation({
     mutationFn: (data) => createSavedFilter(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-filters', id] }),
-  })
-
-  const deleteFilterMut = useMutation({
-    mutationFn: (filterId) => deleteSavedFilter(filterId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-filters', id] }),
   })
 

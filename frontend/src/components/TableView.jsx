@@ -142,7 +142,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
   )
 }
 
-export default function TableView({ tasks, projectId, labels, cycles, onUpdate, onReorder }) {
+export default function TableView({ tasks, projectId: _projectId, labels: _labels, cycles, onUpdate, onReorder }) {
   const { t } = useTranslation()
   const [sortKey, setSortKey] = useState('position')
   const [sortDir, setSortDir] = useState('asc')

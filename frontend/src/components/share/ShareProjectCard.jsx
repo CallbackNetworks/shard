@@ -207,7 +207,7 @@ function TaskRow({ task, index, bp }) {
   )
 }
 
-export default function ShareProjectCard({ project, index, bp }) {
+export default function ShareProjectCard({ project, index: _index, bp }) {
   const [expanded, setExpanded] = useState(false)
   const [ref, visible] = useScrollReveal(0.1)
   const u = urgencyScore(project)
