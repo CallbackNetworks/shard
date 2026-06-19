@@ -9,7 +9,7 @@ on:
 jobs:
   backend:
     name: Backend tests
-    runs-on: ubuntu-latest
+    runs-on: ci-builder
     defaults:
       run:
         working-directory: backend
@@ -41,7 +41,7 @@ jobs:
 
   frontend-build:
     name: Frontend build
-    runs-on: ubuntu-latest
+    runs-on: ci-builder
     defaults:
       run:
         working-directory: frontend
@@ -73,7 +73,7 @@ jobs:
 
   docker-build:
     name: Docker Compose build (dev)
-    runs-on: ubuntu-latest
+    runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
 
@@ -83,7 +83,7 @@ jobs:
   integration:
     name: Integration smoke test (prod)
     needs: [backend, frontend-build]
-    runs-on: ubuntu-latest
+    runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
 
