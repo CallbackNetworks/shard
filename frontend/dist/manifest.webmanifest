@@ -1,1 +1,0 @@
-{"name":"Shard","short_name":"Shard","description":"Multi-identity task manager","start_url":"/app","display":"standalone","background_color":"#07080f","theme_color":"#07080f","lang":"en","scope":"/","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}

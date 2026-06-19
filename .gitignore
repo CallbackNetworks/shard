@@ -10,6 +10,13 @@ __pycache__/
 # Node
 node_modules/
 
+# Build artifacts
+frontend/dist/
+
+# Coverage
+.coverage
+backend/.coverage
+
 # Editor
 .DS_Store
 *.swp

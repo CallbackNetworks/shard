@@ -1,1 +1,0 @@
-import{r as t}from"./index-Dv8tPE--.js";function o(){const[n,i]=t.useState(()=>window.innerWidth>=800?"desktop":window.innerWidth>=600?"tablet":"mobile");return t.useEffect(()=>{const e=()=>i(window.innerWidth>=800?"desktop":window.innerWidth>=600?"tablet":"mobile");return window.addEventListener("resize",e),()=>window.removeEventListener("resize",e)},[]),n}export{o as u};
