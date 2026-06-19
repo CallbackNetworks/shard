@@ -229,11 +229,11 @@ async def _send_daily_summary(db: Session) -> None:
 
         {"<h3 style='color: #16a34a; margin: 0 0 8px;'>Completed Yesterday (" + str(len(completed_yesterday)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #4b5563;'>" + ''.join(completed_items) + "</ul>" if completed_items else "<p style='color: #9ca3af; font-size: 13px;'>No tasks completed yesterday.</p>"}
       </div>
-      <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">Sent by TODO Platform</p>
+      <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">Sent by Shard</p>
     </div>
     """
 
-    subject = f"[TODO Platform] Daily Summary — {now.strftime('%b %d')}"
+    subject = f"[Shard] Daily Summary — {now.strftime('%b %d')}"
 
     # Send to all email-type integrations
     integrations = (

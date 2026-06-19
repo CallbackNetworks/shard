@@ -276,7 +276,7 @@ def ical_feed(
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//TODO Platform//EN",
+        "PRODID:-//Shard//EN",
     ]
 
     for t in tasks:
@@ -286,7 +286,7 @@ def ical_feed(
         lines.extend(
             [
                 "BEGIN:VEVENT",
-                f"UID:{t.id}@todo-platform",
+                f"UID:{t.id}@shard",
                 f"DTSTART;VALUE=DATE:{dt_str}",
                 f"SUMMARY:{t.title}",
                 f"DESCRIPTION:{description}",

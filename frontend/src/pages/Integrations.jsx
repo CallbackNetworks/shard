@@ -348,7 +348,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
     name: '', type: 'generic', url: '', secret: '', project_id: '',
     events: ['task.done', 'task.failed', 'project.complete'], active: true,
-    email_to: '', email_subject_prefix: '[TODO Platform]',
+    email_to: '', email_subject_prefix: '[Shard]',
     auth_type: 'bearer', auth_config: {}, custom_headers: {}, template_id: null,
   })
   const [showSetup, setShowSetup] = useState(null)
@@ -397,7 +397,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
                 <input value={form.email_to} onChange={e => set('email_to', e.target.value)} placeholder={t('integrations.recipientsPlaceholder')} className={s.inputStyle} />
               </label>
               <label className={s.labelStyle}>{t('integrations.subjectPrefix')}
-                <input value={form.email_subject_prefix} onChange={e => set('email_subject_prefix', e.target.value)} placeholder="[TODO Platform]" className={s.inputStyle} />
+                <input value={form.email_subject_prefix} onChange={e => set('email_subject_prefix', e.target.value)} placeholder="[Shard]" className={s.inputStyle} />
               </label>
             </>
           ) : (
@@ -543,7 +543,7 @@ export default function Integrations() {
       project_id: form.project_id || null,
       secret: form.secret || null,
       email_to: form.email_to || null,
-      email_subject_prefix: form.email_subject_prefix || '[TODO Platform]',
+      email_subject_prefix: form.email_subject_prefix || '[Shard]',
       custom_headers: form.custom_headers && Object.keys(form.custom_headers).length > 0 ? form.custom_headers : null,
       auth_config: form.auth_config && Object.keys(form.auth_config).length > 0 ? form.auth_config : null,
     }
@@ -559,7 +559,7 @@ export default function Integrations() {
       data: {
         name: tmpl.name, type: tmpl.type, url: '', secret: '',
         project_id: '', events: tmpl.default_events, active: true,
-        email_to: '', email_subject_prefix: '[TODO Platform]',
+        email_to: '', email_subject_prefix: '[Shard]',
         auth_type: tmpl.auth_type || 'bearer', auth_config: {}, custom_headers: {},
         template_id: tmpl.id,
       },
@@ -648,7 +648,7 @@ export default function Integrations() {
                   </button>
                   <button onClick={() => setModal({ mode: 'edit', data: {
                     ...intg, secret: intg.secret || '', project_id: intg.project_id || '',
-                    email_to: intg.email_to || '', email_subject_prefix: intg.email_subject_prefix || '[TODO Platform]',
+                    email_to: intg.email_to || '', email_subject_prefix: intg.email_subject_prefix || '[Shard]',
                     auth_type: intg.auth_type || 'bearer', auth_config: intg.auth_config || {},
                     custom_headers: intg.custom_headers || {},
                   }})}

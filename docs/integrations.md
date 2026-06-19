@@ -93,7 +93,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: make build
-      - name: Notify TODO Platform
+      - name: Notify Shard
         if: always()
         run: |
           STATUS=${{ job.status == 'success' && 'done' || 'failed' }}
@@ -160,7 +160,7 @@ pipeline {
             sh """
                 curl -s -X POST ${TODO_WEBHOOK_URL} \
                   -H 'Content-Type: application/json' \
-                  -H 'X-Jenkins-Source: todo-platform' \
+                  -H 'X-Jenkins-Source: shard' \
                   -d '{"build": {"phase": "FINALIZED", "status": "SUCCESS", "number": ${BUILD_NUMBER}, "full_url": "${BUILD_URL}"}}'
             """
         }
@@ -168,7 +168,7 @@ pipeline {
             sh """
                 curl -s -X POST ${TODO_WEBHOOK_URL} \
                   -H 'Content-Type: application/json' \
-                  -H 'X-Jenkins-Source: todo-platform' \
+                  -H 'X-Jenkins-Source: shard' \
                   -d '{"build": {"phase": "FINALIZED", "status": "FAILURE", "number": ${BUILD_NUMBER}, "full_url": "${BUILD_URL}"}}'
             """
         }
@@ -243,7 +243,7 @@ jobs:
       - image: cimg/base:stable
     steps:
       - run:
-          name: Notify TODO Platform
+          name: Notify Shard
           command: |
             curl -s -X POST "$TODO_WEBHOOK_URL" \
               -H "Content-Type: application/json" \
@@ -473,7 +473,7 @@ Configure SMTP in your `.env` file, then create an email integration:
 1. Go to **Integrations** → **New Integration**
 2. Type: **Email**
 3. Fill in **To** (comma-separated)
-4. Optionally customize the **Subject Prefix** (default: `[TODO Platform]`)
+4. Optionally customize the **Subject Prefix** (default: `[Shard]`)
 5. Select events
 
 ### SMTP Environment Variables

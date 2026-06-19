@@ -978,5 +978,5 @@ Sent to all matching active integrations:
 
 Additional headers per integration type:
 - Drone: `X-Drone-Event: custom`
-- Jenkins: `X-Jenkins-Source: todo-platform`
+- Jenkins: `X-Jenkins-Source: shard`
 - With secret: `Authorization: Bearer {secret}`

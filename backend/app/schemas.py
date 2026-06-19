@@ -258,7 +258,7 @@ class IntegrationCreate(BaseModel):
     events: list[str] = ["task.done", "task.failed", "project.complete"]
     active: bool = True
     email_to: str | None = None
-    email_subject_prefix: str | None = "[TODO Platform]"
+    email_subject_prefix: str | None = "[Shard]"
     custom_headers: dict | None = None
     auth_type: Literal["bearer", "basic", "api_key", "none"] | None = "bearer"
     auth_config: dict | None = None
@@ -725,7 +725,7 @@ class AgentProjectInfo(BaseModel):
 
 
 class AgentContextOut(BaseModel):
-    platform: str = "TODO Platform"
+    platform: str = "Shard"
     version: str = "1.0.0"
     capabilities: list[str]
     instructions: str | None = Field(None, description="Global agent instructions from platform config")

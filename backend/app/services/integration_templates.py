@@ -20,7 +20,7 @@ Add a step at the end of your workflow that POSTs to the task's webhook URL.
 The platform will auto-detect the GitHub payload format.
 
 ```yaml
-- name: Notify TODO Platform
+- name: Notify Shard
   if: always()
   env:
     WEBHOOK_URL: ${{ secrets.TODO_WEBHOOK_URL }}
@@ -123,7 +123,7 @@ pipeline {
       sh '''
         curl -s -X POST "${TODO_WEBHOOK_URL}" \\
           -H "Content-Type: application/json" \\
-          -H "X-Jenkins-Source: todo-platform" \\
+          -H "X-Jenkins-Source: shard" \\
           -d '{"build": {"phase": "FINALIZED", "status": "SUCCESS", "number": '${BUILD_NUMBER}', "full_url": "'${BUILD_URL}'"}}'
       '''
     }
@@ -131,7 +131,7 @@ pipeline {
       sh '''
         curl -s -X POST "${TODO_WEBHOOK_URL}" \\
           -H "Content-Type: application/json" \\
-          -H "X-Jenkins-Source: todo-platform" \\
+          -H "X-Jenkins-Source: shard" \\
           -d '{"build": {"phase": "FINALIZED", "status": "FAILURE", "number": '${BUILD_NUMBER}', "full_url": "'${BUILD_URL}'"}}'
       '''
     }
@@ -288,7 +288,7 @@ jobs:
       - image: cimg/base:stable
     steps:
       - run:
-          name: Notify TODO Platform
+          name: Notify Shard
           command: |
             curl -s -X POST "$TODO_WEBHOOK_URL" \\
               -H "Content-Type: application/json" \\

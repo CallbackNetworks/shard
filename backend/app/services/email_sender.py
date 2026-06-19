@@ -51,7 +51,7 @@ def send_email(to_addresses: list[str], subject: str, html_body: str, text_body:
         return False
 
 
-def build_notification_email(event: str, payload: dict, subject_prefix: str = "[TODO Platform]") -> tuple[str, str]:
+def build_notification_email(event: str, payload: dict, subject_prefix: str = "[Shard]") -> tuple[str, str]:
     project = payload.get("project", {})
     task = payload.get("task", {})
 
@@ -92,7 +92,7 @@ def build_notification_email(event: str, payload: dict, subject_prefix: str = "[
         {"<div style='margin-bottom: 16px;'><h3 style='margin: 0 0 8px; color: #374151; font-size: 14px;'>Task</h3><p style='margin: 0; font-size: 16px; font-weight: 600;'>" + task.get('title', 'N/A') + "</p><div style='margin-top: 8px;'><span style='background: " + status_color + "; color: white; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;'>" + task_status.upper() + "</span><span style='margin-left: 8px; color: #6b7280; font-size: 13px;'>Priority: " + task.get('priority', 'N/A') + "</span></div></div>" if task.get('title') else ""}
         {"<div style='background: #f0fdf4; padding: 12px 16px; border-radius: 8px; color: #166534; font-size: 14px;'>" + payload.get('message', '') + "</div>" if payload.get('message') else ""}
       </div>
-      <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">Sent by TODO Platform</p>
+      <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">Sent by Shard</p>
     </div>
     """
 

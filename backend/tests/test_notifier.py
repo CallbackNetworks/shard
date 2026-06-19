@@ -116,7 +116,7 @@ class TestBuildHeaders:
 
         headers = _build_headers(integ)
         assert headers["X-Drone-Event"] == "custom"
-        assert headers["X-Drone-Source"] == "todo-platform"
+        assert headers["X-Drone-Source"] == "shard"
 
     def test_custom_headers_merged(self, db):
         p = Project(name="P")
@@ -141,7 +141,7 @@ class TestBuildHeaders:
         db.flush()
 
         headers = _build_headers(integ)
-        assert headers["X-Todo-Platform-Event"] == "notification"
+        assert headers["X-Shard-Event"] == "notification"
 
 
 # ── _dispatch_webhook ────────────────────────────────────────────────────

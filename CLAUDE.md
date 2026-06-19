@@ -12,11 +12,11 @@ docker compose up           # subsequent runs (hot-reload active)
 
 # With PostgreSQL:
 docker compose --profile postgres up --build
-# Set in .env: DATABASE_URL=postgresql+psycopg://todo:todo_dev@postgres:5432/todo_platform
+# Set in .env: DATABASE_URL=postgresql+psycopg://todo:todo_dev@postgres:5432/shard
 
 # With MySQL:
 docker compose --profile mysql up --build
-# Set in .env: DATABASE_URL=mysql+pymysql://todo:todo_dev@mysql:3306/todo_platform
+# Set in .env: DATABASE_URL=mysql+pymysql://todo:todo_dev@mysql:3306/shard
 ```
 
 - Backend API + Swagger UI: http://localhost:8000/docs
@@ -48,7 +48,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Database connection string (default `sqlite:///./todo_platform.db`). Supports `sqlite`, `postgresql+psycopg`, `mysql+pymysql` |
+| `DATABASE_URL` | Database connection string (default `sqlite:///./shard.db`). Supports `sqlite`, `postgresql+psycopg`, `mysql+pymysql` |
 | `DB_POOL_SIZE` | Connection pool size for PostgreSQL/MySQL (default `5`) |
 | `DB_MAX_OVERFLOW` | Max overflow connections for PostgreSQL/MySQL (default `10`) |
 | `DB_POOL_TIMEOUT` | Pool timeout in seconds for PostgreSQL/MySQL (default `30`) |

@@ -11,8 +11,8 @@
 ### 1. Clone and configure
 
 ```bash
-git clone <repo> todo-platform
-cd todo-platform
+git clone <repo> shard
+cd shard
 ```
 
 Create a `.env` file:

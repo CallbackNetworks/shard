@@ -16,8 +16,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'TODO Platform',
-        short_name: 'TODO',
+        name: 'Shard',
+        short_name: 'Shard',
         description: 'Multi-identity task manager',
         theme_color: '#07080f',
         background_color: '#07080f',

@@ -90,9 +90,9 @@ export default function Sidebar({ onOpenPalette }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 13, fontWeight: 900, color: '#000',
           boxShadow: `0 0 16px rgba(30,215,96,0.4)`,
-        }}>T</div>
+        }}>S</div>
         <span style={{ color: theme.text, fontWeight: 700, fontSize: 14, letterSpacing: '0.01em' }}>
-          TODO Platform
+          Shard
         </span>
       </div>
 

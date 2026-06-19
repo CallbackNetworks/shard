@@ -62,13 +62,13 @@ def _build_headers(integration: Integration, body_bytes: bytes | None = None) ->
     # Type-specific headers
     if integration.type == "drone":
         headers["X-Drone-Event"] = "custom"
-        headers["X-Drone-Source"] = "todo-platform"
+        headers["X-Drone-Source"] = "shard"
     elif integration.type == "jenkins":
-        headers["X-Jenkins-Source"] = "todo-platform"
+        headers["X-Jenkins-Source"] = "shard"
     elif integration.type == "github":
-        headers["X-GitHub-Source"] = "todo-platform"
+        headers["X-GitHub-Source"] = "shard"
     elif integration.type == "gitlab":
-        headers["X-GitLab-Source"] = "todo-platform"
+        headers["X-GitLab-Source"] = "shard"
 
     # Custom headers (user-defined key-value pairs)
     custom_headers = getattr(integration, "custom_headers", None)
@@ -76,7 +76,7 @@ def _build_headers(integration: Integration, body_bytes: bytes | None = None) ->
         for key, value in custom_headers.items():
             headers[str(key)] = str(value)
 
-    headers["X-Todo-Platform-Event"] = "notification"
+    headers["X-Shard-Event"] = "notification"
     return headers
 
 
@@ -182,7 +182,7 @@ async def fire_notifications(db: Session, task: Task, event: str) -> None:
             logger.warning("Email integration %s has no recipients", integration.name)
             continue
         recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
-        prefix = integration.email_subject_prefix or "[TODO Platform]"
+        prefix = integration.email_subject_prefix or "[Shard]"
         subject, html = build_notification_email(event, payload, prefix)
         send_email(recipients, subject, html)
 
@@ -250,7 +250,7 @@ async def retry_delivery(db: Session, delivery: WebhookDelivery) -> bool:
 async def fire_test_notification(integration: Integration) -> dict:
     payload = {
         "event": "test",
-        "message": "This is a test notification from the TODO platform.",
+        "message": "This is a test notification from Shard.",
         "integration": {"id": integration.id, "name": integration.name, "type": integration.type},
         "project": {"name": "Test Project", "progress": 75.0, "total_tasks": 4, "done_tasks": 3},
         "task": {"title": "Test Task", "status": "done", "priority": "high"},
@@ -263,7 +263,7 @@ async def fire_test_notification(integration: Integration) -> dict:
         if not smtp_configured():
             return {"success": False, "error": "SMTP not configured (set SMTP_HOST and SMTP_FROM env vars)"}
         recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
-        prefix = integration.email_subject_prefix or "[TODO Platform]"
+        prefix = integration.email_subject_prefix or "[Shard]"
         subject, html = build_notification_email("test", payload, prefix)
         ok = send_email(recipients, subject, html)
         return {"success": ok, "recipients": recipients} if ok else {"success": False, "error": "SMTP send failed"}

@@ -53,9 +53,9 @@ function setup(options = {}) {
 }
 
 describe('Sidebar', () => {
-  it('renders the brand text "TODO Platform"', () => {
+  it('renders the brand text "Shard"', () => {
     setup()
-    expect(screen.getByText('TODO Platform')).toBeTruthy()
+    expect(screen.getByText('Shard')).toBeTruthy()
   })
 
   it('renders nav links for main sections', () => {

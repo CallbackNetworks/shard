@@ -213,7 +213,7 @@
   "apiKeys.subtitle": "Manage API keys for external service access",
   "apiKeys.new": "+ New API Key",
   "apiKeys.empty": "No API keys yet",
-  "apiKeys.emptyHint": "Create an API key to allow external services to access the TODO Platform API",
+  "apiKeys.emptyHint": "Create an API key to allow external services to access the Shard API",
   "apiKeys.namePlaceholder": "My CI/CD Pipeline",
   "apiKeys.projectScope": "Project (leave blank for all projects)",
   "apiKeys.allProjects": "All projects",

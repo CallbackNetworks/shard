@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "todo-platform": {
+    "shard": {
       "command": "docker",
       "args": ["compose", "exec", "-T", "mcp", "python", "/app/mcp_server/server.py"],
       "cwd": "/home/chungchen/20260318"

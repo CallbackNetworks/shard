@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-The MCP (Model Context Protocol) server allows AI tools like Claude Desktop and Cursor to interact with the TODO Platform via structured tool calls over stdio transport.
+The MCP (Model Context Protocol) server allows AI tools like Claude Desktop and Cursor to interact with Shard via structured tool calls over stdio transport.
 
 The original implementation (`mcp_server/server.py`) accessed the SQLite database directly using raw `sqlite3` queries. This design bypassed the FastAPI application layer entirely, causing several silent data integrity issues:
 

@@ -1,5 +1,5 @@
 [project]
-name = "todo-platform-backend"
+name = "shard-backend"
 version = "1.0.0"
 requires-python = ">=3.11"
 

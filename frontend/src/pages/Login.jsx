@@ -96,7 +96,7 @@ export default function Login() {
             fontSize: 10, fontWeight: 800, letterSpacing: '0.22em',
             color: 'rgba(255,255,255,0.22)', textTransform: 'uppercase',
           }}>
-            TODO Platform
+            Shard
           </div>
         </div>
 

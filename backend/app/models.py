@@ -175,7 +175,7 @@ class Integration(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     # email-specific fields
     email_to: Mapped[str | None] = mapped_column(Text, nullable=True)  # comma-separated recipients
-    email_subject_prefix: Mapped[str | None] = mapped_column(String(255), nullable=True, default="[TODO Platform]")
+    email_subject_prefix: Mapped[str | None] = mapped_column(String(255), nullable=True, default="[Shard]")
     # Phase 3: custom headers & auth
     custom_headers: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {"X-Custom": "value"}
     auth_type: Mapped[str | None] = mapped_column(

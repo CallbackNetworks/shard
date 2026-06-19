@@ -1,4 +1,4 @@
-# TODO Platform
+# Shard
 
 A personal multi-identity task manager with CI/CD webhook integration. Manage tasks across multiple identities (work, side projects, roles), automate status updates via CI/CD pipeline callbacks, and share public status pages per identity.
 

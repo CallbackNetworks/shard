@@ -134,7 +134,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 
 app = FastAPI(
-    title="TODO Platform",
+    title="Shard",
     version="1.0.0",
     description=API_DESCRIPTION,
     openapi_tags=tags_metadata,

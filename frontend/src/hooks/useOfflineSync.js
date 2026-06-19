@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const DB_NAME = 'todo-platform-offline'
+const DB_NAME = 'shard-offline'
 const STORE_NAME = 'pending-actions'
 const DB_VERSION = 1
 

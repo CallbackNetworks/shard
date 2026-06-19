@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP server exposing TODO Platform tools via stdio transport.
+"""MCP server exposing Shard tools via stdio transport.
 
 Proxies all operations through the backend HTTP API (/api/v1) to ensure
 business logic (activity logging, notifications, workflow rules, WebSocket
@@ -18,7 +18,7 @@ from mcp.server.stdio import stdio_server
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://backend:8000")
 API_KEY = os.environ.get("API_KEY", "")
 
-server = Server("todo-platform")
+server = Server("shard")
 
 
 def _api_url(path: str) -> str:

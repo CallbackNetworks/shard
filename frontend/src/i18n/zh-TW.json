@@ -213,7 +213,7 @@
   "apiKeys.subtitle": "管理外部服務的 API 存取金鑰",
   "apiKeys.new": "+ 新增 API 金鑰",
   "apiKeys.empty": "尚無 API 金鑰",
-  "apiKeys.emptyHint": "建立 API 金鑰以允許外部服務存取 TODO Platform API",
+  "apiKeys.emptyHint": "建立 API 金鑰以允許外部服務存取 Shard API",
   "apiKeys.namePlaceholder": "我的 CI/CD 流程",
   "apiKeys.projectScope": "專案（留空為所有專案）",
   "apiKeys.allProjects": "所有專案",
