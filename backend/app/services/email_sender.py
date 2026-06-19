@@ -85,12 +85,12 @@ def build_notification_email(event: str, payload: dict, subject_prefix: str = "[
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #5e6ad2; color: white; padding: 20px 24px; border-radius: 12px 12px 0 0;">
         <h2 style="margin: 0; font-size: 18px;">{event_label}</h2>
-        <p style="margin: 4px 0 0; opacity: 0.8; font-size: 14px;">{payload.get('timestamp', '')}</p>
+        <p style="margin: 4px 0 0; opacity: 0.8; font-size: 14px;">{payload.get("timestamp", "")}</p>
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 12px 12px;">
-        {"<div style='margin-bottom: 16px;'><h3 style='margin: 0 0 8px; color: #374151; font-size: 14px;'>Project</h3><p style='margin: 0; font-size: 16px; font-weight: 600;'>" + project.get('name', 'N/A') + "</p><p style='margin: 4px 0 0; color: #6b7280; font-size: 13px;'>Progress: " + str(project.get('progress', 0)) + "% (" + str(project.get('done_tasks', 0)) + "/" + str(project.get('total_tasks', 0)) + " tasks)</p></div>" if project else ""}
-        {"<div style='margin-bottom: 16px;'><h3 style='margin: 0 0 8px; color: #374151; font-size: 14px;'>Task</h3><p style='margin: 0; font-size: 16px; font-weight: 600;'>" + task.get('title', 'N/A') + "</p><div style='margin-top: 8px;'><span style='background: " + status_color + "; color: white; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;'>" + task_status.upper() + "</span><span style='margin-left: 8px; color: #6b7280; font-size: 13px;'>Priority: " + task.get('priority', 'N/A') + "</span></div></div>" if task.get('title') else ""}
-        {"<div style='background: #f0fdf4; padding: 12px 16px; border-radius: 8px; color: #166534; font-size: 14px;'>" + payload.get('message', '') + "</div>" if payload.get('message') else ""}
+        {"<div style='margin-bottom: 16px;'><h3 style='margin: 0 0 8px; color: #374151; font-size: 14px;'>Project</h3><p style='margin: 0; font-size: 16px; font-weight: 600;'>" + project.get("name", "N/A") + "</p><p style='margin: 4px 0 0; color: #6b7280; font-size: 13px;'>Progress: " + str(project.get("progress", 0)) + "% (" + str(project.get("done_tasks", 0)) + "/" + str(project.get("total_tasks", 0)) + " tasks)</p></div>" if project else ""}
+        {"<div style='margin-bottom: 16px;'><h3 style='margin: 0 0 8px; color: #374151; font-size: 14px;'>Task</h3><p style='margin: 0; font-size: 16px; font-weight: 600;'>" + task.get("title", "N/A") + "</p><div style='margin-top: 8px;'><span style='background: " + status_color + "; color: white; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;'>" + task_status.upper() + "</span><span style='margin-left: 8px; color: #6b7280; font-size: 13px;'>Priority: " + task.get("priority", "N/A") + "</span></div></div>" if task.get("title") else ""}
+        {"<div style='background: #f0fdf4; padding: 12px 16px; border-radius: 8px; color: #166534; font-size: 14px;'>" + payload.get("message", "") + "</div>" if payload.get("message") else ""}
       </div>
       <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">Sent by Shard</p>
     </div>

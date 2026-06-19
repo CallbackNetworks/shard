@@ -231,7 +231,7 @@ async def _tool_get_summary(db: Session) -> str:
                 "done": done,
                 "in_progress": in_prog,
                 "overdue": overdue,
-                "progress": f"{round(done/total*100,1) if total else 0}%",
+                "progress": f"{round(done / total * 100, 1) if total else 0}%",
             }
         )
     return json.dumps(result, default=str)

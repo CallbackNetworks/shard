@@ -36,9 +36,7 @@ class SQLiteSearchBackend(SearchBackend):
         with engine.connect() as conn:
             existing_tables = set(inspect(engine).get_table_names())
             if "tasks_fts" not in existing_tables:
-                conn.execute(
-                    text("CREATE VIRTUAL TABLE tasks_fts USING fts5(" "task_id UNINDEXED, title, description" ")")
-                )
+                conn.execute(text("CREATE VIRTUAL TABLE tasks_fts USING fts5(task_id UNINDEXED, title, description)"))
                 conn.execute(
                     text(
                         "INSERT INTO tasks_fts(task_id, title, description) "

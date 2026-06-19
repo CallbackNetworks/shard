@@ -121,7 +121,7 @@ async def webhook_callback(
     # Build a human-readable detail message
     detail_msg = normalized.get("message") or f"Status changed to {normalized['status']} via webhook"
     if normalized.get("provider") != "generic":
-        detail_msg = f'[{normalized["provider"]}] {detail_msg}'
+        detail_msg = f"[{normalized['provider']}] {detail_msg}"
 
     log_activity(
         db,

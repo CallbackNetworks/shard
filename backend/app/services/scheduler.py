@@ -215,19 +215,19 @@ async def _send_daily_summary(db: Session) -> None:
     html = f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #5e6ad2; color: white; padding: 20px 24px; border-radius: 12px 12px 0 0;">
-        <h2 style="margin: 0; font-size: 18px;">Daily Summary — {now.strftime('%B %d, %Y')}</h2>
+        <h2 style="margin: 0; font-size: 18px;">Daily Summary — {now.strftime("%B %d, %Y")}</h2>
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 12px 12px;">
         <h3 style="color: #374151; margin: 0 0 8px;">Projects</h3>
-        <ul style="margin: 0 0 16px; padding-left: 20px; color: #4b5563;">{''.join(project_summaries)}</ul>
+        <ul style="margin: 0 0 16px; padding-left: 20px; color: #4b5563;">{"".join(project_summaries)}</ul>
 
-        {"<h3 style='color: #dc2626; margin: 0 0 8px;'>⚠ Overdue (" + str(len(overdue_tasks)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #dc2626;'>" + ''.join(overdue_items) + "</ul>" if overdue_items else ""}
+        {"<h3 style='color: #dc2626; margin: 0 0 8px;'>⚠ Overdue (" + str(len(overdue_tasks)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #dc2626;'>" + "".join(overdue_items) + "</ul>" if overdue_items else ""}
 
-        {"<h3 style='color: #d97706; margin: 0 0 8px;'>Due Today (" + str(len(due_today)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #92400e;'>" + ''.join(due_today_items) + "</ul>" if due_today_items else ""}
+        {"<h3 style='color: #d97706; margin: 0 0 8px;'>Due Today (" + str(len(due_today)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #92400e;'>" + "".join(due_today_items) + "</ul>" if due_today_items else ""}
 
-        {"<h3 style='color: #2563eb; margin: 0 0 8px;'>In Progress (" + str(len(in_progress)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #4b5563;'>" + ''.join(in_progress_items) + "</ul>" if in_progress_items else ""}
+        {"<h3 style='color: #2563eb; margin: 0 0 8px;'>In Progress (" + str(len(in_progress)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #4b5563;'>" + "".join(in_progress_items) + "</ul>" if in_progress_items else ""}
 
-        {"<h3 style='color: #16a34a; margin: 0 0 8px;'>Completed Yesterday (" + str(len(completed_yesterday)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #4b5563;'>" + ''.join(completed_items) + "</ul>" if completed_items else "<p style='color: #9ca3af; font-size: 13px;'>No tasks completed yesterday.</p>"}
+        {"<h3 style='color: #16a34a; margin: 0 0 8px;'>Completed Yesterday (" + str(len(completed_yesterday)) + ")</h3><ul style='margin: 0 0 16px; padding-left: 20px; color: #4b5563;'>" + "".join(completed_items) + "</ul>" if completed_items else "<p style='color: #9ca3af; font-size: 13px;'>No tasks completed yesterday.</p>"}
       </div>
       <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">Sent by Shard</p>
     </div>

@@ -122,7 +122,7 @@ async def update_project(project_id: str, body: ProjectUpdate, db: Session = Dep
     if "status" in changes and changes["status"] != old_status:
         log_activity(
             db,
-            f'project.{changes["status"]}',
+            f"project.{changes['status']}",
             project_id=project_id,
             detail=f'Project "{project.name}" changed to {changes["status"]}',
             meta={"old_status": old_status, "new_status": changes["status"]},
