@@ -1,12 +1,12 @@
-fastapi==0.115.5
+fastapi==0.137.2
 uvicorn[standard]==0.32.1
 sqlalchemy==2.0.36
 alembic==1.14.0
 httpx==0.28.0
 pydantic-settings==2.6.1
-python-multipart==0.0.17
-pytest==8.3.4
-pytest-asyncio==0.24.0
+python-multipart==0.0.32
+pytest==9.1.1
+pytest-asyncio==1.4.0
 pytest-cov==6.0.0
 psycopg[binary]==3.2.4
 pymysql==1.1.1

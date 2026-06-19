@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models import Attachment, Task
 from app.schemas import AttachmentOut
 
-UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/uploads"))
+UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 

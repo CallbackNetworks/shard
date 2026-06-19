@@ -10,79 +10,56 @@ jobs:
   backend:
     name: Backend tests
     runs-on: ci-builder
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install dependencies
-        run: pip install --upgrade pip wheel && pip install -r requirements.txt
+      - name: Build backend image
+        run: docker compose build backend
 
       - name: Lint
-        run: ruff check app/ tests/
+        run: docker compose run --rm --no-deps backend ruff check app/ tests/
 
       - name: Format check
-        run: ruff format --check app/ tests/
+        run: docker compose run --rm --no-deps backend ruff format --check app/ tests/
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
+        run: docker compose run --rm --no-deps backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
 
       - name: Security audit
-        run: pip install pip-audit && pip-audit --strict
+        run: docker compose run --rm --no-deps backend sh -c "pip install pip-audit && pip-audit --strict"
 
-  frontend-build:
-    name: Frontend build
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
+
+  frontend:
+    name: Frontend tests
     runs-on: ci-builder
-    defaults:
-      run:
-        working-directory: frontend
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Build frontend image
+        run: docker compose build frontend
 
       - name: Lint
-        run: npm run lint -- --max-warnings 300
+        run: docker compose run --rm --no-deps frontend npm run lint -- --max-warnings 300
 
       - name: Run tests
-        run: npx vitest run
+        run: docker compose run --rm --no-deps frontend npx vitest run
 
       - name: Security audit
-        run: npm audit --audit-level=moderate
+        run: docker compose run --rm --no-deps frontend npm audit --audit-level=moderate
 
       - name: Build
-        run: npm run build
+        run: docker compose run --rm --no-deps frontend npx vite build
 
-  docker-build:
-    name: Docker Compose build (dev)
-    runs-on: ci-builder
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build all images
-        run: docker compose build --no-cache
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
 
   integration:
     name: Integration smoke test (prod)
-    needs: [backend, frontend-build]
+    needs: [backend, frontend]
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
@@ -108,4 +85,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml down -v

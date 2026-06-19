@@ -7,7 +7,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Install deps into venv first (cached layer — only re-runs when requirements change)
 COPY requirements.txt .
-RUN uv venv .venv && uv pip install -r requirements.txt
+RUN uv venv .venv && uv pip install --upgrade pip wheel && uv pip install -r requirements.txt
 
 RUN mkdir -p /app/data
 
