@@ -1,17 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { INSET_SHADOW, DARK } from '../constants/theme'
+import { DARK, FORM_INPUT } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
 import { getApiKeys } from '../api/client'
 
-const darkInput = {
-  background: DARK.elevated,
-  border: 'none',
-  boxShadow: INSET_SHADOW,
-  borderRadius: 4, padding: '6px 10px', fontSize: 12,
-  color: DARK.text, outline: 'none',
-}
+const darkInput = FORM_INPUT
 
 export default function TaskEditForm({ task, depth, onSave, onCancel }) {
   const { t } = useTranslation()

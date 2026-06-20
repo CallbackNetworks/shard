@@ -12,6 +12,7 @@ import ShareActivityFeed from '../components/share/ShareActivityFeed'
 import SharePinGate from '../components/share/SharePinGate'
 import ShareFooter from '../components/share/ShareFooter'
 import useBreakpoint from '../components/share/useBreakpoint'
+import EmptyState from '../components/shared/EmptyState'
 
 export default function ShareView() {
   const { token } = useParams()
@@ -162,12 +163,7 @@ export default function ShareView() {
         {/* Section: Projects */}
         <div id="share-section-projects" style={{ paddingTop: 8 }}>
           {projects.length === 0 && (
-            <div style={{
-              padding: '48px 0', textAlign: 'center',
-              color: DIM, fontSize: 11, letterSpacing: '0.14em',
-            }}>
-              No active projects
-            </div>
+            <EmptyState message="No active projects" />
           )}
           {projects.map((p, i) => (
             <ShareProjectCard key={p.id} project={p} index={i} bp={bp} />

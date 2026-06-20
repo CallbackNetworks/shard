@@ -8,6 +8,7 @@ import {
   setSharePin, clearSharePin, setShareExpiry, getShareViewCount,
 } from '../api/client'
 import { BRAND, INSET_SHADOW, SHADOW_SM, DARK } from '../constants/theme'
+import EmptyState from '../components/shared/EmptyState'
 
 const COLORS = [
   '#5e6ad2', '#22c55e', '#ef4444', '#f59e0b', '#3b82f6',
@@ -292,10 +293,7 @@ export default function Identities() {
       )}
 
       {identities.length === 0 && !showCreate ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.25)' }}>
-          <p style={{ fontSize: 18 }}>{t('identities.empty')}</p>
-          <p style={{ marginTop: 8 }}>{t('identities.emptyHint')}</p>
-        </div>
+        <EmptyState message={t('identities.empty')} hint={t('identities.emptyHint')} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {identities.map(identity => {

@@ -1,6 +1,8 @@
 import { useState, useMemo, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import DonutChart from './charts/DonutChart'
+import EmptyState from './shared/EmptyState'
+import TabBar from './shared/TabBar'
 
 const HeatmapChart = lazy(() => import('./charts/HeatmapChart'))
 const TrendLineChart = lazy(() => import('./charts/TrendLineChart'))
@@ -365,11 +367,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
   }
 
   if (identities.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
-        {t('hub.noIdentities')}
-      </div>
-    )
+    return <EmptyState message={t('hub.noIdentities')} />
   }
 
   const subViewTabs = [
@@ -409,25 +407,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
       </div>
 
       {/* Sub-view tabs */}
-      <div style={{
-        display: 'flex', gap: 2, borderBottom: '1px solid rgba(255,255,255,0.06)',
-        marginBottom: 20,
-      }}>
-        {subViewTabs.map(tab => (
-          <button key={tab.key} onClick={() => setSubView(tab.key)} style={{
-            background: subView === tab.key ? 'rgba(255,255,255,0.06)' : 'transparent',
-            border: 'none',
-            borderBottom: `2px solid ${subView === tab.key ? '#1ed760' : 'transparent'}`,
-            cursor: 'pointer', padding: '8px 14px',
-            fontSize: 11, fontWeight: subView === tab.key ? 700 : 400,
-            color: subView === tab.key ? '#fff' : 'rgba(255,255,255,0.4)',
-            transition: 'all 0.15s', outline: 'none', letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <TabBar tabs={subViewTabs} active={subView} onChange={setSubView} style={{ marginBottom: 20 }} />
 
       {/* Overview */}
       {subView === 'overview' && (

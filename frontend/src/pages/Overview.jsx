@@ -9,6 +9,7 @@ import {
   getPinnedIds, togglePin,
 } from '../components/OverviewViews'
 import IdentityChartsView from '../components/IdentityChartsView'
+import EmptyState from '../components/shared/EmptyState'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 const PARA   = (px = 8)  => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
@@ -258,9 +259,7 @@ export default function Overview() {
             </div>
           )}
           {!isLoading && active.length === 0 && (
-            <div style={{ padding: '48px 0', textAlign: 'center', color: DIM, fontSize: 11, letterSpacing: '0.14em' }}>
-              {identityId ? 'No active projects for this identity' : 'No active projects'}
-            </div>
+            <EmptyState message={identityId ? 'No active projects for this identity' : 'No active projects'} />
           )}
           {!isLoading && active.length > 0 && view === 'progress' && <ViewProgress projects={active} pinned={pinned} onTogglePin={handleTogglePin} />}
           {!isLoading && active.length > 0 && view === 'health'   && <ViewHealth   projects={active} pinned={pinned} onTogglePin={handleTogglePin} />}

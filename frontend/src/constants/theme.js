@@ -107,6 +107,18 @@ export const LIGHT = {
   infoBg:    'rgba(37,99,235,0.1)',
 }
 
+// ── Form input ──
+export const FORM_INPUT = {
+  background: DARK.elevated,
+  border: 'none',
+  borderRadius: 4,
+  padding: '7px 10px',
+  fontSize: 13,
+  outline: 'none',
+  color: DARK.text,
+  boxShadow: INSET_SHADOW,
+}
+
 // ── Label color palette ──
 export const LABEL_PALETTE = [
   '#1ed760', '#f3727f', '#ffa42b', '#539df5', '#b3b3b3',
