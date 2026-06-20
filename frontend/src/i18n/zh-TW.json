@@ -607,5 +607,28 @@
 
   "templates.createdSuccess": "範本已建立",
   "templates.updatedSuccess": "範本已更新",
-  "templates.deletedSuccess": "範本已刪除"
+  "templates.deletedSuccess": "範本已刪除",
+
+  "dashboard.charts": "圖表",
+
+  "hub.all": "全部",
+  "hub.overview": "總覽",
+  "hub.activity": "活動",
+  "hub.mindMap": "脈絡圖",
+  "hub.totalTasks": "任務總數",
+  "hub.completed": "已完成",
+  "hub.inProgress": "進行中",
+  "hub.overdueCount": "逾期",
+  "hub.completionRate": "完成率",
+  "hub.done": "已完成",
+  "hub.todoLabel": "待辦",
+  "hub.failed": "失敗",
+  "hub.projects": "專案",
+  "hub.tasks": "任務",
+  "hub.activityHeatmap": "活動熱圖",
+  "hub.activityTrend": "活動趨勢 (90天)",
+  "hub.byIdentity": "依身份",
+  "hub.byStatus": "依狀態",
+  "hub.byPriority": "依優先順序",
+  "hub.noIdentities": "尚無身份。建立身份後即可查看圖表。"
 }

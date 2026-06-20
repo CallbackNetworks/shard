@@ -1,13 +1,14 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import Date, cast, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog, Identity, Project, ProjectIdentity
-from app.schemas import IdentityCreate, IdentityOut, IdentityUpdate
+from app.schemas import IdentityCreate, IdentityHubOut, IdentityOut, IdentityUpdate
 
 router = APIRouter(prefix="/identities", tags=["identities"])
 
@@ -24,6 +25,64 @@ def _enrich(identity: Identity) -> IdentityOut:
 def list_identities(db: Session = Depends(get_db)):
     identities = db.query(Identity).order_by(Identity.created_at.asc()).all()
     return [_enrich(i) for i in identities]
+
+
+@router.get("/hub-stats", response_model=IdentityHubOut)
+def get_hub_stats(db: Session = Depends(get_db)):
+    now = datetime.now(UTC)
+    year_ago = now - timedelta(days=365)
+
+    identities = db.query(Identity).order_by(Identity.created_at.asc()).all()
+    totals = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
+    result = []
+
+    for ident in identities:
+        ident_project_ids = [pi.project_id for pi in ident.project_identities]
+        projects_data = []
+        ident_stats = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
+
+        if ident_project_ids:
+            projects = db.query(Project).filter(Project.id.in_(ident_project_ids)).all()
+            for p in projects:
+                p_stats = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
+                for t in p.tasks:
+                    p_stats["total_tasks"] += 1
+                    if t.status in p_stats:
+                        p_stats[t.status] += 1
+                    if t.due_date and t.due_date < now and t.status not in ("done", "failed"):
+                        p_stats["overdue"] += 1
+                projects_data.append({"id": p.id, "name": p.name, "status": p.status, **p_stats})
+                for k in ident_stats:
+                    ident_stats[k] += p_stats[k]
+
+            daily = (
+                db.query(cast(ActivityLog.created_at, Date).label("day"), func.count(ActivityLog.id).label("count"))
+                .filter(
+                    ActivityLog.project_id.in_(ident_project_ids),
+                    ActivityLog.created_at >= year_ago,
+                )
+                .group_by("day")
+                .order_by("day")
+                .all()
+            )
+            daily_activity = [{"date": str(r.day), "count": r.count} for r in daily]
+        else:
+            daily_activity = []
+
+        for k in totals:
+            totals[k] += ident_stats[k]
+
+        result.append({
+            "id": ident.id,
+            "name": ident.name,
+            "color": ident.color,
+            "avatar": ident.avatar,
+            **ident_stats,
+            "projects": projects_data,
+            "daily_activity": daily_activity,
+        })
+
+    return {"identities": result, "totals": totals}
 
 
 @router.post("", response_model=IdentityOut, status_code=status.HTTP_201_CREATED)

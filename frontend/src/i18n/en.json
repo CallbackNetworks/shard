@@ -608,5 +608,28 @@
 
   "templates.createdSuccess": "Template created",
   "templates.updatedSuccess": "Template updated",
-  "templates.deletedSuccess": "Template deleted"
+  "templates.deletedSuccess": "Template deleted",
+
+  "dashboard.charts": "Charts",
+
+  "hub.all": "All",
+  "hub.overview": "Overview",
+  "hub.activity": "Activity",
+  "hub.mindMap": "Mind Map",
+  "hub.totalTasks": "Total Tasks",
+  "hub.completed": "Completed",
+  "hub.inProgress": "In Progress",
+  "hub.overdueCount": "Overdue",
+  "hub.completionRate": "Rate",
+  "hub.done": "Done",
+  "hub.todoLabel": "Todo",
+  "hub.failed": "Failed",
+  "hub.projects": "projects",
+  "hub.tasks": "tasks",
+  "hub.activityHeatmap": "Activity Heatmap",
+  "hub.activityTrend": "Activity Trend (90d)",
+  "hub.byIdentity": "By Identity",
+  "hub.byStatus": "By Status",
+  "hub.byPriority": "By Priority",
+  "hub.noIdentities": "No identities yet. Create identities to see charts here."
 }

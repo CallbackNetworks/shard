@@ -111,6 +111,7 @@ export const deleteIdentity = (id) => api.delete(`/identities/${id}`)
 export const getIdentityProjects = (identityId) => api.get(`/identities/${identityId}/projects`).then(r => r.data)
 export const linkProjectIdentity = (identityId, projectId) => api.post(`/identities/${identityId}/projects/${projectId}`).then(r => r.data)
 export const unlinkProjectIdentity = (identityId, projectId) => api.delete(`/identities/${identityId}/projects/${projectId}`)
+export const getIdentityHubStats = () => api.get('/identities/hub-stats').then(r => r.data)
 
 // Activity
 export const getActivity = (params = {}) => api.get('/activity', { params }).then(r => r.data)

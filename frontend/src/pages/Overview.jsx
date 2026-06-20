@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getProjects, getIdentities, getIdentityProjects } from '../api/client'
+import { getProjects, getIdentities, getIdentityProjects, getIdentityHubStats } from '../api/client'
 import {
   FONT, BG, LINE, DIM, HI,
   urgencyScore,
@@ -8,6 +8,7 @@ import {
   ViewProgress, ViewHealth, ViewTasks, ViewCompare,
   getPinnedIds, togglePin,
 } from '../components/OverviewViews'
+import IdentityChartsView from '../components/IdentityChartsView'
 
 const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 const PARA   = (px = 8)  => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
@@ -83,6 +84,12 @@ export default function Overview() {
     enabled: !!identityId,
   })
 
+  const { data: hubStats } = useQuery({
+    queryKey: ['identity-hub-stats'],
+    queryFn: getIdentityHubStats,
+    refetchInterval: 30000,
+  })
+
   const [pinned, setPinned] = useState(() => getPinnedIds())
 
   const handleTogglePin = useCallback((projectId) => {
@@ -114,6 +121,7 @@ export default function Overview() {
     { key: 'health',   label: 'HEALTH'   },
     { key: 'tasks',    label: 'TASKS'    },
     { key: 'compare',  label: 'COMPARE'  },
+    { key: 'charts',   label: 'CHARTS'   },
   ]
 
   return (
@@ -258,6 +266,13 @@ export default function Overview() {
           {!isLoading && active.length > 0 && view === 'health'   && <ViewHealth   projects={active} pinned={pinned} onTogglePin={handleTogglePin} />}
           {!isLoading && active.length > 0 && view === 'tasks'    && <ViewTasks    projects={active} />}
           {!isLoading && active.length > 0 && view === 'compare'  && <ViewCompare  projects={active} />}
+          {!isLoading && view === 'charts' && (
+            <IdentityChartsView
+              data={hubStats}
+              selectedIdentityId={identityId}
+              onSelectIdentity={selectIdentity}
+            />
+          )}
         </div>
 
       </div>

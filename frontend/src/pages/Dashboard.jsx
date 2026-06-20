@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp } from 'lucide-react'
-import { getProjects, createProject, deleteProject, getActivity } from '../api/client'
+import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp, BarChart2 } from 'lucide-react'
+import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats } from '../api/client'
 import AgentTasksPanel from '../components/AgentTasksPanel'
+import IdentityChartsView from '../components/IdentityChartsView'
 import { BRAND, STATUS_MAP, PRIORITY, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Dashboard.module.css'
@@ -539,6 +540,7 @@ function GettingStarted({ onNewProject, isMobile }) {
 /* ── Dashboard ────────────────────────────────────────────────────── */
 export default function Dashboard() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
@@ -548,6 +550,12 @@ export default function Dashboard() {
     queryFn: () => getActivity({ limit: 50 }),
     staleTime: 10000,
   })
+  const { data: hubStats } = useQuery({
+    queryKey: ['identity-hub-stats'],
+    queryFn: getIdentityHubStats,
+    staleTime: 60000,
+  })
+  const [chartIdentityId, setChartIdentityId] = useState(null)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -631,6 +639,7 @@ export default function Dashboard() {
         {[
           { key: 'projects', label: t('nav.projects'), icon: <FolderOpen size={13} /> },
           { key: 'mywork',   label: t('dashboard.myWork'),  icon: <User size={13} /> },
+          { key: 'charts',   label: t('dashboard.charts'),  icon: <BarChart2 size={13} /> },
         ].map(tabItem => (
           <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
             className={`${s.tabBtn} ${tab === tabItem.key ? s.tabBtnActive : s.tabBtnInactive}`}>
@@ -646,6 +655,13 @@ export default function Dashboard() {
             <div className={s.loadingSpinner} />
             {t('loading')}
           </div>
+        ) : tab === 'charts' ? (
+          <IdentityChartsView
+            data={hubStats}
+            selectedIdentityId={chartIdentityId}
+            onSelectIdentity={setChartIdentityId}
+            onNavigate={(projectId) => navigate(`/app/projects/${projectId}`)}
+          />
         ) : tab === 'mywork' ? (
           <div className={`${s.myWorkGrid} ${isMobile ? s.myWorkGridMobile : s.myWorkGridDesktop}`}>
             <div>

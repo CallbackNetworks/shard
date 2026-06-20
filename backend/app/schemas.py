@@ -852,3 +852,52 @@ class TaskImportRequest(BaseModel):
 class TaskImportResult(BaseModel):
     imported: int
     task_ids: list[str]
+
+
+# --- Identity Hub Stats ---
+
+
+class IdentityHubProject(BaseModel):
+    id: str
+    name: str
+    status: str
+    total_tasks: int = 0
+    done: int = 0
+    in_progress: int = 0
+    todo: int = 0
+    failed: int = 0
+    overdue: int = 0
+
+
+class IdentityHubDailyActivity(BaseModel):
+    date: str
+    count: int
+
+
+class IdentityHubItem(BaseModel):
+    id: str
+    name: str
+    color: str
+    avatar: str | None
+    total_tasks: int = 0
+    done: int = 0
+    in_progress: int = 0
+    todo: int = 0
+    failed: int = 0
+    overdue: int = 0
+    projects: list[IdentityHubProject] = []
+    daily_activity: list[IdentityHubDailyActivity] = []
+
+
+class IdentityHubTotals(BaseModel):
+    total_tasks: int = 0
+    done: int = 0
+    in_progress: int = 0
+    todo: int = 0
+    failed: int = 0
+    overdue: int = 0
+
+
+class IdentityHubOut(BaseModel):
+    identities: list[IdentityHubItem]
+    totals: IdentityHubTotals
