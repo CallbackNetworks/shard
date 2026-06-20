@@ -1,0 +1,56 @@
+# Standalone compose for CI — no host bind mounts (safe for Docker-in-Docker).
+
+services:
+  # ---------- lint / test / audit ----------
+  backend:
+    build: ./backend
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-stub}
+    networks:
+      - ci-network
+
+  frontend:
+    build: ./frontend
+    networks:
+      - ci-network
+
+  # ---------- integration smoke test (prod images) ----------
+  backend-prod:
+    profiles: [integration]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-stub}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      ci-network:
+        aliases:
+          - backend
+
+  frontend-prod:
+    profiles: [integration]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "80:80"
+    depends_on:
+      backend-prod:
+        condition: service_healthy
+    networks:
+      - ci-network
+
+networks:
+  ci-network:

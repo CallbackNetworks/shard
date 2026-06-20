@@ -9,7 +9,6 @@ __pycache__
 *.db-shm
 *.db-wal
 data/
-tests/
 .pytest_cache
 .ruff_cache
 *.egg-info

@@ -9,6 +9,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY requirements.txt .
 RUN uv venv .venv && uv pip install --upgrade pip wheel && uv pip install -r requirements.txt
 
+COPY . .
+
 RUN mkdir -p /app/data
 
 ENV PATH="/app/.venv/bin:$PATH"
