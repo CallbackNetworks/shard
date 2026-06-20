@@ -7,7 +7,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile.prod
     volumes:
-      - backend_data:/app/data
+      - ./data:/app/data
     # Remove source mount and dev venv volume; image is self-contained
 
   frontend:

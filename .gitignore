@@ -17,6 +17,9 @@ frontend/dist/
 .coverage
 backend/.coverage
 
+# Data
+data/
+
 # Editor
 .DS_Store
 *.swp

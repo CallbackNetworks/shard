@@ -6,7 +6,7 @@ services:
     volumes:
       - ./backend:/app            # host source → container (hot-reload)
       - backend_venv:/app/.venv   # named volume protects the installed venv
-      - backend_data:/app/data    # persist SQLite database
+      - ./data:/app/data           # persist SQLite database
     environment:
       - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
@@ -118,7 +118,6 @@ services:
 
 volumes:
   backend_venv:
-  backend_data:
   frontend_modules:
   postgres_data:
   mysql_data:
