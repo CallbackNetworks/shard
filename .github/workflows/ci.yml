@@ -81,16 +81,22 @@ jobs:
           docker compose -f docker-compose.ci.yml -p ci-integration --profile integration logs backend-prod
           exit 1
 
-      - name: Smoke test frontend
+      - name: Wait for frontend health
         run: |
-          for i in $(seq 1 15); do
-            docker compose -f docker-compose.ci.yml -p ci-integration --profile integration exec frontend-prod \
-              wget -qO- http://localhost:80/ > /dev/null 2>&1 && exit 0
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' ci-integration-frontend-prod-1 2>/dev/null || echo "not found")
+            echo "Attempt $i: frontend-prod health=$status"
+            [ "$status" = "healthy" ] && exit 0
             sleep 2
           done
-          echo "Frontend smoke test failed"
+          echo "Frontend health check failed"
           docker compose -f docker-compose.ci.yml -p ci-integration --profile integration logs frontend-prod
           exit 1
+
+      - name: Smoke test frontend
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration exec frontend-prod \
+            wget -qO- http://127.0.0.1/ > /dev/null
 
       - name: Cleanup
         if: always()
