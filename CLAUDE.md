@@ -126,7 +126,7 @@ Runs on push/PR to `main`. Five jobs:
 2. **Frontend**: ESLint, vitest, npm audit, vite build
 3. **Integration**: production compose up, backend health check, frontend smoke test
 4. **Publish**: build and push Docker images to registry (main branch only)
-5. **Deploy**: pull images on `cd-deployer`, generate compose file at `~/deployments/todo-platform/`, bring services up with health checks (main branch only). Requires `.env` pre-configured on the deployer machine.
+5. **Deploy**: pull images on `cd-deployer`, generate compose file at `$DEPLOY_DIR` (configurable via `vars.DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`), bring services up with health checks (main branch only). Requires `.env` pre-configured in the deploy directory.
 
 ## Schema migrations (Alembic)
 

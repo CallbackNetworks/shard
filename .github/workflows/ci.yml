@@ -157,14 +157,18 @@ jobs:
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USERNAME" --password-stdin
 
-      - name: Compute image prefix
-        run: echo "IMAGE_PREFIX=$(echo '${{ vars.REGISTRY_URL }}/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Compute deploy variables
+        env:
+          CUSTOM_DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+        run: |
+          echo "IMAGE_PREFIX=$(echo '${{ vars.REGISTRY_URL }}/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          REPO_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]' | cut -d'/' -f2)
+          echo "DEPLOY_DIR=${CUSTOM_DEPLOY_DIR:-$HOME/deployments/$REPO_NAME}" >> $GITHUB_ENV
 
       - name: Generate compose file
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          DEPLOY_DIR="$HOME/deployments/todo-platform"
           mkdir -p "$DEPLOY_DIR"
           cat > "$DEPLOY_DIR/docker-compose.yml" <<EOF
           services:
@@ -204,11 +208,10 @@ jobs:
           EOF
 
       - name: Pull images
-        run: docker compose -f "$HOME/deployments/todo-platform/docker-compose.yml" pull
+        run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" pull
 
       - name: Deploy services
-        run: |
-          docker compose -f "$HOME/deployments/todo-platform/docker-compose.yml" up -d --remove-orphans
+        run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" up -d --remove-orphans
 
       - name: Wait for backend health
         run: |
@@ -233,4 +236,4 @@ jobs:
           exit 1
 
       - name: Show deployment status
-        run: docker compose -f "$HOME/deployments/todo-platform/docker-compose.yml" ps -a
+        run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps -a

@@ -25,11 +25,11 @@ We use the **generated compose** approach. The `deploy` job in `.github/workflow
 
 1. Runs on `cd-deployer` after the `publish` job succeeds (main branch only).
 2. Logs into the self-hosted Docker registry.
-3. Generates a `docker-compose.yml` at `~/deployments/todo-platform/` with image tags pinned to the commit SHA.
+3. Generates a `docker-compose.yml` at the deploy directory (configurable via Gitea variable `DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`) with image tags pinned to the commit SHA.
 4. Pulls the new images and brings services up with `--remove-orphans`.
 5. Waits for backend health check and verifies frontend responds.
 
-Environment configuration (database URL, SMTP, auth, etc.) is read from `~/deployments/todo-platform/.env`, which is pre-configured on the deployer machine and not managed by CI.
+Environment configuration (database URL, SMTP, auth, etc.) is read from `.env` in the deploy directory, which is pre-configured on the deployer machine and not managed by CI.
 
 ## Consequences
 
