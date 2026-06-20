@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Label, Task, TaskLabel
+from app.models import Label, TaskLabel
+from app.routers.deps import get_label_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.schemas import LabelCreate, LabelOut, LabelUpdate
 
@@ -28,9 +29,7 @@ def create_label(project_id: str, body: LabelCreate, db: Session = Depends(get_d
 @router.patch("/{label_id}", response_model=LabelOut)
 def update_label(project_id: str, label_id: str, body: LabelUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    label = db.query(Label).filter(Label.id == label_id, Label.project_id == project_id).first()
-    if not label:
-        raise HTTPException(status_code=404, detail="Label not found")
+    label = get_label_or_404(label_id, db, project_id=project_id)
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(label, field, value)
     db.commit()
@@ -41,9 +40,7 @@ def update_label(project_id: str, label_id: str, body: LabelUpdate, db: Session 
 @router.delete("/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_label(project_id: str, label_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    label = db.query(Label).filter(Label.id == label_id, Label.project_id == project_id).first()
-    if not label:
-        raise HTTPException(status_code=404, detail="Label not found")
+    label = get_label_or_404(label_id, db, project_id=project_id)
     db.delete(label)
     db.commit()
 
@@ -58,12 +55,8 @@ task_label_router = APIRouter(
 @task_label_router.post("/{label_id}", response_model=LabelOut, status_code=status.HTTP_201_CREATED)
 def add_label_to_task(project_id: str, task_id: str, label_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    label = db.query(Label).filter(Label.id == label_id, Label.project_id == project_id).first()
-    if not label:
-        raise HTTPException(status_code=404, detail="Label not found")
+    get_task_or_404(task_id, db, project_id=project_id)
+    label = get_label_or_404(label_id, db, project_id=project_id)
     existing = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
     if not existing:
         tl = TaskLabel(task_id=task_id, label_id=label_id)

@@ -6,23 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Project, Task
-from app.schemas import LabelOut, TaskOut
+from app.services.enrichment import enrich_task_as_dict
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["search"])
-
-
-def _enrich_task(task) -> dict:
-    out = TaskOut.model_validate(task)
-    out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
-    out.subtask_count = len(task.subtasks)
-    out.comment_count = len(task.comments)
-    out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
-    out.blocking = [d.task_id for d in task.blocking_deps]
-    if task.assigned_agent is not None:
-        out.assigned_agent_name = task.assigned_agent.name
-    return out.model_dump()
 
 
 @router.get("")
@@ -92,6 +80,6 @@ def search(
 
     return {
         "query": q,
-        "tasks": [_enrich_task(t) for t in tasks],
+        "tasks": [enrich_task_as_dict(t) for t in tasks],
         "projects": projects,
     }

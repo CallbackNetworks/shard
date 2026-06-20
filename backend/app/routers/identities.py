@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog, Identity, Project, ProjectIdentity
+from app.routers.deps import get_identity_or_404, get_project_or_404
 from app.schemas import IdentityCreate, IdentityHubOut, IdentityOut, IdentityUpdate
 
 router = APIRouter(prefix="/identities", tags=["identities"])
@@ -96,9 +97,7 @@ def create_identity(body: IdentityCreate, db: Session = Depends(get_db)):
 
 @router.patch("/{identity_id}", response_model=IdentityOut)
 def update_identity(identity_id: str, body: IdentityUpdate, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    identity = get_identity_or_404(identity_id, db)
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(identity, field, value)
     db.commit()
@@ -108,9 +107,7 @@ def update_identity(identity_id: str, body: IdentityUpdate, db: Session = Depend
 
 @router.post("/{identity_id}/rotate-share-token")
 def rotate_share_token(identity_id: str, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    identity = get_identity_or_404(identity_id, db)
     identity.share_token = str(uuid.uuid4())
     db.commit()
     db.refresh(identity)
@@ -119,9 +116,7 @@ def rotate_share_token(identity_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{identity_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_identity(identity_id: str, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    identity = get_identity_or_404(identity_id, db)
     db.delete(identity)
     db.commit()
 
@@ -131,12 +126,8 @@ def delete_identity(identity_id: str, db: Session = Depends(get_db)):
 
 @router.post("/{identity_id}/projects/{project_id}", status_code=status.HTTP_201_CREATED)
 def link_project(identity_id: str, project_id: str, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    get_identity_or_404(identity_id, db)
+    get_project_or_404(project_id, db)
     existing = (
         db.query(ProjectIdentity)
         .filter(
@@ -171,9 +162,7 @@ def unlink_project(identity_id: str, project_id: str, db: Session = Depends(get_
 
 @router.get("/{identity_id}/projects")
 def get_identity_projects(identity_id: str, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    identity = get_identity_or_404(identity_id, db)
     return [
         {"id": pi.project.id, "name": pi.project.name, "status": pi.project.status}
         for pi in identity.project_identities
@@ -192,9 +181,7 @@ class SetPinBody(BaseModel):
 def set_identity_pin(identity_id: str, body: SetPinBody, db: Session = Depends(get_db)):
     from app.services.pin_utils import hash_pin
 
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    identity = get_identity_or_404(identity_id, db)
     if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
         raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
     identity.share_pin_hash = hash_pin(body.pin)
@@ -204,9 +191,7 @@ def set_identity_pin(identity_id: str, body: SetPinBody, db: Session = Depends(g
 
 @router.delete("/{identity_id}/pin")
 def clear_identity_pin(identity_id: str, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    identity = get_identity_or_404(identity_id, db)
     identity.share_pin_hash = None
     db.commit()
     return {"ok": True}
@@ -221,9 +206,7 @@ class SetExpiryBody(BaseModel):
 
 @router.post("/{identity_id}/set-expiry")
 def set_identity_expiry(identity_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    identity = get_identity_or_404(identity_id, db)
     identity.share_expires_at = body.expires_at
     db.commit()
     return {"ok": True}
@@ -234,9 +217,7 @@ def set_identity_expiry(identity_id: str, body: SetExpiryBody, db: Session = Dep
 
 @router.get("/{identity_id}/share-views")
 def get_share_view_count(identity_id: str, db: Session = Depends(get_db)):
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
-    if not identity:
-        raise HTTPException(status_code=404, detail="Identity not found")
+    get_identity_or_404(identity_id, db)
     count = (
         db.query(ActivityLog)
         .filter(

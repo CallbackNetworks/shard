@@ -2,81 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import Project, RecurrenceRule
-from app.schemas import (
-    CycleOut,
-    IdentityOut,
-    LabelOut,
-    ProjectCreate,
-    ProjectOut,
-    ProjectUpdate,
-    RecurrenceRuleOut,
-    TaskOut,
-)
+from app.models import Project
+from app.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 from app.services.activity import log_activity
+from app.services.enrichment import enrich_project
 from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-
-def _enrich_task(task, db=None) -> TaskOut:
-    out = TaskOut.model_validate(task)
-    out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
-    out.subtask_count = len(task.subtasks)
-    out.comment_count = len(task.comments)
-    out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
-    out.blocking = [d.task_id for d in task.blocking_deps]
-    if task.assigned_agent is not None:
-        out.assigned_agent_name = task.assigned_agent.name
-    if db is not None:
-        rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task.id).first()
-        out.recurrence = RecurrenceRuleOut.model_validate(rule) if rule else None
-    return out
-
-
-def _enrich(project: Project, db=None) -> ProjectOut:
-    # Only top-level tasks (no parent) for progress counting
-    top_tasks = [t for t in project.tasks if t.parent_id is None]
-    total = len(top_tasks)
-    done = sum(1 for t in top_tasks if t.status == "done")
-    progress = round(done / total * 100, 1) if total > 0 else 0.0
-    out = ProjectOut.model_validate(project)
-    out.total_tasks = total
-    out.done_tasks = done
-    out.progress = progress
-    out.tasks = [_enrich_task(t, db) for t in project.tasks]
-    out.labels = [LabelOut.model_validate(lb) for lb in project.labels]
-
-    # Enrich cycles
-    enriched_cycles = []
-    for cycle in project.cycles:
-        task_ids = [ct.task_id for ct in cycle.cycle_tasks]
-        tasks = [ct.task for ct in cycle.cycle_tasks if ct.task is not None]
-        c_total = len(tasks)
-        c_done = sum(1 for t in tasks if t.status == "done")
-        cout = CycleOut.model_validate(cycle)
-        cout.task_ids = task_ids
-        cout.total_tasks = c_total
-        cout.done_tasks = c_done
-        enriched_cycles.append(cout)
-    out.cycles = enriched_cycles
-
-    # Enrich identities
-    out.identities = [
-        IdentityOut(
-            id=pi.identity.id,
-            name=pi.identity.name,
-            color=pi.identity.color,
-            description=pi.identity.description,
-            avatar=pi.identity.avatar,
-            created_at=pi.identity.created_at,
-            project_count=len(pi.identity.project_identities),
-        )
-        for pi in project.project_identities
-        if pi.identity is not None
-    ]
-
-    return out
 
 
 def _project_eager_options():
@@ -99,7 +31,7 @@ def _project_eager_options():
 @router.get("", response_model=list[ProjectOut])
 def list_projects(db: Session = Depends(get_db)):
     projects = db.query(Project).options(*_project_eager_options()).order_by(Project.created_at.desc()).all()
-    return [_enrich(p, db) for p in projects]
+    return [enrich_project(p, db) for p in projects]
 
 
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
@@ -116,7 +48,7 @@ async def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(project)
     await ws_manager.broadcast("project.created", {"project_id": project.id})
-    return _enrich(project, db)
+    return enrich_project(project, db)
 
 
 @router.get("/{project_id}", response_model=ProjectOut)
@@ -124,7 +56,7 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
     project = db.query(Project).options(*_project_eager_options()).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return _enrich(project, db)
+    return enrich_project(project, db)
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
@@ -147,7 +79,7 @@ async def update_project(project_id: str, body: ProjectUpdate, db: Session = Dep
     db.commit()
     db.refresh(project)
     await ws_manager.broadcast("project.updated", {"project_id": project_id})
-    return _enrich(project, db)
+    return enrich_project(project, db)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

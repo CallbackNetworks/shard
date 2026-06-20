@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Goal, GoalProject, Project, Task
+from app.routers.deps import get_goal_or_404
 from app.schemas import GoalCreate, GoalOut, GoalProjectOut, GoalUpdate
 from app.services.activity import log_activity
 from app.services.ws_manager import ws_manager
@@ -51,9 +52,7 @@ def list_goals(
 
 @router.get("/{goal_id}", response_model=GoalOut)
 def get_goal(goal_id: str, db: Session = Depends(get_db)):
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = get_goal_or_404(goal_id, db)
     return _enrich_goal(goal, db)
 
 
@@ -86,9 +85,7 @@ async def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
 
 @router.patch("/{goal_id}", response_model=GoalOut)
 async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_db)):
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = get_goal_or_404(goal_id, db)
 
     changes = body.model_dump(exclude_none=True)
     project_ids = changes.pop("project_ids", None)
@@ -118,9 +115,7 @@ async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_
 
 @router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_goal(goal_id: str, db: Session = Depends(get_db)):
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = get_goal_or_404(goal_id, db)
     log_activity(
         db,
         "goal.deleted",

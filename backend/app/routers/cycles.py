@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Cycle, CycleTask, Task
+from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.schemas import CycleCreate, CycleOut, CycleUpdate
 
@@ -43,18 +44,14 @@ def create_cycle(project_id: str, body: CycleCreate, db: Session = Depends(get_d
 @router.get("/{cycle_id}", response_model=CycleOut)
 def get_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycle = db.query(Cycle).filter(Cycle.id == cycle_id, Cycle.project_id == project_id).first()
-    if not cycle:
-        raise HTTPException(status_code=404, detail="Cycle not found")
+    cycle = get_cycle_or_404(cycle_id, db, project_id=project_id)
     return _enrich_cycle(cycle)
 
 
 @router.patch("/{cycle_id}", response_model=CycleOut)
 def update_cycle(project_id: str, cycle_id: str, body: CycleUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycle = db.query(Cycle).filter(Cycle.id == cycle_id, Cycle.project_id == project_id).first()
-    if not cycle:
-        raise HTTPException(status_code=404, detail="Cycle not found")
+    cycle = get_cycle_or_404(cycle_id, db, project_id=project_id)
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(cycle, field, value)
     db.commit()
@@ -65,9 +62,7 @@ def update_cycle(project_id: str, cycle_id: str, body: CycleUpdate, db: Session 
 @router.delete("/{cycle_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycle = db.query(Cycle).filter(Cycle.id == cycle_id, Cycle.project_id == project_id).first()
-    if not cycle:
-        raise HTTPException(status_code=404, detail="Cycle not found")
+    cycle = get_cycle_or_404(cycle_id, db, project_id=project_id)
     db.delete(cycle)
     db.commit()
 
@@ -75,12 +70,8 @@ def delete_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
 @router.post("/{cycle_id}/tasks/{task_id}", status_code=status.HTTP_201_CREATED)
 def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycle = db.query(Cycle).filter(Cycle.id == cycle_id, Cycle.project_id == project_id).first()
-    if not cycle:
-        raise HTTPException(status_code=404, detail="Cycle not found")
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    get_cycle_or_404(cycle_id, db, project_id=project_id)
+    get_task_or_404(task_id, db, project_id=project_id)
     existing = db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id).first()
     if not existing:
         ct = CycleTask(cycle_id=cycle_id, task_id=task_id)
@@ -103,9 +94,7 @@ def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, db: Ses
 def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     """Create a new draft cycle with cloned tasks from an existing cycle (cycle template)."""
     _get_project_or_404(project_id, db)
-    source = db.query(Cycle).filter(Cycle.id == cycle_id, Cycle.project_id == project_id).first()
-    if not source:
-        raise HTTPException(status_code=404, detail="Cycle not found")
+    source = get_cycle_or_404(cycle_id, db, project_id=project_id)
 
     new_cycle = Cycle(
         id=str(uuid.uuid4()),

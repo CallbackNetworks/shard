@@ -1,14 +1,14 @@
 """
 Shared helpers for External API v1.
 
-Provides project/task enrichment and lookup utilities.
+Provides project enrichment and lookup utilities.
 """
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import Project, Task
-from app.schemas import LabelOut, TaskOut
+from app.routers.deps import get_task_or_404 as _deps_get_task_or_404
+from app.services.enrichment import enrich_task_as_dict
 
 
 def _enrich_project(project: Project) -> dict:
@@ -27,20 +27,9 @@ def _enrich_project(project: Project) -> dict:
 
 def _get_task_or_404(project_id: str, task_id: str, db: Session) -> Task:
     """Shared helper: validate task exists within the given project."""
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return _deps_get_task_or_404(task_id, db, project_id=project_id)
 
 
 def _enrich_task_for_search(task: Task) -> dict:
     """Attach labels, counts, and dependency IDs to a TaskOut dict."""
-    out = TaskOut.model_validate(task)
-    out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
-    out.subtask_count = len(task.subtasks)
-    out.comment_count = len(task.comments)
-    out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
-    out.blocking = [d.task_id for d in task.blocking_deps]
-    if task.assigned_agent is not None:
-        out.assigned_agent_name = task.assigned_agent.name
-    return out.model_dump()
+    return enrich_task_as_dict(task)
