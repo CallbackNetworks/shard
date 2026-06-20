@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -140,3 +140,97 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}/frontend:${{ github.sha }}
             ${{ env.IMAGE_PREFIX }}/frontend:latest
+
+  deploy:
+    name: Deploy to production
+    needs: [publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: cd-deployer
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Login to registry
+        env:
+          REGISTRY_URL: ${{ vars.REGISTRY_URL }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USERNAME" --password-stdin
+
+      - name: Compute image prefix
+        run: echo "IMAGE_PREFIX=$(echo '${{ vars.REGISTRY_URL }}/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Generate compose file
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          DEPLOY_DIR="$HOME/deployments/todo-platform"
+          mkdir -p "$DEPLOY_DIR"
+          cat > "$DEPLOY_DIR/docker-compose.yml" <<EOF
+          services:
+            backend:
+              image: $IMAGE_PREFIX/backend:$IMAGE_TAG
+              container_name: todo-backend
+              ports:
+                - "8000:8000"
+              volumes:
+                - backend_data:/app/data
+              env_file:
+                - .env
+              restart: unless-stopped
+              healthcheck:
+                test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+                interval: 30s
+                timeout: 5s
+                retries: 3
+                start_period: 10s
+              networks:
+                - app-network
+            frontend:
+              image: $IMAGE_PREFIX/frontend:$IMAGE_TAG
+              container_name: todo-frontend
+              ports:
+                - "80:80"
+              depends_on:
+                backend:
+                  condition: service_healthy
+              restart: unless-stopped
+              networks:
+                - app-network
+          volumes:
+            backend_data:
+          networks:
+            app-network:
+          EOF
+
+      - name: Pull images
+        run: docker compose -f "$HOME/deployments/todo-platform/docker-compose.yml" pull
+
+      - name: Deploy services
+        run: |
+          docker compose -f "$HOME/deployments/todo-platform/docker-compose.yml" up -d --remove-orphans
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' todo-backend 2>/dev/null || echo "not found")
+            echo "Attempt $i: backend health=$status"
+            [ "$status" = "healthy" ] && exit 0
+            sleep 2
+          done
+          echo "Backend health check failed"
+          docker logs todo-backend --tail 50
+          exit 1
+
+      - name: Verify frontend
+        run: |
+          for i in $(seq 1 10); do
+            docker exec todo-frontend wget -qO- http://127.0.0.1:80/ > /dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          echo "Frontend verification failed"
+          docker logs todo-frontend --tail 50
+          exit 1
+
+      - name: Show deployment status
+        run: docker compose -f "$HOME/deployments/todo-platform/docker-compose.yml" ps -a

@@ -119,13 +119,14 @@ docker compose exec frontend npm run lint
 
 Config in `frontend/eslint.config.js` (flat config). CI allows up to 300 warnings (`--max-warnings 300`).
 
-## CI pipeline (`.github/workflows/ci.yml`)
+## CI/CD pipeline (`.github/workflows/ci.yml`)
 
-Runs on push/PR to `main`. Four jobs:
+Runs on push/PR to `main`. Five jobs:
 1. **Backend**: ruff lint + format check, pytest with coverage (>=70%), pip-audit
 2. **Frontend**: ESLint, vitest, npm audit, vite build
-3. **Docker build**: `docker compose build --no-cache`
-4. **Integration**: production compose up, backend health check, frontend smoke test
+3. **Integration**: production compose up, backend health check, frontend smoke test
+4. **Publish**: build and push Docker images to registry (main branch only)
+5. **Deploy**: pull images on `cd-deployer`, generate compose file at `~/deployments/todo-platform/`, bring services up with health checks (main branch only). Requires `.env` pre-configured on the deployer machine.
 
 ## Schema migrations (Alembic)
 

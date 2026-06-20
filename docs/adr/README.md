@@ -9,3 +9,4 @@
 | [0005](0005-mcp-server-http-proxy.md) | MCP Server HTTP Proxy Architecture | Accepted | 2026-05-29 |
 | [0006](0006-cicd-adapter-architecture.md) | CI/CD Adapter Architecture for Multi-Platform Webhook Support | Accepted | 2026-05-30 |
 | [0007](0007-multi-database-support.md) | Multi-Database Support (SQLite / PostgreSQL / MySQL) | Accepted | 2026-06-05 |
+| [0008](0008-automated-docker-deployment.md) | Automated Docker Deployment via CD Pipeline | Accepted | 2026-06-19 |
