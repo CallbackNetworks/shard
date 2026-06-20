@@ -14,23 +14,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build backend image
-        run: docker compose -f docker-compose.ci.yml build backend
+        run: docker compose -f docker-compose.ci.yml -p ci-backend build backend
 
       - name: Lint
-        run: docker compose -f docker-compose.ci.yml run --rm backend ruff check app/ tests/
+        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend ruff check app/ tests/
 
       - name: Format check
-        run: docker compose -f docker-compose.ci.yml run --rm backend ruff format --check app/ tests/
+        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend ruff format --check app/ tests/
 
       - name: Run tests with coverage
-        run: docker compose -f docker-compose.ci.yml run --rm backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
+        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
 
       - name: Security audit
-        run: docker compose -f docker-compose.ci.yml run --rm backend sh -c "pip install pip-audit && pip-audit --strict"
+        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend sh -c "pip install pip-audit && pip-audit --strict"
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml down -v
+        run: docker compose -f docker-compose.ci.yml -p ci-backend down -v
 
   frontend:
     name: Frontend tests
@@ -39,23 +39,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build frontend image
-        run: docker compose -f docker-compose.ci.yml build frontend
+        run: docker compose -f docker-compose.ci.yml -p ci-frontend build frontend
 
       - name: Lint
-        run: docker compose -f docker-compose.ci.yml run --rm frontend npm run lint -- --max-warnings 300
+        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npm run lint -- --max-warnings 300
 
       - name: Run tests
-        run: docker compose -f docker-compose.ci.yml run --rm frontend npx vitest run
+        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npx vitest run
 
       - name: Security audit
-        run: docker compose -f docker-compose.ci.yml run --rm frontend npm audit --audit-level=moderate
+        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npm audit --audit-level=moderate
 
       - name: Build
-        run: docker compose -f docker-compose.ci.yml run --rm frontend npx vite build
+        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npx vite build
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml down -v
+        run: docker compose -f docker-compose.ci.yml -p ci-frontend down -v
 
   integration:
     name: Integration smoke test (prod)
@@ -65,30 +65,30 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build production images
-        run: docker compose -f docker-compose.ci.yml --profile integration build backend-prod frontend-prod
+        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration build backend-prod frontend-prod
 
       - name: Start services
-        run: docker compose -f docker-compose.ci.yml --profile integration up -d backend-prod frontend-prod
+        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration up -d backend-prod frontend-prod
 
       - name: Wait for backend health
         run: |
           for i in $(seq 1 30); do
-            docker compose -f docker-compose.ci.yml --profile integration exec backend-prod \
+            docker compose -f docker-compose.ci.yml -p ci-integration --profile integration exec backend-prod \
               python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null && exit 0
             sleep 2
           done
           echo "Backend health check failed"
-          docker compose -f docker-compose.ci.yml --profile integration logs backend-prod
+          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration logs backend-prod
           exit 1
 
       - name: Smoke test frontend
         run: |
-          docker compose -f docker-compose.ci.yml --profile integration exec frontend-prod \
+          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration exec frontend-prod \
             wget -qO- http://localhost:80/ > /dev/null
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml --profile integration down -v
+        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration down -v
 
   publish:
     name: Publish Docker images
