@@ -165,11 +165,51 @@ jobs:
           REPO_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]' | cut -d'/' -f2)
           echo "DEPLOY_DIR=${CUSTOM_DEPLOY_DIR:-$HOME/deployments/$REPO_NAME}" >> $GITHUB_ENV
 
+      - name: Write .env file
+        env:
+          DATABASE_URL: ${{ vars.DATABASE_URL }}
+          DB_POOL_SIZE: ${{ vars.DB_POOL_SIZE }}
+          DB_MAX_OVERFLOW: ${{ vars.DB_MAX_OVERFLOW }}
+          DB_POOL_TIMEOUT: ${{ vars.DB_POOL_TIMEOUT }}
+          DB_SSL_MODE: ${{ vars.DB_SSL_MODE }}
+          AUTH_PASSWORD: ${{ secrets.AUTH_PASSWORD }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SMTP_USER: ${{ vars.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ vars.SMTP_FROM }}
+          SMTP_USE_TLS: ${{ vars.SMTP_USE_TLS }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          SUMMARY_HOUR: ${{ vars.SUMMARY_HOUR }}
+          AGENT_CONTEXT_INSTRUCTIONS: ${{ vars.AGENT_CONTEXT_INSTRUCTIONS }}
+        run: |
+          mkdir -p "$DEPLOY_DIR"
+          cat > "$DEPLOY_DIR/.env" <<ENVEOF
+          DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
+          DB_POOL_SIZE=${DB_POOL_SIZE:-5}
+          DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+          DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+          DB_SSL_MODE=${DB_SSL_MODE:-}
+          AUTH_PASSWORD=${AUTH_PASSWORD:-}
+          SMTP_HOST=${SMTP_HOST:-}
+          SMTP_PORT=${SMTP_PORT:-587}
+          SMTP_USER=${SMTP_USER:-}
+          SMTP_PASS=${SMTP_PASS:-}
+          SMTP_FROM=${SMTP_FROM:-}
+          SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+          LLM_PROVIDER=${LLM_PROVIDER:-stub}
+          LLM_API_KEY=${LLM_API_KEY:-}
+          LLM_MODEL=${LLM_MODEL:-}
+          SUMMARY_HOUR=${SUMMARY_HOUR:-8}
+          AGENT_CONTEXT_INSTRUCTIONS=${AGENT_CONTEXT_INSTRUCTIONS:-}
+          ENVEOF
+
       - name: Generate compose file
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          mkdir -p "$DEPLOY_DIR"
           cat > "$DEPLOY_DIR/docker-compose.yml" <<EOF
           services:
             backend:
