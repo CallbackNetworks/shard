@@ -59,6 +59,18 @@ export default defineConfig({
       }
     }
   ],
+  build: {
+    reportCompressedSize: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          query: ['@tanstack/react-query'],
+          i18n: ['i18next', 'react-i18next'],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/projects': backendUrl,

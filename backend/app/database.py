@@ -33,6 +33,7 @@ def _create_engine(url: str):
         kwargs["max_overflow"] = int(os.environ.get("DB_MAX_OVERFLOW", "10"))
         kwargs["pool_timeout"] = int(os.environ.get("DB_POOL_TIMEOUT", "30"))
         kwargs["pool_pre_ping"] = True
+        kwargs["pool_recycle"] = 1800
         ssl_mode = os.environ.get("DB_SSL_MODE")
         if ssl_mode:
             kwargs.setdefault("connect_args", {})["sslmode"] = ssl_mode
@@ -41,6 +42,7 @@ def _create_engine(url: str):
         kwargs["max_overflow"] = int(os.environ.get("DB_MAX_OVERFLOW", "10"))
         kwargs["pool_timeout"] = int(os.environ.get("DB_POOL_TIMEOUT", "30"))
         kwargs["pool_pre_ping"] = True
+        kwargs["pool_recycle"] = 1800
         kwargs["connect_args"] = {"charset": "utf8mb4"}
 
     eng = create_engine(url, **kwargs)

@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import json
@@ -184,7 +185,7 @@ async def fire_notifications(db: Session, task: Task, event: str) -> None:
         recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
         prefix = integration.email_subject_prefix or "[Shard]"
         subject, html = build_notification_email(event, payload, prefix)
-        send_email(recipients, subject, html)
+        await asyncio.to_thread(send_email, recipients, subject, html)
 
     # Send webhook notifications with delivery logging
     for integration in webhook_integrations:

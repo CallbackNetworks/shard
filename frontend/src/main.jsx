@@ -7,7 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import App from './App'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 10_000 } },
+  defaultOptions: { queries: { retry: 1, staleTime: 30_000, gcTime: 5 * 60_000 } },
   mutationCache: new MutationCache({
     onError: (error) => {
       const msg = error.response?.data?.detail || error.message || 'Something went wrong'

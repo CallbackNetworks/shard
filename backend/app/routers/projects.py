@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import Project, RecurrenceRule
@@ -79,9 +79,26 @@ def _enrich(project: Project, db=None) -> ProjectOut:
     return out
 
 
+def _project_eager_options():
+    from app.models import Cycle, ProjectIdentity, Task, TaskLabel
+    return [
+        selectinload(Project.tasks)
+        .selectinload(Task.task_labels)
+        .selectinload(TaskLabel.label),
+        selectinload(Project.tasks).selectinload(Task.subtasks),
+        selectinload(Project.tasks).selectinload(Task.comments),
+        selectinload(Project.tasks).selectinload(Task.blocked_by_deps),
+        selectinload(Project.tasks).selectinload(Task.blocking_deps),
+        selectinload(Project.tasks).selectinload(Task.assigned_agent),
+        selectinload(Project.labels),
+        selectinload(Project.cycles).selectinload(Cycle.cycle_tasks),
+        selectinload(Project.project_identities).selectinload(ProjectIdentity.identity),
+    ]
+
+
 @router.get("", response_model=list[ProjectOut])
 def list_projects(db: Session = Depends(get_db)):
-    projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    projects = db.query(Project).options(*_project_eager_options()).order_by(Project.created_at.desc()).all()
     return [_enrich(p, db) for p in projects]
 
 
@@ -104,7 +121,7 @@ async def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
 
 @router.get("/{project_id}", response_model=ProjectOut)
 def get_project(project_id: str, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).options(*_project_eager_options()).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return _enrich(project, db)

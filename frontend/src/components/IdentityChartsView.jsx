@@ -1,15 +1,20 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import DonutChart from './charts/DonutChart'
-import HeatmapChart from './charts/HeatmapChart'
-import TrendLineChart from './charts/TrendLineChart'
-import MindMapCanvas from './charts/MindMapCanvas'
-import RadarChart from './charts/RadarChart'
-import StackedBarChart from './charts/StackedBarChart'
-import GaugeChart from './charts/GaugeChart'
-import WaffleChart from './charts/WaffleChart'
-import HorizontalBarChart from './charts/HorizontalBarChart'
-import AreaChart from './charts/AreaChart'
+
+const HeatmapChart = lazy(() => import('./charts/HeatmapChart'))
+const TrendLineChart = lazy(() => import('./charts/TrendLineChart'))
+const MindMapCanvas = lazy(() => import('./charts/MindMapCanvas'))
+const RadarChart = lazy(() => import('./charts/RadarChart'))
+const StackedBarChart = lazy(() => import('./charts/StackedBarChart'))
+const GaugeChart = lazy(() => import('./charts/GaugeChart'))
+const WaffleChart = lazy(() => import('./charts/WaffleChart'))
+const HorizontalBarChart = lazy(() => import('./charts/HorizontalBarChart'))
+const AreaChart = lazy(() => import('./charts/AreaChart'))
+
+const ChartFallback = () => (
+  <div style={{ padding: '24px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>Loading...</div>
+)
 
 const STATUS_COLORS = {
   done: '#1ed760',
@@ -456,74 +461,79 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
 
       {/* Compare */}
       {subView === 'compare' && (
-        <div>
-          <Section title={t('hub.radarOverview')}>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <RadarChart
-                axes={radarAxes}
-                datasets={selectedIdent ? radarDatasets.filter(d => d.name === selectedIdent.name) : radarDatasets}
-                size={280}
+        <Suspense fallback={<ChartFallback />}>
+          <div>
+            <Section title={t('hub.radarOverview')}>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <RadarChart
+                  axes={radarAxes}
+                  datasets={selectedIdent ? radarDatasets.filter(d => d.name === selectedIdent.name) : radarDatasets}
+                  size={280}
+                />
+              </div>
+            </Section>
+
+            <Section title={t('hub.leaderboard')}>
+              <HorizontalBarChart
+                items={leaderboardItems}
+                maxValue={100}
               />
-            </div>
-          </Section>
+            </Section>
 
-          <Section title={t('hub.leaderboard')}>
-            <HorizontalBarChart
-              items={leaderboardItems}
-              maxValue={100}
-            />
-          </Section>
-
-          <Section title={t('hub.statusComparison')}>
-            <StackedBarChart
-              bars={selectedIdent
-                ? stackedBars.filter(b => b.label === selectedIdent.name)
-                : stackedBars
-              }
-              segments={[
-                { key: 'done', label: t('hub.done'), color: STATUS_COLORS.done },
-                { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLORS.in_progress },
-                { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLORS.todo },
-                { key: 'failed', label: t('hub.failed'), color: STATUS_COLORS.failed },
-              ]}
-              horizontal
-            />
-          </Section>
-        </div>
+            <Section title={t('hub.statusComparison')}>
+              <StackedBarChart
+                bars={selectedIdent
+                  ? stackedBars.filter(b => b.label === selectedIdent.name)
+                  : stackedBars
+                }
+                segments={[
+                  { key: 'done', label: t('hub.done'), color: STATUS_COLORS.done },
+                  { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLORS.in_progress },
+                  { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLORS.todo },
+                  { key: 'failed', label: t('hub.failed'), color: STATUS_COLORS.failed },
+                ]}
+                horizontal
+              />
+            </Section>
+          </div>
+        </Suspense>
       )}
 
       {/* Activity */}
       {subView === 'activity' && (
-        <div>
-          <Section title={t('hub.activityHeatmap')}>
-            <HeatmapChart
-              data={heatmapData}
-              color={selectedIdent?.color || '#1ed760'}
-            />
-          </Section>
-
-          <Section title={t('hub.activityTrend')}>
-            <TrendLineChart
-              series={trendSeries}
-              height={220}
-              showArea={!!selectedIdent}
-              showLegend={!selectedIdent}
-            />
-          </Section>
-
-          {!selectedIdent && identities.length > 1 && (
-            <Section title={t('hub.stackedActivity')}>
-              <AreaChart
-                layers={areaLayers}
-                height={220}
+        <Suspense fallback={<ChartFallback />}>
+          <div>
+            <Section title={t('hub.activityHeatmap')}>
+              <HeatmapChart
+                data={heatmapData}
+                color={selectedIdent?.color || '#1ed760'}
               />
             </Section>
-          )}
-        </div>
+
+            <Section title={t('hub.activityTrend')}>
+              <TrendLineChart
+                series={trendSeries}
+                height={220}
+                showArea={!!selectedIdent}
+                showLegend={!selectedIdent}
+              />
+            </Section>
+
+            {!selectedIdent && identities.length > 1 && (
+              <Section title={t('hub.stackedActivity')}>
+                <AreaChart
+                  layers={areaLayers}
+                  height={220}
+                />
+              </Section>
+            )}
+          </div>
+        </Suspense>
       )}
 
       {/* Breakdown */}
       {subView === 'breakdown' && (
+        <Suspense fallback={<ChartFallback />}>
         <div>
           <div style={{
             display: 'grid',
@@ -595,17 +605,20 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             </Section>
           )}
         </div>
+        </Suspense>
       )}
 
       {/* Mind Map */}
       {subView === 'mindmap' && (
-        <div>
-          <PerspectiveSwitcher value={perspective} onChange={setPerspective} />
-          <MindMapCanvas
-            trees={trees}
-            onNodeClick={handleNodeClick}
-          />
-        </div>
+        <Suspense fallback={<ChartFallback />}>
+          <div>
+            <PerspectiveSwitcher value={perspective} onChange={setPerspective} />
+            <MindMapCanvas
+              trees={trees}
+              onNodeClick={handleNodeClick}
+            />
+          </div>
+        </Suspense>
       )}
     </div>
   )
