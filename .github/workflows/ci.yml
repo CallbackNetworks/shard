@@ -252,6 +252,11 @@ jobs:
             app-network:
           EOF
 
+      - name: Persist deploy files to host
+        run: |
+          cat "$DEPLOY_DIR/.env" | docker run --rm -i -v "${DEPLOY_DIR}:/deploy" docker:27-cli sh -c 'cat > /deploy/.env'
+          cat "$DEPLOY_DIR/docker-compose.yml" | docker run --rm -i -v "${DEPLOY_DIR}:/deploy" docker:27-cli sh -c 'cat > /deploy/docker-compose.yml'
+
       - name: Pull images
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" pull
 
