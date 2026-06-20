@@ -4,6 +4,12 @@ import DonutChart from './charts/DonutChart'
 import HeatmapChart from './charts/HeatmapChart'
 import TrendLineChart from './charts/TrendLineChart'
 import MindMapCanvas from './charts/MindMapCanvas'
+import RadarChart from './charts/RadarChart'
+import StackedBarChart from './charts/StackedBarChart'
+import GaugeChart from './charts/GaugeChart'
+import WaffleChart from './charts/WaffleChart'
+import HorizontalBarChart from './charts/HorizontalBarChart'
+import AreaChart from './charts/AreaChart'
 
 const STATUS_COLORS = {
   done: '#1ed760',
@@ -263,7 +269,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
   const [subView, setSubView] = useState('overview')
   const [perspective, setPerspective] = useState('identity')
 
-  const identities = data?.identities || []
+  const identities = useMemo(() => data?.identities || [], [data])
   const totals = data?.totals || { total_tasks: 0, done: 0, in_progress: 0, todo: 0, failed: 0, overdue: 0 }
 
   const selectedIdent = selectedIdentityId
@@ -298,6 +304,57 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
     return buildTreesByIdentity(data)
   }, [data, perspective])
 
+  const radarAxes = [
+    { key: 'completion', label: t('hub.completionRate') },
+    { key: 'volume', label: t('hub.volume') },
+    { key: 'active', label: t('hub.activeRate') },
+    { key: 'health', label: t('hub.health') },
+    { key: 'scope', label: t('hub.scope') },
+  ]
+
+  const radarDatasets = useMemo(() => {
+    return identities.map(ident => {
+      const maxTasks = Math.max(...identities.map(i => i.total_tasks), 1)
+      const maxProjects = Math.max(...identities.map(i => i.projects.length), 1)
+      const completionRate = ident.total_tasks > 0 ? (ident.done / ident.total_tasks) * 100 : 0
+      const volumeRate = (ident.total_tasks / maxTasks) * 100
+      const activeRate = ident.total_tasks > 0 ? (ident.in_progress / ident.total_tasks) * 100 : 0
+      const healthRate = ident.total_tasks > 0 ? Math.max(0, 100 - (ident.overdue / ident.total_tasks) * 200) : 100
+      const scopeRate = (ident.projects.length / maxProjects) * 100
+      return {
+        name: ident.name,
+        color: ident.color,
+        values: [completionRate, volumeRate, activeRate, healthRate, scopeRate],
+      }
+    })
+  }, [identities])
+
+  const stackedBars = useMemo(() => {
+    return identities.map(ident => ({
+      label: ident.name,
+      values: { done: ident.done, in_progress: ident.in_progress, todo: ident.todo, failed: ident.failed },
+    }))
+  }, [identities])
+
+  const leaderboardItems = useMemo(() => {
+    return [...identities]
+      .map(i => ({
+        label: i.name,
+        value: i.total_tasks > 0 ? Math.round((i.done / i.total_tasks) * 100) : 0,
+        displayValue: `${i.total_tasks > 0 ? Math.round((i.done / i.total_tasks) * 100) : 0}%`,
+        color: i.color,
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [identities])
+
+  const areaLayers = useMemo(() => {
+    return identities.map(ident => ({
+      name: ident.name,
+      color: ident.color,
+      data: (ident.daily_activity || []).slice(-60).map(d => ({ date: d.date, value: d.count })),
+    }))
+  }, [identities])
+
   const handleNodeClick = (node) => {
     if (onNavigate && node.projectId) onNavigate(node.projectId)
   }
@@ -312,7 +369,9 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
 
   const subViewTabs = [
     { key: 'overview', label: t('hub.overview') },
+    { key: 'compare', label: t('hub.compare') },
     { key: 'activity', label: t('hub.activity') },
+    { key: 'breakdown', label: t('hub.breakdown') },
     { key: 'mindmap', label: t('hub.mindMap') },
   ]
 
@@ -395,6 +454,44 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
         </div>
       )}
 
+      {/* Compare */}
+      {subView === 'compare' && (
+        <div>
+          <Section title={t('hub.radarOverview')}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <RadarChart
+                axes={radarAxes}
+                datasets={selectedIdent ? radarDatasets.filter(d => d.name === selectedIdent.name) : radarDatasets}
+                size={280}
+              />
+            </div>
+          </Section>
+
+          <Section title={t('hub.leaderboard')}>
+            <HorizontalBarChart
+              items={leaderboardItems}
+              maxValue={100}
+            />
+          </Section>
+
+          <Section title={t('hub.statusComparison')}>
+            <StackedBarChart
+              bars={selectedIdent
+                ? stackedBars.filter(b => b.label === selectedIdent.name)
+                : stackedBars
+              }
+              segments={[
+                { key: 'done', label: t('hub.done'), color: STATUS_COLORS.done },
+                { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLORS.in_progress },
+                { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLORS.todo },
+                { key: 'failed', label: t('hub.failed'), color: STATUS_COLORS.failed },
+              ]}
+              horizontal
+            />
+          </Section>
+        </div>
+      )}
+
       {/* Activity */}
       {subView === 'activity' && (
         <div>
@@ -413,6 +510,90 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
               showLegend={!selectedIdent}
             />
           </Section>
+
+          {!selectedIdent && identities.length > 1 && (
+            <Section title={t('hub.stackedActivity')}>
+              <AreaChart
+                layers={areaLayers}
+                height={220}
+              />
+            </Section>
+          )}
+        </div>
+      )}
+
+      {/* Breakdown */}
+      {subView === 'breakdown' && (
+        <div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: 16, marginBottom: 24,
+          }}>
+            {displayedIdentities.map(ident => {
+              return (
+                <div key={ident.id} style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 10, padding: 16,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: ident.color }}>{ident.name}</div>
+                  <GaugeChart
+                    value={ident.done}
+                    max={ident.total_tasks}
+                    size={130}
+                    color={ident.color}
+                    label={`${ident.done}/${ident.total_tasks}`}
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          <Section title={t('hub.taskDistribution')}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: 16,
+            }}>
+              {displayedIdentities.map(ident => (
+                <div key={ident.id} style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 10, padding: 16,
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: ident.color, marginBottom: 10 }}>
+                    {ident.name}
+                  </div>
+                  <WaffleChart
+                    segments={[
+                      { value: ident.done, color: STATUS_COLORS.done, label: t('hub.done') },
+                      { value: ident.in_progress, color: STATUS_COLORS.in_progress, label: t('hub.inProgress') },
+                      { value: ident.todo, color: STATUS_COLORS.todo, label: t('hub.todoLabel') },
+                      { value: ident.failed, color: STATUS_COLORS.failed, label: t('hub.failed') },
+                    ]}
+                    cols={8}
+                    cellSize={12}
+                  />
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          {!selectedIdent && identities.length > 1 && (
+            <Section title={t('hub.verticalComparison')}>
+              <StackedBarChart
+                bars={stackedBars}
+                segments={[
+                  { key: 'done', label: t('hub.done'), color: STATUS_COLORS.done },
+                  { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLORS.in_progress },
+                  { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLORS.todo },
+                  { key: 'failed', label: t('hub.failed'), color: STATUS_COLORS.failed },
+                ]}
+              />
+            </Section>
+          )}
         </div>
       )}
 
