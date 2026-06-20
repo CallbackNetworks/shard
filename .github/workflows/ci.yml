@@ -167,6 +167,8 @@ jobs:
 
       - name: Write .env file
         env:
+          BACKEND_PORT: ${{ vars.BACKEND_PORT }}
+          FRONTEND_PORT: ${{ vars.FRONTEND_PORT }}
           DATABASE_URL: ${{ vars.DATABASE_URL }}
           DB_POOL_SIZE: ${{ vars.DB_POOL_SIZE }}
           DB_MAX_OVERFLOW: ${{ vars.DB_MAX_OVERFLOW }}
@@ -187,6 +189,8 @@ jobs:
         run: |
           mkdir -p "$DEPLOY_DIR"
           cat > "$DEPLOY_DIR/.env" <<ENVEOF
+          BACKEND_PORT=${BACKEND_PORT:-8000}
+          FRONTEND_PORT=${FRONTEND_PORT:-80}
           DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
           DB_POOL_SIZE=${DB_POOL_SIZE:-5}
           DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
@@ -216,7 +220,7 @@ jobs:
               image: $IMAGE_PREFIX/backend:$IMAGE_TAG
               container_name: todo-backend
               ports:
-                - "8000:8000"
+                - "\${BACKEND_PORT:-8000}:8000"
               volumes:
                 - backend_data:/app/data
               env_file:
@@ -234,7 +238,7 @@ jobs:
               image: $IMAGE_PREFIX/frontend:$IMAGE_TAG
               container_name: todo-frontend
               ports:
-                - "80:80"
+                - "\${FRONTEND_PORT:-80}:80"
               depends_on:
                 backend:
                   condition: service_healthy
