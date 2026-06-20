@@ -223,7 +223,7 @@ jobs:
               expose:
                 - "8000"
               volumes:
-                - backend_data:/app/data
+                - ./data:/app/data
               env_file:
                 - .env
               restart: unless-stopped
@@ -246,8 +246,6 @@ jobs:
               restart: unless-stopped
               networks:
                 - app-network
-          volumes:
-            backend_data:
           networks:
             app-network:
           EOF
