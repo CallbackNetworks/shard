@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.routers.auth import AUTH_PASSWORD, _active_tokens
+from app.routers.auth import AUTH_PASSWORD
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -41,6 +41,5 @@ def change_password(body: PasswordChangeRequest, request: Request):
         raise HTTPException(status_code=400, detail="New password must be at least 4 characters")
 
     auth_mod.AUTH_PASSWORD = body.new_password
-    # Invalidate all existing sessions
-    _active_tokens.clear()
+    # Old HMAC-signed tokens are automatically invalid since they were signed with the old password.
     return {"ok": True, "message": "Password changed. All sessions invalidated."}

@@ -7,7 +7,6 @@ def _enable_auth(pw="secret123"):
 
     old_pw = auth_mod.AUTH_PASSWORD
     auth_mod.AUTH_PASSWORD = pw
-    auth_mod._active_tokens.clear()
     return old_pw
 
 
@@ -15,7 +14,6 @@ def _restore_auth(old_pw):
     import app.routers.auth as auth_mod
 
     auth_mod.AUTH_PASSWORD = old_pw
-    auth_mod._active_tokens.clear()
 
 
 def test_login_no_auth_configured(client):
@@ -40,7 +38,7 @@ def test_login_correct_password(client):
         assert r.status_code == 200
         data = r.json()
         assert data["auth_required"] is True
-        assert len(data["token"]) == 64  # secrets.token_hex(32) produces 64 hex chars
+        assert data["token"].count(".") == 2
     finally:
         _restore_auth(old_pw)
 
@@ -91,12 +89,22 @@ def test_logout(client):
         r = client.post("/auth/login", json={"password": "secret123"})
         token = r.json()["token"]
 
-        # Logout
         r = client.post("/auth/logout", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["ok"] is True
+    finally:
+        _restore_auth(old_pw)
 
-        # Token should no longer work
+
+def test_password_change_invalidates_tokens(client):
+    import app.routers.auth as auth_mod
+
+    old_pw = _enable_auth("oldpass")
+    try:
+        r = client.post("/auth/login", json={"password": "oldpass"})
+        token = r.json()["token"]
+
+        auth_mod.AUTH_PASSWORD = "newpass"
         r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 401
     finally:
