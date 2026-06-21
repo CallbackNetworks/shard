@@ -60,6 +60,7 @@ async def bulk_update_tasks(
 
     if len(body.task_ids) > 500:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="Bulk update limited to 500 tasks per request")
 
     tasks = db.query(Task).filter(Task.project_id == project_id, Task.id.in_(body.task_ids)).all()

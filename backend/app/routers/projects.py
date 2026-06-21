@@ -13,10 +13,9 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 def _project_eager_options():
     from app.models import Cycle, ProjectIdentity, Task, TaskLabel
+
     return [
-        selectinload(Project.tasks)
-        .selectinload(Task.task_labels)
-        .selectinload(TaskLabel.label),
+        selectinload(Project.tasks).selectinload(Task.task_labels).selectinload(TaskLabel.label),
         selectinload(Project.tasks).selectinload(Task.subtasks),
         selectinload(Project.tasks).selectinload(Task.comments),
         selectinload(Project.tasks).selectinload(Task.blocked_by_deps),

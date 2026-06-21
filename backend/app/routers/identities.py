@@ -73,15 +73,17 @@ def get_hub_stats(db: Session = Depends(get_db)):
         for k in totals:
             totals[k] += ident_stats[k]
 
-        result.append({
-            "id": ident.id,
-            "name": ident.name,
-            "color": ident.color,
-            "avatar": ident.avatar,
-            **ident_stats,
-            "projects": projects_data,
-            "daily_activity": daily_activity,
-        })
+        result.append(
+            {
+                "id": ident.id,
+                "name": ident.name,
+                "color": ident.color,
+                "avatar": ident.avatar,
+                **ident_stats,
+                "projects": projects_data,
+                "daily_activity": daily_activity,
+            }
+        )
 
     return {"identities": result, "totals": totals}
 
