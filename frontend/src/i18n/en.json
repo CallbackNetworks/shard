@@ -75,7 +75,7 @@
   "dashboard.newProject": "New Project",
   "dashboard.projectNamePlaceholder": "Project name *",
   "dashboard.descriptionPlaceholder": "Description (optional)",
-  "dashboard.myWork": "My Work",
+  "dashboard.myWork": "Tasks",
   "dashboard.activeWork": "Active Work",
   "dashboard.recentActivity": "Recent Activity",
   "dashboard.noProjectsEmpty": "No projects yet",

@@ -75,7 +75,7 @@
   "dashboard.newProject": "新增專案",
   "dashboard.projectNamePlaceholder": "專案名稱 *",
   "dashboard.descriptionPlaceholder": "說明（選填）",
-  "dashboard.myWork": "我的工作",
+  "dashboard.myWork": "任務總覽",
   "dashboard.activeWork": "進行中工作",
   "dashboard.recentActivity": "最近動態",
   "dashboard.noProjectsEmpty": "尚無專案",
