@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp, BarChart2 } from 'lucide-react'
+import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp, BarChart2, TrendingUp, Shield, ListChecks, GitCompare } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats } from '../api/client'
 import AgentTasksPanel from '../components/AgentTasksPanel'
 import IdentityChartsView from '../components/IdentityChartsView'
+import { ViewProgress, ViewHealth, ViewTasks, ViewCompare, getPinnedIds, togglePin } from '../components/OverviewViews'
 import { BRAND, STATUS_MAP, PRIORITY, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Dashboard.module.css'
@@ -52,7 +53,7 @@ function ProjectCard({ project, onDelete, index }) {
       className={`card-hover ${s.projectCard}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => navigate(`/app/projects/${project.id}`)}
+      onClick={() => navigate(`/projects/${project.id}`)}
       style={{ animationDelay: `${index * 0.055}s` }}
     >
       {/* Subtle gradient top accent */}
@@ -353,7 +354,7 @@ function DueSoonPanel({ projects }) {
               t={task}
               i={i}
               total={dueSoonTasks.length}
-              onClick={() => navigate(`/app/projects/${task.projectId}`)}
+              onClick={() => navigate(`/projects/${task.projectId}`)}
             />
           ))}
         </div>
@@ -392,7 +393,7 @@ function IdentityGroup({ ident, tasks, navigate }) {
       </div>
       {visibleTasks.map((task, i) => (
         <TaskRow key={task.id + ident.id} t={task} i={i} total={visibleTasks.length}
-          onClick={() => navigate(`/app/projects/${task.projectId}`)} />
+          onClick={() => navigate(`/projects/${task.projectId}`)} />
       ))}
       {tasks.length > 8 && !showAll && (
         <button
@@ -463,7 +464,7 @@ function MyWorkSection({ projects }) {
           )}
           {ungroupedTasks.slice(0, 8).map((task, i) => (
             <TaskRow key={task.id} t={task} i={i} total={Math.min(ungroupedTasks.length, 8)}
-              onClick={() => navigate(`/app/projects/${task.projectId}`)} />
+              onClick={() => navigate(`/projects/${task.projectId}`)} />
           ))}
         </div>
       )}
@@ -561,6 +562,10 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false)
   const [filter, setFilter] = useState('active')
   const [tab, setTab] = useState('projects')
+  const [pinned, setPinned] = useState(() => getPinnedIds())
+  const handleTogglePin = useCallback((projectId) => {
+    setPinned(togglePin(projectId))
+  }, [])
 
   const createMut = useMutation({
     mutationFn: () => createProject({ name: name.trim(), description: desc.trim() || undefined }),
@@ -638,8 +643,12 @@ export default function Dashboard() {
       <div className={s.tabBar}>
         {[
           { key: 'projects', label: t('nav.projects'), icon: <FolderOpen size={13} /> },
-          { key: 'mywork',   label: t('dashboard.myWork'),  icon: <User size={13} /> },
-          { key: 'charts',   label: t('dashboard.charts'),  icon: <BarChart2 size={13} /> },
+          { key: 'progress', label: t('dashboard.progress'), icon: <TrendingUp size={13} /> },
+          { key: 'health',   label: t('dashboard.health'),   icon: <Shield size={13} /> },
+          { key: 'tasks',    label: t('dashboard.myWork'),   icon: <ListChecks size={13} /> },
+          { key: 'compare',  label: t('dashboard.compare'),  icon: <GitCompare size={13} /> },
+          { key: 'mywork',   label: t('dashboard.myWork'),   icon: <User size={13} /> },
+          { key: 'charts',   label: t('dashboard.charts'),   icon: <BarChart2 size={13} /> },
         ].map(tabItem => (
           <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
             className={`${s.tabBtn} ${tab === tabItem.key ? s.tabBtnActive : s.tabBtnInactive}`}>
@@ -655,12 +664,20 @@ export default function Dashboard() {
             <div className={s.loadingSpinner} />
             {t('loading')}
           </div>
+        ) : tab === 'progress' ? (
+          <ViewProgress projects={active} pinned={pinned} onTogglePin={handleTogglePin} />
+        ) : tab === 'health' ? (
+          <ViewHealth projects={active} pinned={pinned} onTogglePin={handleTogglePin} />
+        ) : tab === 'tasks' ? (
+          <ViewTasks projects={active} />
+        ) : tab === 'compare' ? (
+          <ViewCompare projects={active} />
         ) : tab === 'charts' ? (
           <IdentityChartsView
             data={hubStats}
             selectedIdentityId={chartIdentityId}
             onSelectIdentity={setChartIdentityId}
-            onNavigate={(projectId) => navigate(`/app/projects/${projectId}`)}
+            onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
           />
         ) : tab === 'mywork' ? (
           <div className={`${s.myWorkGrid} ${isMobile ? s.myWorkGridMobile : s.myWorkGridDesktop}`}>

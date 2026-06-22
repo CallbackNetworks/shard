@@ -321,7 +321,7 @@ export default function ProjectDetail() {
       {/* Header */}
       <div className={`${s.header} ${isMobile ? s.headerMobile : s.headerDesktop}`}>
         <button
-          onClick={() => navigate('/app')}
+          onClick={() => navigate('/')}
           className={s.backBtn}
         >
           <ArrowLeft size={12} /> My Issues

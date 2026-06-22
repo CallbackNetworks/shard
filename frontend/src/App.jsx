@@ -30,7 +30,6 @@ const Goals = lazy(() => import('./pages/Goals'))
 const Activity = lazy(() => import('./pages/Activity'))
 const Assistant = lazy(() => import('./pages/Assistant'))
 const Settings = lazy(() => import('./pages/Settings'))
-const Overview = lazy(() => import('./pages/Overview'))
 const ShareView = lazy(() => import('./pages/ShareView'))
 const Login = lazy(() => import('./pages/Login'))
 
@@ -178,10 +177,9 @@ export default function App() {
             <ToastProvider>
               <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
-                  <Route path="/" element={<Overview />} />
                   <Route path="/share/:token" element={<ShareView />} />
                   <Route path="/login" element={<Login />} />
-                  <Route path="/app/*" element={<Layout />} />
+                  <Route path="/*" element={<Layout />} />
                 </Routes>
               </Suspense>
             </ToastProvider>

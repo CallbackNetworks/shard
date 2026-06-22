@@ -611,6 +611,9 @@
   "templates.deletedSuccess": "Template deleted",
 
   "dashboard.charts": "Charts",
+  "dashboard.progress": "Progress",
+  "dashboard.health": "Health",
+  "dashboard.compare": "Compare",
 
   "hub.all": "All",
   "hub.overview": "Overview",

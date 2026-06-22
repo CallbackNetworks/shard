@@ -44,7 +44,7 @@ function setup(options = {}) {
   })
 
   const utils = render(
-    <MemoryRouter initialEntries={['/app']}>
+    <MemoryRouter initialEntries={['/']}>
       <Sidebar onOpenPalette={onOpenPalette} />
     </MemoryRouter>
   )

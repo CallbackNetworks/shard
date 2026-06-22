@@ -54,10 +54,10 @@ export default function useKeyboardShortcuts(config = {}) {
         clearPending()
 
         const chords = {
-          h: '/app',
-          a: '/app/analytics',
-          i: '/app/identities',
-          g: '/app/goals',
+          h: '/',
+          a: '/analytics',
+          i: '/identities',
+          g: '/goals',
         }
 
         if (chords[key] && navigate) {

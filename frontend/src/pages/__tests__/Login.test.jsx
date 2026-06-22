@@ -102,7 +102,7 @@ describe('Login', () => {
     expect(input.value).toBe('')
   })
 
-  it('redirects to /app on successful login', async () => {
+  it('redirects to / on successful login', async () => {
     mockLogin.mockResolvedValueOnce()
 
     render(<Login />)
@@ -114,7 +114,7 @@ describe('Login', () => {
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('correct')
-      expect(locationHref).toBe('/app')
+      expect(locationHref).toBe('/')
     })
   })
 

@@ -610,6 +610,9 @@
   "templates.deletedSuccess": "範本已刪除",
 
   "dashboard.charts": "圖表",
+  "dashboard.progress": "進度",
+  "dashboard.health": "健康度",
+  "dashboard.compare": "比較",
 
   "hub.all": "全部",
   "hub.overview": "總覽",

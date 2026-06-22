@@ -66,32 +66,32 @@ describe('useKeyboardShortcuts', () => {
     expect(onShowHelp).toHaveBeenCalledTimes(1)
   })
 
-  it('navigates to /app on chord g+h', () => {
+  it('navigates to / on chord g+h', () => {
     renderShortcuts()
     press('g')
     press('h')
-    expect(navigate).toHaveBeenCalledWith('/app')
+    expect(navigate).toHaveBeenCalledWith('/')
   })
 
-  it('navigates to /app/analytics on chord g+a', () => {
+  it('navigates to /analytics on chord g+a', () => {
     renderShortcuts()
     press('g')
     press('a')
-    expect(navigate).toHaveBeenCalledWith('/app/analytics')
+    expect(navigate).toHaveBeenCalledWith('/analytics')
   })
 
-  it('navigates to /app/identities on chord g+i', () => {
+  it('navigates to /identities on chord g+i', () => {
     renderShortcuts()
     press('g')
     press('i')
-    expect(navigate).toHaveBeenCalledWith('/app/identities')
+    expect(navigate).toHaveBeenCalledWith('/identities')
   })
 
-  it('navigates to /app/goals on chord g+g', () => {
+  it('navigates to /goals on chord g+g', () => {
     renderShortcuts()
     press('g')
     press('g')
-    expect(navigate).toHaveBeenCalledWith('/app/goals')
+    expect(navigate).toHaveBeenCalledWith('/goals')
   })
 
   it('chord expires after 500ms', () => {

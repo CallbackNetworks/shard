@@ -22,7 +22,7 @@ export default defineConfig({
         theme_color: '#07080f',
         background_color: '#07080f',
         display: 'standalone',
-        start_url: '/app',
+        start_url: '/',
         scope: '/',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -33,7 +33,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/docs/, /^\/openapi\.json/, /^\/redoc/],
-        navigateFallbackAllowlist: [/^\/app/, /^\/share/],
+        navigateFallbackAllowlist: [/^\//, /^\/share/],
         runtimeCaching: [
           {
             urlPattern: /^\/(projects|identities|activity|analytics|api-keys|workflow-rules|decisions|search)/,

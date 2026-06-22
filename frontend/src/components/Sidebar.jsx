@@ -55,7 +55,7 @@ export default function Sidebar({ onOpenPalette }) {
   })
 
   const projectLinkStyle = (id) => {
-    const on = location.pathname === `/app/projects/${id}`
+    const on = location.pathname === `/projects/${id}`
     return {
       display: 'flex', alignItems: 'center', gap: 8,
       padding: '4px 12px 4px 28px', borderRadius: 4, textDecoration: 'none',
@@ -123,19 +123,19 @@ export default function Sidebar({ onOpenPalette }) {
       {/* Nav links */}
       <nav aria-label="Main navigation" style={{ padding: '8px 0', borderBottom: `1px solid ${SB_BORDER}` }}>
         {[
-          { to: '/app', icon: <LayoutGrid size={13} />, labelKey: 'nav.myIssues' },
-          { to: '/app/identities', icon: <Users size={13} />, labelKey: 'nav.identities' },
-          { to: '/app/integrations', icon: <Zap size={13} />, labelKey: 'nav.integrations' },
-          { to: '/app/api-keys', icon: <Key size={13} />, labelKey: 'nav.apiKeys' },
-          { to: '/app/analytics', icon: <BarChart2 size={13} />, labelKey: 'nav.analytics' },
-          { to: '/app/workflow-rules', icon: <GitMerge size={13} />, labelKey: 'nav.workflowRules' },
-          { to: '/app/goals', icon: <Target size={13} />, labelKey: 'nav.goals' },
-          { to: '/app/decisions', icon: <GitFork size={13} />, labelKey: 'nav.decisions' },
-          { to: '/app/templates', icon: <FileText size={13} />, labelKey: 'nav.templates' },
-          { to: '/app/webhook-logs', icon: <ScrollText size={13} />, labelKey: 'nav.webhookLogs' },
-          { to: '/app/activity', icon: <Activity size={13} />, labelKey: 'nav.activity' },
-          { to: '/app/assistant', icon: <MessageCircle size={13} />, labelKey: 'nav.assistant' },
-          { to: '/app/settings', icon: <Settings2 size={13} />, labelKey: 'nav.settings' },
+          { to: '/', icon: <LayoutGrid size={13} />, labelKey: 'nav.myIssues' },
+          { to: '/identities', icon: <Users size={13} />, labelKey: 'nav.identities' },
+          { to: '/integrations', icon: <Zap size={13} />, labelKey: 'nav.integrations' },
+          { to: '/api-keys', icon: <Key size={13} />, labelKey: 'nav.apiKeys' },
+          { to: '/analytics', icon: <BarChart2 size={13} />, labelKey: 'nav.analytics' },
+          { to: '/workflow-rules', icon: <GitMerge size={13} />, labelKey: 'nav.workflowRules' },
+          { to: '/goals', icon: <Target size={13} />, labelKey: 'nav.goals' },
+          { to: '/decisions', icon: <GitFork size={13} />, labelKey: 'nav.decisions' },
+          { to: '/templates', icon: <FileText size={13} />, labelKey: 'nav.templates' },
+          { to: '/webhook-logs', icon: <ScrollText size={13} />, labelKey: 'nav.webhookLogs' },
+          { to: '/activity', icon: <Activity size={13} />, labelKey: 'nav.activity' },
+          { to: '/assistant', icon: <MessageCircle size={13} />, labelKey: 'nav.assistant' },
+          { to: '/settings', icon: <Settings2 size={13} />, labelKey: 'nav.settings' },
         ].map(({ to, icon, labelKey }) => (
           <Link key={to} to={to} className="sb-link" style={navLinkStyle(to)}
             aria-current={isActive(to) ? 'page' : undefined}>
@@ -177,7 +177,7 @@ export default function Sidebar({ onOpenPalette }) {
                     {ident.name}
                   </div>
                   {group.projects.map(p => (
-                    <Link key={p.id} to={`/app/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
+                    <Link key={p.id} to={`/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
                       <div style={{
                         width: 5, height: 5, borderRadius: '50%', background: ident.color,
                         flexShrink: 0, boxShadow: `0 0 5px ${ident.color}88`,
@@ -209,7 +209,7 @@ export default function Sidebar({ onOpenPalette }) {
         {projectsOpen && (
           <>
             {active.map(p => (
-              <Link key={p.id} to={`/app/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
+              <Link key={p.id} to={`/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
                 <div style={{
                   width: 5, height: 5, borderRadius: '50%',
                   background: p.identities?.[0]?.color || BRAND, flexShrink: 0,
@@ -228,7 +228,7 @@ export default function Sidebar({ onOpenPalette }) {
               </div>
             )}
             {archived.map(p => (
-              <Link key={p.id} to={`/app/projects/${p.id}`} className="sb-link"
+              <Link key={p.id} to={`/projects/${p.id}`} className="sb-link"
                 style={{ ...projectLinkStyle(p.id), opacity: 0.45 }}>
                 <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.name}</span>

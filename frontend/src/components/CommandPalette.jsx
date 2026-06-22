@@ -13,10 +13,10 @@ const ACCENT   = DARK.success
 const ITEM_HOVER = DARK.active
 
 const STATIC_COMMANDS = [
-  { id: 'nav-dashboard',    labelKey: 'nav.myIssues',      section: 'Navigation', icon: <LayoutGrid size={14}/>, path: '/app' },
-  { id: 'nav-identities',  labelKey: 'nav.identities',    section: 'Navigation', icon: <Users size={14}/>,      path: '/app/identities' },
-  { id: 'nav-integrations',labelKey: 'nav.integrations',  section: 'Navigation', icon: <Zap size={14}/>,        path: '/app/integrations' },
-  { id: 'nav-apikeys',     labelKey: 'nav.apiKeys',       section: 'Navigation', icon: <Key size={14}/>,        path: '/app/api-keys' },
+  { id: 'nav-dashboard',    labelKey: 'nav.myIssues',      section: 'Navigation', icon: <LayoutGrid size={14}/>, path: '/' },
+  { id: 'nav-identities',  labelKey: 'nav.identities',    section: 'Navigation', icon: <Users size={14}/>,      path: '/identities' },
+  { id: 'nav-integrations',labelKey: 'nav.integrations',  section: 'Navigation', icon: <Zap size={14}/>,        path: '/integrations' },
+  { id: 'nav-apikeys',     labelKey: 'nav.apiKeys',       section: 'Navigation', icon: <Key size={14}/>,        path: '/api-keys' },
 ]
 
 function useDebounce(value, delay) {
@@ -121,7 +121,7 @@ export default function CommandPalette({ open, onClose }) {
         section: 'Projects',
         icon: <FolderOpen size={14}/>,
         meta: p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined,
-        path: `/app/projects/${p.id}`,
+        path: `/projects/${p.id}`,
       }))
     }
   } else {
@@ -141,7 +141,7 @@ export default function CommandPalette({ open, onClose }) {
       section: 'Projects',
       icon: <FolderOpen size={14}/>,
       meta: p.status === 'archived' ? 'archived' : (p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined),
-      path: `/app/projects/${p.id}`,
+      path: `/projects/${p.id}`,
     }))
 
     // Search results (tasks)
@@ -152,7 +152,7 @@ export default function CommandPalette({ open, onClose }) {
         section: 'Tasks',
         icon: <Hash size={14}/>,
         meta: t.status,
-        path: `/app/projects/${t.project_id}`,
+        path: `/projects/${t.project_id}`,
       }))
     }
 
@@ -164,7 +164,7 @@ export default function CommandPalette({ open, onClose }) {
         label: p.name,
         section: 'Projects',
         icon: <FolderOpen size={14}/>,
-        path: `/app/projects/${p.id}`,
+        path: `/projects/${p.id}`,
       }))
     }
   }

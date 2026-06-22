@@ -18,7 +18,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(password)
-      const next = new URLSearchParams(window.location.search).get('next') || '/app'
+      const next = new URLSearchParams(window.location.search).get('next') || '/'
       window.location.href = next
     } catch {
       setError(true)
