@@ -196,11 +196,11 @@ async def fire_notifications(db: Session, task: Task, event: str) -> None:
 
 
 _EVENT_MESSAGES = {
-    "task.done": lambda t, p: (f'Task "{t.title}" completed in {p.name}', f"/app/projects/{p.id}"),
-    "task.failed": lambda t, p: (f'Task "{t.title}" failed in {p.name}', f"/app/projects/{p.id}"),
-    "task.due_soon": lambda t, p: (f'Task "{t.title}" is due soon', f"/app/projects/{p.id}"),
-    "task.overdue": lambda t, p: (f'Task "{t.title}" is overdue', f"/app/projects/{p.id}"),
-    "project.complete": lambda t, p: (f'All tasks in "{p.name}" are done!', f"/app/projects/{p.id}"),
+    "task.done": lambda t, p: (f'Task "{t.title}" completed in {p.name}', f"/projects/{p.id}"),
+    "task.failed": lambda t, p: (f'Task "{t.title}" failed in {p.name}', f"/projects/{p.id}"),
+    "task.due_soon": lambda t, p: (f'Task "{t.title}" is due soon', f"/projects/{p.id}"),
+    "task.overdue": lambda t, p: (f'Task "{t.title}" is overdue', f"/projects/{p.id}"),
+    "project.complete": lambda t, p: (f'All tasks in "{p.name}" are done!', f"/projects/{p.id}"),
 }
 
 

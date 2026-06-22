@@ -326,7 +326,7 @@ class TestCreateNotification:
         notif = db.query(Notification).first()
         assert notif is not None
         assert "Deploy" in notif.message
-        assert notif.link == f"/app/projects/{p.id}"
+        assert notif.link == f"/projects/{p.id}"
 
     def test_unknown_event_skips(self, db):
         p = Project(name="P")
