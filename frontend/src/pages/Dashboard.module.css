@@ -1,7 +1,7 @@
 /* ── GlowBar ─────────────────────────────────────────────────────── */
 .glowBarEmpty {
   height: 3px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0,240,255,0.04);
   border-radius: 2px;
 }
 
@@ -9,7 +9,7 @@
   height: 3px;
   border-radius: 2px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0,240,255,0.04);
   position: relative;
 }
 
@@ -29,7 +29,7 @@
 .glowBarShimmer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0,240,255,0.25), transparent);
   animation: shimmerSlide 2.4s ease infinite;
 }
 
@@ -45,15 +45,22 @@
 
 /* ── ProjectCard ─────────────────────────────────────────────────── */
 .projectCard {
-  background: #181818;
-  border-radius: 8px;
+  background: #111318;
+  border: 1px solid rgba(0,240,255,0.12);
+  border-radius: 2px;
   padding: 18px 20px;
   cursor: pointer;
   position: relative;
   overflow: hidden;
   animation: fadeUpIn 0.35s ease forwards;
   opacity: 0;
-  box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 8px;
+  box-shadow: 0 0 10px rgba(0,240,255,0.08);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  transition: box-shadow 0.2s;
+}
+
+.projectCard:hover {
+  box-shadow: 0 0 20px rgba(0,240,255,0.15);
 }
 
 .projectCardAccent {
@@ -62,6 +69,7 @@
   left: 0;
   right: 0;
   height: 1px;
+  background: rgba(0,240,255,0.3);
 }
 
 .cardHeader {
@@ -74,7 +82,7 @@
 .cardAvatar {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
+  border-radius: 2px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -92,7 +100,7 @@
 .cardTitle {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: #e0e6f0;
   margin-bottom: 3px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -101,7 +109,7 @@
 
 .cardDescription {
   font-size: 12px;
-  color: #b3b3b3;
+  color: #7a8599;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -110,7 +118,7 @@
 .statusBadge {
   font-size: 10px;
   padding: 2px 9px;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-weight: 600;
   flex-shrink: 0;
   text-transform: capitalize;
@@ -118,15 +126,15 @@
 }
 
 .statusBadgeActive {
-  background: rgba(30, 215, 96, 0.1);
-  color: #1ed760;
-  border: 1px solid rgba(30, 215, 96, 0.3);
+  background: rgba(0, 255, 65, 0.1);
+  color: #00ff41;
+  border: 1px solid rgba(0, 255, 65, 0.3);
 }
 
 .statusBadgeArchived {
-  background: rgba(255, 255, 255, 0.06);
-  color: #b3b3b3;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0,240,255,0.05);
+  color: #7a8599;
+  border: 1px solid rgba(0,240,255,0.08);
 }
 
 .statsRow {
@@ -144,13 +152,13 @@
 
 .statsDone {
   font-size: 11px;
-  color: #1ed760;
+  color: #00f0ff;
   font-weight: 500;
 }
 
 .statsRemaining {
   font-size: 11px;
-  color: #b3b3b3;
+  color: #7a8599;
 }
 
 .statsPercent {
@@ -160,12 +168,12 @@
 
 .deleteBtn {
   background: none;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  border: 1px solid rgba(255, 45, 85, 0.3);
   cursor: pointer;
-  color: #f87171;
+  color: #ff2d55;
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 5px;
+  border-radius: 2px;
   transition: background 0.15s;
 }
 
@@ -173,7 +181,7 @@
 .activityEmpty {
   text-align: center;
   padding: 28px 0;
-  color: #4d4d4d;
+  color: #3d4556;
   font-size: 12px;
 }
 
@@ -200,13 +208,13 @@
 
 .activityDetail {
   font-size: 12px;
-  color: #b3b3b3;
+  color: #7a8599;
   line-height: 1.5;
 }
 
 .activityMeta {
   font-size: 10px;
-  color: #4d4d4d;
+  color: #3d4556;
   margin-top: 2px;
   display: flex;
   gap: 8px;
@@ -218,19 +226,19 @@
   align-items: center;
   gap: 10px;
   padding: 7px 10px;
-  border-radius: 7px;
+  border-radius: 0;
   cursor: pointer;
   transition: background 0.12s;
   border-left: 2px solid transparent;
 }
 
 .taskRowOverdue {
-  background: rgba(248, 113, 113, 0.06);
-  border-left: 2px solid #f87171;
+  background: rgba(255, 45, 85, 0.06);
+  border-left: 2px solid #ff2d55;
 }
 
 .taskRowHover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0,240,255,0.04);
 }
 
 .taskStatusDot {
@@ -260,7 +268,7 @@
 
 .taskProject {
   font-size: 10px;
-  color: #4d4d4d;
+  color: #3d4556;
   flex-shrink: 0;
 }
 
@@ -287,30 +295,35 @@
 }
 
 .statCard {
-  background: #181818;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: #111318;
+  border: 1px solid rgba(0,240,255,0.12);
+  border-radius: 2px;
   padding: 14px 16px;
   animation: fadeUpIn 0.35s ease forwards;
   opacity: 0;
+  box-shadow: 0 0 8px rgba(0,240,255,0.06);
 }
 
 .statCardLabel {
   font-size: 11px;
-  color: #4d4d4d;
+  color: #3d4556;
   margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .statCardValue {
   font-size: 22px;
   font-weight: 800;
+  font-family: inherit;
+  letter-spacing: 0.05em;
 }
 
 /* ── DueSoonPanel ────────────────────────────────────────────────── */
 .dueSoonPanel {
-  background: #181818;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: #111318;
+  border: 1px solid rgba(0,240,255,0.12);
+  border-radius: 2px;
   margin-bottom: 16px;
   overflow: hidden;
   animation: fadeUpIn 0.3s ease forwards;
@@ -327,13 +340,13 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #b3b3b3;
+  color: #7a8599;
 }
 
 .dueSoonTitle {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  color: #e0e6f0;
   flex: 1;
   text-align: left;
 }
@@ -341,11 +354,12 @@
 .dueSoonCount {
   font-size: 10px;
   padding: 1px 7px;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-weight: 700;
-  background: rgba(255, 164, 43, 0.15);
-  color: #ffa42b;
-  border: 1px solid rgba(255, 164, 43, 0.3);
+  background: rgba(255, 184, 0, 0.15);
+  color: #ffb800;
+  border: 1px solid rgba(255, 184, 0, 0.3);
+  box-shadow: 0 0 6px rgba(255, 184, 0, 0.15);
 }
 
 .dueSoonList {
@@ -358,7 +372,7 @@
 .identityGroupAvatar {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: 2px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -383,20 +397,20 @@
 .identityGroupBadge {
   font-size: 10px;
   padding: 1px 6px;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-weight: 700;
 }
 
 .identityGroupOpen {
   font-size: 10px;
-  color: #4d4d4d;
+  color: #3d4556;
 }
 
 .identityShowMore {
   background: none;
   border: none;
   cursor: pointer;
-  color: #1ed760;
+  color: #00f0ff;
   font-size: 11px;
   padding: 4px 10px;
   margin-top: 4px;
@@ -406,7 +420,7 @@
 .myWorkEmpty {
   text-align: center;
   padding: 20px 0;
-  color: #4d4d4d;
+  color: #3d4556;
   font-size: 12px;
 }
 
@@ -419,7 +433,7 @@
 .otherLabel {
   font-size: 11px;
   font-weight: 600;
-  color: #4d4d4d;
+  color: #3d4556;
   margin-bottom: 8px;
 }
 
@@ -437,13 +451,13 @@
 .gettingStartedTitle {
   font-size: 22px;
   font-weight: 800;
-  color: #ffffff;
+  color: #e0e6f0;
   margin-bottom: 6px;
 }
 
 .gettingStartedSubtitle {
   font-size: 13px;
-  color: #b3b3b3;
+  color: #7a8599;
 }
 
 .stepsGrid {
@@ -460,9 +474,9 @@
 }
 
 .stepCard {
-  background: #181818;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: #111318;
+  border: 1px solid rgba(0,240,255,0.12);
+  border-radius: 2px;
   padding: 20px 16px;
   animation: fadeUpIn 0.35s ease forwards;
   opacity: 0;
@@ -471,7 +485,8 @@
 .stepNumber {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -479,19 +494,19 @@
   font-weight: 800;
   color: #fff;
   margin-bottom: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 12px rgba(0,240,255,0.12);
 }
 
 .stepTitle {
   font-size: 13px;
   font-weight: 700;
-  color: #ffffff;
+  color: #e0e6f0;
   margin-bottom: 6px;
 }
 
 .stepDesc {
   font-size: 12px;
-  color: #b3b3b3;
+  color: #7a8599;
   line-height: 1.5;
 }
 
@@ -499,26 +514,32 @@
   margin-top: 10px;
   padding: 7px 16px;
   border: none;
-  border-radius: 9999px;
-  background: #1ed760;
+  border-radius: 2px;
+  background: #00f0ff;
   color: #000;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 1px;
+  box-shadow: 0 0 8px rgba(0,240,255,0.2);
 }
 
 /* ── Input style ─────────────────────────────────────────────────── */
 .inputField {
-  background: #1f1f1f;
-  border: none;
-  border-radius: 4px;
+  background: #161920;
+  border: 1px solid rgba(0,240,255,0.15);
+  border-radius: 2px;
   padding: 10px 14px;
   font-size: 14px;
-  color: #ffffff;
+  color: #e0e6f0;
   outline: none;
-  box-shadow: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.inputField:focus {
+  border-color: #00f0ff;
+  box-shadow: 0 0 8px rgba(0,240,255,0.2);
 }
 
 /* ── Dashboard layout ────────────────────────────────────────────── */
@@ -526,17 +547,17 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #07080f;
-  color: #ffffff;
+  background: #0a0c10;
+  color: #e0e6f0;
 }
 
 .header {
   padding: 18px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(0,240,255,0.15);
   display: flex;
   align-items: center;
   gap: 16px;
-  background: rgba(255, 255, 255, 0.015);
+  background: #0d0f14;
 }
 
 .headerContent {
@@ -545,7 +566,7 @@
 
 .headerGreeting {
   font-size: 12px;
-  color: #b3b3b3;
+  color: #7a8599;
   margin-bottom: 2px;
 }
 
@@ -553,22 +574,24 @@
   margin: 0;
   font-size: 24px;
   font-weight: 700;
-  color: #ffffff;
+  color: #e0e6f0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .headerStats {
   font-size: 12px;
-  color: #4d4d4d;
+  color: #3d4556;
   margin-top: 2px;
 }
 
 .headerStatsActive {
-  color: #1ed760;
+  color: #00f0ff;
   font-weight: 600;
 }
 
 .headerStatsArchived {
-  color: #b3b3b3;
+  color: #7a8599;
 }
 
 .newProjectBtn {
@@ -576,24 +599,28 @@
   align-items: center;
   gap: 6px;
   padding: 10px 24px;
-  border-radius: 9999px;
+  border-radius: 2px;
   border: none;
-  background: #1ed760;
+  background: #00f0ff;
   color: #000;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   text-transform: uppercase;
-  letter-spacing: 1.4px;
-  box-shadow: rgba(0, 0, 0, 0.3) 0px 4px 8px;
-  transition: transform 0.1s, background 0.1s;
+  letter-spacing: 0.15em;
+  box-shadow: 0 0 8px rgba(0,240,255,0.1);
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.newProjectBtn:hover {
+  box-shadow: 0 0 16px rgba(0,240,255,0.25);
 }
 
 /* ── Create form ─────────────────────────────────────────────────── */
 .createForm {
   padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.025);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0,240,255,0.02);
+  border-bottom: 1px solid rgba(0,240,255,0.12);
   animation: fadeUpIn 0.2s ease forwards;
 }
 
@@ -614,13 +641,13 @@
 
 .cancelBtn {
   padding: 8px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 9999px;
+  border: 1px solid rgba(0,240,255,0.15);
+  border-radius: 2px;
   background: transparent;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  color: #ffffff;
+  color: #e0e6f0;
   text-transform: uppercase;
   letter-spacing: 1.4px;
 }
@@ -628,15 +655,16 @@
 .createBtn {
   padding: 8px 22px;
   border: none;
-  border-radius: 9999px;
-  background: #1ed760;
+  border-radius: 2px;
+  background: #00f0ff;
   color: #000;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, box-shadow 0.2s;
   text-transform: uppercase;
   letter-spacing: 1.4px;
+  box-shadow: 0 0 8px rgba(0,240,255,0.1);
 }
 
 /* ── Tab bar ─────────────────────────────────────────────────────── */
@@ -644,7 +672,7 @@
   display: flex;
   gap: 0;
   padding: 0 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(0,240,255,0.12);
 }
 
 .tabBtn {
@@ -655,20 +683,23 @@
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 11px;
   margin-bottom: -1px;
   transition: color 0.15s;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .tabBtnActive {
   font-weight: 700;
-  color: #ffffff;
-  border-bottom: 2px solid #1ed760;
+  color: #00f0ff;
+  border-bottom: 2px solid #00f0ff;
+  text-shadow: 0 0 8px rgba(0,240,255,0.4);
 }
 
 .tabBtnInactive {
   font-weight: 400;
-  color: #b3b3b3;
+  color: #3d4556;
   border-bottom: 2px solid transparent;
 }
 
@@ -692,13 +723,13 @@
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #b3b3b3;
+  color: #7a8599;
 }
 
 .loadingSpinner {
   width: 18px;
   height: 18px;
-  border: 2px solid #1ed760;
+  border: 2px solid #00f0ff;
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -732,14 +763,15 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: #ffffff;
+  color: #e0e6f0;
 }
 
 .sectionPanel {
-  background: #181818;
-  border-radius: 8px;
+  background: #111318;
+  border: 1px solid rgba(0,240,255,0.12);
+  border-radius: 2px;
   padding: 12px 14px;
-  box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 8px;
+  box-shadow: 0 0 10px rgba(0,240,255,0.08);
 }
 
 /* ── Filter buttons ──────────────────────────────────────────────── */
@@ -754,7 +786,7 @@
   align-items: center;
   gap: 5px;
   padding: 6px 16px;
-  border-radius: 9999px;
+  border-radius: 2px;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.15s;
@@ -762,16 +794,16 @@
 
 .filterBtnActive {
   font-weight: 700;
-  background: #1f1f1f;
-  border: none;
-  color: #ffffff;
+  background: rgba(0,240,255,0.08);
+  border: 1px solid rgba(0,240,255,0.2);
+  color: #00f0ff;
 }
 
 .filterBtnInactive {
   font-weight: 400;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #b3b3b3;
+  border: 1px solid rgba(0,240,255,0.12);
+  color: #7a8599;
 }
 
 .filterCount {
@@ -783,7 +815,7 @@
 .emptyState {
   text-align: center;
   padding: 60px;
-  color: #4d4d4d;
+  color: #3d4556;
   animation: fadeIn 0.4s ease;
 }
 
@@ -791,13 +823,13 @@
   margin: 0 auto 14px;
   opacity: 0.3;
   display: block;
-  color: #1ed760;
+  color: #00f0ff;
 }
 
 .emptyTitle {
   font-size: 16px;
   font-weight: 700;
-  color: #ffffff;
+  color: #e0e6f0;
 }
 
 .emptySubtitle {
