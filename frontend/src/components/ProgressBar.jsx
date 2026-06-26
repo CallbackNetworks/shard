@@ -1,6 +1,6 @@
 export default function ProgressBar({ value, height = 6 }) {
   const pct = Math.min(100, Math.max(0, value ?? 0))
-  const color = pct === 100 ? '#00ff41' : pct > 50 ? '#00f0ff' : '#ffb800'
+  const color = pct === 100 ? '#10b981' : pct > 50 ? '#ef4444' : '#f59e0b'
   return (
     <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 999, height, overflow: 'hidden' }}>
       <div style={{

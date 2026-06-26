@@ -15,7 +15,7 @@ export default function TabBar({ tabs, active, onChange, style }) {
           style={{
             background: active === tab.key ? 'rgba(255,255,255,0.06)' : 'transparent',
             border: 'none',
-            borderBottom: `2px solid ${active === tab.key ? '#00f0ff' : 'transparent'}`,
+            borderBottom: `2px solid ${active === tab.key ? '#ef4444' : 'transparent'}`,
             cursor: 'pointer',
             padding: '8px 14px',
             fontSize: 11,

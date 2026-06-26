@@ -25,9 +25,9 @@ const ALL_EVENTS = [...EVENT_GROUPS.task, ...EVENT_GROUPS.project, ...EVENT_GROU
 const CRITICAL_EVENTS = ['task.done', 'task.failed', 'task.overdue', 'project.complete']
 
 const STATUS_COLORS = {
-  success: { bg: 'rgba(0,255,65,0.1)',    color: '#00ff41', dot: '#00ff41' },
-  failed:  { bg: 'rgba(255,45,85,0.1)',   color: '#ff2d55', dot: '#ef4444' },
-  dead:    { bg: 'rgba(255,45,85,0.1)',   color: '#fca5a5', dot: '#b91c1c' },
+  success: { bg: 'rgba(16,185,129,0.1)',  color: '#10b981', dot: '#10b981' },
+  failed:  { bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', dot: '#ef4444' },
+  dead:    { bg: 'rgba(239,68,68,0.1)',   color: '#fca5a5', dot: '#b91c1c' },
   pending: { bg: 'rgba(251,191,36,0.1)',  color: '#fbbf24', dot: '#f59e0b' },
 }
 
@@ -97,7 +97,7 @@ function HealthStats({ integrationId }) {
   })
   if (!health || health.total_deliveries === 0) return null
 
-  const rateColor = health.success_rate >= 90 ? '#00ff41' : health.success_rate >= 50 ? '#f59e0b' : '#ef4444'
+  const rateColor = health.success_rate >= 90 ? '#10b981' : health.success_rate >= 50 ? '#f59e0b' : '#ef4444'
 
   return (
     <div className={s.healthStats}>
@@ -467,7 +467,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
             {/* Quick presets */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, marginTop: 4 }}>
               <button type="button" onClick={() => set('events', [...ALL_EVENTS])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.allEvents')}
               </button>
               <button type="button" onClick={() => set('events', [...CRITICAL_EVENTS])}

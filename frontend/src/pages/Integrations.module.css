@@ -21,9 +21,9 @@
 }
 
 .modalPanel {
-  background: #111318;
-  border: 1px solid rgba(0,240,255,0.12);
-  border-radius: 2px;
+  background: #111111;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   padding: 24px;
   width: 90vw;
   max-height: 80vh;
@@ -48,9 +48,9 @@
 }
 
 .modalPanelTemplate {
-  background: #111318;
-  border: 1px solid rgba(0,240,255,0.12);
-  border-radius: 2px;
+  background: #111111;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   padding: 28px;
   width: 90vw;
   max-width: 560px;
@@ -111,10 +111,10 @@
 
 .responsePre {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0,240,255,0.12);
+  border: 1px solid #1f2937;
   border-radius: 6px;
   padding: 8px 10px;
-  color: #7a8599;
+  color: #9ca3af;
   font-size: 11px;
   white-space: pre-wrap;
   margin: 0;
@@ -124,10 +124,10 @@
 
 .payloadPre {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0,240,255,0.12);
+  border: 1px solid #1f2937;
   border-radius: 6px;
   padding: 8px 10px;
-  color: #7a8599;
+  color: #9ca3af;
   font-size: 11px;
   white-space: pre-wrap;
   margin: 0;
@@ -232,17 +232,17 @@
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(0,240,255,0.12);
-  background: #111318;
-  color: #7a8599;
+  border: 1px solid #1f2937;
+  background: #111111;
+  color: #9ca3af;
 }
 
 .bulkRetryBtn {
   font-size: 10px;
   padding: 3px 8px;
-  border: 1px solid rgba(0,128,160,0.4);
+  border: 1px solid rgba(239,68,68,0.4);
   border-radius: 6px;
-  background: rgba(0,128,160,0.1);
+  background: rgba(239,68,68,0.1);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -269,7 +269,7 @@
   border-radius: 6px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(0,240,255,0.04);
+  border: 1px solid rgba(255,255,255,0.03);
 }
 
 .deliveryDot {
@@ -298,10 +298,10 @@
 .retryBtn {
   font-size: 10px;
   padding: 1px 6px;
-  border: 1px solid rgba(0,128,160,0.4);
+  border: 1px solid rgba(239,68,68,0.4);
   border-radius: 4px;
-  background: rgba(0,128,160,0.1);
-  color: #00f0ff;
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
   cursor: pointer;
 }
 
@@ -315,8 +315,8 @@
 
 .templateCard {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0,240,255,0.12);
-  border-radius: 2px;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   padding: 14px 12px;
   cursor: pointer;
   text-align: left;
@@ -348,14 +348,14 @@
 
 .setupBody {
   font-size: 13px;
-  color: #7a8599;
+  color: #9ca3af;
   white-space: pre-wrap;
   line-height: 1.7;
 }
 
 .setupCodeBlock {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0,240,255,0.12);
+  border: 1px solid #1f2937;
   border-radius: 6px;
   padding: 10px 14px;
   font-size: 12px;
@@ -419,11 +419,11 @@
   display: block;
   width: 100%;
   margin-top: 4px;
-  border: 1px solid rgba(0,240,255,0.12);
-  border-radius: 2px;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   padding: 8px 12px;
   font-size: 14px;
-  background: rgba(0,240,255,0.04);
+  background: rgba(255,255,255,0.03);
   color: #ffffff;
 }
 
@@ -431,11 +431,11 @@
   display: block;
   width: 100%;
   margin-top: 4px;
-  border: 1px solid rgba(0,240,255,0.12);
-  border-radius: 2px;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   padding: 8px 12px;
   font-size: 14px;
-  background: #111318;
+  background: #111111;
   color: #ffffff;
 }
 
@@ -448,7 +448,7 @@
 .hmacInfo {
   background: rgba(96, 165, 250, 0.08);
   border: 1px solid rgba(96, 165, 250, 0.25);
-  border-radius: 2px;
+  border-radius: 0;
   padding: 10px 14px;
   font-size: 12px;
   color: #60a5fa;
@@ -466,12 +466,12 @@
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  background: rgba(0,240,255,0.12);
-  color: #00f0ff;
-  border-radius: 2px;
+  background: #1f2937;
+  color: #ef4444;
+  border-radius: 0;
   padding: 4px 12px;
   font-size: 13px;
-  border: 1px solid rgba(0,240,255,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
 }
 
 .eventChipInactive {
@@ -479,12 +479,12 @@
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  background: rgba(0,240,255,0.04);
+  background: rgba(255,255,255,0.03);
   color: rgba(255, 255, 255, 0.4);
-  border-radius: 2px;
+  border-radius: 0;
   padding: 4px 12px;
   font-size: 13px;
-  border: 1px solid rgba(0,240,255,0.12);
+  border: 1px solid #1f2937;
 }
 
 .activeLabel {
@@ -589,9 +589,9 @@
 }
 
 .card {
-  background: #111318;
-  border: 1px solid rgba(0,240,255,0.12);
-  border-radius: 2px;
+  background: #111111;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   padding: 16px 20px;
   opacity: 0;
   animation: fadeUpIn 0.35s ease forwards;
@@ -626,8 +626,8 @@
 }
 
 .badgeActive {
-  background: rgba(0,255,65,0.15);
-  color: #00ff41;
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 12px;
@@ -644,8 +644,8 @@
 }
 
 .badgeType {
-  background: rgba(0,240,255,0.12);
-  color: #00f0ff;
+  background: #1f2937;
+  color: #ef4444;
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 12px;
@@ -685,8 +685,8 @@
 }
 
 .eventTag {
-  background: rgba(0,240,255,0.1);
-  color: #00f0ff;
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 12px;
@@ -702,7 +702,7 @@
   background: rgba(96, 165, 250, 0.1);
   border: 1px solid rgba(96, 165, 250, 0.2);
   color: #60a5fa;
-  border-radius: 2px;
+  border-radius: 0;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 13px;
@@ -712,10 +712,10 @@
 }
 
 .testBtn {
-  background: rgba(0,240,255,0.1);
-  border: 1px solid rgba(0,240,255,0.2);
-  color: #00f0ff;
-  border-radius: 2px;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: #ef4444;
+  border-radius: 0;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 13px;
@@ -723,9 +723,9 @@
 
 .editBtn {
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(0,240,255,0.12);
-  color: #7a8599;
-  border-radius: 2px;
+  border: 1px solid #1f2937;
+  color: #9ca3af;
+  border-radius: 0;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 13px;
@@ -733,9 +733,9 @@
 
 .deleteBtn {
   background: none;
-  border: 1px solid rgba(255,45,85,0.3);
-  color: #ff2d55;
-  border-radius: 2px;
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #ef4444;
+  border-radius: 0;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 13px;
@@ -743,20 +743,20 @@
 
 .testResultSuccess {
   margin-top: 10px;
-  background: rgba(0,255,65,0.1);
-  border-radius: 2px;
+  background: rgba(16,185,129,0.1);
+  border-radius: 0;
   padding: 8px 12px;
   font-size: 13px;
-  color: #00ff41;
+  color: #10b981;
 }
 
 .testResultFailed {
   margin-top: 10px;
-  background: rgba(255,45,85,0.1);
-  border-radius: 2px;
+  background: rgba(239,68,68,0.1);
+  border-radius: 0;
   padding: 8px 12px;
   font-size: 13px;
-  color: #ff2d55;
+  color: #ef4444;
 }
 
 /* ── Buttons with inline-flex ── */

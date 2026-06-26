@@ -65,7 +65,7 @@ export default function ShareView() {
   }
   const recentActivity = effectiveData?.recent_activity || []
   const meta = effectiveData?.meta || {}
-  const color = identity?.color || '#00f0ff'
+  const color = identity?.color || '#ef4444'
 
   // Error state
   if (isError) {

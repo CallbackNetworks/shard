@@ -38,7 +38,7 @@ export default function HorizontalBarChart({ items = [], maxValue, showMedals = 
               fill="rgba(255,255,255,0.03)" />
 
             <rect x={PAD.l} y={y} width={Math.max(w, 2)} height={barH} rx={4}
-              fill={item.color || '#00f0ff'}
+              fill={item.color || '#ef4444'}
               opacity={isHov ? 1 : 0.75}
             />
 

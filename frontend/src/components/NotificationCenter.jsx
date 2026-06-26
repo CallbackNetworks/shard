@@ -11,10 +11,10 @@ import { DARK } from '../constants/theme'
 
 const TYPE_ICON = {
   'task.done': <CheckCircle2 size={13} style={{ color: '#4ade80' }} />,
-  'task.failed': <XCircle size={13} style={{ color: '#ff2d55' }} />,
-  'task.due_soon': <Clock size={13} style={{ color: '#ffb800' }} />,
+  'task.failed': <XCircle size={13} style={{ color: '#ef4444' }} />,
+  'task.due_soon': <Clock size={13} style={{ color: '#f59e0b' }} />,
   'task.overdue': <AlertCircle size={13} style={{ color: '#ff6b35' }} />,
-  'project.complete': <CheckCheck size={13} style={{ color: '#00f0ff' }} />,
+  'project.complete': <CheckCheck size={13} style={{ color: '#3b82f6' }} />,
 }
 
 function timeAgo(dateStr, t) {

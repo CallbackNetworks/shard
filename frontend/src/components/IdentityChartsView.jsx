@@ -19,10 +19,10 @@ const ChartFallback = () => (
 )
 
 const STATUS_COLORS = {
-  done: '#00ff41',
-  in_progress: '#00f0ff',
+  done: '#10b981',
+  in_progress: '#3b82f6',
   todo: 'rgba(255,255,255,0.3)',
-  failed: '#ff2d55',
+  failed: '#ef4444',
 }
 
 function StatCard({ label, value, color, delay = 0 }) {
@@ -130,7 +130,7 @@ function IdentityCard({ identity, onNavigate }) {
             { label: t('hub.done'), value: identity.done, color: STATUS_COLORS.done },
             { label: t('hub.inProgress'), value: identity.in_progress, color: STATUS_COLORS.in_progress },
             { label: t('hub.todoLabel'), value: identity.todo, color: 'rgba(255,255,255,0.3)' },
-            { label: t('hub.overdueCount'), value: identity.overdue, color: '#ff2d55' },
+            { label: t('hub.overdueCount'), value: identity.overdue, color: '#ef4444' },
           ].map(s => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
@@ -243,9 +243,9 @@ function buildTreesByStatus(data) {
 
 function buildTreesByPriority(data) {
   const priorities = [
-    { key: 'high', label: 'HIGH', color: '#ff2d55' },
-    { key: 'medium', label: 'MEDIUM', color: '#ffb800' },
-    { key: 'low', label: 'LOW', color: '#7a8599' },
+    { key: 'high', label: 'HIGH', color: '#ef4444' },
+    { key: 'medium', label: 'MEDIUM', color: '#f59e0b' },
+    { key: 'low', label: 'LOW', color: '#9ca3af' },
   ]
   return priorities.map(pri => ({
     id: `pri-${pri.key}`,
@@ -386,9 +386,9 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
         marginBottom: 4, flexWrap: 'wrap',
       }}>
         <button onClick={() => onSelectIdentity?.(null)} style={{
-          background: !selectedIdentityId ? 'rgba(0,240,255,0.1)' : 'transparent',
+          background: !selectedIdentityId ? 'rgba(239,68,68,0.1)' : 'transparent',
           border: 'none',
-          borderBottom: `2px solid ${!selectedIdentityId ? '#00f0ff' : 'transparent'}`,
+          borderBottom: `2px solid ${!selectedIdentityId ? '#ef4444' : 'transparent'}`,
           cursor: 'pointer', padding: '8px 16px',
           fontSize: 11, fontWeight: !selectedIdentityId ? 700 : 400,
           color: !selectedIdentityId ? '#fff' : 'rgba(255,255,255,0.4)',
@@ -418,9 +418,9 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             gap: 10, marginBottom: 24,
           }}>
             <StatCard label={t('hub.totalTasks')} value={selectedIdent ? selectedIdent.total_tasks : totals.total_tasks} color="#fff" delay={0} />
-            <StatCard label={t('hub.completed')} value={selectedIdent ? selectedIdent.done : totals.done} color="#00f0ff" delay={0.06} />
-            <StatCard label={t('hub.inProgress')} value={selectedIdent ? selectedIdent.in_progress : totals.in_progress} color="#00f0ff" delay={0.12} />
-            <StatCard label={t('hub.overdueCount')} value={selectedIdent ? selectedIdent.overdue : totals.overdue} color={(selectedIdent ? selectedIdent.overdue : totals.overdue) > 0 ? '#ff2d55' : '#fff'} delay={0.18} />
+            <StatCard label={t('hub.completed')} value={selectedIdent ? selectedIdent.done : totals.done} color="#10b981" delay={0.06} />
+            <StatCard label={t('hub.inProgress')} value={selectedIdent ? selectedIdent.in_progress : totals.in_progress} color="#3b82f6" delay={0.12} />
+            <StatCard label={t('hub.overdueCount')} value={selectedIdent ? selectedIdent.overdue : totals.overdue} color={(selectedIdent ? selectedIdent.overdue : totals.overdue) > 0 ? '#ef4444' : '#fff'} delay={0.18} />
           </div>
 
           <div style={{
@@ -486,7 +486,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             <Section title={t('hub.activityHeatmap')}>
               <HeatmapChart
                 data={heatmapData}
-                color={selectedIdent?.color || '#00f0ff'}
+                color={selectedIdent?.color || '#ef4444'}
               />
             </Section>
 

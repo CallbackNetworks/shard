@@ -3,12 +3,12 @@ import useScrollReveal from './useScrollReveal'
 import { relativeTime } from './utils'
 
 const ACTION_COLORS = {
-  'task.done': '#00ff41',
-  'task.status_changed': '#00f0ff',
-  'task.created': '#00f0ff',
-  'task.deleted': '#ff2d55',
-  'task.failed': '#ff2d55',
-  'project.created': '#00f0ff',
+  'task.done': '#10b981',
+  'task.status_changed': '#3b82f6',
+  'task.created': '#3b82f6',
+  'task.deleted': '#ef4444',
+  'task.failed': '#ef4444',
+  'project.created': '#3b82f6',
   'project.archived': DIM,
 }
 

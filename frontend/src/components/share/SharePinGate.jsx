@@ -10,7 +10,7 @@ export default function SharePinGate({ identity, token, onVerified }) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const color = identity?.color || '#00f0ff'
+  const color = identity?.color || '#ef4444'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -127,7 +127,7 @@ export default function SharePinGate({ identity, token, onVerified }) {
           style={{
             width: '100%', padding: '12px 16px',
             background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${error ? '#ff2d55' : 'rgba(255,255,255,0.1)'}`,
+            border: `1px solid ${error ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
             color: HI, fontSize: 18, fontWeight: 700,
             letterSpacing: '0.3em', textAlign: 'center',
             outline: 'none', fontFamily: FONT,
@@ -138,7 +138,7 @@ export default function SharePinGate({ identity, token, onVerified }) {
 
         {error && (
           <div style={{
-            fontSize: 11, color: '#ff2d55', textAlign: 'center',
+            fontSize: 11, color: '#ef4444', textAlign: 'center',
             marginTop: 8, fontWeight: 600,
           }}>
             {error}

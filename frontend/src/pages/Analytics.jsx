@@ -5,8 +5,8 @@ import { BarChart2, TrendingUp, Activity, Flame, Download } from 'lucide-react'
 import { getProjects, getCycles, getAnalyticsOverview, getAnalyticsHeatmap, getAnalyticsBurndown, getAnalyticsVelocity, getAnalyticsStatusTrend } from '../api/client'
 import useBreakpoint from '../hooks/useBreakpoint'
 
-const BRAND = '#00f0ff'
-const STATUS_COLORS = { done: '#00ff41', in_progress: '#3b82f6', todo: '#94a3b8', failed: '#ef4444' }
+const BRAND = '#ef4444'
+const STATUS_COLORS = { done: '#10b981', in_progress: '#3b82f6', todo: '#94a3b8', failed: '#ef4444' }
 
 // ——— Tooltip component ———
 function SvgTooltip({ x, y, text, svgWidth }) {
@@ -99,7 +99,7 @@ function Heatmap({ data }) {
             const intensity = cell.count === 0 ? 0 : 0.15 + (cell.count / maxCount) * 0.85
             const fill = cell.count === 0
               ? 'rgba(255,255,255,0.05)'
-              : `rgba(0,240,255,${intensity})`
+              : `rgba(239,68,68,${intensity})`
             const isHovered = hover && hover.date === cell.date
             return (
               <rect
@@ -136,7 +136,7 @@ function Heatmap({ data }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
         {t('analytics.less')}
         {[0.05, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
-          <span key={i} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: `rgba(0,240,255,${op})` }} />
+          <span key={i} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: `rgba(239,68,68,${op})` }} />
         ))}
         {t('analytics.more')}
       </div>
@@ -498,7 +498,7 @@ export default function Analytics() {
       {overview && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
           <StatCard icon={<BarChart2 size={13}/>} label={t('analytics.totalTasks')} value={overview.total_tasks} delay={0} />
-          <StatCard icon={<Activity size={13}/>} label={t('analytics.done')} value={overview.done_tasks} color="#00ff41" delay={0.08} />
+          <StatCard icon={<Activity size={13}/>} label={t('analytics.done')} value={overview.done_tasks} color="#10b981" delay={0.08} />
           <StatCard icon={<TrendingUp size={13}/>} label={t('analytics.inProgress')} value={overview.in_progress_tasks} color="#3b82f6" delay={0.16} />
           <StatCard icon={<Flame size={13}/>} label={t('analytics.overdueCount')} value={overview.overdue_tasks} color="#ef4444" delay={0.24} />
           {overview.most_active_project && (
@@ -507,7 +507,7 @@ export default function Analytics() {
               label={t('analytics.mostActive')}
               value={overview.most_active_project.name}
               sub={t('analytics.eventsThisWeek', { count: overview.most_active_project.activity_count })}
-              color="#00f0ff"
+              color="#ef4444"
               delay={0.32}
             />
           )}

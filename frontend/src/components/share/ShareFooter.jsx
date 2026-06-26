@@ -11,7 +11,7 @@ export default function ShareFooter({ generatedAt }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{
           width: 6, height: 6, borderRadius: '50%',
-          background: '#00f0ff',
+          background: '#ef4444',
           animation: 'refreshPulse 3s ease-in-out infinite',
         }} />
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', letterSpacing: '0.1em' }}>

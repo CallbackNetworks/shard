@@ -120,13 +120,13 @@ function ProjectCard({ project, onDelete, index }) {
 
 /* ── Activity feed ────────────────────────────────────────────────── */
 const ACTION_COLORS = {
-  'task.created':        '#00ff41',
-  'task.status_changed': '#ffb800',
-  'task.assigned':       '#00f0ff',
-  'task.deleted':        '#ff2d55',
-  'project.created':     '#00ff41',
-  'project.archived':    '#7a8599',
-  'project.deleted':     '#ff2d55',
+  'task.created':        '#10b981',
+  'task.status_changed': '#f59e0b',
+  'task.assigned':       '#3b82f6',
+  'task.deleted':        '#ef4444',
+  'project.created':     '#10b981',
+  'project.archived':    '#9ca3af',
+  'project.deleted':     '#ef4444',
 }
 
 function timeAgo(dateStr) {
@@ -481,7 +481,7 @@ function GettingStarted({ onNewProject, isMobile }) {
       num: 1,
       title: t('dashboard.step1Title'),
       desc: t('dashboard.step1Desc'),
-      gradient: 'linear-gradient(135deg, #00f0ff, #0080a0)',
+      gradient: 'linear-gradient(135deg, #ef4444, #dc2626)',
       action: <button
         onClick={onNewProject}
         className={s.stepActionBtn}
@@ -494,13 +494,13 @@ function GettingStarted({ onNewProject, isMobile }) {
       num: 2,
       title: t('dashboard.step2Title'),
       desc: t('dashboard.step2Desc'),
-      gradient: 'linear-gradient(135deg, #00ff41, #008a22)',
+      gradient: 'linear-gradient(135deg, #10b981, #059669)',
     },
     {
       num: 3,
       title: t('dashboard.step3Title'),
       desc: t('dashboard.step3Desc'),
-      gradient: 'linear-gradient(135deg, #ffb800, #cc9300)',
+      gradient: 'linear-gradient(135deg, #f59e0b, #d97706)',
     },
     {
       num: 4,
@@ -606,7 +606,7 @@ export default function Dashboard() {
         <button
           onClick={() => setShowForm(v => !v)}
           className={s.newProjectBtn}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#1fdf64' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#dc2626' }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
         >
           <Plus size={14} /> {t('dashboard.newProject')}
