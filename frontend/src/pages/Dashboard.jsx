@@ -120,13 +120,13 @@ function ProjectCard({ project, onDelete, index }) {
 
 /* ── Activity feed ────────────────────────────────────────────────── */
 const ACTION_COLORS = {
-  'task.created':        '#1ed760',
-  'task.status_changed': '#ffa42b',
-  'task.assigned':       '#539df5',
-  'task.deleted':        '#f3727f',
-  'project.created':     '#1ed760',
-  'project.archived':    '#b3b3b3',
-  'project.deleted':     '#f3727f',
+  'task.created':        '#00ff41',
+  'task.status_changed': '#ffb800',
+  'task.assigned':       '#00f0ff',
+  'task.deleted':        '#ff2d55',
+  'project.created':     '#00ff41',
+  'project.archived':    '#7a8599',
+  'project.deleted':     '#ff2d55',
 }
 
 function timeAgo(dateStr) {
@@ -481,7 +481,7 @@ function GettingStarted({ onNewProject, isMobile }) {
       num: 1,
       title: t('dashboard.step1Title'),
       desc: t('dashboard.step1Desc'),
-      gradient: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+      gradient: 'linear-gradient(135deg, #00f0ff, #0080a0)',
       action: <button
         onClick={onNewProject}
         className={s.stepActionBtn}
@@ -494,13 +494,13 @@ function GettingStarted({ onNewProject, isMobile }) {
       num: 2,
       title: t('dashboard.step2Title'),
       desc: t('dashboard.step2Desc'),
-      gradient: 'linear-gradient(135deg, #1ed760, #059669)',
+      gradient: 'linear-gradient(135deg, #00ff41, #008a22)',
     },
     {
       num: 3,
       title: t('dashboard.step3Title'),
       desc: t('dashboard.step3Desc'),
-      gradient: 'linear-gradient(135deg, #ffa42b, #d97706)',
+      gradient: 'linear-gradient(135deg, #ffb800, #cc9300)',
     },
     {
       num: 4,

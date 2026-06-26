@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function HeatmapChart({ data = [], color = '#818cf8', cellSize = 10, days = 365 }) {
+export default function HeatmapChart({ data = [], color = '#00f0ff', cellSize = 10, days = 365 }) {
   const [hover, setHover] = useState(null)
 
   const countByDate = {}

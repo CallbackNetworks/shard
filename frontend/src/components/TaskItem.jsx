@@ -3,25 +3,25 @@ import { DARK } from '../constants/theme'
 
 const STATUS_COLORS = {
   todo: 'rgba(255,255,255,0.08)',
-  in_progress: 'rgba(83,157,245,0.15)',
-  done: 'rgba(30,215,96,0.12)',
-  failed: 'rgba(243,114,127,0.12)',
+  in_progress: 'rgba(0,240,255,0.15)',
+  done: 'rgba(0,255,65,0.12)',
+  failed: 'rgba(255,45,85,0.12)',
 }
 const STATUS_TEXT = {
   todo: 'rgba(255,255,255,0.5)',
-  in_progress: '#539df5',
-  done: '#1ed760',
-  failed: '#f3727f',
+  in_progress: '#00f0ff',
+  done: '#00ff41',
+  failed: '#ff2d55',
 }
 const PRIORITY_COLORS = {
-  low: 'rgba(179,179,179,0.12)',
-  medium: 'rgba(255,164,43,0.12)',
-  high: 'rgba(243,114,127,0.12)',
+  low: 'rgba(122,133,153,0.12)',
+  medium: 'rgba(255,184,0,0.12)',
+  high: 'rgba(255,45,85,0.12)',
 }
 const PRIORITY_TEXT = {
-  low: '#b3b3b3',
-  medium: '#ffa42b',
-  high: '#f3727f',
+  low: '#7a8599',
+  medium: '#ffb800',
+  high: '#ff2d55',
 }
 
 export default function TaskItem({ task, projectId: _projectId, onUpdate, onDelete }) {
@@ -91,7 +91,7 @@ export default function TaskItem({ task, projectId: _projectId, onUpdate, onDele
           onClick={e => { e.stopPropagation(); onDelete(task.id) }}
           style={{
             fontSize: 12, fontWeight: 700, background: 'none',
-            border: '1px solid rgba(243,114,127,0.4)', borderRadius: 9999,
+            border: '1px solid rgba(255,45,85,0.4)', borderRadius: 9999,
             padding: '4px 14px', cursor: 'pointer', color: DARK.danger, marginLeft: 'auto',
             textTransform: 'uppercase', letterSpacing: '1px',
           }}

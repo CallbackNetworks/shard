@@ -10,11 +10,11 @@ import {
 } from 'lucide-react'
 
 const toolbarBtnStyle = (active) => ({
-  background: active ? 'rgba(129,140,248,0.2)' : 'none',
+  background: active ? 'rgba(0,240,255,0.2)' : 'none',
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',
-  color: active ? '#1ed760' : 'rgba(255,255,255,0.4)',
+  color: active ? '#00f0ff' : 'rgba(255,255,255,0.4)',
   padding: '3px 5px',
   display: 'flex',
   alignItems: 'center',
@@ -28,7 +28,7 @@ const modeBtnStyle = (active) => ({
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',
-  background: active ? '#1ed760' : 'transparent',
+  background: active ? '#00f0ff' : 'transparent',
   color: active ? '#fff' : 'rgba(255,255,255,0.4)',
 })
 
@@ -87,7 +87,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
       }),
       Link.configure({
         openOnClick: false,
-        HTMLAttributes: { style: 'color: #1ed760; text-decoration: underline;' },
+        HTMLAttributes: { style: 'color: #00f0ff; text-decoration: underline;' },
       }),
       Placeholder.configure({
         placeholder: placeholder || 'Write something...',
@@ -186,11 +186,11 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
             .tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
             .tiptap ul, .tiptap ol { padding-left: 1.4em; margin: 0.3em 0; }
             .tiptap li { margin: 0.1em 0; }
-            .tiptap code { background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: #1ed760; }
+            .tiptap code { background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: #00f0ff; }
             .tiptap pre { background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
             .tiptap pre code { background: none; padding: 0; color: inherit; }
             .tiptap blockquote { border-left: 3px solid rgba(255,255,255,0.15); padding-left: 12px; margin: 0.4em 0; color: rgba(255,255,255,0.4); }
-            .tiptap a { color: #1ed760; text-decoration: underline; }
+            .tiptap a { color: #00f0ff; text-decoration: underline; }
             .tiptap p.is-editor-empty:first-child::before {
               content: attr(data-placeholder);
               float: left;

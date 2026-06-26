@@ -24,8 +24,8 @@
   align-items: center;
   gap: 5px;
   padding: 6px 14px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  border: 1px solid rgba(0,240,255,0.15);
   background: transparent;
   font-size: 12px;
   font-weight: 700;
@@ -41,10 +41,10 @@
   top: 100%;
   right: 0;
   margin-top: 4px;
-  background: #181818;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  box-shadow: rgba(0, 0, 0, 0.5) 0px 8px 24px;
+  background: #111318;
+  border: 1px solid rgba(0,240,255,0.12);
+  border-radius: 2px;
+  box-shadow: 0 0 20px rgba(0,240,255,0.12);
   padding: 14px;
   min-width: 260px;
 }
@@ -105,10 +105,10 @@
 .labelManagerInput {
   flex: 1;
   padding: 5px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0,240,255,0.12);
   border-radius: 6px;
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0,240,255,0.04);
   color: #ffffff;
 }
 
@@ -132,8 +132,8 @@
   width: 100%;
   padding: 8px 0;
   border: none;
-  border-radius: 9999px;
-  background: #1ed760;
+  border-radius: 2px;
+  background: #00f0ff;
   color: #000;
   font-size: 12px;
   font-weight: 700;
@@ -148,7 +148,7 @@
   flex-direction: column;
   height: 100%;
   position: relative;
-  background: #121212;
+  background: #0a0c10;
   color: #ffffff;
 }
 
@@ -224,22 +224,22 @@
 .statusBadge {
   font-size: 10px;
   padding: 2px 9px;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-weight: 600;
   text-transform: capitalize;
   letter-spacing: 0.05em;
 }
 
 .statusActive {
-  background: rgba(30, 215, 96, 0.1);
-  color: #1ed760;
-  border: 1px solid rgba(30, 215, 96, 0.3);
+  background: rgba(0,240,255,0.1);
+  color: #00f0ff;
+  border: 1px solid rgba(0,240,255,0.3);
 }
 
 .statusArchived {
   background: rgba(255, 255, 255, 0.06);
-  color: #b3b3b3;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #7a8599;
+  border: 1px solid rgba(0,240,255,0.12);
 }
 
 .projectDescription {
@@ -276,7 +276,7 @@
 .progressBarTrack {
   width: 90px;
   height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0,240,255,0.12);
   border-radius: 2px;
   overflow: hidden;
   margin-top: 4px;
@@ -284,7 +284,7 @@
 
 .progressBarFill {
   height: 100%;
-  background: #1ed760;
+  background: #00f0ff;
   border-radius: 2px;
   transition: width 0.3s;
 }
@@ -294,8 +294,8 @@
   align-items: center;
   gap: 5px;
   padding: 6px 14px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  border: 1px solid rgba(0,240,255,0.15);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -305,7 +305,7 @@
 }
 
 .agentBtnActive {
-  background: rgba(129, 140, 248, 0.15);
+  background: rgba(0,240,255,0.15);
 }
 
 .agentBtnInactive {
@@ -314,8 +314,8 @@
 
 .archiveBtn {
   padding: 7px 16px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  border: 1px solid rgba(0,240,255,0.15);
   background: transparent;
   font-size: 12px;
   font-weight: 700;
@@ -330,23 +330,23 @@
   align-items: center;
   gap: 5px;
   padding: 7px 18px;
-  border-radius: 9999px;
+  border-radius: 2px;
   border: none;
-  background: #1ed760;
+  background: #00f0ff;
   color: #000;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 1.4px;
-  box-shadow: rgba(0, 0, 0, 0.3) 0px 4px 8px;
+  box-shadow: 0 0 10px rgba(0,240,255,0.08);
 }
 
 /* ── Agent Instructions panel ── */
 .agentInstrPanel {
-  background: rgba(129, 140, 248, 0.06);
-  border: 1px solid rgba(129, 140, 248, 0.2);
-  border-radius: 10px;
+  background: rgba(0,240,255,0.06);
+  border: 1px solid rgba(0,240,255,0.2);
+  border-radius: 2px;
   padding: 16px;
   margin-bottom: 16px;
 }
@@ -354,7 +354,7 @@
 .agentInstrTitle {
   font-size: 12px;
   font-weight: 700;
-  color: #539df5;
+  color: #00f0ff;
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -370,7 +370,7 @@
   width: 100%;
   background: rgba(0, 0, 0, 0.3);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0,240,255,0.12);
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 13px;
@@ -390,7 +390,7 @@
   padding: 5px 14px;
   border-radius: 6px;
   border: none;
-  background: #539df5;
+  background: #00f0ff;
   color: #000;
   font-size: 12px;
   font-weight: 700;
@@ -400,7 +400,7 @@
 .agentInstrCancelBtn {
   padding: 5px 14px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(0,240,255,0.15);
   background: transparent;
   color: #fff;
   font-size: 12px;
@@ -421,14 +421,14 @@
   margin-bottom: -1px;
   transition: color 0.15s;
   border-bottom: 2px solid transparent;
-  color: #b3b3b3;
+  color: #7a8599;
   font-weight: 400;
 }
 
 .tabActive {
   color: #ffffff;
   font-weight: 700;
-  border-bottom-color: #1ed760;
+  border-bottom-color: #00f0ff;
 }
 
 .cycleTabContent {
@@ -438,9 +438,9 @@
 }
 
 .cycleActiveBadge {
-  background: #1ed760;
+  background: #00f0ff;
   color: #000;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-size: 9px;
   padding: 1px 6px;
   font-weight: 700;
@@ -465,7 +465,7 @@
 
 .filterBtn {
   padding: 4px 14px;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
@@ -474,15 +474,15 @@
 .filterBtnActive {
   font-weight: 700;
   border: none;
-  background: #1f1f1f;
+  background: #161920;
   color: #ffffff;
 }
 
 .filterBtnInactive {
   font-weight: 400;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(0,240,255,0.15);
   background: transparent;
-  color: #b3b3b3;
+  color: #7a8599;
 }
 
 .filterCount {
@@ -502,28 +502,28 @@
   align-items: center;
   gap: 4px;
   padding: 5px 12px;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-size: 12px;
   cursor: pointer;
   font-weight: 600;
 }
 
 .advancedFilterActive {
-  border: 1px solid rgba(30, 215, 96, 0.4);
-  background: rgba(30, 215, 96, 0.08);
-  color: #1ed760;
+  border: 1px solid rgba(0,240,255,0.4);
+  background: rgba(0,240,255,0.08);
+  color: #00f0ff;
 }
 
 .advancedFilterInactive {
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(0,240,255,0.15);
   background: transparent;
-  color: #b3b3b3;
+  color: #7a8599;
 }
 
 .activeFilterBadge {
-  background: #1ed760;
+  background: #00f0ff;
   color: #000;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-size: 9px;
   padding: 1px 5px;
   font-weight: 700;
@@ -531,11 +531,11 @@
 
 .searchInput {
   padding: 6px 14px;
-  border-radius: 9999px;
+  border-radius: 2px;
   font-size: 13px;
   border: none;
   outline: none;
-  background: #1f1f1f;
+  background: #161920;
   color: #ffffff;
   width: 160px;
   box-shadow: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
@@ -573,37 +573,37 @@
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(0,240,255,0.12);
   color: #ffffff;
   outline: none;
 }
 
 .filterSelectDefault {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0,240,255,0.04);
 }
 
 .filterSelectActive {
-  background: rgba(30, 215, 96, 0.08);
+  background: rgba(0,240,255,0.08);
 }
 
 .filterSelectAgent {
-  background: rgba(129, 140, 248, 0.12);
-  color: #539df5;
+  background: rgba(0,240,255,0.12);
+  color: #00f0ff;
 }
 
 .filterSelectAgentDefault {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0,240,255,0.04);
   color: #ffffff;
 }
 
 .clearAllFiltersBtn {
   padding: 3px 10px;
-  border-radius: 9999px;
-  border: 1px solid rgba(243, 114, 127, 0.3);
+  border-radius: 2px;
+  border: 1px solid rgba(255,45,85,0.3);
   background: transparent;
   font-size: 11px;
   cursor: pointer;
-  color: #f3727f;
+  color: #ff2d55;
   font-weight: 600;
 }
 
@@ -682,14 +682,14 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #b3b3b3;
-  background: #121212;
+  color: #7a8599;
+  background: #0a0c10;
 }
 
 .loadingSpinner {
   width: 18px;
   height: 18px;
-  border: 2px solid #1ed760;
+  border: 2px solid #00f0ff;
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -699,8 +699,8 @@
 /* ── Not found ── */
 .notFound {
   padding: 32px;
-  color: #f3727f;
-  background: #121212;
+  color: #ff2d55;
+  background: #0a0c10;
 }
 
 /* ── Floating Quick-Add button ── */
@@ -711,19 +711,19 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #1ed760;
+  background: #00f0ff;
   color: #000;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(94, 106, 210, 0.45);
+  box-shadow: 0 0 10px rgba(0,240,255,0.08);
   z-index: 100;
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .fab:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(94, 106, 210, 0.55);
+  box-shadow: 0 0 20px rgba(0,240,255,0.12);
 }

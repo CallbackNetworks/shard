@@ -4,7 +4,7 @@ const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 1
 const PARA = (px = 8) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 
 export default function ShareHero({ identity, summary: _summary, now, bp }) {
-  const color = identity?.color || '#1ed760'
+  const color = identity?.color || '#00f0ff'
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const dateStr = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
   const isMobile = bp === 'mobile'

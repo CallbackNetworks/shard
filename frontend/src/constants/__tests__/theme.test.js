@@ -23,7 +23,7 @@ describe('theme constants', () => {
   })
 
   it('STATUS_MAP maps keys correctly', () => {
-    expect(STATUS_MAP.done.color).toBe('#1ed760')
+    expect(STATUS_MAP.done.color).toBe('#00ff41')
     expect(STATUS_MAP.todo.label).toBe('Todo')
   })
 

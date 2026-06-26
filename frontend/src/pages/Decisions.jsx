@@ -8,10 +8,10 @@ import useBreakpoint from '../hooks/useBreakpoint'
 import useFocusTrap from '../hooks/useFocusTrap'
 
 const STATUS_COLORS = {
-  proposed: { bg: 'rgba(129,140,248,0.15)', color: '#818cf8', border: '1px dashed #818cf8' },
-  accepted: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid #22c55e' },
+  proposed: { bg: 'rgba(0,240,255,0.15)', color: '#00f0ff', border: '1px dashed #00f0ff' },
+  accepted: { bg: 'rgba(0,255,65,0.15)', color: '#00ff41', border: '1px solid #00ff41' },
   deprecated: { bg: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: '1px solid #94a3b8' },
-  superseded: { bg: 'rgba(243,114,127,0.12)', color: '#f3727f', border: '1px solid #f3727f' },
+  superseded: { bg: 'rgba(255,45,85,0.12)', color: '#ff2d55', border: '1px solid #ff2d55' },
 }
 
 const inp = {
@@ -36,9 +36,9 @@ const btn = (variant = 'default') => ({
   ...(variant === 'primary'
     ? { background: DARK.success, color: '#000' }
     : variant === 'danger'
-    ? { background: 'rgba(243,114,127,0.12)', color: DARK.danger, border: '1px solid rgba(243,114,127,0.2)' }
+    ? { background: 'rgba(255,45,85,0.12)', color: DARK.danger, border: '1px solid rgba(255,45,85,0.2)' }
     : variant === 'accept'
-    ? { background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }
+    ? { background: 'rgba(0,255,65,0.15)', color: '#00ff41', border: '1px solid rgba(0,255,65,0.3)' }
     : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: DARK.textMid }),
 })
 
@@ -51,12 +51,12 @@ function DecisionForm({ projects, initial, onSave, onClose }) {
     name: initial.name,
     description: initial.description || '',
     project_id: initial.project_id,
-    color: initial.color || '#818cf8',
+    color: initial.color || '#00f0ff',
   } : {
     name: '',
     description: TEMPLATE_DESC,
     project_id: projects[0]?.id || '',
-    color: '#818cf8',
+    color: '#00f0ff',
   })
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
@@ -131,9 +131,9 @@ function DecisionCard({ decision, projectName, onAccept, onReject, onEdit, onDel
   return (
     <div style={{
       background: '#0f1117',
-      border: decision.decision_status === 'proposed' ? '1px dashed rgba(129,140,248,0.4)' : '1px solid rgba(255,255,255,0.08)',
+      border: decision.decision_status === 'proposed' ? '1px dashed rgba(0,240,255,0.4)' : '1px solid rgba(255,255,255,0.08)',
       borderRadius: 10, padding: 16,
-      ...(decision.decision_status === 'proposed' ? { boxShadow: '0 0 12px rgba(129,140,248,0.08)' } : {}),
+      ...(decision.decision_status === 'proposed' ? { boxShadow: '0 0 12px rgba(0,240,255,0.08)' } : {}),
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <GitFork size={14} style={{ color: statusStyle.color, marginTop: 2, flexShrink: 0 }} />
@@ -237,7 +237,7 @@ export default function Decisions() {
   const createDecision = useMutation({
     mutationFn: (form) => createLabel(form.project_id, {
       name: form.name,
-      color: form.color || '#818cf8',
+      color: form.color || '#00f0ff',
       type: 'decision',
       description: form.description,
       decision_status: 'proposed',
@@ -304,7 +304,7 @@ export default function Decisions() {
             {pendingCount > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999,
-                background: 'rgba(129,140,248,0.2)', color: DARK.info,
+                background: 'rgba(0,240,255,0.2)', color: DARK.info,
               }}>
                 {t('decisions.pendingReview', { count: pendingCount })}
               </span>

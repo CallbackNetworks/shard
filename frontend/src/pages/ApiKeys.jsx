@@ -17,9 +17,9 @@ const inputStyle = {
 
 const METHOD_STYLE = {
   GET:    { bg: 'rgba(96,165,250,0.15)',  color: '#60a5fa' },
-  POST:   { bg: 'rgba(52,211,153,0.15)',  color: '#1ed760' },
+  POST:   { bg: 'rgba(0,240,255,0.15)',   color: '#00f0ff' },
   PATCH:  { bg: 'rgba(251,191,36,0.15)',  color: '#fbbf24' },
-  DELETE: { bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
+  DELETE: { bg: 'rgba(255,45,85,0.15)',   color: '#ff2d55' },
 }
 
 export default function ApiKeys() {
@@ -108,11 +108,11 @@ export default function ApiKeys() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <code style={{
                 flex: 1, background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: 6, fontSize: 13,
-                fontFamily: 'monospace', color: '#1ed760', wordBreak: 'break-all', border: '1px solid rgba(255,255,255,0.08)',
+                fontFamily: 'monospace', color: '#00f0ff', wordBreak: 'break-all', border: '1px solid rgba(255,255,255,0.08)',
               }}>
                 {newKey}
               </code>
-              <button onClick={() => copyKey('new', newKey)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === 'new' ? '#1ed760' : '#9ca3af', padding: 4, flexShrink: 0 }}>
+              <button onClick={() => copyKey('new', newKey)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === 'new' ? '#00f0ff' : '#9ca3af', padding: 4, flexShrink: 0 }}>
                 {copiedId === 'new' ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
@@ -153,10 +153,10 @@ export default function ApiKeys() {
                 {SCOPES.map(scope => (
                   <label key={scope} style={{
                     display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-                    background: form.scopes.includes(scope) ? 'rgba(30,215,96,0.12)' : 'rgba(255,255,255,0.05)',
+                    background: form.scopes.includes(scope) ? 'rgba(0,240,255,0.12)' : 'rgba(255,255,255,0.05)',
                     color: form.scopes.includes(scope) ? BRAND : 'rgba(255,255,255,0.4)',
                     borderRadius: 999, padding: '4px 12px', fontSize: 13,
-                    border: form.scopes.includes(scope) ? `1px solid rgba(30,215,96,0.3)` : '1px solid rgba(255,255,255,0.08)',
+                    border: form.scopes.includes(scope) ? `1px solid rgba(0,240,255,0.3)` : '1px solid rgba(255,255,255,0.08)',
                   }}>
                     <input type="checkbox" checked={form.scopes.includes(scope)} onChange={() => toggleScope(scope)} style={{ cursor: 'pointer' }} />
                     {scope}
@@ -201,21 +201,21 @@ export default function ApiKeys() {
                     <span style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, color: '#ffffff' }}>{ak.name}</span>
                     <span style={{
                       background: ak.active ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: ak.active ? '#1ed760' : 'rgba(255,255,255,0.35)',
+                      color: ak.active ? '#00f0ff' : 'rgba(255,255,255,0.35)',
                       borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600,
                     }}>{ak.active ? 'active' : 'inactive'}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <code style={{
                       background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 6, fontSize: 13,
-                      fontFamily: 'monospace', color: '#1ed760',
+                      fontFamily: 'monospace', color: '#00f0ff',
                     }}>
                       {ak.key_preview}
                     </code>
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                     {ak.scopes.map(s => (
-                      <span key={s} style={{ background: 'rgba(30,215,96,0.12)', color: BRAND, borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{s}</span>
+                      <span key={s} style={{ background: 'rgba(0,240,255,0.12)', color: BRAND, borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{s}</span>
                     ))}
                   </div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>
@@ -232,7 +232,7 @@ export default function ApiKeys() {
                     {ak.active ? t('apiKeys.disable') : t('apiKeys.enable')}
                   </button>
                   <button onClick={() => { if (confirm('Delete this API key?')) deleteMut.mutate(ak.id) }}
-                    style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
+                    style={{ background: 'none', border: '1px solid rgba(255,45,85,0.4)', color: '#ff2d55', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
                     {t('delete')}
                   </button>
                 </div>
@@ -245,7 +245,7 @@ export default function ApiKeys() {
       <div style={{ marginTop: 32, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20 }}>
         <h3 style={{ fontWeight: 600, marginBottom: 12, color: '#ffffff' }}>{t('apiKeys.usage')}</h3>
         <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginBottom: 12 }}>
-          Use the <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#1ed760' }}>X-API-Key</code> header to authenticate requests to <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#1ed760' }}>/api/v1/</code> endpoints.
+          Use the <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#00f0ff' }}>X-API-Key</code> header to authenticate requests to <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3, color: '#00f0ff' }}>/api/v1/</code> endpoints.
         </p>
         <div style={{ background: '#1e1e2e', borderRadius: 8, padding: 16, overflow: 'auto' }}>
           <pre style={{ margin: 0, color: '#cdd6f4', fontSize: 13, lineHeight: 1.6 }}>{`# List projects
@@ -314,7 +314,7 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
                 </td>
                 <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12, color: '#ffffff' }}>{path}</td>
                 <td style={{ padding: '6px 12px' }}>
-                  <span style={{ background: 'rgba(30,215,96,0.12)', color: BRAND, padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>{scope}</span>
+                  <span style={{ background: 'rgba(0,240,255,0.12)', color: BRAND, padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>{scope}</span>
                 </td>
                 <td style={{ padding: '6px 12px', color: 'rgba(255,255,255,0.35)' }}>{desc}</td>
               </tr>

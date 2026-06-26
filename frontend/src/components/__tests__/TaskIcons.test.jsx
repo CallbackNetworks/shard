@@ -35,20 +35,20 @@ describe('StatusIcon', () => {
     const { container } = render(<StatusIcon status="done" />)
     const circle = container.querySelector('circle')
     expect(circle).toBeTruthy()
-    expect(circle.getAttribute('fill')).toBe('#1ed760')
+    expect(circle.getAttribute('fill')).toBe('#00ff41')
   })
 
   it('renders in_progress icon with blue stroke', () => {
     const { container } = render(<StatusIcon status="in_progress" />)
     const circle = container.querySelector('circle')
-    expect(circle.getAttribute('stroke')).toBe('#539df5')
+    expect(circle.getAttribute('stroke')).toBe('#00f0ff')
   })
 
   it('renders failed icon with red X lines', () => {
     const { container } = render(<StatusIcon status="failed" />)
     const lines = container.querySelectorAll('line')
     expect(lines.length).toBe(2)
-    expect(lines[0].getAttribute('stroke')).toBe('#f3727f')
+    expect(lines[0].getAttribute('stroke')).toBe('#ff2d55')
   })
 
   it('renders todo icon with dashed circle', () => {
