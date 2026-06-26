@@ -1,39 +1,35 @@
-// ── Brand colors ──
-export const BRAND = '#00f0ff'
-export const BRAND_2 = '#00c8d6'
+export const BRAND = '#ef4444'
+export const BRAND_2 = '#dc2626'
 
-// ── Shadows ──
-export const SHADOW_SM = '0 0 8px rgba(0,240,255,0.15), 0 0 2px rgba(0,240,255,0.3)'
-export const SHADOW_LG = '0 0 20px rgba(0,240,255,0.12), 0 0 4px rgba(0,240,255,0.25)'
-export const INSET_SHADOW = 'inset 0 0 8px rgba(0,240,255,0.06), 0 0 1px rgba(0,240,255,0.3)'
+export const SHADOW_SM = '0 1px 2px rgba(0,0,0,0.3)'
+export const SHADOW_LG = '0 4px 12px rgba(0,0,0,0.4)'
+export const INSET_SHADOW = 'inset 0 1px 2px rgba(0,0,0,0.2)'
 
-// ── Color palette ──
 export const DARK = {
-  bg:        '#0a0c10',
-  bgAlt:     '#0d0f14',
-  surface:   '#111318',
-  elevated:  '#161920',
-  overlay:   '#1c1f28',
-  text:      '#e0e6f0',
-  textMid:   '#7a8599',
-  textDim:   '#3d4556',
-  textFaint: 'rgba(224,230,240,0.15)',
-  border:    'rgba(0,240,255,0.12)',
-  borderMid: 'rgba(0,240,255,0.2)',
-  borderStrong: 'rgba(0,240,255,0.35)',
-  hover:     'rgba(0,240,255,0.06)',
-  active:    'rgba(0,240,255,0.1)',
-  danger:    '#ff2d55',
-  dangerBg:  'rgba(255,45,85,0.12)',
-  warning:   '#ffb800',
-  warningBg: 'rgba(255,184,0,0.12)',
-  success:   '#00ff41',
-  successBg: 'rgba(0,255,65,0.12)',
-  info:      '#00f0ff',
-  infoBg:    'rgba(0,240,255,0.12)',
+  bg:        '#000000',
+  bgAlt:     '#000000',
+  surface:   '#111111',
+  elevated:  '#1a1a1a',
+  overlay:   '#222222',
+  text:      '#ffffff',
+  textMid:   '#9ca3af',
+  textDim:   '#4b5563',
+  textFaint: 'rgba(255,255,255,0.15)',
+  border:    '#1f2937',
+  borderMid: '#374151',
+  borderStrong: '#4b5563',
+  hover:     'rgba(255,255,255,0.05)',
+  active:    'rgba(255,255,255,0.08)',
+  danger:    '#ef4444',
+  dangerBg:  'rgba(239,68,68,0.12)',
+  warning:   '#f59e0b',
+  warningBg: 'rgba(245,158,11,0.12)',
+  success:   '#10b981',
+  successBg: 'rgba(16,185,129,0.12)',
+  info:      '#3b82f6',
+  infoBg:    'rgba(59,130,246,0.12)',
 }
 
-// ── Spacing scale (px) ──
 export const SPACE = {
   xs: 4,
   sm: 8,
@@ -43,9 +39,9 @@ export const SPACE = {
   xxl: 32,
 }
 
-// ── Typography ──
 export const FONT = {
-  family: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+  family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  display: "'Bebas Neue', 'Impact', sans-serif",
   mono: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
   xs: 10,
   sm: 11,
@@ -55,73 +51,66 @@ export const FONT = {
   xxl: 24,
 }
 
-// ── Border radius ──
 export const RADIUS = {
-  sm: 1,
-  md: 2,
-  lg: 2,
-  xl: 3,
-  full: 2,
+  sm: 0,
+  md: 0,
+  lg: 0,
+  xl: 0,
+  full: 0,
 }
 
-// ── Status definitions ──
 export const STATUS_COLS = [
-  { key: 'todo',        label: 'Todo',        color: '#7a8599' },
-  { key: 'in_progress', label: 'In Progress', color: '#00f0ff' },
-  { key: 'done',        label: 'Done',        color: '#00ff41' },
-  { key: 'failed',      label: 'Failed',      color: '#ff2d55' },
+  { key: 'todo',        label: 'Todo',        color: '#6b7280' },
+  { key: 'in_progress', label: 'In Progress', color: '#3b82f6' },
+  { key: 'done',        label: 'Done',        color: '#10b981' },
+  { key: 'failed',      label: 'Failed',      color: '#ef4444' },
 ]
 
 export const STATUS_MAP = Object.fromEntries(STATUS_COLS.map(s => [s.key, s]))
 
-// ── Priority definitions ──
 export const PRIORITY = {
-  high:   { label: 'High',   color: '#ff2d55', bg: 'rgba(255,45,85,0.12)', icon: '▲' },
-  medium: { label: 'Medium', color: '#ffb800', bg: 'rgba(255,184,0,0.12)', icon: '■' },
-  low:    { label: 'Low',    color: '#7a8599', bg: 'rgba(122,133,153,0.12)', icon: '▼' },
+  high:   { label: 'High',   color: '#ef4444', bg: 'rgba(239,68,68,0.12)', icon: '▲' },
+  medium: { label: 'Medium', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', icon: '■' },
+  low:    { label: 'Low',    color: '#6b7280', bg: 'rgba(107,114,128,0.12)', icon: '▼' },
 }
 
-// ── Light mode palette ──
 export const LIGHT = {
-  bg:        '#e8eaf0',
-  bgAlt:     '#f0f2f6',
-  surface:   '#f5f7fa',
-  elevated:  '#ffffff',
-  overlay:   '#e0e3ea',
-  text:      '#0a0c10',
-  textMid:   '#4a5568',
-  textDim:   '#8a94a6',
-  textFaint: 'rgba(10,12,16,0.15)',
-  border:    'rgba(0,180,200,0.15)',
-  borderMid: 'rgba(0,180,200,0.25)',
-  borderStrong: 'rgba(0,180,200,0.4)',
-  hover:     'rgba(0,180,200,0.06)',
-  active:    'rgba(0,180,200,0.1)',
+  bg:        '#ffffff',
+  bgAlt:     '#fafafa',
+  surface:   '#ffffff',
+  elevated:  '#f3f4f6',
+  overlay:   '#e5e7eb',
+  text:      '#000000',
+  textMid:   '#4b5563',
+  textDim:   '#9ca3af',
+  textFaint: 'rgba(0,0,0,0.15)',
+  border:    '#e5e7eb',
+  borderMid: '#d1d5db',
+  borderStrong: '#9ca3af',
+  hover:     'rgba(0,0,0,0.03)',
+  active:    'rgba(0,0,0,0.06)',
   danger:    '#dc2626',
-  dangerBg:  'rgba(220,38,38,0.1)',
+  dangerBg:  'rgba(220,38,38,0.08)',
   warning:   '#d97706',
-  warningBg: 'rgba(217,119,6,0.1)',
+  warningBg: 'rgba(217,119,6,0.08)',
   success:   '#059669',
-  successBg: 'rgba(5,150,105,0.1)',
-  info:      '#0891b2',
-  infoBg:    'rgba(8,145,178,0.1)',
+  successBg: 'rgba(5,150,105,0.08)',
+  info:      '#2563eb',
+  infoBg:    'rgba(37,99,235,0.08)',
 }
 
-// ── Form input ──
 export const FORM_INPUT = {
-  background: DARK.elevated,
-  border: `1px solid ${DARK.border}`,
-  borderRadius: 2,
+  background: '#111111',
+  border: '1px solid #1f2937',
+  borderRadius: 0,
   padding: '7px 10px',
   fontSize: 13,
   outline: 'none',
-  color: DARK.text,
+  color: '#ffffff',
   fontFamily: FONT.family,
-  boxShadow: INSET_SHADOW,
 }
 
-// ── Label color palette ──
 export const LABEL_PALETTE = [
-  '#00f0ff', '#ff2d55', '#ffb800', '#00ff41', '#7a8599',
-  '#00c8d6', '#ff6b35', '#ffd700', '#87ceeb', '#c084fc',
+  '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#6b7280',
+  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316',
 ]

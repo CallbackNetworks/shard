@@ -48,26 +48,24 @@ export default function Sidebar({ onOpenPalette }) {
 
   const navLinkStyle = (path) => ({
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '6px 12px', borderRadius: 2, textDecoration: 'none',
-    fontSize: 12, fontWeight: isActive(path) ? 700 : 400, margin: '1px 6px',
-    fontFamily: FONT.family, letterSpacing: '0.04em', textTransform: 'uppercase',
-    color: isActive(path) ? theme.text : SB_TEXT,
-    background: isActive(path) ? 'rgba(0,240,255,0.08)' : 'transparent',
-    borderLeft: isActive(path) ? '2px solid #00f0ff' : '2px solid transparent',
-    boxShadow: isActive(path) ? 'inset 0 0 12px rgba(0,240,255,0.05)' : 'none',
+    padding: '6px 12px', borderRadius: 0, textDecoration: 'none',
+    fontSize: 13, fontWeight: isActive(path) ? 700 : 400, margin: '1px 6px',
+    letterSpacing: '0.04em', textTransform: 'uppercase',
+    color: isActive(path) ? '#ffffff' : '#9ca3af',
+    background: isActive(path) ? 'rgba(255,255,255,0.05)' : 'transparent',
+    borderLeft: isActive(path) ? '2px solid #ef4444' : '2px solid transparent',
   })
 
   const projectLinkStyle = (id) => {
     const on = location.pathname === `/projects/${id}`
     return {
       display: 'flex', alignItems: 'center', gap: 8,
-      padding: '4px 12px 4px 28px', borderRadius: 2, textDecoration: 'none',
+      padding: '4px 12px 4px 28px', borderRadius: 0, textDecoration: 'none',
       fontSize: 12, fontWeight: on ? 700 : 400, margin: '1px 6px', overflow: 'hidden',
-      fontFamily: FONT.family, letterSpacing: '0.04em',
-      color: on ? theme.text : SB_TEXT,
-      background: on ? 'rgba(0,240,255,0.08)' : 'transparent',
-      borderLeft: on ? '2px solid #00f0ff' : '2px solid transparent',
-      boxShadow: on ? 'inset 0 0 12px rgba(0,240,255,0.05)' : 'none',
+      letterSpacing: '0.04em',
+      color: on ? '#ffffff' : '#9ca3af',
+      background: on ? 'rgba(255,255,255,0.05)' : 'transparent',
+      borderLeft: on ? '2px solid #ef4444' : '2px solid transparent',
       transition: 'background 0.12s, color 0.12s',
     }
   }
@@ -75,36 +73,33 @@ export default function Sidebar({ onOpenPalette }) {
   const sectionHeader = {
     display: 'flex', alignItems: 'center', gap: 4,
     padding: '3px 12px', width: '100%', background: 'none', border: 'none',
-    cursor: 'pointer', color: theme.textFaint, fontSize: 10, fontWeight: 700,
-    fontFamily: FONT.family,
+    cursor: 'pointer', color: '#4b5563', fontSize: 10, fontWeight: 700,
     textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 2,
-    borderBottom: '1px solid rgba(0,240,255,0.08)', paddingBottom: 4,
+    borderBottom: '1px solid #1f2937', paddingBottom: 4,
   }
 
   return (
     <aside aria-label="Sidebar navigation" style={{
-      width: 220, minWidth: 220, background: SB_BG, height: '100vh',
-      display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(0,240,255,0.12)',
-      overflow: 'hidden', userSelect: 'none', fontFamily: FONT.family,
+      width: 220, minWidth: 220, background: '#000000', height: '100vh',
+      display: 'flex', flexDirection: 'column', borderRight: '1px solid #1f2937',
+      overflow: 'hidden', userSelect: 'none',
     }}>
       {/* Brand */}
       <div style={{
         padding: '20px 16px', display: 'flex', alignItems: 'center', gap: 10,
-        borderBottom: '1px solid rgba(0,240,255,0.12)',
+        borderBottom: '1px solid #1f2937',
       }}>
         <div style={{
           width: 28, height: 28, flexShrink: 0,
-          clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
-          background: '#00f0ff',
+          borderRadius: 0,
+          background: '#ef4444',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 900, color: '#000',
-          boxShadow: '0 0 12px rgba(0,240,255,0.5)',
-          fontFamily: FONT.family,
+          fontSize: 11, fontWeight: 900, color: '#ffffff',
         }}>S</div>
         <span style={{
-          color: theme.text, fontWeight: 700, fontSize: 12,
-          letterSpacing: '0.15em', textTransform: 'uppercase',
-          fontFamily: FONT.family,
+          color: '#ffffff', fontWeight: 700, fontSize: 18,
+          letterSpacing: '0.2em', textTransform: 'uppercase',
+          fontFamily: FONT.display,
         }}>
           Shard
         </span>

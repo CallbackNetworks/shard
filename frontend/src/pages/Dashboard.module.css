@@ -1,15 +1,15 @@
 /* ── GlowBar ─────────────────────────────────────────────────────── */
 .glowBarEmpty {
   height: 3px;
-  background: rgba(0,240,255,0.04);
-  border-radius: 2px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 0;
 }
 
 .glowBarTrack {
   height: 3px;
-  border-radius: 2px;
+  border-radius: 0;
   overflow: hidden;
-  background: rgba(0,240,255,0.04);
+  background: rgba(255,255,255,0.04);
   position: relative;
 }
 
@@ -29,7 +29,7 @@
 .glowBarShimmer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(0,240,255,0.25), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
   animation: shimmerSlide 2.4s ease infinite;
 }
 
@@ -45,22 +45,21 @@
 
 /* ── ProjectCard ─────────────────────────────────────────────────── */
 .projectCard {
-  background: #111318;
-  border: 1px solid rgba(0,240,255,0.12);
-  border-radius: 2px;
+  background: #111111;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   padding: 18px 20px;
   cursor: pointer;
   position: relative;
   overflow: hidden;
   animation: fadeUpIn 0.35s ease forwards;
   opacity: 0;
-  box-shadow: 0 0 10px rgba(0,240,255,0.08);
-  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
-  transition: box-shadow 0.2s;
+  box-shadow: none;
+  transition: border-color 0.2s;
 }
 
 .projectCard:hover {
-  box-shadow: 0 0 20px rgba(0,240,255,0.15);
+  border-color: #ffffff;
 }
 
 .projectCardAccent {
