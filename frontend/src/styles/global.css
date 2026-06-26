@@ -117,11 +117,11 @@ input, select, button, textarea { font-family: inherit; }
   border-color: rgba(0,240,255,0.25);
 }
 .sb-link {
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
 }
 .sb-link:hover {
-  background: rgba(0,240,255,0.08) !important;
-  color: #00f0ff !important;
+  background: rgba(0,240,255,0.06) !important;
+  color: #e0e6f0 !important;
 }
 
 /* ── Shared button styles ── */

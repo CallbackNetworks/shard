@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, ChevronDown, ChevronRight, ExternalLink, Search, BarChart2, GitMerge, GitFork, FileText, ScrollText, Target, Activity, MessageCircle, Settings2, Sun, Moon } from 'lucide-react'
 import { getProjects, getIdentities } from '../api/client'
-import { BRAND, INSET_SHADOW } from '../constants/theme'
+import { BRAND, INSET_SHADOW, FONT } from '../constants/theme'
 import { useTheme } from '../context/ThemeContext'
 
 export default function Sidebar({ onOpenPalette }) {
@@ -48,20 +48,26 @@ export default function Sidebar({ onOpenPalette }) {
 
   const navLinkStyle = (path) => ({
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '6px 12px', borderRadius: 4, textDecoration: 'none',
-    fontSize: 14, fontWeight: isActive(path) ? 700 : 400, margin: '1px 6px',
+    padding: '6px 12px', borderRadius: 2, textDecoration: 'none',
+    fontSize: 12, fontWeight: isActive(path) ? 700 : 400, margin: '1px 6px',
+    fontFamily: FONT.family, letterSpacing: '0.04em', textTransform: 'uppercase',
     color: isActive(path) ? theme.text : SB_TEXT,
-    background: isActive(path) ? SB_ACTIVE : 'transparent',
+    background: isActive(path) ? 'rgba(0,240,255,0.08)' : 'transparent',
+    borderLeft: isActive(path) ? '2px solid #00f0ff' : '2px solid transparent',
+    boxShadow: isActive(path) ? 'inset 0 0 12px rgba(0,240,255,0.05)' : 'none',
   })
 
   const projectLinkStyle = (id) => {
     const on = location.pathname === `/projects/${id}`
     return {
       display: 'flex', alignItems: 'center', gap: 8,
-      padding: '4px 12px 4px 28px', borderRadius: 4, textDecoration: 'none',
-      fontSize: 14, fontWeight: on ? 700 : 400, margin: '1px 6px', overflow: 'hidden',
+      padding: '4px 12px 4px 28px', borderRadius: 2, textDecoration: 'none',
+      fontSize: 12, fontWeight: on ? 700 : 400, margin: '1px 6px', overflow: 'hidden',
+      fontFamily: FONT.family, letterSpacing: '0.04em',
       color: on ? theme.text : SB_TEXT,
-      background: on ? SB_ACTIVE : 'transparent',
+      background: on ? 'rgba(0,240,255,0.08)' : 'transparent',
+      borderLeft: on ? '2px solid #00f0ff' : '2px solid transparent',
+      boxShadow: on ? 'inset 0 0 12px rgba(0,240,255,0.05)' : 'none',
       transition: 'background 0.12s, color 0.12s',
     }
   }
@@ -70,28 +76,36 @@ export default function Sidebar({ onOpenPalette }) {
     display: 'flex', alignItems: 'center', gap: 4,
     padding: '3px 12px', width: '100%', background: 'none', border: 'none',
     cursor: 'pointer', color: theme.textFaint, fontSize: 10, fontWeight: 700,
-    textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 2,
+    fontFamily: FONT.family,
+    textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 2,
+    borderBottom: '1px solid rgba(0,240,255,0.08)', paddingBottom: 4,
   }
 
   return (
     <aside aria-label="Sidebar navigation" style={{
       width: 220, minWidth: 220, background: SB_BG, height: '100vh',
-      display: 'flex', flexDirection: 'column', borderRight: `1px solid ${SB_BORDER}`,
-      overflow: 'hidden', userSelect: 'none',
+      display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(0,240,255,0.12)',
+      overflow: 'hidden', userSelect: 'none', fontFamily: FONT.family,
     }}>
       {/* Brand */}
       <div style={{
         padding: '20px 16px', display: 'flex', alignItems: 'center', gap: 10,
-        borderBottom: `1px solid ${SB_BORDER}`,
+        borderBottom: '1px solid rgba(0,240,255,0.12)',
       }}>
         <div style={{
-          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-          background: BRAND,
+          width: 28, height: 28, flexShrink: 0,
+          clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
+          background: '#00f0ff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, fontWeight: 900, color: '#000',
-          boxShadow: `0 0 16px rgba(30,215,96,0.4)`,
+          fontSize: 11, fontWeight: 900, color: '#000',
+          boxShadow: '0 0 12px rgba(0,240,255,0.5)',
+          fontFamily: FONT.family,
         }}>S</div>
-        <span style={{ color: theme.text, fontWeight: 700, fontSize: 14, letterSpacing: '0.01em' }}>
+        <span style={{
+          color: theme.text, fontWeight: 700, fontSize: 12,
+          letterSpacing: '0.15em', textTransform: 'uppercase',
+          fontFamily: FONT.family,
+        }}>
           Shard
         </span>
       </div>
@@ -102,21 +116,23 @@ export default function Sidebar({ onOpenPalette }) {
         aria-label={t('search')}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          margin: '10px 12px', padding: '8px 14px', borderRadius: 9999,
-          background: theme.elevated, border: 'none',
+          margin: '10px 12px', padding: '8px 14px', borderRadius: 2,
+          background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.15)',
           cursor: 'pointer', width: 'calc(100% - 24px)',
-          color: theme.textMid, fontSize: 13,
-          transition: 'background 0.12s',
+          color: theme.textMid, fontSize: 12, fontFamily: FONT.family,
+          letterSpacing: '0.04em', textTransform: 'uppercase',
+          transition: 'background 0.12s, border-color 0.12s',
           boxShadow: INSET_SHADOW,
         }}
-        onMouseEnter={e => e.currentTarget.style.background = theme.overlay}
-        onMouseLeave={e => e.currentTarget.style.background = theme.elevated}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,240,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(0,240,255,0.25)' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,240,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(0,240,255,0.15)' }}
       >
         <Search size={12} />
         <span style={{ flex: 1, textAlign: 'left' }}>{t('search')}</span>
         <kbd style={{
-          padding: '1px 6px', borderRadius: 3, fontSize: 10,
-          background: theme.hover, color: theme.textMid,
+          padding: '1px 6px', borderRadius: 2, fontSize: 10,
+          background: 'rgba(0,240,255,0.06)', color: theme.textMid,
+          border: '1px solid rgba(0,240,255,0.2)', fontFamily: FONT.family,
         }}>⌘K</kbd>
       </button>
 
@@ -143,7 +159,7 @@ export default function Sidebar({ onOpenPalette }) {
           </Link>
         ))}
         <a href="/" target="_blank" rel="noreferrer" className="sb-link"
-          style={{ ...navLinkStyle('/status-noop'), color: SB_TEXT, borderLeft: '2px solid transparent' }}>
+          style={{ ...navLinkStyle('/status-noop'), color: SB_TEXT }}>
           <ExternalLink size={13} />{t('nav.statusPage')}
         </a>
       </nav>
@@ -164,13 +180,15 @@ export default function Sidebar({ onOpenPalette }) {
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '4px 18px 2px', fontSize: 10, fontWeight: 700,
-                    color: ident.color, letterSpacing: '0.06em', textTransform: 'uppercase',
+                    fontFamily: FONT.family,
+                    color: ident.color, letterSpacing: '0.1em', textTransform: 'uppercase',
+                    borderBottom: '1px solid rgba(0,240,255,0.06)', marginBottom: 2, paddingBottom: 4,
                   }}>
                     <span style={{
-                      width: 13, height: 13, borderRadius: 4, background: ident.color,
+                      width: 13, height: 13, borderRadius: 2, background: ident.color,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 7, color: '#fff', fontWeight: 900, flexShrink: 0,
-                      boxShadow: `0 0 8px ${ident.color}66`,
+                      boxShadow: `0 0 10px ${ident.color}66, 0 0 4px ${ident.color}44`,
                     }}>
                       {ident.avatar || ident.name.charAt(0).toUpperCase()}
                     </span>
@@ -180,7 +198,7 @@ export default function Sidebar({ onOpenPalette }) {
                     <Link key={p.id} to={`/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
                       <div style={{
                         width: 5, height: 5, borderRadius: '50%', background: ident.color,
-                        flexShrink: 0, boxShadow: `0 0 5px ${ident.color}88`,
+                        flexShrink: 0, boxShadow: `0 0 6px ${ident.color}88, 0 0 2px ${ident.color}aa`,
                       }} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                         {p.name}
@@ -208,11 +226,14 @@ export default function Sidebar({ onOpenPalette }) {
 
         {projectsOpen && (
           <>
-            {active.map(p => (
+            {active.map(p => {
+              const dotColor = p.identities?.[0]?.color || BRAND
+              return (
               <Link key={p.id} to={`/projects/${p.id}`} className="sb-link" style={projectLinkStyle(p.id)}>
                 <div style={{
                   width: 5, height: 5, borderRadius: '50%',
-                  background: p.identities?.[0]?.color || BRAND, flexShrink: 0,
+                  background: dotColor, flexShrink: 0,
+                  boxShadow: `0 0 6px ${dotColor}88`,
                 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                   {p.name}
@@ -221,7 +242,8 @@ export default function Sidebar({ onOpenPalette }) {
                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', flexShrink: 0 }}>{p.total_tasks}</span>
                 )}
               </Link>
-            ))}
+              )
+            })}
             {archived.length > 0 && (
               <div style={{ padding: '6px 18px 2px', fontSize: 9, color: 'rgba(255,255,255,0.12)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                 {t('archived')}
@@ -243,7 +265,7 @@ export default function Sidebar({ onOpenPalette }) {
 
       {/* Theme & Language */}
       <div style={{
-        borderTop: `1px solid ${SB_BORDER}`,
+        borderTop: '1px solid rgba(0,240,255,0.12)',
         padding: '10px 16px',
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
       }}>
@@ -253,15 +275,15 @@ export default function Sidebar({ onOpenPalette }) {
           aria-label={mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
           title={mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
           style={{
-            padding: '4px 6px', borderRadius: 5, cursor: 'pointer',
-            background: SB_ACTIVE, border: `1px solid ${SB_BORDER}`,
+            padding: '4px 6px', borderRadius: 2, cursor: 'pointer',
+            background: SB_ACTIVE, border: '1px solid rgba(0,240,255,0.15)',
             color: theme.text, display: 'flex', alignItems: 'center',
             transition: 'all 0.15s',
           }}
         >
           {mode === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
         </button>
-        <span style={{ fontSize: 11, color: theme.textDim, flex: 1, letterSpacing: '0.04em' }}>
+        <span style={{ fontSize: 10, color: theme.textDim, flex: 1, letterSpacing: '0.08em', fontFamily: FONT.family, textTransform: 'uppercase' }}>
           {t('nav.language')}
         </span>
         {[{ code: 'en', label: 'EN' }, { code: 'zh-TW', label: '中文' }].map(({ code, label }) => (
@@ -270,12 +292,13 @@ export default function Sidebar({ onOpenPalette }) {
             onClick={() => i18n.changeLanguage(code)}
             aria-pressed={i18n.language === code}
             style={{
-              padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
-              fontSize: 11, fontWeight: i18n.language === code ? 700 : 400,
+              padding: '3px 9px', borderRadius: 2, cursor: 'pointer',
+              fontSize: 10, fontWeight: i18n.language === code ? 700 : 400,
+              fontFamily: FONT.family,
               background: i18n.language === code ? SB_ACTIVE : 'transparent',
               color: i18n.language === code ? theme.text : theme.textDim,
               border: i18n.language === code
-                ? `1px solid ${theme.borderMid}`
+                ? '1px solid rgba(0,240,255,0.2)'
                 : '1px solid transparent',
               transition: 'all 0.15s',
             }}
