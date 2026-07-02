@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Date, cast, func
+from sqlalchemy import Date, cast, func, text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -62,13 +62,14 @@ def get_heatmap(
     end_dt = datetime.fromisoformat(end) if end else now
     start_dt = datetime.fromisoformat(start) if start else end_dt - timedelta(days=365)
 
-    q = db.query(cast(ActivityLog.created_at, Date).label("day"), func.count(ActivityLog.id).label("count")).filter(
+    day_col = func.date(ActivityLog.created_at).label("day")
+    q = db.query(day_col, func.count(ActivityLog.id).label("count")).filter(
         ActivityLog.created_at >= start_dt,
         ActivityLog.created_at <= end_dt,
     )
     if project_id:
         q = q.filter(ActivityLog.project_id == project_id)
-    rows = q.group_by("day").order_by("day").all()
+    rows = q.group_by(day_col).order_by(day_col).all()
     return [{"date": str(r.day), "count": r.count} for r in rows]
 
 

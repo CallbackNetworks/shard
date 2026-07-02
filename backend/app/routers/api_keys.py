@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import ApiKey, Task
+from app.models import ApiKey, Task, TaskLabel
 from app.schemas import AgentTaskSummary, ApiKeyCreate, ApiKeyCreateOut, ApiKeyOut, ApiKeyUpdate, LabelOut, TaskOut
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
@@ -80,7 +80,7 @@ def get_agent_summary(db: Session = Depends(get_db)):
         db.query(Task)
         .filter(Task.assigned_agent_key_id.in_(key_ids))
         .options(
-            joinedload(Task.task_labels).joinedload("label"),
+            joinedload(Task.task_labels).joinedload(TaskLabel.label),
             joinedload(Task.subtasks),
             joinedload(Task.comments),
             joinedload(Task.blocked_by_deps),

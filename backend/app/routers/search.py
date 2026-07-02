@@ -25,6 +25,7 @@ def search(
     """Full-text search across tasks and projects. Uses FTS when available, falls back to LIKE."""
     search_backend = request.app.state.search_backend
     task_ids, used_fts = search_backend.search_tasks(db, q, project_id, limit, offset)
+    pattern = f"%{q}%"
 
     tasks = []
     if used_fts and task_ids:
@@ -37,7 +38,6 @@ def search(
         tasks.sort(key=lambda t: id_order.get(t.id, 0))
 
     if not used_fts:
-        pattern = f"%{q}%"
         task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
         if project_id:
             task_query = task_query.filter(Task.project_id == project_id)

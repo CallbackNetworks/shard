@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import Date, cast, func
+from sqlalchemy import Date, cast, func, text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -50,20 +50,21 @@ def get_hub_stats(db: Session = Depends(get_db)):
                     p_stats["total_tasks"] += 1
                     if t.status in p_stats:
                         p_stats[t.status] += 1
-                    if t.due_date and t.due_date < now and t.status not in ("done", "failed"):
+                    if t.due_date and t.due_date.replace(tzinfo=None) < now.replace(tzinfo=None) and t.status not in ("done", "failed"):
                         p_stats["overdue"] += 1
                 projects_data.append({"id": p.id, "name": p.name, "status": p.status, **p_stats})
                 for k in ident_stats:
                     ident_stats[k] += p_stats[k]
 
+            day_col = func.date(ActivityLog.created_at).label("day")
             daily = (
-                db.query(cast(ActivityLog.created_at, Date).label("day"), func.count(ActivityLog.id).label("count"))
+                db.query(day_col, func.count(ActivityLog.id).label("count"))
                 .filter(
                     ActivityLog.project_id.in_(ident_project_ids),
                     ActivityLog.created_at >= year_ago,
                 )
-                .group_by("day")
-                .order_by("day")
+                .group_by(day_col)
+                .order_by(day_col)
                 .all()
             )
             daily_activity = [{"date": str(r.day), "count": r.count} for r in daily]
