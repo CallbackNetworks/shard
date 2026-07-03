@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --- Identity ---
 
@@ -112,7 +112,16 @@ class ProjectOut(BaseModel):
 # --- Task ---
 
 
-class TaskCreate(BaseModel):
+class _TaskTitleMixin:
+    @field_validator("title")
+    @classmethod
+    def title_not_blank(cls, v: str | None) -> str | None:
+        if v is not None and not v.strip():
+            raise ValueError("Title must not be blank")
+        return v.strip() if v is not None else v
+
+
+class TaskCreate(_TaskTitleMixin, BaseModel):
     title: str = Field(min_length=1, max_length=500, description="Task title")
     description: str | None = Field(None, description="Optional task description")
     priority: Literal["low", "medium", "high"] = Field("medium", description="Task priority: low, medium, or high")
@@ -126,7 +135,7 @@ class TaskCreate(BaseModel):
     is_pinned: bool = False
 
 
-class TaskUpdate(BaseModel):
+class TaskUpdate(_TaskTitleMixin, BaseModel):
     title: str | None = Field(None, min_length=1, max_length=500, description="New task title")
     description: str | None = Field(None, description="New task description")
     status: Literal["todo", "in_progress", "done", "failed"] | None = Field(
