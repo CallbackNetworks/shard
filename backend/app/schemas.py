@@ -95,6 +95,7 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     status: str
+    share_token: str | None = None
     repo_url: str | None = None
     wip_limits: dict | None = None
     created_at: datetime
@@ -112,7 +113,7 @@ class ProjectOut(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    title: str = Field(description="Task title")
+    title: str = Field(min_length=1, max_length=500, description="Task title")
     description: str | None = Field(None, description="Optional task description")
     priority: Literal["low", "medium", "high"] = Field("medium", description="Task priority: low, medium, or high")
     assignee: str | None = Field(None, description="Name of the person assigned to this task")
@@ -126,7 +127,7 @@ class TaskCreate(BaseModel):
 
 
 class TaskUpdate(BaseModel):
-    title: str | None = Field(None, description="New task title")
+    title: str | None = Field(None, min_length=1, max_length=500, description="New task title")
     description: str | None = Field(None, description="New task description")
     status: Literal["todo", "in_progress", "done", "failed"] | None = Field(
         None, description="Task status: todo, in_progress, done, or failed"

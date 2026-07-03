@@ -8,6 +8,7 @@ from app.models import ApiKey, Task, TaskDependency
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate
 from app.services.activity import log_activity
+from app.services.notifier import fire_notifications
 from app.services.rules_engine import run_rules
 from app.services.ws_manager import ws_manager
 
@@ -49,6 +50,7 @@ async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(g
     await run_rules(db, "task.created", task, {})
     db.commit()
     db.refresh(task)
+    await fire_notifications(db, task, "task.created")
     await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
     return task
 
@@ -124,6 +126,9 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
 
     db.commit()
     db.refresh(task)
+
+    if "status" in changes and changes["status"] != old_status:
+        await fire_notifications(db, task, "task.status_changed")
 
     for trigger, ctx in triggered_rules:
         await run_rules(db, trigger, task, {"_rule_depth": 1, **ctx})

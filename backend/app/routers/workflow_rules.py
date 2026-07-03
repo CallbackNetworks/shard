@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -67,11 +67,13 @@ def delete_rule(rule_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{rule_id}/test", response_model=dict)
-async def test_rule(rule_id: str, task_id: str, db: Session = Depends(get_db)):
+async def test_rule(rule_id: str, task_id: str | None = Query(None), db: Session = Depends(get_db)):
     """Dry-run: check which actions would fire for a given task without executing them."""
     rule = db.query(WorkflowRule).filter(WorkflowRule.id == rule_id).first()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
+    if task_id is None:
+        raise HTTPException(status_code=422, detail="Either task_id query parameter is required")
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
