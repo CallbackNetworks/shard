@@ -269,6 +269,11 @@ async def _tool_create_task(
 ) -> str:
     import uuid
 
+    title = title.strip()
+    if not title:
+        return "Title must not be blank"
+    if len(title) > 500:
+        return "Title must be 500 characters or fewer"
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         return f"Project {project_id} not found"
@@ -322,6 +327,11 @@ def _tool_update_task(db: Session, task_id: str, **kwargs) -> str:
 async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, priority: str = "medium") -> str:
     import uuid
 
+    title = title.strip()
+    if not title:
+        return "Title must not be blank"
+    if len(title) > 500:
+        return "Title must be 500 characters or fewer"
     parent = db.query(Task).filter(Task.id == parent_task_id).first()
     if not parent:
         return f"Parent task {parent_task_id} not found"

@@ -219,6 +219,7 @@ async def api_bulk_update_tasks(
     """Bulk update tasks. Each item needs 'id' and fields to update."""
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
+    _ALLOWED_FIELDS = {"title", "description", "status", "priority", "assignee", "due_date", "start_date", "time_estimate", "time_spent", "is_pinned", "parent_id", "position", "progress_pct"}
     results = []
     for update in updates:
         task_id = update.pop("id", None)
@@ -229,8 +230,15 @@ async def api_bulk_update_tasks(
             continue
         old_status = task.status
         for field, value in update.items():
-            if hasattr(task, field):
-                setattr(task, field, value)
+            if field not in _ALLOWED_FIELDS:
+                continue
+            if field == "title":
+                if not isinstance(value, str) or not value.strip():
+                    raise HTTPException(status_code=422, detail="Title must not be blank")
+                if len(value.strip()) > 500:
+                    raise HTTPException(status_code=422, detail="Title must be 500 characters or fewer")
+                value = value.strip()
+            setattr(task, field, value)
         results.append(task)
 
         if "status" in update and update["status"] != old_status:

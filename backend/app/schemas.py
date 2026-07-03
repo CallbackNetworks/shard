@@ -842,8 +842,8 @@ class BulkActionResult(BaseModel):
 # --- Import/Export ---
 
 
-class TaskImportItem(BaseModel):
-    title: str
+class TaskImportItem(_TaskTitleMixin, BaseModel):
+    title: str = Field(min_length=1, max_length=500)
     description: str | None = None
     status: Literal["todo", "in_progress", "done", "failed"] = "todo"
     priority: Literal["low", "medium", "high"] = "medium"
