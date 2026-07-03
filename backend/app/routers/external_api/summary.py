@@ -85,7 +85,7 @@ def api_summary(
                     }
                 )
 
-            is_overdue = t.due_date and t.due_date < now and t.status not in ("done", "failed")
+            is_overdue = t.due_date and t.due_date.replace(tzinfo=None) < now.replace(tzinfo=None) and t.status not in ("done", "failed")
             if is_overdue:
                 overdue += 1
 
@@ -106,7 +106,7 @@ def api_summary(
 
             if (
                 t.due_date
-                and t.due_date >= now
+                and t.due_date.replace(tzinfo=None) >= now.replace(tzinfo=None)
                 and t.status not in ("done", "failed")
                 and (next_due is None or t.due_date < next_due)
             ):
