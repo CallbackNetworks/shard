@@ -544,17 +544,42 @@ export default function StructureMap() {
       visit(selectedNodeKey)
       return keys
     }
-    const sourceKeys = new Set([selectedNodeKey])
-    if (selectedProjectId) sourceKeys.add(`project:${selectedProjectId}`)
-    const keys = new Set([...sourceKeys])
+    // Follow the identity -> project -> task hierarchy up (ancestors) and
+    // down (descendants) so selecting a node focuses its whole chain.
+    const children = new Map()
+    const parents = new Map()
     for (const link of mapLayout.links) {
-      if (sourceKeys.has(link.from) || sourceKeys.has(link.to)) {
+      if (!link.flow) continue
+      if (!children.has(link.from)) children.set(link.from, [])
+      if (!parents.has(link.to)) parents.set(link.to, [])
+      children.get(link.from).push(link.to)
+      parents.get(link.to).push(link.from)
+    }
+    const keys = new Set([selectedNodeKey])
+    const walk = (start, adjacency) => {
+      const stack = [start]
+      while (stack.length) {
+        const key = stack.pop()
+        for (const next of adjacency.get(key) || []) {
+          if (!keys.has(next)) {
+            keys.add(next)
+            stack.push(next)
+          }
+        }
+      }
+    }
+    walk(selectedNodeKey, children)
+    walk(selectedNodeKey, parents)
+    // Pull in goal/decision accents attached to any highlighted project.
+    for (const link of mapLayout.links) {
+      if (link.flow) continue
+      if (keys.has(link.from) || keys.has(link.to)) {
         keys.add(link.from)
         keys.add(link.to)
       }
     }
     return keys
-  }, [mapLayout.links, selected, selectedNodeKey, selectedProjectId, viewMode])
+  }, [mapLayout.links, selected, selectedNodeKey, viewMode])
 
   const shouldMute = (node) => {
     if (!selected) return false
