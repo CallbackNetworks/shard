@@ -3,9 +3,11 @@ GitHub / GitLab issue synchronization service.
 
 Inbound: Webhook payloads from GitHub/GitLab create or update Shard tasks.
 Outbound: When Shard tasks are completed, the corresponding external issue is closed.
+Also handles GitHub pull request events for PR-to-task linking.
 """
 
 import logging
+import re
 
 import httpx
 
@@ -64,6 +66,50 @@ def normalize_gitlab_issue(payload: dict) -> dict | None:
         "assignee": (payload.get("assignees") or [{}])[0].get("username") if payload.get("assignees") else None,
         "repo": payload.get("project", {}).get("path_with_namespace", ""),
     }
+
+
+_ISSUE_REF_PATTERN = re.compile(
+    r"(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+#(\d+)",
+    re.IGNORECASE,
+)
+
+
+def parse_issue_refs(text: str) -> list[str]:
+    """Extract issue numbers from 'Fixes #N' / 'Closes #N' / 'Resolves #N' patterns."""
+    if not text:
+        return []
+    return _ISSUE_REF_PATTERN.findall(text)
+
+
+def normalize_github_pr(payload: dict) -> dict | None:
+    """Extract normalized PR data from a GitHub pull_request webhook payload."""
+    action = payload.get("action")
+    pr = payload.get("pull_request")
+    if not pr:
+        return None
+
+    merged = bool(pr.get("merged"))
+
+    return {
+        "type": "pull_request",
+        "action": action,
+        "pr_number": pr.get("number"),
+        "pr_url": pr.get("html_url", ""),
+        "pr_title": pr.get("title", ""),
+        "branch": (pr.get("head") or {}).get("ref", ""),
+        "merged": merged,
+        "repo": payload.get("repository", {}).get("full_name", ""),
+        "body": pr.get("body") or "",
+        "issue_refs": parse_issue_refs(pr.get("body") or ""),
+    }
+
+
+def detect_pr_webhook(headers: dict, payload: dict) -> dict | None:
+    """Detect a GitHub pull_request webhook event and normalize it."""
+    gh_event = headers.get("x-github-event", "")
+    if gh_event == "pull_request":
+        return normalize_github_pr(payload)
+    return None
 
 
 def detect_issue_webhook(headers: dict, payload: dict) -> dict | None:

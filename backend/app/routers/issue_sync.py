@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Integration, Project, Task
 from app.services.activity import log_activity
-from app.services.issue_sync import close_github_issue, close_gitlab_issue, detect_issue_webhook
+from app.services.issue_sync import close_github_issue, close_gitlab_issue, detect_issue_webhook, detect_pr_webhook
 from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,9 @@ async def receive_issue_webhook(
     headers = dict(request.headers)
     normalized = detect_issue_webhook(headers, body)
     if not normalized:
+        pr_data = detect_pr_webhook(headers, body)
+        if pr_data:
+            return await _handle_pr_event(pr_data, project_id, db)
         return {"ok": True, "detail": "Ignored (not an issue event)"}
 
     provider = normalized["provider"]
@@ -132,6 +135,118 @@ async def receive_issue_webhook(
     db.refresh(task)
     await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
     return {"ok": True, "action": "created", "task_id": task.id}
+
+
+async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
+    """Handle a GitHub pull_request webhook event.
+
+    - On opened/edited: link the PR URL to tasks referenced via 'Fixes #N' etc.
+    - On merged (action=closed, merged=true): mark referenced tasks as done.
+    """
+    action = pr_data.get("action", "")
+    repo = pr_data["repo"]
+    pr_url = pr_data["pr_url"]
+    pr_title = pr_data["pr_title"]
+    issue_refs = pr_data.get("issue_refs", [])
+    merged = pr_data.get("merged", False)
+
+    affected_task_ids: list[str] = []
+
+    # Find tasks matching the issue references
+    referenced_tasks = []
+    for ref_num in issue_refs:
+        task = (
+            db.query(Task)
+            .filter(
+                Task.project_id == project_id,
+                Task.external_provider == "github",
+                Task.external_id == ref_num,
+                Task.external_repo == repo,
+            )
+            .first()
+        )
+        if task:
+            referenced_tasks.append(task)
+
+    if action in ("opened", "edited", "synchronize", "reopened"):
+        # Link PR URL to task descriptions
+        for task in referenced_tasks:
+            pr_link = f"\n\nLinked PR: [{pr_title}]({pr_url})"
+            if pr_url not in (task.description or ""):
+                task.description = (task.description or "") + pr_link
+                log_activity(
+                    db,
+                    "task.updated",
+                    project_id=project_id,
+                    task_id=task.id,
+                    actor="pr-sync:github",
+                    detail=f'PR #{pr_data["pr_number"]} linked to task "{task.title}"',
+                    meta={"pr_url": pr_url},
+                )
+                affected_task_ids.append(task.id)
+
+        db.commit()
+        for tid in affected_task_ids:
+            await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": tid})
+
+        return {
+            "ok": True,
+            "action": "pr_linked",
+            "affected_tasks": affected_task_ids,
+        }
+
+    if action == "closed" and merged:
+        # Merged PR: mark referenced tasks as done
+        for task in referenced_tasks:
+            if task.status != "done":
+                task.status = "done"
+                log_activity(
+                    db,
+                    "task.completed",
+                    project_id=project_id,
+                    task_id=task.id,
+                    actor="pr-sync:github",
+                    detail=f'Task "{task.title}" completed by merged PR #{pr_data["pr_number"]}',
+                    meta={"pr_url": pr_url},
+                )
+                affected_task_ids.append(task.id)
+
+        # Also check for tasks whose description already contains this PR URL
+        tasks_with_pr_url = (
+            db.query(Task)
+            .filter(
+                Task.project_id == project_id,
+                Task.description.contains(pr_url),
+                Task.status != "done",
+            )
+            .all()
+        )
+        for task in tasks_with_pr_url:
+            if task.id not in affected_task_ids:
+                task.status = "done"
+                log_activity(
+                    db,
+                    "task.completed",
+                    project_id=project_id,
+                    task_id=task.id,
+                    actor="pr-sync:github",
+                    detail=f'Task "{task.title}" completed by merged PR #{pr_data["pr_number"]}',
+                    meta={"pr_url": pr_url},
+                )
+                affected_task_ids.append(task.id)
+
+        db.commit()
+        for tid in affected_task_ids:
+            await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": tid})
+
+        return {
+            "ok": True,
+            "action": "pr_merged",
+            "affected_tasks": affected_task_ids,
+        }
+
+    # Closed without merge or other actions: acknowledge but take no action
+    return {"ok": True, "action": "pr_ignored", "affected_tasks": []}
 
 
 async def sync_task_closure_to_external(task: Task, db: Session) -> bool:

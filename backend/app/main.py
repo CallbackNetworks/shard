@@ -26,6 +26,7 @@ from app.routers import (
     external_api,
     goals,
     identities,
+    imports,
     integrations,
     issue_sync,
     labels,
@@ -181,6 +182,7 @@ app.include_router(notifications.router)
 app.include_router(cicd.router)
 app.include_router(goals.router)
 app.include_router(bulk.router)
+app.include_router(imports.router)
 app.include_router(settings.router)
 app.include_router(ws_router.router)
 

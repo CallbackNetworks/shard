@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog, Cycle, CycleTask, Project, Task
+from app.services.critical_path import compute_critical_path
 from app.services.usage_tracker import tracker
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -192,6 +193,12 @@ def get_cycle_burndown(
             point["ideal"] = round(total - (total * i / (len(result) - 1)), 1)
 
     return result
+
+
+@router.get("/critical-path/{project_id}")
+def get_critical_path(project_id: str, db: Session = Depends(get_db)):
+    """Compute the critical path through task dependencies for a project."""
+    return compute_critical_path(db, project_id)
 
 
 @router.get("/usage")
