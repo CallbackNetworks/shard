@@ -8,7 +8,6 @@ import { STATUS_COLOR } from '../constants/theme'
 import { dependencyNeighborhood, deriveStructureMap } from '../utils/structureMap'
 import EmptyState from '../components/shared/EmptyState'
 
-const CANVAS_W = 1680
 const FILTERS = ['all', 'active', 'risk', 'unowned']
 const VIEW_MODES = ['map', 'dependencies']
 
@@ -16,15 +15,6 @@ function riskColor(risk) {
   if (risk === 'failed' || risk === 'overdue') return STATUS_COLOR.failed
   if (risk === 'active' || risk === 'priority') return STATUS_COLOR.in_progress
   return STATUS_COLOR.todo
-}
-
-function spread(index, total, min, max) {
-  if (total <= 1) return (min + max) / 2
-  return min + ((max - min) / (total - 1)) * index
-}
-
-function laneY(index, start, gap) {
-  return start + index * gap
 }
 
 function nodeDataKey(node) {
@@ -77,62 +67,129 @@ function GraphNode({ children, active, muted, color, label, onClick, className =
   )
 }
 
-function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode, t }) {
-  const topBand = 104
-  const bottomBand = 104
-  const projectGap = 116
-  const taskGap = 86
-  const identityGap = 86
-  const bodyHeight = Math.max(
-    520,
-    Math.max(visibleProjects.length, 1) * projectGap,
-    Math.max(visibleTaskNodes.length, 1) * taskGap,
-    Math.max(visibleIdentityNodes.length, 1) * identityGap
-  )
-  const canvasH = topBand + bodyHeight + bottomBand
-  const bodyTop = topBand
-  const bodyBottom = topBand + bodyHeight - 92
-  const rootY = topBand + bodyHeight / 2 - 43
+function resolveOverlaps(items, minGap) {
+  if (items.length <= 1) return
+  items.sort((a, b) => a.y - b.y)
+  for (let i = 1; i < items.length; i++) {
+    const minY = items[i - 1].y + items[i - 1].h + minGap
+    if (items[i].y < minY) items[i].y = minY
+  }
+}
 
-  const nodes = [{
-    id: 'root:structure',
-    type: 'root',
-    name: t('structure.title'),
-    x: 745,
-    y: rootY,
-    w: 190,
-    h: 86,
-    color: STATUS_COLOR.in_progress,
-    data: { id: 'root:structure', type: 'root', name: t('structure.title'), status: t('structure.liveMap') },
-  }]
-  const links = []
+function computePath(from, to, linkType) {
+  const fromCy = from.y + from.h / 2
+  const toCy = to.y + to.h / 2
+  const dx = (to.x + to.w / 2) - (from.x + from.w / 2)
 
-  visibleProjects.forEach((project, index) => {
-    const x = 620 + (index % 2) * 280
-    const y = spread(index, visibleProjects.length, bodyTop + 16, bodyBottom)
-    nodes.push({
-      id: `project:${project.id}`,
-      type: 'project',
-      name: project.name,
-      x,
-      y,
-      w: 220,
-      h: 82,
-      color: riskColor(project.risk),
-      data: project,
-    })
-    links.push({ from: 'root:structure', to: `project:${project.id}`, color: riskColor(project.risk), type: 'root' })
+  if (linkType === 'dependency') {
+    const x1 = from.x + from.w
+    const x2 = to.x + to.w
+    const arc = 36 + Math.abs(toCy - fromCy) * 0.12
+    return `M ${x1} ${fromCy} C ${x1 + arc} ${fromCy}, ${x2 + arc} ${toCy}, ${x2} ${toCy}`
+  }
+
+  if (Math.abs(dx) > 80) {
+    const goRight = dx > 0
+    const x1 = goRight ? from.x + from.w : from.x
+    const x2 = goRight ? to.x : to.x + to.w
+    const bend = Math.max(30, Math.abs(x2 - x1) * 0.38)
+    const dir = goRight ? 1 : -1
+    return `M ${x1} ${fromCy} C ${x1 + dir * bend} ${fromCy}, ${x2 - dir * bend} ${toCy}, ${x2} ${toCy}`
+  }
+
+  const goDown = toCy > fromCy
+  const x1 = from.x + from.w / 2
+  const y1 = goDown ? from.y + from.h : from.y
+  const x2 = to.x + to.w / 2
+  const y2 = goDown ? to.y : to.y + to.h
+  const bend = Math.max(20, Math.abs(y2 - y1) * 0.4)
+  const dir = goDown ? 1 : -1
+  return `M ${x1} ${y1} C ${x1} ${y1 + dir * bend}, ${x2} ${y2 - dir * bend}, ${x2} ${y2}`
+}
+
+function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
+  const colDef = {
+    identity: { x: 40, w: 152 },
+    project: { x: 330, w: 220 },
+    task: { x: 680, w: 196 },
+  }
+  const canvasW = 940
+  const labelH = 28
+  const projectH = 72
+  const taskH = 54
+  const identityH = 54
+  const goalH = 42
+  const decisionH = 42
+  const taskGapV = 6
+  const rowPad = 16
+
+  const tasksByProject = new Map()
+  visibleTaskNodes.forEach(task => {
+    if (!tasksByProject.has(task.projectId)) tasksByProject.set(task.projectId, [])
+    tasksByProject.get(task.projectId).push(task)
   })
 
-  visibleIdentityNodes.forEach((identity, index) => {
+  const goalLane = laneNodes.filter(n => n.lane === 'goal')
+  const decisionLane = laneNodes.filter(n => n.lane === 'decision')
+  const goalCols = Math.min(goalLane.length, 3) || 1
+  const goalRows = Math.ceil(goalLane.length / goalCols)
+  const goalAreaH = goalLane.length > 0 ? goalRows * (goalH + 8) + 12 : 0
+
+  const bodyTop = labelH + goalAreaH + 8
+
+  const projectRowData = []
+  let bodyY = bodyTop
+  visibleProjects.forEach(project => {
+    const tasks = tasksByProject.get(project.id) || []
+    const stackH = tasks.length > 0 ? tasks.length * (taskH + taskGapV) - taskGapV : 0
+    const rowH = Math.max(projectH, stackH) + rowPad
+    projectRowData.push({ project, y: bodyY, h: rowH, tasks })
+    bodyY += rowH
+  })
+
+  const nodes = []
+  const links = []
+
+  projectRowData.forEach(row => {
+    const py = row.y + (row.h - rowPad - projectH) / 2
+    nodes.push({
+      id: `project:${row.project.id}`,
+      type: 'project',
+      name: row.project.name,
+      x: colDef.project.x,
+      y: py,
+      w: colDef.project.w,
+      h: projectH,
+      color: riskColor(row.project.risk),
+      data: row.project,
+    })
+  })
+
+  const projectYMap = new Map(
+    nodes.filter(n => n.type === 'project').map(n => [n.data.id, n.y])
+  )
+
+  const identityItems = visibleIdentityNodes.map((identity, i) => {
+    const connYs = visibleProjects
+      .filter(p => p.identityIds.includes(identity.id))
+      .map(p => projectYMap.get(p.id))
+      .filter(y => y !== undefined)
+    const idealY = connYs.length > 0
+      ? connYs.reduce((a, b) => a + b, 0) / connYs.length + (projectH - identityH) / 2
+      : bodyTop + i * (identityH + 8)
+    return { identity, y: idealY, h: identityH }
+  })
+  resolveOverlaps(identityItems, 8)
+
+  identityItems.forEach(({ identity, y }) => {
     nodes.push({
       id: `identity:${identity.id}`,
       type: 'identity',
       name: identity.name,
-      x: 96 + (index % 2) * 132,
-      y: spread(index, visibleIdentityNodes.length, bodyTop + 28, bodyBottom),
-      w: 156,
-      h: 62,
+      x: colDef.identity.x,
+      y,
+      w: colDef.identity.w,
+      h: identityH,
       color: identity.color,
       data: { ...identity, type: 'identity' },
     })
@@ -149,23 +206,31 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
     })
   })
 
-  visibleTaskNodes.forEach((task, index) => {
-    nodes.push({
-      id: `task:${task.id}`,
-      type: 'task',
-      name: task.name,
-      x: 1240 + (index % 2) * 132,
-      y: laneY(index, bodyTop + 4, taskGap),
-      w: 200,
-      h: 66,
-      color: task.color,
-      data: task,
-    })
-    links.push({
-      from: `project:${task.projectId}`,
-      to: `task:${task.id}`,
-      color: viewMode === 'dependencies' ? '#737373' : riskColor(task.risk),
-      type: task.risk,
+  projectRowData.forEach(row => {
+    const py = projectYMap.get(row.project.id)
+    if (py === undefined) return
+    const tasks = row.tasks
+    const stackH = tasks.length > 0 ? tasks.length * (taskH + taskGapV) - taskGapV : 0
+    const stackTop = py + (projectH - stackH) / 2
+
+    tasks.forEach((task, i) => {
+      nodes.push({
+        id: `task:${task.id}`,
+        type: 'task',
+        name: task.name,
+        x: colDef.task.x,
+        y: stackTop + i * (taskH + taskGapV),
+        w: colDef.task.w,
+        h: taskH,
+        color: task.color,
+        data: task,
+      })
+      links.push({
+        from: `project:${row.project.id}`,
+        to: `task:${task.id}`,
+        color: viewMode === 'dependencies' ? '#737373' : riskColor(task.risk),
+        type: task.risk,
+      })
     })
   })
 
@@ -180,18 +245,20 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
     })
   }
 
-  const goalNodes = laneNodes.filter(node => node.lane === 'goal')
-  const decisionNodes = laneNodes.filter(node => node.lane === 'decision')
+  const goalW = 152
+  const goalGapH = 12
+  const totalGoalW = goalCols * goalW + (goalCols - 1) * goalGapH
+  const goalStartX = colDef.project.x + (colDef.project.w - totalGoalW) / 2
 
-  goalNodes.forEach((goal, index) => {
+  goalLane.forEach((goal, i) => {
     nodes.push({
       id: `goal:${goal.id}`,
       type: 'goal',
       name: goal.name,
-      x: 360 + (index % 5) * 220,
-      y: 24 + Math.floor(index / 5) * 58,
-      w: 142,
-      h: 54,
+      x: goalStartX + (i % goalCols) * (goalW + goalGapH),
+      y: labelH + Math.floor(i / goalCols) * (goalH + 8),
+      w: goalW,
+      h: goalH,
       color: goal.color,
       data: goal,
     })
@@ -203,15 +270,22 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
     }))
   })
 
-  decisionNodes.forEach((decision, index) => {
+  const decisionTop = bodyY + 12
+  const decisionColCount = Math.min(decisionLane.length, 3) || 1
+  const decW = 146
+  const decGapH = 12
+  const totalDecW = decisionColCount * decW + (decisionColCount - 1) * decGapH
+  const decStartX = colDef.project.x + (colDef.project.w - totalDecW) / 2
+
+  decisionLane.forEach((decision, i) => {
     nodes.push({
       id: `decision:${decision.id}`,
       type: 'decision',
       name: decision.name,
-      x: 360 + (index % 5) * 220,
-      y: canvasH - 78 - Math.floor(index / 5) * 58,
-      w: 138,
-      h: 54,
+      x: decStartX + (i % decisionColCount) * (decW + decGapH),
+      y: decisionTop + Math.floor(i / decisionColCount) * (decisionH + 8),
+      w: decW,
+      h: decisionH,
       color: decision.color,
       data: decision,
     })
@@ -225,13 +299,18 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
     }
   })
 
-  const nodeById = new Map(nodes.map(node => [node.id, node]))
+  const decAreaH = decisionLane.length > 0 ? Math.ceil(decisionLane.length / decisionColCount) * (decisionH + 8) + 24 : 0
+  const canvasH = Math.max(520, bodyY + decAreaH + 40)
+
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
   return {
     nodes,
-    links: links.filter(link => nodeById.has(link.from) && nodeById.has(link.to)),
+    links: links.filter(l => nodeById.has(l.from) && nodeById.has(l.to)),
     nodeById,
-    width: CANVAS_W,
+    width: canvasW,
     height: canvasH,
+    columns: colDef,
+    labelH,
   }
 }
 
@@ -376,7 +455,6 @@ export default function StructureMap() {
   const selectedNodeKey = nodeDataKey(selected)
   const relatedNodeKeys = useMemo(() => {
     if (!selectedNodeKey) return new Set()
-    if (selectedNodeKey === 'root:structure') return new Set(mapLayout.nodes.map(node => node.id))
     if (viewMode === 'dependencies' && selected?.type === 'task') {
       const keys = new Set(['root:structure', selectedNodeKey, `project:${selected.projectId}`])
       const visit = (key) => {
@@ -397,7 +475,7 @@ export default function StructureMap() {
     }
     const sourceKeys = new Set([selectedNodeKey])
     if (selectedProjectId) sourceKeys.add(`project:${selectedProjectId}`)
-    const keys = new Set(['root:structure', ...sourceKeys])
+    const keys = new Set([...sourceKeys])
     for (const link of mapLayout.links) {
       if (sourceKeys.has(link.from) || sourceKeys.has(link.to)) {
         keys.add(link.from)
@@ -405,7 +483,7 @@ export default function StructureMap() {
       }
     }
     return keys
-  }, [mapLayout.links, mapLayout.nodes, selected, selectedNodeKey, selectedProjectId, viewMode])
+  }, [mapLayout.links, selected, selectedNodeKey, selectedProjectId, viewMode])
 
   const shouldMute = (node) => {
     if (!selected) return false
@@ -611,33 +689,40 @@ export default function StructureMap() {
                 {mapLayout.links.map((link, index) => {
                   const from = mapLayout.nodeById.get(link.from)
                   const to = mapLayout.nodeById.get(link.to)
-                  const x1 = from.x + from.w / 2
-                  const y1 = from.y + from.h / 2
-                  const x2 = to.x + to.w / 2
-                  const y2 = to.y + to.h / 2
-                  const bend = Math.max(70, Math.abs(x2 - x1) * 0.42)
-                  const direction = x2 >= x1 ? 1 : -1
-                  const dependencyDash = link.type === 'dependency'
-                    ? '1.75 1.75'
-                    : undefined
+                  const d = computePath(from, to, link.type)
+                  const dependencyDash = link.type === 'dependency' ? '1.75 1.75' : undefined
                   return (
-                <path
-                  key={`${link.from}-${link.to}-${index}`}
-                  className={[
-                    `is-${link.type}`,
-                    isLinkMuted(link) ? 'is-muted' : '',
-                  ].filter(Boolean).join(' ')}
-                  d={`M ${x1} ${y1} C ${x1 + direction * bend} ${y1}, ${x2 - direction * bend} ${y2}, ${x2} ${y2}`}
-                  stroke={link.color}
-                  strokeWidth={link.type === 'root' ? 2.4 : 1.35}
-                  strokeDasharray={dependencyDash}
-                  style={dependencyDash ? { '--kt-map-dash': dependencyDash, strokeDasharray: dependencyDash } : undefined}
-                  fill="none"
-                  strokeLinecap="round"
-                />
+                    <path
+                      key={`${link.from}-${link.to}-${index}`}
+                      className={[
+                        `is-${link.type}`,
+                        isLinkMuted(link) ? 'is-muted' : '',
+                      ].filter(Boolean).join(' ')}
+                      d={d}
+                      stroke={link.color}
+                      strokeWidth={1.35}
+                      strokeDasharray={dependencyDash}
+                      style={dependencyDash ? { '--kt-map-dash': dependencyDash, strokeDasharray: dependencyDash } : undefined}
+                      fill="none"
+                      strokeLinecap="round"
+                    />
                   )
                 })}
               </svg>
+
+              {mapLayout.columns && (
+                <>
+                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.identity.x, top: 6, width: mapLayout.columns.identity.w }}>
+                    {t('structure.identities')}
+                  </div>
+                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.project.x, top: 6, width: mapLayout.columns.project.w }}>
+                    {t('structure.projects')}
+                  </div>
+                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.task.x, top: 6, width: mapLayout.columns.task.w }}>
+                    {t('structure.signalTasks')}
+                  </div>
+                </>
+              )}
 
               {mapLayout.nodes.map(node => (
                 <GraphNode
@@ -660,7 +745,6 @@ export default function StructureMap() {
                   {node.type === 'project' && <Network size={13} />}
                   {node.type === 'task' && <AlertTriangle size={13} />}
                   <strong>{node.name}</strong>
-                  {node.type === 'root' && <em>{graph.stats.projects} {t('structure.projects')} · {graph.stats.identities} {t('structure.identities')}</em>}
                   {node.type === 'identity' && <em>{node.data.projectCount} {t('structure.projects')}</em>}
                   {node.type === 'project' && (
                     <>

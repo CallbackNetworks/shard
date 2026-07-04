@@ -1862,21 +1862,14 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   text-transform: uppercase;
   white-space: nowrap;
 }
-.kt-map-node.is-root {
-  grid-template-columns: 1fr;
-  place-items: center;
-  text-align: center;
-  border-color: rgba(250,204,21,0.6);
-  background:
-    linear-gradient(135deg, rgba(250,204,21,0.24), rgba(255,255,255,0.04)),
-    #171717;
-}
-.kt-map-node.is-root strong {
-  color: var(--kt-hit);
-  font-family: var(--kt-display);
-  font-size: 36px;
-  font-weight: 400;
-  line-height: 0.9;
+.kt-map-col-label {
+  position: absolute;
+  color: #525252;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  pointer-events: none;
 }
 .kt-map-node.is-goal,
 .kt-map-node.is-decision {
