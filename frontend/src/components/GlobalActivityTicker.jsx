@@ -43,19 +43,36 @@ function formatTimelineTime(value) {
 }
 
 const ACTIVITY_KINDS = ['task', 'project', 'decision', 'goal', 'webhook', 'alert']
-const ACTIVITY_COLOR = {
-  task: '#facc15',
-  project: '#e5e7eb',
-  decision: '#a78bfa',
-  goal: '#34d399',
-  webhook: '#60a5fa',
-  alert: '#fb7185',
-}
-const ACTIVITY_BUCKETS = 22
+const ACTIVITY_BUCKETS = 52
 
-// Bucket recent activity by time into stacked columns (volume = bar height,
-// kind = coloured segments) so the strip reads as a compact chart, not text.
-function buildActivityBars(activities) {
+// Cool -> hot ramp: faint void, indigo, wine, ember, amber, white-hot.
+const HEAT_STOPS = [
+  [0.0, [34, 20, 52]],
+  [0.22, [76, 29, 149]],
+  [0.44, [157, 23, 77]],
+  [0.64, [194, 65, 12]],
+  [0.82, [245, 158, 11]],
+  [1.0, [254, 243, 199]],
+]
+
+function heatColor(t) {
+  if (t <= 0) return 'rgba(255,255,255,0.045)'
+  const clamped = Math.min(1, t)
+  for (let i = 1; i < HEAT_STOPS.length; i++) {
+    const [p1, c1] = HEAT_STOPS[i]
+    if (clamped <= p1) {
+      const [p0, c0] = HEAT_STOPS[i - 1]
+      const f = (clamped - p0) / (p1 - p0 || 1)
+      const mix = c0.map((v, k) => Math.round(v + (c1[k] - v) * f))
+      return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`
+    }
+  }
+  return 'rgb(254, 243, 199)'
+}
+
+// Bucket recent activity by time, then lightly smooth it so the strip reads
+// as a continuous cool->hot heat line rather than isolated specks.
+function buildActivityHeat(activities) {
   const now = Date.now()
   const times = activities.map(eventTime)
   const fallbackStart = now - 6 * 60 * 60 * 1000
@@ -63,29 +80,34 @@ function buildActivityBars(activities) {
   const span = Math.max(now - minTime, 60 * 60 * 1000)
   const bucketMs = span / ACTIVITY_BUCKETS
 
-  const buckets = Array.from({ length: ACTIVITY_BUCKETS }, (_, i) => ({ time: minTime + i * bucketMs, total: 0, kinds: {} }))
-  const kindTotals = {}
+  const raw = new Array(ACTIVITY_BUCKETS).fill(0)
   let total = 0
   for (const entry of activities) {
     const kind = eventKind(entry)
-    if (!ACTIVITY_COLOR[kind]) continue
+    if (!ACTIVITY_KINDS.includes(kind)) continue
     const i = Math.max(0, Math.min(ACTIVITY_BUCKETS - 1, Math.floor((eventTime(entry) - minTime) / bucketMs)))
-    buckets[i].kinds[kind] = (buckets[i].kinds[kind] || 0) + 1
-    buckets[i].total += 1
-    kindTotals[kind] = (kindTotals[kind] || 0) + 1
+    raw[i] += 1
     total += 1
   }
 
-  const peak = Math.max(1, ...buckets.map(b => b.total))
-  const columns = buckets.map(b => ({
-    time: b.time,
-    total: b.total,
-    height: b.total === 0 ? 0 : Math.round((0.16 + 0.84 * (b.total / peak)) * 100),
-    segments: ACTIVITY_KINDS.filter(kind => b.kinds[kind]).map(kind => ({ kind, count: b.kinds[kind], color: ACTIVITY_COLOR[kind] })),
-  }))
-  const legend = ACTIVITY_KINDS.filter(kind => kindTotals[kind]).map(kind => ({ kind, color: ACTIVITY_COLOR[kind], total: kindTotals[kind] }))
+  const kernel = [0.25, 0.55, 1, 0.55, 0.25]
+  const smoothed = raw.map((_, i) => {
+    let sum = 0
+    for (let k = -2; k <= 2; k++) {
+      const j = i + k
+      if (j >= 0 && j < ACTIVITY_BUCKETS) sum += raw[j] * kernel[k + 2]
+    }
+    return sum
+  })
+  const peak = Math.max(1, ...smoothed)
 
-  return { columns, legend, total, minTime, maxTime: now }
+  const cells = raw.map((count, i) => ({
+    count,
+    time: minTime + i * bucketMs,
+    t: smoothed[i] === 0 ? 0 : Math.min(1, smoothed[i] / peak),
+  }))
+
+  return { cells, total, minTime, maxTime: now }
 }
 
 export default function GlobalActivityTicker() {
@@ -124,7 +146,7 @@ export default function GlobalActivityTicker() {
   const activityItems = activities.map(eventLabel).filter(Boolean)
   const tickerItems = activityItems.length > 0 ? activityItems : FALLBACK_ITEMS
   const loopItems = [...tickerItems, ...tickerItems]
-  const chart = useMemo(() => buildActivityBars(activities), [activities])
+  const chart = useMemo(() => buildActivityHeat(activities), [activities])
 
   return (
     <>
@@ -155,24 +177,21 @@ export default function GlobalActivityTicker() {
           <strong>{chart.total}</strong>
           <em>{`${formatTimelineTime(chart.minTime)} / ${formatTimelineTime(chart.maxTime)}`}</em>
         </div>
-        <div className="kt-actchart" role="img" aria-label={`${chart.total} recent events over time`}>
-          {chart.columns.map((col, i) => (
-            <div
+        <div className="kt-actheat" role="img" aria-label={`${chart.total} recent events over time`}>
+          {chart.cells.map((cell, i) => (
+            <span
               key={i}
-              className="kt-actbar"
-              style={{ height: `${col.height}%` }}
-              title={col.total ? `${col.total} events · ${formatTimelineTime(col.time)}` : undefined}
-            >
-              {col.segments.map(seg => (
-                <i key={seg.kind} style={{ background: seg.color, flexGrow: seg.count }} />
-              ))}
-            </div>
+              className="kt-actheat-cell"
+              style={{ background: heatColor(cell.t), boxShadow: cell.t > 0.66 ? `0 0 7px ${heatColor(cell.t)}` : undefined }}
+              title={cell.count ? `${cell.count} events · ${formatTimelineTime(cell.time)}` : undefined}
+            />
           ))}
+          <em className="kt-actheat-now" aria-hidden="true" />
         </div>
-        <div className="kt-signal-summary" aria-label="Activity type legend">
-          {chart.legend.map(item => (
-            <span key={item.kind}><i style={{ background: item.color, borderColor: item.color }} />{item.total} {item.kind}</span>
-          ))}
+        <div className="kt-heatscale" aria-label="Activity intensity scale">
+          <span>LOW</span>
+          <i />
+          <span>HIGH</span>
         </div>
       </div>
     </>
