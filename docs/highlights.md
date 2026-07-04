@@ -32,9 +32,74 @@ Setup:
 
 **Why this matters:** You get a unified view of all your work — GitHub issues, GitLab issues, and standalone tasks — in one board, with completions reflected back to the source.
 
+### GitHub PR Linking
+
+On the same webhook endpoint, Shard also handles `pull_request` events:
+
+- **PR opens:** Shard parses the PR body for `Fixes #N`, `Closes #N`, `Resolves #N` references and appends a PR link to the matching task's description
+- **PR merges:** All referenced tasks are automatically marked as `done`
+- **No duplicate links:** If a PR link is already in the description, it won't be added again
+
+Setup: add `Pull requests` to the same webhook you configured for Issues — Shard auto-detects the event type from headers.
+
 ---
 
-## 2. Multi-Identity Architecture
+## 2. Data Import from External Tools
+
+Migrate your existing tasks from other tools with one API call:
+
+| Source | Endpoint | What it imports |
+|--------|----------|-----------------|
+| **Trello** | `POST /projects/{id}/import/trello` | Cards with name, description, labels, due dates, closed state |
+| **Linear** | `POST /projects/{id}/import/linear` | Issues with title, description, state, priority (1-4), labels, assignees |
+| **GitHub Issues** | `POST /projects/{id}/import/github` | Issues with full external linking (provider, ID, URL for bidirectional sync) |
+
+All importers auto-create labels that don't exist yet and return a summary: `{"imported": N, "skipped": N, "errors": [...]}`.
+
+---
+
+## 3. Critical Path Analysis
+
+For projects with task dependencies, Shard computes the critical path — the longest chain of dependent tasks that determines the minimum project duration.
+
+```
+GET /analytics/critical-path/{project_id}
+```
+
+Returns:
+- Ordered list of task IDs on the critical path
+- Per-task timing: earliest start, latest start, slack (float time)
+- Total project duration in minutes
+- Cycle detection: gracefully reports if dependencies form a loop
+
+Useful for identifying which tasks, if delayed, will delay the entire project.
+
+---
+
+## 4. SLA / Aging Alerts
+
+The background scheduler monitors tasks for staleness:
+
+- **3+ days stuck in `in_progress`:** Priority auto-escalated to `high` (logged as `task.sla_escalated`)
+- **7+ days stuck:** `task.overdue` notification fired to all configured integrations
+- **De-duplication:** Tasks already escalated in the last 7 days are not re-escalated
+- Only `in_progress` tasks are affected — `todo` and `done` are ignored
+
+No configuration needed — runs automatically every hour as part of the scheduler loop.
+
+---
+
+## 5. Weekly Digest Email
+
+In addition to the daily summary, Shard sends a weekly digest on a configurable day:
+
+- **Content:** Tasks completed this week, tasks created, overdue count, per-project progress, top 5 most active projects
+- **Schedule:** Configurable via `DIGEST_DAY` env var (0=Monday through 6=Sunday, default: Monday)
+- **Recipients:** All active email-type integrations (same as daily summary)
+
+---
+
+## 6. Multi-Identity Architecture
 
 Unlike team-oriented tools, Shard is built for individuals who wear multiple hats. Each identity (work, side project, freelance, open source) gets its own namespace with:
 
@@ -47,7 +112,7 @@ This lets you manage your full-stack engineer job, your open-source library, and
 
 ---
 
-## 3. AI Agent Integration (MCP + External API)
+## 7. AI Agent Integration (MCP + External API)
 
 Shard is designed as an AI-native platform. Any LLM agent (Claude Code, OpenCode, custom agents) can manage tasks programmatically.
 
@@ -62,7 +127,7 @@ Shard is designed as an AI-native platform. Any LLM agent (Claude Code, OpenCode
 
 ---
 
-## 4. CI/CD Webhook Integration
+## 8. CI/CD Webhook Integration
 
 Every task gets a unique callback URL. Point your CI/CD pipeline at it and task status updates automatically when builds pass or fail.
 
@@ -75,7 +140,7 @@ Every task gets a unique callback URL. Point your CI/CD pipeline at it and task 
 
 ---
 
-## 5. Workflow Automation Engine
+## 9. Workflow Automation Engine
 
 Define rules that trigger on task events and execute actions automatically:
 
@@ -87,7 +152,7 @@ Define rules that trigger on task events and execute actions automatically:
 
 ---
 
-## 6. Customizable Dashboard
+## 10. Customizable Dashboard
 
 The dashboard is a command center, not just a list:
 
@@ -98,7 +163,7 @@ The dashboard is a command center, not just a list:
 
 ---
 
-## 7. Multiple Project Views
+## 11. Multiple Project Views
 
 Each project supports four synchronized views:
 
@@ -113,7 +178,7 @@ All views share the same filter, search, and bulk-action capabilities.
 
 ---
 
-## 8. Offline-First with Real-Time Sync
+## 12. Offline-First with Real-Time Sync
 
 - **WebSocket live updates:** Changes broadcast instantly across all open tabs
 - **Offline queue:** When disconnected, mutations are queued in IndexedDB and auto-synced on reconnect
@@ -121,7 +186,7 @@ All views share the same filter, search, and bulk-action capabilities.
 
 ---
 
-## 9. Full-Stack Docker Architecture
+## 13. Full-Stack Docker Architecture
 
 Everything runs in Docker with hot-reload — no host-level dependencies:
 
@@ -132,7 +197,7 @@ Everything runs in Docker with hot-reload — no host-level dependencies:
 
 ---
 
-## 10. Developer Experience
+## 14. Developer Experience
 
 - **Command palette** (`Ctrl+K` / `Cmd+K`): fuzzy search across tasks, projects, and navigation
 - **Keyboard shortcuts:** Single-key (`c`, `n`, `/`, `?`) and chord (`g→h`, `g→a`) navigation

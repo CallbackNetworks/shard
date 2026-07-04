@@ -5,10 +5,13 @@ A personal multi-identity task management platform with CI/CD integration, AI ag
 ## Key Highlights
 
 - **GitHub / GitLab Issue Sync** — Bidirectional: inbound webhooks create tasks from issues, completing a task closes the external issue via API
+- **GitHub PR Linking** — Parse `Fixes #N` refs in PR body, auto-close linked tasks on merge
 - **AI Agent Platform** — MCP server (20 tools), External API v1, event subscriptions, agent identity tracking, and tools-schema auto-discovery
 - **Multi-Identity** — Manage separate personas (work, open source, freelance) with independent projects, share pages, and analytics
 - **CI/CD Webhooks** — Auto-detect GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket from headers; build history with commit/branch/duration tracking
 - **Workflow Automation** — Rules engine with triggers, conditions, and actions; chain rules up to depth 2
+- **Critical Path Analysis** — DAG-based computation of the longest dependency chain with slack analysis
+- **SLA / Aging Alerts** — Auto-escalate tasks stuck in a status too long; fire notifications for stale work
 
 See [**docs/highlights.md**](docs/highlights.md) for detailed descriptions of all major features.
 
@@ -31,6 +34,9 @@ See [**docs/highlights.md**](docs/highlights.md) for detailed descriptions of al
 - **Keyboard shortcuts**: Single-key and chord navigation (`?` for help)
 - **Search**: Full-text search with pluggable backend
 - **Bulk operations**: Multi-select tasks for batch status/priority/pin changes
+- **Data import**: Trello JSON, Linear JSON, and GitHub Issues import with auto label creation
+- **Weekly digest**: Scheduled email summary with per-project progress and top active projects
+- **PWA support**: Installable progressive web app with offline caching and service worker
 - **Saved filters & JSON import/export**: Bookmark filters, move data in/out
 - **Multi-database**: SQLite (default), PostgreSQL, or MySQL
 - **Optional auth**: Password-protect the UI; leave unset for local use
