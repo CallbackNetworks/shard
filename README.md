@@ -1,28 +1,39 @@
 # Shard
 
-A personal multi-identity task manager with CI/CD webhook integration. Manage tasks across multiple identities (work, side projects, roles), automate status updates via CI/CD pipeline callbacks, and share public status pages per identity.
+A personal multi-identity task management platform with CI/CD integration, AI agent support, and bidirectional issue sync. Built for developers who manage work across multiple roles, repositories, and tools.
 
-## Features
+## Key Highlights
 
-- **Multi-identity**: Group projects under separate identities (personas/roles), each with a color and avatar
-- **CI/CD webhooks**: Inbound callbacks from Drone CI / Jenkins / GitHub Actions update task status automatically
-- **Outbound notifications**: Fire webhooks or emails when tasks complete or projects finish
-- **External API**: REST API v1 with API key auth for scripts and AI agents
-- **Markdown editor**: Ghost-style inline WYSIWYG editing with raw markdown toggle
-- **Multiple views**: Board (kanban), table, and Gantt chart per project
-- **Cycles/sprints**: Time-box work into named cycles
-- **Labels**: Color-coded tags per project
-- **Comments**: Threaded comments on tasks with markdown support
-- **Attachments**: File upload/download on tasks (max 20 MB)
-- **Recurring tasks**: Daily, weekly, monthly, or interval-based task recurrence
-- **Task templates**: Reusable templates with predefined subtasks and labels
-- **Workflow rules**: Automation rules triggered on task create/update (auto-assign, set status, etc.)
-- **Analytics**: Overview, activity heatmap, burn-down charts, velocity, and status trends
-- **LLM assistant**: Built-in AI chat with tool use (supports Claude, OpenAI, or stub mode)
-- **Real-time sync**: WebSocket-based live updates across tabs
+- **GitHub / GitLab Issue Sync** — Bidirectional: inbound webhooks create tasks from issues, completing a task closes the external issue via API
+- **AI Agent Platform** — MCP server (20 tools), External API v1, event subscriptions, agent identity tracking, and tools-schema auto-discovery
+- **Multi-Identity** — Manage separate personas (work, open source, freelance) with independent projects, share pages, and analytics
+- **CI/CD Webhooks** — Auto-detect GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket from headers; build history with commit/branch/duration tracking
+- **Workflow Automation** — Rules engine with triggers, conditions, and actions; chain rules up to depth 2
+
+See [**docs/highlights.md**](docs/highlights.md) for detailed descriptions of all major features.
+
+## All Features
+
+- **Multiple views**: Board (kanban with WIP limits), table, Gantt chart, and calendar per project
+- **Time tracking**: Inline start/stop timer on tasks with elapsed time display
+- **Customizable dashboard**: Toggle widget visibility with server-persisted preferences
+- **LLM assistant**: Built-in AI chat with tool use (Claude, OpenAI, or stub), including batch task creation
+- **Real-time sync**: WebSocket live updates + offline queue with IndexedDB
+- **Cycles/sprints**: Time-box work into named cycles with progress tracking
+- **Labels & decisions**: Color-coded tags and structured decision records per project
+- **Comments & attachments**: Threaded markdown comments, file upload/download (max 20 MB)
+- **Recurring tasks**: Daily, weekly, monthly, or custom-interval recurrence
+- **Task templates**: Reusable structures with subtasks and labels
+- **Analytics**: Activity heatmap, burn-down charts, velocity, status trends, and identity-level charts
+- **Outbound notifications**: Webhooks (HMAC-signed) and emails with retry backoff
 - **Public share pages**: Per-identity shareable pages with optional PIN protection and expiry
-- **Search**: Full-text search across tasks and projects (⌘K / Ctrl+K command palette)
-- **Optional auth**: Password-protect the management UI; leave unset for local/dev use
+- **Command palette**: Fuzzy search across tasks and projects (`Ctrl+K` / `Cmd+K`)
+- **Keyboard shortcuts**: Single-key and chord navigation (`?` for help)
+- **Search**: Full-text search with pluggable backend
+- **Bulk operations**: Multi-select tasks for batch status/priority/pin changes
+- **Saved filters & JSON import/export**: Bookmark filters, move data in/out
+- **Multi-database**: SQLite (default), PostgreSQL, or MySQL
+- **Optional auth**: Password-protect the UI; leave unset for local use
 
 ## Quick Start
 
@@ -44,13 +55,16 @@ docker compose up
 |------|-------------|------|
 | `/` | Public status page | Public |
 | `/s/:token` | Public identity share page | Public |
-| `/app` | Dashboard (My Issues) | Protected |
-| `/app/projects/:id` | Project detail | Protected |
+| `/app` | Dashboard (customizable widgets) | Protected |
+| `/app/projects/:id` | Project detail (board/table/gantt/calendar) | Protected |
 | `/app/identities` | Identity management | Protected |
-| `/app/integrations` | Webhook/email config | Protected |
+| `/app/integrations` | Webhook/email/issue-sync config | Protected |
 | `/app/api-keys` | API key management | Protected |
 | `/app/analytics` | Analytics dashboard | Protected |
 | `/app/workflow-rules` | Workflow automation rules | Protected |
+| `/app/goals` | Goals & OKR tracking | Protected |
+| `/app/activity` | Activity feed | Protected |
+| `/app/settings` | System settings | Protected |
 | `/login` | Password login | Public |
 
 ## Authentication
@@ -67,16 +81,17 @@ The management UI at `/app` requires login; the public status page at `/` is alw
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./shard.db` | Database connection (`sqlite`, `postgresql+psycopg`, `mysql+pymysql`) |
 | `AUTH_PASSWORD` | _(empty)_ | Password for management UI; empty = no auth |
 | `SMTP_HOST` | _(empty)_ | SMTP server hostname |
 | `SMTP_PORT` | `587` | SMTP port |
-| `SMTP_USER` | _(empty)_ | SMTP username |
-| `SMTP_PASS` | _(empty)_ | SMTP password |
+| `SMTP_USER` / `SMTP_PASS` | _(empty)_ | SMTP credentials |
 | `SMTP_FROM` | _(empty)_ | Sender address |
-| `SMTP_USE_TLS` | `true` | Enable STARTTLS |
 | `LLM_PROVIDER` | `stub` | LLM provider: `claude`, `openai`, or `stub` |
 | `LLM_API_KEY` | _(empty)_ | API key for the chosen LLM provider |
 | `LLM_MODEL` | _(varies)_ | Model name (e.g. `claude-sonnet-4-6`, `gpt-4o`) |
+| `MCP_TRANSPORT` | `stdio` | MCP server transport: `stdio` or `http` |
+| `MCP_API_KEY` | _(empty)_ | API key for MCP server to call backend |
 | `SUMMARY_HOUR` | `8` | Hour (UTC) to send daily summary email |
 
 Create a `.env` file in the project root:
@@ -113,7 +128,10 @@ docker compose up --build
 
 ## Documentation
 
+- [**Highlights**](docs/highlights.md) — detailed feature descriptions and usage
 - [Architecture](docs/architecture.md) — system design, data models, data flow
 - [API Reference](docs/api.md) — all endpoints, request/response schemas
+- [Agent Guide](docs/agent-guide.md) — AI agent integration (API, MCP, subscriptions)
 - [Deployment](docs/deployment.md) — VPS/production setup guide
-- [Integrations](docs/integrations.md) — CI/CD webhook setup for Drone and Jenkins
+- [Integrations](docs/integrations.md) — CI/CD webhook setup
+- [ADRs](docs/adr/) — architecture decision records
