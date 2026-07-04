@@ -248,7 +248,7 @@ async def retry_delivery(db: Session, delivery: WebhookDelivery) -> bool:
     return await _dispatch_webhook(db, integration, delivery.event, delivery.payload, delivery)
 
 
-async def fire_test_notification(integration: Integration) -> dict:
+async def fire_test_notification(integration: Integration, db: Session | None = None) -> dict:
     payload = {
         "event": "test",
         "message": "This is a test notification from Shard.",
@@ -268,6 +268,10 @@ async def fire_test_notification(integration: Integration) -> dict:
         subject, html = build_notification_email("test", payload, prefix)
         ok = send_email(recipients, subject, html)
         return {"success": ok, "recipients": recipients} if ok else {"success": False, "error": "SMTP send failed"}
+
+    if db:
+        success = await _dispatch_webhook(db, integration, "test", payload)
+        return {"success": success}
 
     try:
         body_bytes = json.dumps(payload, separators=(",", ":")).encode()

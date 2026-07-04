@@ -76,5 +76,5 @@ async def test_integration(integration_id: str, db: Session = Depends(get_db)):
     integration = db.query(Integration).filter(Integration.id == integration_id).first()
     if not integration:
         raise HTTPException(status_code=404, detail="Integration not found")
-    result = await fire_test_notification(integration)
+    result = await fire_test_notification(integration, db=db)
     return result
