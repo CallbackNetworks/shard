@@ -42,8 +42,8 @@ function formatTimelineTime(value) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-const HEATMAP_KINDS = ['task', 'project', 'decision', 'goal', 'webhook', 'alert']
-const HEATMAP_COLOR = {
+const ACTIVITY_KINDS = ['task', 'project', 'decision', 'goal', 'webhook', 'alert']
+const ACTIVITY_COLOR = {
   task: '#facc15',
   project: '#e5e7eb',
   decision: '#a78bfa',
@@ -51,55 +51,41 @@ const HEATMAP_COLOR = {
   webhook: '#60a5fa',
   alert: '#fb7185',
 }
-const HEATMAP_BUCKETS = 24
+const ACTIVITY_BUCKETS = 22
 
-// Bucket recent activity into a kind x time grid so the strip reads as a
-// heatmap (colour intensity = volume) instead of a wall of event text.
-function buildHeatmap(activities) {
+// Bucket recent activity by time into stacked columns (volume = bar height,
+// kind = coloured segments) so the strip reads as a compact chart, not text.
+function buildActivityBars(activities) {
   const now = Date.now()
   const times = activities.map(eventTime)
   const fallbackStart = now - 6 * 60 * 60 * 1000
   const minTime = times.length ? Math.min(...times, fallbackStart) : fallbackStart
   const span = Math.max(now - minTime, 60 * 60 * 1000)
-  const bucketMs = span / HEATMAP_BUCKETS
+  const bucketMs = span / ACTIVITY_BUCKETS
 
-  const grid = {}
-  for (const kind of HEATMAP_KINDS) grid[kind] = new Array(HEATMAP_BUCKETS).fill(0)
-
+  const buckets = Array.from({ length: ACTIVITY_BUCKETS }, (_, i) => ({ time: minTime + i * bucketMs, total: 0, kinds: {} }))
+  const kindTotals = {}
   let total = 0
   for (const entry of activities) {
     const kind = eventKind(entry)
-    if (!grid[kind]) continue
-    const bucket = Math.max(0, Math.min(HEATMAP_BUCKETS - 1, Math.floor((eventTime(entry) - minTime) / bucketMs)))
-    grid[kind][bucket] += 1
+    if (!ACTIVITY_COLOR[kind]) continue
+    const i = Math.max(0, Math.min(ACTIVITY_BUCKETS - 1, Math.floor((eventTime(entry) - minTime) / bucketMs)))
+    buckets[i].kinds[kind] = (buckets[i].kinds[kind] || 0) + 1
+    buckets[i].total += 1
+    kindTotals[kind] = (kindTotals[kind] || 0) + 1
     total += 1
   }
 
-  let peak = 0
-  for (const kind of HEATMAP_KINDS) {
-    for (const count of grid[kind]) if (count > peak) peak = count
-  }
-  peak = Math.max(peak, 1)
+  const peak = Math.max(1, ...buckets.map(b => b.total))
+  const columns = buckets.map(b => ({
+    time: b.time,
+    total: b.total,
+    height: b.total === 0 ? 0 : Math.round((0.16 + 0.84 * (b.total / peak)) * 100),
+    segments: ACTIVITY_KINDS.filter(kind => b.kinds[kind]).map(kind => ({ kind, count: b.kinds[kind], color: ACTIVITY_COLOR[kind] })),
+  }))
+  const legend = ACTIVITY_KINDS.filter(kind => kindTotals[kind]).map(kind => ({ kind, color: ACTIVITY_COLOR[kind], total: kindTotals[kind] }))
 
-  const rows = HEATMAP_KINDS
-    .map(kind => ({
-      kind,
-      color: HEATMAP_COLOR[kind],
-      total: grid[kind].reduce((sum, count) => sum + count, 0),
-      cells: grid[kind].map((count, i) => ({
-        count,
-        intensity: count === 0 ? 0 : 0.28 + 0.72 * (count / peak),
-        time: minTime + i * bucketMs,
-      })),
-    }))
-    .filter(row => row.total > 0)
-
-  return { rows: rows.length ? rows : HEATMAP_KINDS.slice(0, 4).map(kind => ({
-    kind,
-    color: HEATMAP_COLOR[kind],
-    total: 0,
-    cells: new Array(HEATMAP_BUCKETS).fill(0).map((_, i) => ({ count: 0, intensity: 0, time: minTime + i * bucketMs })),
-  })), total, minTime, maxTime: now }
+  return { columns, legend, total, minTime, maxTime: now }
 }
 
 export default function GlobalActivityTicker() {
@@ -138,7 +124,7 @@ export default function GlobalActivityTicker() {
   const activityItems = activities.map(eventLabel).filter(Boolean)
   const tickerItems = activityItems.length > 0 ? activityItems : FALLBACK_ITEMS
   const loopItems = [...tickerItems, ...tickerItems]
-  const heatmap = useMemo(() => buildHeatmap(activities), [activities])
+  const chart = useMemo(() => buildActivityBars(activities), [activities])
 
   return (
     <>
@@ -163,32 +149,29 @@ export default function GlobalActivityTicker() {
           </div>
         </div>
       </div>
-      <div className="kt-signal-timeline" aria-label="Activity heatmap">
+      <div className="kt-signal-timeline" aria-label="Activity chart">
         <div className="kt-signal-timeline-head">
           <span>LIVE</span>
-          <strong>{heatmap.total}</strong>
-          <em>{`${formatTimelineTime(heatmap.minTime)} / ${formatTimelineTime(heatmap.maxTime)}`}</em>
+          <strong>{chart.total}</strong>
+          <em>{`${formatTimelineTime(chart.minTime)} / ${formatTimelineTime(chart.maxTime)}`}</em>
         </div>
-        <div className="kt-heatmap" role="img" aria-label={`${heatmap.total} recent events by type and time`}>
-          {heatmap.rows.map(row => (
-            <div key={row.kind} className="kt-heatmap-row">
-              <i className="kt-heatmap-key" style={{ background: row.color }} title={row.kind} />
-              <div className="kt-heatmap-cells">
-                {row.cells.map((cell, i) => (
-                  <span
-                    key={i}
-                    className="kt-heatmap-cell"
-                    style={cell.count ? { background: row.color, opacity: cell.intensity } : undefined}
-                    title={cell.count ? `${cell.count} ${row.kind} · ${formatTimelineTime(cell.time)}` : undefined}
-                  />
-                ))}
-              </div>
+        <div className="kt-actchart" role="img" aria-label={`${chart.total} recent events over time`}>
+          {chart.columns.map((col, i) => (
+            <div
+              key={i}
+              className="kt-actbar"
+              style={{ height: `${col.height}%` }}
+              title={col.total ? `${col.total} events · ${formatTimelineTime(col.time)}` : undefined}
+            >
+              {col.segments.map(seg => (
+                <i key={seg.kind} style={{ background: seg.color, flexGrow: seg.count }} />
+              ))}
             </div>
           ))}
         </div>
         <div className="kt-signal-summary" aria-label="Activity type legend">
-          {heatmap.rows.map(row => (
-            <span key={row.kind}><i style={{ background: row.color, borderColor: row.color }} />{row.total} {row.kind}</span>
+          {chart.legend.map(item => (
+            <span key={item.kind}><i style={{ background: item.color, borderColor: item.color }} />{item.total} {item.kind}</span>
           ))}
         </div>
       </div>
