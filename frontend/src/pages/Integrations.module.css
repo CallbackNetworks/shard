@@ -21,8 +21,8 @@
 }
 
 .modalPanel {
-  background: #111111;
-  border: 1px solid #1f2937;
+  background: var(--kt-surface);
+  border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 24px;
   width: 90vw;
@@ -48,8 +48,8 @@
 }
 
 .modalPanelTemplate {
-  background: #111111;
-  border: 1px solid #1f2937;
+  background: var(--kt-surface);
+  border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 28px;
   width: 90vw;
@@ -99,8 +99,8 @@
 }
 
 .errorPre {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.2);
   border-radius: 6px;
   padding: 8px 10px;
   color: #fca5a5;
@@ -111,7 +111,7 @@
 
 .responsePre {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
   border-radius: 6px;
   padding: 8px 10px;
   color: #9ca3af;
@@ -124,7 +124,7 @@
 
 .payloadPre {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
   border-radius: 6px;
   padding: 8px 10px;
   color: #9ca3af;
@@ -185,7 +185,7 @@
 }
 
 .healthDead {
-  color: #ef4444;
+  color: var(--kt-hit);
 }
 
 /* ── DeliveryLog ── */
@@ -232,17 +232,17 @@
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 6px;
-  border: 1px solid #1f2937;
-  background: #111111;
+  border: 1px solid var(--kt-line);
+  background: var(--kt-surface);
   color: #9ca3af;
 }
 
 .bulkRetryBtn {
   font-size: 10px;
   padding: 3px 8px;
-  border: 1px solid rgba(239,68,68,0.4);
+  border: 1px solid rgba(250,204,21,0.4);
   border-radius: 6px;
-  background: rgba(239,68,68,0.1);
+  background: rgba(250,204,21,0.1);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -298,10 +298,10 @@
 .retryBtn {
   font-size: 10px;
   padding: 1px 6px;
-  border: 1px solid rgba(239,68,68,0.4);
+  border: 1px solid rgba(250,204,21,0.4);
   border-radius: 4px;
-  background: rgba(239,68,68,0.1);
-  color: #ef4444;
+  background: rgba(250,204,21,0.1);
+  color: var(--kt-hit);
   cursor: pointer;
 }
 
@@ -315,7 +315,7 @@
 
 .templateCard {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 14px 12px;
   cursor: pointer;
@@ -355,7 +355,7 @@
 
 .setupCodeBlock {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
   border-radius: 6px;
   padding: 10px 14px;
   font-size: 12px;
@@ -419,7 +419,7 @@
   display: block;
   width: 100%;
   margin-top: 4px;
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 8px 12px;
   font-size: 14px;
@@ -431,11 +431,11 @@
   display: block;
   width: 100%;
   margin-top: 4px;
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 8px 12px;
   font-size: 14px;
-  background: #111111;
+  background: var(--kt-surface);
   color: #ffffff;
 }
 
@@ -466,8 +466,8 @@
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  background: #1f2937;
-  color: #ef4444;
+  background: var(--kt-line);
+  color: var(--kt-hit);
   border-radius: 0;
   padding: 4px 12px;
   font-size: 13px;
@@ -484,7 +484,7 @@
   border-radius: 0;
   padding: 4px 12px;
   font-size: 13px;
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
 }
 
 .activeLabel {
@@ -589,8 +589,8 @@
 }
 
 .card {
-  background: #111111;
-  border: 1px solid #1f2937;
+  background: var(--kt-surface);
+  border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 16px 20px;
   opacity: 0;
@@ -626,9 +626,9 @@
 }
 
 .badgeActive {
-  background: rgba(16,185,129,0.15);
-  color: #10b981;
-  border-radius: 999px;
+  background: rgba(250,204,21,0.12);
+  color: var(--kt-hit);
+  border-radius: 0;
   padding: 2px 8px;
   font-size: 12px;
   font-weight: 600;
@@ -637,16 +637,16 @@
 .badgeInactive {
   background: rgba(255, 255, 255, 0.07);
   color: #6b7280;
-  border-radius: 999px;
+  border-radius: 0;
   padding: 2px 8px;
   font-size: 12px;
   font-weight: 600;
 }
 
 .badgeType {
-  background: #1f2937;
-  color: #ef4444;
-  border-radius: 999px;
+  background: var(--kt-line);
+  color: var(--kt-hit);
+  border-radius: 0;
   padding: 2px 8px;
   font-size: 12px;
   font-weight: 600;
@@ -655,7 +655,7 @@
 .badgeAuth {
   background: rgba(96, 165, 250, 0.12);
   color: #60a5fa;
-  border-radius: 999px;
+  border-radius: 0;
   padding: 2px 8px;
   font-size: 11px;
 }
@@ -685,9 +685,9 @@
 }
 
 .eventTag {
-  background: rgba(239,68,68,0.1);
-  color: #ef4444;
-  border-radius: 999px;
+  background: rgba(250,204,21,0.1);
+  color: var(--kt-hit);
+  border-radius: 0;
   padding: 2px 8px;
   font-size: 12px;
 }
@@ -712,9 +712,9 @@
 }
 
 .testBtn {
-  background: rgba(239,68,68,0.1);
-  border: 1px solid rgba(239,68,68,0.2);
-  color: #ef4444;
+  background: rgba(250,204,21,0.1);
+  border: 1px solid rgba(250,204,21,0.2);
+  color: var(--kt-hit);
   border-radius: 0;
   padding: 6px 12px;
   cursor: pointer;
@@ -723,7 +723,7 @@
 
 .editBtn {
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid #1f2937;
+  border: 1px solid var(--kt-line);
   color: #9ca3af;
   border-radius: 0;
   padding: 6px 12px;
@@ -733,8 +733,8 @@
 
 .deleteBtn {
   background: none;
-  border: 1px solid rgba(239,68,68,0.3);
-  color: #ef4444;
+  border: 1px solid rgba(250,204,21,0.3);
+  color: var(--kt-hit);
   border-radius: 0;
   padding: 6px 12px;
   cursor: pointer;
@@ -743,20 +743,20 @@
 
 .testResultSuccess {
   margin-top: 10px;
-  background: rgba(16,185,129,0.1);
+  background: rgba(250,204,21,0.12);
   border-radius: 0;
   padding: 8px 12px;
   font-size: 13px;
-  color: #10b981;
+  color: var(--kt-hit);
 }
 
 .testResultFailed {
   margin-top: 10px;
-  background: rgba(239,68,68,0.1);
+  background: rgba(250,204,21,0.1);
   border-radius: 0;
   padding: 8px 12px;
   font-size: 13px;
-  color: #ef4444;
+  color: var(--kt-hit);
 }
 
 /* ── Buttons with inline-flex ── */
@@ -771,4 +771,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes fadeUpIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
