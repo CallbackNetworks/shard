@@ -254,6 +254,10 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
     stroke-dashoffset: 0;
   }
 }
+@keyframes kineticRibbonIn {
+  0% { opacity: 0; }
+  100% { opacity: 0.34; }
+}
 @keyframes kineticMapPulse {
   0%, 100% {
     box-shadow: 0 12px 34px rgba(0,0,0,0.28);
@@ -1802,6 +1806,18 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-map-links path.is-dependency.is-muted {
   opacity: 0.08;
+}
+.kt-map-links path.kt-ribbon {
+  opacity: 0.34;
+  filter: none;
+  animation: kineticRibbonIn 0.5s ease both;
+  transition: opacity 0.16s ease;
+}
+.kt-map-links path.kt-ribbon:hover {
+  opacity: 0.55;
+}
+.kt-map-links path.kt-ribbon.is-muted {
+  opacity: 0.06;
 }
 .kt-map-node {
   position: absolute;
