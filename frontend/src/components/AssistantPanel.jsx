@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { MessageCircle, X, Plus, Send, ChevronDown, Wrench, Loader } from 'lucide-react'
 import axios from 'axios'
-import { INSET_SHADOW, SHADOW_LG, DARK } from '../constants/theme'
+import { BRAND, DARK } from '../constants/theme'
 
 const _api = axios.create({ baseURL: '' })
 _api.interceptors.request.use(cfg => {
@@ -28,21 +28,20 @@ const PROMPT_TEMPLATES = [
 
 const PANEL_BG   = DARK.surface
 const BORDER     = DARK.border
-const ACCENT     = DARK.success
+const ACCENT     = BRAND
 const inp = {
-  background: DARK.elevated, border: 'none',
-  boxShadow: INSET_SHADOW,
-  borderRadius: 8, padding: '8px 12px', fontSize: 13, color: DARK.text,
+  background: DARK.elevated, border: `1px solid ${BORDER}`,
+  borderRadius: 0, padding: '8px 12px', fontSize: 13, color: DARK.text,
   outline: 'none', width: '100%', resize: 'none',
 }
 
 function ToolBlock({ name, result }) {
   const [open, setOpen] = useState(false)
   return (
-    <div style={{ background: 'rgba(30,215,96,0.06)', border: `1px solid rgba(30,215,96,0.15)`, borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+    <div style={{ background: 'rgba(250,204,21,0.08)', border: `1px solid rgba(250,204,21,0.22)`, borderRadius: 0, marginBottom: 6, overflow: 'hidden' }}>
       <button
         onClick={() => setOpen(v => !v)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', color: DARK.success, fontSize: 11 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', color: ACCENT, fontSize: 11 }}
       >
         <Wrench size={10} />
         <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>{name}</span>
@@ -70,9 +69,9 @@ function MessageBubble({ msg }) {
       )}
       {msg.content && (
         <div style={{
-          maxWidth: '85%', padding: '8px 12px', borderRadius: 10, fontSize: 13, lineHeight: 1.6,
-          background: isUser ? `rgba(30,215,96,0.15)` : DARK.elevated,
-          border: `1px solid ${isUser ? 'rgba(30,215,96,0.3)' : BORDER}`,
+          maxWidth: '85%', padding: '8px 12px', borderRadius: 0, fontSize: 13, lineHeight: 1.6,
+          background: isUser ? `rgba(250,204,21,0.14)` : DARK.elevated,
+          border: `1px solid ${isUser ? 'rgba(250,204,21,0.34)' : BORDER}`,
           color: DARK.text,
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
@@ -96,7 +95,7 @@ function StreamingMessage({ events }) {
       })}
       {text && (
         <div style={{
-          maxWidth: '85%', padding: '8px 12px', borderRadius: 10, fontSize: 13, lineHeight: 1.6,
+          maxWidth: '85%', padding: '8px 12px', borderRadius: 0, fontSize: 13, lineHeight: 1.6,
           background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}`, color: DARK.text,
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
@@ -224,19 +223,20 @@ export default function AssistantPanel() {
   if (!open) {
     return (
       <button
+        className="kt-assistant-fab"
         onClick={() => setOpen(true)}
         title="AI Assistant"
         style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
-          width: 48, height: 48, borderRadius: '50%',
-          background: DARK.success,
+          position: 'fixed', bottom: 20, right: 20, zIndex: 290,
+          width: 48, height: 48, borderRadius: 0,
+          background: ACCENT,
           border: 'none', cursor: 'pointer', color: '#000',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: SHADOW_LG,
+          boxShadow: '6px 6px 0 rgba(0,0,0,0.45)',
           transition: 'transform 0.2s, box-shadow 0.2s',
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.7) 0px 12px 32px' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = SHADOW_LG }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translate(-2px, -2px)'; e.currentTarget.style.boxShadow = '10px 10px 0 rgba(0,0,0,0.5)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '6px 6px 0 rgba(0,0,0,0.45)' }}
       >
         <MessageCircle size={20} />
       </button>
@@ -244,17 +244,18 @@ export default function AssistantPanel() {
   }
 
   return (
-    <div style={{
-      position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
-      width: 380, height: 560, display: 'flex', flexDirection: 'column',
+    <div className="kt-assistant-panel" style={{
+      position: 'fixed', bottom: 20, right: 20, zIndex: 290,
+      width: 380, maxWidth: 'calc(100vw - 32px)', height: 560, maxHeight: 'calc(100vh - 40px)',
+      display: 'flex', flexDirection: 'column',
       background: PANEL_BG, border: `1px solid ${BORDER}`,
-      borderRadius: 12, boxShadow: SHADOW_LG,
+      borderRadius: 0, boxShadow: '10px 10px 0 rgba(0,0,0,0.42)',
       animation: 'fadeUpIn 0.2s ease',
-      fontFamily: "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif",
+      fontFamily: "'Inter', 'Arial Narrow', sans-serif",
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: `1px solid ${BORDER}` }}>
-        <div style={{ width: 28, height: 28, borderRadius: '50%', background: DARK.success, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 0, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <MessageCircle size={14} color="#000" />
         </div>
         <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -273,7 +274,7 @@ export default function AssistantPanel() {
 
       {/* Conversation list dropdown */}
       {showConvList && (
-        <div style={{ position: 'absolute', top: 52, right: 0, width: '100%', background: DARK.elevated, border: `1px solid ${BORDER}`, borderRadius: '0 0 8px 8px', zIndex: 10, maxHeight: 240, overflowY: 'auto', boxShadow: SHADOW_LG }}>
+        <div style={{ position: 'absolute', top: 52, right: 0, width: '100%', background: DARK.elevated, border: `1px solid ${BORDER}`, borderRadius: 0, zIndex: 10, maxHeight: 240, overflowY: 'auto', boxShadow: '8px 8px 0 rgba(0,0,0,0.35)' }}>
           <div style={{ padding: '8px 10px', borderBottom: `1px solid ${BORDER}`, position: 'sticky', top: 0, background: DARK.elevated }}>
             <input
               value={convSearch}
@@ -288,12 +289,12 @@ export default function AssistantPanel() {
             <div
               key={c.id}
               onClick={() => { setConvId(c.id); setShowConvList(false) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer', background: c.id === convId ? 'rgba(30,215,96,0.1)' : 'transparent' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer', background: c.id === convId ? 'rgba(250,204,21,0.12)' : 'transparent' }}
             >
               <span style={{ flex: 1, fontSize: 12, color: DARK.textMid, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
               <button
                 onClick={(e) => { e.stopPropagation(); deleteMut.mutate(c.id) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(248,113,113,0.5)', padding: 0, display: 'flex', flexShrink: 0 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: ACCENT, padding: 0, display: 'flex', flexShrink: 0 }}
               >
                 <X size={10} />
               </button>
@@ -308,7 +309,7 @@ export default function AssistantPanel() {
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.2)' }}>
             <MessageCircle size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
             <p style={{ fontSize: 13 }}>{t('assistant.noConversations')}</p>
-            <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: DARK.success, border: 'none', borderRadius: 9999, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
+            <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: ACCENT, border: 'none', borderRadius: 0, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
               {t('assistant.newChat')}
             </button>
           </div>
@@ -334,7 +335,7 @@ export default function AssistantPanel() {
               key={tmpl.labelKey}
               onClick={() => { setInput(tmpl.prompt) }}
               style={{
-                padding: '4px 10px', borderRadius: 9999,
+                padding: '4px 10px', borderRadius: 0,
                 border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
                 fontSize: 10, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontWeight: 500,
                 whiteSpace: 'nowrap',
@@ -363,8 +364,8 @@ export default function AssistantPanel() {
             onClick={sendMessage}
             disabled={!input.trim() || streaming || !convId}
             style={{
-              padding: '8px 12px', border: 'none', borderRadius: '50%',
-              background: DARK.success,
+              padding: '8px 12px', border: 'none', borderRadius: 0,
+              background: ACCENT,
               color: '#000', cursor: 'pointer', display: 'flex', alignItems: 'center',
               opacity: (!input.trim() || streaming || !convId) ? 0.4 : 1,
               flexShrink: 0,

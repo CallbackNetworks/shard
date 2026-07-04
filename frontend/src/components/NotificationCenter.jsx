@@ -7,14 +7,14 @@ import {
   getNotifications, getUnreadCount,
   markNotificationRead, markAllNotificationsRead, dismissNotification,
 } from '../api/client'
-import { DARK } from '../constants/theme'
+import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
 
 const TYPE_ICON = {
-  'task.done': <CheckCircle2 size={13} style={{ color: '#4ade80' }} />,
-  'task.failed': <XCircle size={13} style={{ color: '#ef4444' }} />,
+  'task.done': <CheckCircle2 size={13} style={{ color: STATUS_COLOR.done }} />,
+  'task.failed': <XCircle size={13} style={{ color: STATUS_COLOR.failed }} />,
   'task.due_soon': <Clock size={13} style={{ color: '#f59e0b' }} />,
-  'task.overdue': <AlertCircle size={13} style={{ color: '#ff6b35' }} />,
-  'project.complete': <CheckCheck size={13} style={{ color: '#3b82f6' }} />,
+  'task.overdue': <AlertCircle size={13} style={{ color: STATUS_COLOR.failed }} />,
+  'project.complete': <CheckCheck size={13} style={{ color: STATUS_COLOR.done }} />,
 }
 
 function timeAgo(dateStr, t) {
@@ -92,7 +92,9 @@ export default function NotificationCenter() {
   }
 
   return (
-    <div ref={panelRef} style={{ position: 'fixed', top: 14, right: 14, zIndex: 250 }}>
+    <div ref={panelRef} className="kt-notification-center" style={{
+      position: 'fixed', top: 12, right: 12, zIndex: 300,
+    }}>
       {/* Bell button */}
       <button
         onClick={() => setOpen(v => !v)}
@@ -100,7 +102,7 @@ export default function NotificationCenter() {
           position: 'relative',
           background: open ? 'rgba(255,255,255,0.1)' : DARK.hover,
           border: `1px solid ${DARK.border}`,
-          borderRadius: '50%',
+          borderRadius: 0,
           width: 34, height: 34,
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -113,8 +115,8 @@ export default function NotificationCenter() {
         {unread > 0 && (
           <span style={{
             position: 'absolute', top: -4, right: -4,
-            background: '#f87171', color: '#000',
-            borderRadius: '50%', fontSize: 9, fontWeight: 700,
+            background: BRAND, color: '#000',
+            borderRadius: 0, fontSize: 9, fontWeight: 700,
             width: 16, height: 16,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: `1px solid ${DARK.bg}`,
@@ -126,11 +128,11 @@ export default function NotificationCenter() {
 
       {/* Panel */}
       {open && (
-        <div style={{
-          position: 'absolute', top: 40, right: 0,
-          width: 340, maxHeight: 480,
-          background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-          boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+        <div className="kt-notification-panel" style={{
+          position: 'absolute', top: 42, right: 0,
+          width: 340, maxWidth: 'calc(100vw - 24px)', maxHeight: 480,
+          background: '#1f1f1f', border: '1px solid rgba(250,204,21,0.18)', borderRadius: 0,
+          boxShadow: '10px 10px 0 rgba(0,0,0,0.42)',
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
         }}>
@@ -141,7 +143,7 @@ export default function NotificationCenter() {
               {unread > 0 && (
                 <button
                   onClick={() => markAll.mutate()}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.info, fontSize: 11, padding: '2px 6px', borderRadius: 4 }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: BRAND, fontSize: 11, padding: '2px 6px', borderRadius: 0 }}
                   title={t('notifications.markAllRead')}
                 >
                   <Check size={11} style={{ verticalAlign: 'middle' }} /> {t('notifications.markAllRead')}
@@ -166,11 +168,11 @@ export default function NotificationCenter() {
                     display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
                     borderBottom: '1px solid rgba(255,255,255,0.04)',
                     cursor: n.link ? 'pointer' : 'default',
-                    background: n.read ? 'transparent' : 'rgba(129,140,248,0.05)',
+                    background: n.read ? 'transparent' : 'rgba(250,204,21,0.05)',
                     transition: 'background 0.1s',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(129,140,248,0.05)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(250,204,21,0.05)' }}
                 >
                   <div style={{ marginTop: 2, flexShrink: 0 }}>
                     {TYPE_ICON[n.type] || <Bell size={13} style={{ color: '#6b7280' }} />}
@@ -182,7 +184,7 @@ export default function NotificationCenter() {
                     <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>{timeAgo(n.created_at, t)}</div>
                   </div>
                   {!n.read && (
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: DARK.info, flexShrink: 0, marginTop: 4 }} />
+                    <div style={{ width: 6, height: 6, borderRadius: 0, background: BRAND, flexShrink: 0, marginTop: 4 }} />
                   )}
                   <button
                     onClick={e => { e.stopPropagation(); dismiss.mutate(n.id) }}

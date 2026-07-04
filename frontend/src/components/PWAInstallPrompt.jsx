@@ -40,12 +40,8 @@ export default function PWAInstallPrompt() {
   if (!visible) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: 16,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 1000,
+    <div className="kt-pwa-install" style={{
+      position: 'fixed', bottom: 76, right: 20, zIndex: 280,
       display: 'flex',
       alignItems: 'center',
       gap: 12,
