@@ -1808,10 +1808,10 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   z-index: 1;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 5px 8px;
+  gap: 3px 6px;
   align-content: center;
-  min-height: 74px;
-  padding: 10px;
+  min-height: 46px;
+  padding: 7px 8px;
   border: 1px solid color-mix(in srgb, var(--node-color) 34%, var(--kt-line));
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--node-color) 12%, transparent), transparent 58%),
@@ -1873,7 +1873,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-map-node.is-goal,
 .kt-map-node.is-decision {
-  min-height: 54px;
+  min-height: 38px;
 }
 .kt-map-node.is-goal strong,
 .kt-map-node.is-decision strong,

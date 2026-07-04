@@ -84,7 +84,7 @@ function computePath(from, to, linkType) {
   if (linkType === 'dependency') {
     const x1 = from.x + from.w
     const x2 = to.x + to.w
-    const arc = 36 + Math.abs(toCy - fromCy) * 0.12
+    const arc = 28 + Math.abs(toCy - fromCy) * 0.1
     return `M ${x1} ${fromCy} C ${x1 + arc} ${fromCy}, ${x2 + arc} ${toCy}, ${x2} ${toCy}`
   }
 
@@ -92,7 +92,7 @@ function computePath(from, to, linkType) {
     const goRight = dx > 0
     const x1 = goRight ? from.x + from.w : from.x
     const x2 = goRight ? to.x : to.x + to.w
-    const bend = Math.max(30, Math.abs(x2 - x1) * 0.38)
+    const bend = Math.max(20, Math.abs(x2 - x1) * 0.35)
     const dir = goRight ? 1 : -1
     return `M ${x1} ${fromCy} C ${x1 + dir * bend} ${fromCy}, ${x2 - dir * bend} ${toCy}, ${x2} ${toCy}`
   }
@@ -109,19 +109,19 @@ function computePath(from, to, linkType) {
 
 function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
   const colDef = {
-    identity: { x: 40, w: 152 },
-    project: { x: 330, w: 220 },
-    task: { x: 680, w: 196 },
+    identity: { x: 24, w: 138 },
+    project: { x: 228, w: 196 },
+    task: { x: 490, w: 176 },
   }
-  const canvasW = 940
-  const labelH = 28
-  const projectH = 72
-  const taskH = 54
-  const identityH = 54
-  const goalH = 42
-  const decisionH = 42
-  const taskGapV = 6
-  const rowPad = 16
+  const canvasW = 710
+  const labelH = 24
+  const projectH = 62
+  const taskH = 46
+  const identityH = 46
+  const goalH = 38
+  const decisionH = 38
+  const taskGapV = 4
+  const rowPad = 10
 
   const tasksByProject = new Map()
   visibleTaskNodes.forEach(task => {
@@ -133,9 +133,9 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
   const decisionLane = laneNodes.filter(n => n.lane === 'decision')
   const goalCols = Math.min(goalLane.length, 3) || 1
   const goalRows = Math.ceil(goalLane.length / goalCols)
-  const goalAreaH = goalLane.length > 0 ? goalRows * (goalH + 8) + 12 : 0
+  const goalAreaH = goalLane.length > 0 ? goalRows * (goalH + 6) + 8 : 0
 
-  const bodyTop = labelH + goalAreaH + 8
+  const bodyTop = labelH + goalAreaH + 6
 
   const projectRowData = []
   let bodyY = bodyTop
@@ -245,8 +245,8 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
     })
   }
 
-  const goalW = 152
-  const goalGapH = 12
+  const goalW = 138
+  const goalGapH = 8
   const totalGoalW = goalCols * goalW + (goalCols - 1) * goalGapH
   const goalStartX = colDef.project.x + (colDef.project.w - totalGoalW) / 2
 
@@ -256,7 +256,7 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
       type: 'goal',
       name: goal.name,
       x: goalStartX + (i % goalCols) * (goalW + goalGapH),
-      y: labelH + Math.floor(i / goalCols) * (goalH + 8),
+      y: labelH + Math.floor(i / goalCols) * (goalH + 6),
       w: goalW,
       h: goalH,
       color: goal.color,
@@ -272,8 +272,8 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
 
   const decisionTop = bodyY + 12
   const decisionColCount = Math.min(decisionLane.length, 3) || 1
-  const decW = 146
-  const decGapH = 12
+  const decW = 134
+  const decGapH = 8
   const totalDecW = decisionColCount * decW + (decisionColCount - 1) * decGapH
   const decStartX = colDef.project.x + (colDef.project.w - totalDecW) / 2
 
@@ -283,7 +283,7 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
       type: 'decision',
       name: decision.name,
       x: decStartX + (i % decisionColCount) * (decW + decGapH),
-      y: decisionTop + Math.floor(i / decisionColCount) * (decisionH + 8),
+      y: decisionTop + Math.floor(i / decisionColCount) * (decisionH + 6),
       w: decW,
       h: decisionH,
       color: decision.color,
@@ -299,7 +299,7 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
     }
   })
 
-  const decAreaH = decisionLane.length > 0 ? Math.ceil(decisionLane.length / decisionColCount) * (decisionH + 8) + 24 : 0
+  const decAreaH = decisionLane.length > 0 ? Math.ceil(decisionLane.length / decisionColCount) * (decisionH + 6) + 24 : 0
   const canvasH = Math.max(520, bodyY + decAreaH + 40)
 
   const nodeById = new Map(nodes.map(n => [n.id, n]))
