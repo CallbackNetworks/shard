@@ -24,3 +24,4 @@ data/
 .DS_Store
 *.swp
 .env
+backend/uploads/
