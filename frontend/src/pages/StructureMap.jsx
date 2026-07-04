@@ -10,6 +10,7 @@ import EmptyState from '../components/shared/EmptyState'
 
 const FILTERS = ['all', 'active', 'risk', 'unowned']
 const VIEW_MODES = ['map', 'dependencies']
+const STYLE_MODES = ['sankey', 'lines', 'network']
 
 function riskColor(risk) {
   if (risk === 'failed' || risk === 'overdue') return STATUS_COLOR.failed
@@ -386,6 +387,184 @@ function ribbonPath(link, from, to) {
   ].join(' ')
 }
 
+// A gentle center-to-center arc for the force-directed network view, where
+// edges run at arbitrary angles instead of column to column.
+function networkPath(from, to) {
+  const x1 = from.x + from.w / 2
+  const y1 = from.y + from.h / 2
+  const x2 = to.x + to.w / 2
+  const y2 = to.y + to.h / 2
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const len = Math.hypot(dx, dy) || 1
+  const bow = Math.min(28, len * 0.12)
+  const mx = (x1 + x2) / 2 + (-dy / len) * bow
+  const my = (y1 + y2) / 2 + (dx / len) * bow
+  return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0
+  return function () {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+const NETWORK_SIZE = {
+  identity: { w: 140, h: 46 },
+  project: { w: 180, h: 60 },
+  task: { w: 150, h: 44 },
+  goal: { w: 138, h: 44 },
+  decision: { w: 138, h: 44 },
+}
+
+// Deterministic force-directed layout. Runs a fixed number of settling
+// iterations so the same inputs always produce the same picture.
+function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
+  const nodes = []
+  const links = []
+
+  const pushNode = (id, type, name, color, data) => {
+    const size = NETWORK_SIZE[type] || { w: 150, h: 46 }
+    nodes.push({ id, type, name, color, data, w: size.w, h: size.h, x: 0, y: 0 })
+  }
+
+  visibleIdentityNodes.forEach(identity =>
+    pushNode(`identity:${identity.id}`, 'identity', identity.name, identity.color, { ...identity, type: 'identity' })
+  )
+  visibleProjects.forEach(project =>
+    pushNode(`project:${project.id}`, 'project', project.name, riskColor(project.risk), project)
+  )
+  visibleTaskNodes.forEach(task =>
+    pushNode(`task:${task.id}`, 'task', task.name, task.color, task)
+  )
+  laneNodes.forEach(node => {
+    if (node.lane === 'goal') pushNode(`goal:${node.id}`, 'goal', node.name, node.color, node)
+    else pushNode(`decision:${node.id}`, 'decision', node.name, node.color, node)
+  })
+
+  const identityColorById = new Map(visibleIdentityNodes.map(identity => [identity.id, identity.color]))
+  visibleProjects.forEach(project => {
+    project.identityIds.forEach(identityId => {
+      links.push({ from: `identity:${identityId}`, to: `project:${project.id}`, color: identityColorById.get(identityId) || '#64748b', type: 'owns' })
+    })
+  })
+  visibleTaskNodes.forEach(task => {
+    links.push({ from: `project:${task.projectId}`, to: `task:${task.id}`, color: viewMode === 'dependencies' ? '#737373' : riskColor(task.risk), type: task.risk })
+  })
+  laneNodes.forEach(node => {
+    if (node.lane === 'goal') {
+      (node.projectIds || []).forEach(projectId => links.push({ from: `goal:${node.id}`, to: `project:${projectId}`, color: node.color, type: 'goal' }))
+    } else if (node.projectId) {
+      links.push({ from: `decision:${node.id}`, to: `project:${node.projectId}`, color: node.color, type: 'decision' })
+    }
+  })
+  if (viewMode === 'dependencies') {
+    dependencyLinks.forEach(link => links.push({ from: link.from, to: link.to, color: STATUS_COLOR.failed, type: 'dependency' }))
+  }
+
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
+  const validLinks = links.filter(l => nodeById.has(l.from) && nodeById.has(l.to))
+
+  const width = 1200
+  const height = 820
+  const cx = width / 2
+  const cy = height / 2
+  const rng = mulberry32((nodes.length * 2654435761) >>> 0)
+  nodes.forEach((node, i) => {
+    const angle = (i / Math.max(nodes.length, 1)) * Math.PI * 2
+    const radius = Math.min(width, height) * 0.34
+    node.x = cx + Math.cos(angle) * radius + (rng() - 0.5) * 60
+    node.y = cy + Math.sin(angle) * radius + (rng() - 0.5) * 60
+    node.vx = 0
+    node.vy = 0
+  })
+
+  const index = new Map(nodes.map((n, i) => [n.id, i]))
+  const springLen = 150
+  const springK = 0.025
+  const repulse = 9000
+  const gravity = 0.02
+  const damping = 0.86
+  for (let iter = 0; iter < 320; iter++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        let dx = nodes[i].x - nodes[j].x
+        let dy = nodes[i].y - nodes[j].y
+        const d2 = dx * dx + dy * dy + 0.01
+        const d = Math.sqrt(d2)
+        const f = repulse / d2
+        const fx = (dx / d) * f
+        const fy = (dy / d) * f
+        nodes[i].vx += fx
+        nodes[i].vy += fy
+        nodes[j].vx -= fx
+        nodes[j].vy -= fy
+      }
+    }
+    for (const link of validLinks) {
+      const a = nodes[index.get(link.from)]
+      const b = nodes[index.get(link.to)]
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const d = Math.hypot(dx, dy) || 0.01
+      const f = (d - springLen) * springK
+      const fx = (dx / d) * f
+      const fy = (dy / d) * f
+      a.vx += fx
+      a.vy += fy
+      b.vx -= fx
+      b.vy -= fy
+    }
+    for (const node of nodes) {
+      node.vx += (cx - node.x) * gravity
+      node.vy += (cy - node.y) * gravity
+      node.vx *= damping
+      node.vy *= damping
+      node.x += node.vx
+      node.y += node.vy
+    }
+  }
+
+  const pad = 90
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  nodes.forEach(node => {
+    node.x -= node.w / 2
+    node.y -= node.h / 2
+    minX = Math.min(minX, node.x)
+    minY = Math.min(minY, node.y)
+    maxX = Math.max(maxX, node.x + node.w)
+    maxY = Math.max(maxY, node.y + node.h)
+  })
+  if (!nodes.length) {
+    minX = 0
+    minY = 0
+    maxX = width
+    maxY = height
+  }
+  nodes.forEach(node => {
+    node.x += pad - minX
+    node.y += pad - minY
+    delete node.vx
+    delete node.vy
+  })
+
+  return {
+    nodes,
+    links: validLinks,
+    nodeById,
+    width: maxX - minX + pad * 2,
+    height: maxY - minY + pad * 2,
+    columns: null,
+  }
+}
+
 export default function StructureMap() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -394,6 +573,7 @@ export default function StructureMap() {
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState('all')
   const [viewMode, setViewMode] = useState('map')
+  const [layoutStyle, setLayoutStyle] = useState('sankey')
   const [selected, setSelected] = useState(null)
   const [frame, setFrame] = useState({ width: 0, height: 0 })
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
@@ -471,14 +651,34 @@ export default function StructureMap() {
     ...graph.goalNodes.map(node => ({ ...node, lane: 'goal', color: STATUS_COLOR.done })),
     ...graph.decisionNodes.map(node => ({ ...node, lane: 'decision', color: node.status === 'proposed' ? STATUS_COLOR.in_progress : STATUS_COLOR.done })),
   ].filter(node => {
-    if (!search) return true
     const linkedProjectIds = node.projectIds || (node.projectId ? [node.projectId] : [])
-    return node.name.toLowerCase().includes(search) || linkedProjectIds.some(projectId => visibleProjectIds.has(projectId))
-  }).slice(0, 10)
+    const linkedVisible = linkedProjectIds.some(projectId => visibleProjectIds.has(projectId))
+    // Network view exists to expose every non-tree relation, so keep any goal
+    // or decision touching a visible project; column views stay compact.
+    if (layoutStyle === 'network' && !search) return linkedVisible
+    if (!search) return true
+    return node.name.toLowerCase().includes(search) || linkedVisible
+  }).slice(0, layoutStyle === 'network' ? 60 : 10)
+
+  // Stable structural signature so the (potentially expensive force) layout
+  // only rebuilds when the graph actually changes, not on pan/zoom/select.
+  const layoutSignature = [
+    layoutStyle,
+    viewMode,
+    visibleIdentityNodes.map(n => `${n.id}:${n.color}`).join(','),
+    visibleProjects.map(n => `${n.id}:${n.risk}:${n.progress}:${n.identityIds.join('+')}`).join(','),
+    visibleTaskNodes.map(n => `${n.id}:${n.status}:${n.projectId}`).join(','),
+    laneNodes.map(n => `${n.lane}:${n.id}:${(n.projectIds || n.projectId || '')}`).join(','),
+    visibleDependencyLinks.map(l => `${l.from}>${l.to}`).join(','),
+  ].join('|')
 
   const mapLayout = useMemo(
-    () => buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks: visibleDependencyLinks, viewMode, t }),
-    [visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, visibleDependencyLinks, viewMode, t]
+    () => {
+      const params = { visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks: visibleDependencyLinks, viewMode }
+      return layoutStyle === 'network' ? buildNetworkLayout(params) : buildMindMapLayout(params)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layoutSignature]
   )
 
   useEffect(() => {
@@ -509,7 +709,7 @@ export default function StructureMap() {
 
   useEffect(() => {
     setView({ zoom: 1, x: 0, y: 0 })
-  }, [mapLayout.width, mapLayout.height, mode, query, viewMode])
+  }, [mapLayout.width, mapLayout.height, mode, query, viewMode, layoutStyle])
 
   useEffect(() => {
     if (!selected) return
@@ -526,6 +726,15 @@ export default function StructureMap() {
   const selectedNodeKey = nodeDataKey(selected)
   const relatedNodeKeys = useMemo(() => {
     if (!selectedNodeKey) return new Set()
+    if (layoutStyle === 'network') {
+      // General graph: highlight the node and its direct neighbours.
+      const keys = new Set([selectedNodeKey])
+      for (const link of mapLayout.links) {
+        if (link.from === selectedNodeKey) keys.add(link.to)
+        if (link.to === selectedNodeKey) keys.add(link.from)
+      }
+      return keys
+    }
     if (viewMode === 'dependencies' && selected?.type === 'task') {
       const keys = new Set([selectedNodeKey, `project:${selected.projectId}`])
       const visit = (key) => {
@@ -579,7 +788,7 @@ export default function StructureMap() {
       }
     }
     return keys
-  }, [mapLayout.links, selected, selectedNodeKey, viewMode])
+  }, [mapLayout.links, selected, selectedNodeKey, viewMode, layoutStyle])
 
   const shouldMute = (node) => {
     if (!selected) return false
@@ -732,6 +941,13 @@ export default function StructureMap() {
           <Search size={14} />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder={t('structure.search')} />
         </label>
+        <div className="kt-map-segment" aria-label={t('structure.styleMode')}>
+          {STYLE_MODES.map(key => (
+            <button key={key} type="button" onClick={() => setLayoutStyle(key)} className={layoutStyle === key ? 'is-active' : ''}>
+              {t(`structure.style.${key}`)}
+            </button>
+          ))}
+        </div>
         <div className="kt-map-segment" aria-label={t('structure.viewMode')}>
           {VIEW_MODES.map(key => (
             <button key={key} type="button" onClick={() => setViewMode(key)} className={viewMode === key ? 'is-active' : ''}>
@@ -809,7 +1025,7 @@ export default function StructureMap() {
                   const from = mapLayout.nodeById.get(link.from)
                   const to = mapLayout.nodeById.get(link.to)
                   const muted = isLinkMuted(link)
-                  if (link.flow) {
+                  if (layoutStyle === 'sankey' && link.flow) {
                     return (
                       <path
                         key={`${link.from}-${link.to}-${index}`}
@@ -820,7 +1036,7 @@ export default function StructureMap() {
                       />
                     )
                   }
-                  const d = computePath(from, to, link.type)
+                  const d = layoutStyle === 'network' ? networkPath(from, to) : computePath(from, to, link.type)
                   const dependencyDash = link.type === 'dependency' ? '1.75 1.75' : undefined
                   return (
                     <path
@@ -828,7 +1044,7 @@ export default function StructureMap() {
                       className={[`is-${link.type}`, muted ? 'is-muted' : ''].filter(Boolean).join(' ')}
                       d={d}
                       stroke={link.color}
-                      strokeWidth={1.35}
+                      strokeWidth={link.type === 'goal' || link.type === 'decision' ? 1.6 : 1.35}
                       strokeDasharray={dependencyDash}
                       style={dependencyDash ? { '--kt-map-dash': dependencyDash, strokeDasharray: dependencyDash } : undefined}
                       fill="none"

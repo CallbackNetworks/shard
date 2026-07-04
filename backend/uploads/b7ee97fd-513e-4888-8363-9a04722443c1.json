@@ -1,0 +1,22 @@
+{
+  "scenarios": {
+    "blackfriday": {
+      "vus": 500,
+      "duration": "10m"
+    }
+  },
+  "metrics": {
+    "http_req_duration": {
+      "avg": 142.3,
+      "p95": 198.7,
+      "p99": 245.1
+    },
+    "http_reqs": {
+      "count": 287543,
+      "rate": 479.2
+    },
+    "http_req_failed": {
+      "rate": 0.0023
+    }
+  }
+}
