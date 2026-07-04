@@ -21,6 +21,7 @@ from app.routers.external_api.search import sub_router as search_router
 from app.routers.external_api.stats import sub_router as stats_router
 from app.routers.external_api.summary import sub_router as summary_router
 from app.routers.external_api.tasks import sub_router as tasks_router
+from app.routers.external_api.tools_schema import sub_router as tools_schema_router
 
 router = APIRouter(prefix="/api/v1", tags=["External API v1"])
 
@@ -38,3 +39,4 @@ router.include_router(analytics_router)
 router.include_router(notifications_router)
 router.include_router(agent_context_router)
 router.include_router(progress_router)
+router.include_router(tools_schema_router)

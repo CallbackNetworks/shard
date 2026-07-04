@@ -272,6 +272,16 @@ async def _delete_task(project_id: str, task_id: str) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _get_project_detail(project_id: str) -> str:
+    result = await _get(f"/projects/{project_id}")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _bulk_update_tasks(project_id: str, updates: list[dict]) -> str:
+    result = await _post(f"/projects/{project_id}/tasks/bulk-update", updates)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 # ── MCP tool registry ────────────────────────────────────────────────
 
 TOOL_DEFINITIONS = [
@@ -521,6 +531,36 @@ TOOL_DEFINITIONS = [
             "required": ["project_id", "task_id"],
         },
     ),
+    types.Tool(
+        name="get_project_detail",
+        description="Get a single project with all its tasks, labels, and progress stats in one call. More efficient than listing projects then listing tasks separately.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID (required)"},
+            },
+            "required": ["project_id"],
+        },
+    ),
+    types.Tool(
+        name="bulk_update_tasks",
+        description="Batch update multiple tasks in one request. Each item needs an 'id' field and the fields to change. Status changes trigger notifications.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID (required)"},
+                "updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "description": "Object with 'id' (required) and fields to update: status, priority, title, assignee, due_date, etc.",
+                    },
+                    "description": "Array of task updates, each with 'id' and fields to change",
+                },
+            },
+            "required": ["project_id", "updates"],
+        },
+    ),
 ]
 
 
@@ -612,6 +652,15 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
             result = await _delete_task(
                 project_id=args["project_id"],
                 task_id=args["task_id"],
+            )
+        elif name == "get_project_detail":
+            result = await _get_project_detail(
+                project_id=args["project_id"],
+            )
+        elif name == "bulk_update_tasks":
+            result = await _bulk_update_tasks(
+                project_id=args["project_id"],
+                updates=args["updates"],
             )
         else:
             result = f"Unknown tool: {name}"

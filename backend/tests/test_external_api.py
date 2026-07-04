@@ -297,6 +297,30 @@ class TestTasksCrud:
 # ── Agent Context ────────────────────────────────────────────────────────
 
 
+class TestToolsSchema:
+    def test_tools_schema_returns_list(self, client, api_key_read):
+        raw_key, _ = api_key_read
+        r = client.get("/api/v1/tools-schema", headers={"X-API-Key": raw_key})
+        assert r.status_code == 200
+        data = r.json()
+        assert isinstance(data, list)
+        assert len(data) > 10
+
+    def test_tools_schema_has_required_fields(self, client, api_key_read):
+        raw_key, _ = api_key_read
+        r = client.get("/api/v1/tools-schema", headers={"X-API-Key": raw_key})
+        data = r.json()
+        for tool in data:
+            assert "name" in tool
+            assert "description" in tool
+            assert "parameters" in tool
+            assert tool["parameters"]["type"] == "object"
+
+    def test_tools_schema_requires_auth(self, client):
+        r = client.get("/api/v1/tools-schema")
+        assert r.status_code in (401, 422)
+
+
 class TestAgentContext:
     def test_agent_context_returns_structure(self, client, api_key_read):
         raw_key, _ = api_key_read
