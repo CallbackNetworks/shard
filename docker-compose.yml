@@ -116,6 +116,19 @@ services:
     networks:
       - app-network
 
+  e2e:
+    build: ./e2e
+    profiles: ["e2e"]
+    depends_on:
+      - backend
+      - frontend
+    environment:
+      - BASE_URL=http://frontend:80
+      - API_URL=http://backend:8000
+      - API_KEY=${API_KEY:-}
+    networks:
+      - app-network
+
 volumes:
   backend_venv:
   frontend_modules:

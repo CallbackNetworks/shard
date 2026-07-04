@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ApiKey, Task, TaskDependency
 from app.routers.deps import get_project_or_404 as _get_project_or_404
-from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate
+from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate, TaskWithSubtasksOut
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications
 from app.services.rules_engine import run_rules
@@ -15,10 +15,11 @@ from app.services.ws_manager import ws_manager
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["tasks"])
 
 
-@router.get("", response_model=list[TaskOut])
+@router.get("")
 def list_tasks(
     project_id: str,
     status_filter: str | None = Query(None, alias="status"),
+    include: str | None = Query(None, description="Comma-separated includes: subtasks"),
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -27,7 +28,14 @@ def list_tasks(
     q = db.query(Task).filter(Task.project_id == project_id)
     if status_filter:
         q = q.filter(Task.status == status_filter)
-    return q.order_by(Task.position.asc(), Task.created_at.asc()).offset(offset).limit(limit).all()
+    want_subtasks = include and "subtasks" in include.split(",")
+    if want_subtasks:
+        from sqlalchemy.orm import selectinload
+        q = q.options(selectinload(Task.subtasks))
+    tasks = q.order_by(Task.position.asc(), Task.created_at.asc()).offset(offset).limit(limit).all()
+    if want_subtasks:
+        return [TaskWithSubtasksOut.model_validate(t, from_attributes=True).model_dump() for t in tasks]
+    return [TaskOut.model_validate(t, from_attributes=True).model_dump() for t in tasks]
 
 
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
@@ -129,6 +137,8 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
 
     if "status" in changes and changes["status"] != old_status:
         await fire_notifications(db, task, "task.status_changed")
+    if "assignee" in changes and changes["assignee"] != old_assignee:
+        await fire_notifications(db, task, "task.assigned")
 
     for trigger, ctx in triggered_rules:
         await run_rules(db, trigger, task, {"_rule_depth": 1, **ctx})

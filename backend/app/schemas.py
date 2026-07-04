@@ -187,6 +187,10 @@ class TaskOut(BaseModel):
     recurrence: "RecurrenceRuleOut | None" = None
 
 
+class TaskWithSubtasksOut(TaskOut):
+    subtasks: list[TaskOut] = []
+
+
 class TaskProgressUpdate(BaseModel):
     progress_pct: int | None = Field(None, ge=0, le=100, description="Progress percentage (0-100)")
     agent_notes: str | None = Field(None, description="Agent status notes (markdown)")
