@@ -41,6 +41,14 @@ def _check_project_access(api_key: ApiKey, project_id: str):
         raise HTTPException(status_code=403, detail="API key does not have access to this project")
 
 
+def _build_actor(api_key: ApiKey, agent_id: str | None = None) -> str:
+    """Build actor string for activity logs, including agent ID if provided."""
+    base = f"api:{api_key.name}"
+    if agent_id:
+        return f"{base}:{agent_id}"
+    return base
+
+
 _auth_errors = {
     401: {"description": "Invalid or inactive API key"},
     403: {"description": "Insufficient scope or project access denied"},

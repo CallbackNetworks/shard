@@ -20,49 +20,54 @@ API_KEY = os.environ.get("API_KEY", "")
 
 server = Server("shard")
 
-
-def _api_url(path: str) -> str:
-    return f"{API_BASE_URL}/api/v1{path}"
+_http_client: httpx.AsyncClient | None = None
 
 
-def _headers() -> dict:
-    return {"X-API-Key": API_KEY, "Content-Type": "application/json"}
+def _get_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            base_url=f"{API_BASE_URL}/api/v1",
+            headers={"X-API-Key": API_KEY, "Content-Type": "application/json"},
+            timeout=30,
+        )
+    return _http_client
 
 
 async def _get(path: str, params: dict | None = None) -> dict | list | str:
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(_api_url(path), headers=_headers(), params=params)
-        if resp.status_code >= 400:
-            return f"Error {resp.status_code}: {resp.text}"
-        return resp.json()
+    client = _get_client()
+    resp = await client.get(path, params=params)
+    if resp.status_code >= 400:
+        return f"Error {resp.status_code}: {resp.text}"
+    return resp.json()
 
 
 async def _post(path: str, body: dict | list | None = None) -> dict | list | str:
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(_api_url(path), headers=_headers(), json=body)
-        if resp.status_code >= 400:
-            return f"Error {resp.status_code}: {resp.text}"
-        if resp.status_code == 204:
-            return {"status": "ok"}
-        return resp.json()
+    client = _get_client()
+    resp = await client.post(path, json=body)
+    if resp.status_code >= 400:
+        return f"Error {resp.status_code}: {resp.text}"
+    if resp.status_code == 204:
+        return {"status": "ok"}
+    return resp.json()
 
 
 async def _patch(path: str, body: dict | None = None) -> dict | list | str:
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.patch(_api_url(path), headers=_headers(), json=body)
-        if resp.status_code >= 400:
-            return f"Error {resp.status_code}: {resp.text}"
-        return resp.json()
+    client = _get_client()
+    resp = await client.patch(path, json=body)
+    if resp.status_code >= 400:
+        return f"Error {resp.status_code}: {resp.text}"
+    return resp.json()
 
 
 async def _delete(path: str) -> dict | str:
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.delete(_api_url(path), headers=_headers())
-        if resp.status_code >= 400:
-            return f"Error {resp.status_code}: {resp.text}"
-        if resp.status_code == 204:
-            return {"status": "deleted"}
-        return resp.json()
+    client = _get_client()
+    resp = await client.delete(path)
+    if resp.status_code >= 400:
+        return f"Error {resp.status_code}: {resp.text}"
+    if resp.status_code == 204:
+        return {"status": "deleted"}
+    return resp.json()
 
 
 # ── Tool implementations ────────────────────────────────────────────

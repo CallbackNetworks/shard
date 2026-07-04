@@ -92,11 +92,15 @@ async def _dispatch_webhook(
     event: str,
     payload: dict,
     delivery: WebhookDelivery | None = None,
+    background: bool = False,
 ) -> bool:
-    """Send one webhook request, create/update delivery log, return success."""
+    """Send one webhook request, create/update delivery log, return success.
+
+    If background=True, the HTTP call is fired as an asyncio task that uses
+    its own DB session, so the caller's request is not blocked by slow targets.
+    """
     body_bytes = json.dumps(payload, separators=(",", ":")).encode()
     headers = _build_headers(integration, body_bytes)
-    now = datetime.now(UTC)
 
     if delivery is None:
         delivery = WebhookDelivery(
@@ -111,6 +115,85 @@ async def _dispatch_webhook(
         db.add(delivery)
         db.flush()
 
+    if background:
+        delivery_id = delivery.id
+        url = integration.url
+        name = integration.name
+        itype = integration.type
+        attempt = delivery.attempt
+        db.commit()
+        asyncio.create_task(_send_webhook_background(delivery_id, url, body_bytes, headers, name, itype, attempt))
+        return True
+
+    return await _send_webhook_inline(db, delivery, integration, body_bytes, headers)
+
+
+async def _send_webhook_background(
+    delivery_id: str,
+    url: str,
+    body_bytes: bytes,
+    headers: dict,
+    name: str,
+    itype: str,
+    attempt: int,
+) -> None:
+    """Execute webhook HTTP call in background with its own DB session."""
+    from app.database import SessionLocal
+
+    now = datetime.now(UTC)
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(url, content=body_bytes, headers=headers)
+
+        with SessionLocal() as bg_db:
+            delivery = bg_db.query(WebhookDelivery).filter(WebhookDelivery.id == delivery_id).first()
+            if not delivery:
+                return
+            delivery.status_code = resp.status_code
+            delivery.response_body = resp.text[:2048]
+            if resp.is_success:
+                delivery.status = "success"
+                delivery.delivered_at = now
+                logger.info("Notified %s [%s] → %s", name, itype, resp.status_code)
+            else:
+                delivery.error = f"HTTP {resp.status_code}"
+                if delivery.attempt >= MAX_ATTEMPTS:
+                    delivery.status = "dead"
+                    delivery.next_retry_at = None
+                else:
+                    delivery.status = "failed"
+                    backoff = RETRY_BACKOFF_MINUTES[delivery.attempt - 1]
+                    delivery.next_retry_at = now + timedelta(minutes=backoff)
+                logger.warning("Failed to notify %s (attempt %d): HTTP %s", name, attempt, resp.status_code)
+            bg_db.commit()
+    except httpx.HTTPError as exc:
+        with SessionLocal() as bg_db:
+            delivery = bg_db.query(WebhookDelivery).filter(WebhookDelivery.id == delivery_id).first()
+            if not delivery:
+                return
+            delivery.error = str(exc)[:500]
+            if delivery.attempt >= MAX_ATTEMPTS:
+                delivery.status = "dead"
+                delivery.next_retry_at = None
+            else:
+                delivery.status = "failed"
+                backoff = RETRY_BACKOFF_MINUTES[delivery.attempt - 1]
+                delivery.next_retry_at = now + timedelta(minutes=backoff)
+            bg_db.commit()
+        logger.warning("Failed to notify %s (attempt %d): %s", name, attempt, exc)
+    except Exception as exc:
+        logger.error("Unexpected error dispatching webhook to %s: %s", name, exc)
+
+
+async def _send_webhook_inline(
+    db: Session,
+    delivery: WebhookDelivery,
+    integration: Integration,
+    body_bytes: bytes,
+    headers: dict,
+) -> bool:
+    """Execute webhook HTTP call inline (used for test/retry where caller needs result)."""
+    now = datetime.now(UTC)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(integration.url, content=body_bytes, headers=headers)
@@ -187,9 +270,9 @@ async def fire_notifications(db: Session, task: Task, event: str) -> None:
         subject, html = build_notification_email(event, payload, prefix)
         await asyncio.to_thread(send_email, recipients, subject, html)
 
-    # Send webhook notifications with delivery logging
+    # Send webhook notifications with delivery logging (background — non-blocking)
     for integration in webhook_integrations:
-        await _dispatch_webhook(db, integration, event, payload)
+        await _dispatch_webhook(db, integration, event, payload, background=True)
 
     # Create in-app notification
     _create_notification(db, event, task, project)

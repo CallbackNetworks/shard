@@ -297,6 +297,66 @@ class TestTasksCrud:
 # ── Agent Context ────────────────────────────────────────────────────────
 
 
+class TestRateLimiter:
+    def test_rate_limiter_allows_normal_traffic(self):
+        from app.services.rate_limiter import RateLimiter
+
+        limiter = RateLimiter(max_requests=5, window_seconds=60)
+        for _ in range(5):
+            assert limiter.check("test-key") is True
+
+    def test_rate_limiter_blocks_excess(self):
+        from app.services.rate_limiter import RateLimiter
+
+        limiter = RateLimiter(max_requests=3, window_seconds=60)
+        for _ in range(3):
+            limiter.check("test-key")
+        assert limiter.check("test-key") is False
+
+    def test_rate_limiter_separate_keys(self):
+        from app.services.rate_limiter import RateLimiter
+
+        limiter = RateLimiter(max_requests=2, window_seconds=60)
+        limiter.check("key-a")
+        limiter.check("key-a")
+        assert limiter.check("key-a") is False
+        assert limiter.check("key-b") is True
+
+
+class TestAgentIdTracking:
+    def test_create_task_with_agent_id(self, client, db, api_key_write, project_with_tasks):
+        raw_key, _ = api_key_write
+        p, _, _ = project_with_tasks
+        r = client.post(
+            f"/api/v1/projects/{p.id}/tasks",
+            json={"title": "Agent Task", "priority": "medium"},
+            headers={"X-API-Key": raw_key, "X-Agent-Id": "claude-code-session-123"},
+        )
+        assert r.status_code == 201
+
+        from app.models import ActivityLog
+
+        log = db.query(ActivityLog).filter(ActivityLog.action == "task.created").order_by(ActivityLog.created_at.desc()).first()
+        assert log is not None
+        assert "claude-code-session-123" in log.actor
+
+    def test_create_task_without_agent_id(self, client, db, api_key_write, project_with_tasks):
+        raw_key, key = api_key_write
+        p, _, _ = project_with_tasks
+        r = client.post(
+            f"/api/v1/projects/{p.id}/tasks",
+            json={"title": "Normal Task", "priority": "low"},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 201
+
+        from app.models import ActivityLog
+
+        log = db.query(ActivityLog).filter(ActivityLog.action == "task.created").order_by(ActivityLog.created_at.desc()).first()
+        assert log is not None
+        assert log.actor == f"api:{key.name}"
+
+
 class TestToolsSchema:
     def test_tools_schema_returns_list(self, client, api_key_read):
         raw_key, _ = api_key_read

@@ -2,13 +2,14 @@
 External API v1 — Task progress reporting endpoint.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey, Comment
 from app.routers.external_api.auth import (
     _auth_errors,
+    _build_actor,
     _check_project_access,
     _get_api_key,
     _require_scope,
@@ -40,6 +41,7 @@ async def api_report_progress(
     body: TaskProgressUpdate,
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(_get_api_key),
+    x_agent_id: str | None = Header(None, alias="X-Agent-Id"),
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
@@ -50,11 +52,12 @@ async def api_report_progress(
     if body.agent_notes is not None:
         task.agent_notes = body.agent_notes
 
+    actor = _build_actor(api_key, x_agent_id)
     if body.comment:
         comment = Comment(
             task_id=task_id,
             body=body.comment,
-            author=f"api:{api_key.name}",
+            author=actor,
         )
         db.add(comment)
 
@@ -63,7 +66,7 @@ async def api_report_progress(
         "task.progress_updated",
         project_id=project_id,
         task_id=task_id,
-        actor=f"api:{api_key.name}",
+        actor=actor,
         detail=f'Task "{task.title}" progress updated to {body.progress_pct}%'
         if body.progress_pct is not None
         else f'Task "{task.title}" agent notes updated',
@@ -71,6 +74,7 @@ async def api_report_progress(
             "progress_pct": body.progress_pct,
             "has_notes": body.agent_notes is not None,
             "has_comment": body.comment is not None,
+            "agent_id": x_agent_id,
         },
     )
 

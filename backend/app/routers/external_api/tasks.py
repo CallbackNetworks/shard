@@ -2,13 +2,14 @@
 External API v1 — Task CRUD and bulk operations.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey, Project, Task
 from app.routers.external_api.auth import (
     _auth_errors,
+    _build_actor,
     _check_project_access,
     _get_api_key,
     _require_scope,
@@ -78,6 +79,7 @@ def api_create_task(
     body: TaskCreate,
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(_get_api_key),
+    x_agent_id: str | None = Header(None, alias="X-Agent-Id"),
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
@@ -87,14 +89,15 @@ def api_create_task(
     task = Task(project_id=project_id, **body.model_dump())
     db.add(task)
     db.flush()
+    actor = _build_actor(api_key, x_agent_id)
     log_activity(
         db,
         "task.created",
         project_id=project_id,
         task_id=task.id,
-        actor=f"api:{api_key.name}",
+        actor=actor,
         detail=f'Task "{task.title}" created via API',
-        meta={"title": task.title, "priority": task.priority, "api_key": api_key.name},
+        meta={"title": task.title, "priority": task.priority, "api_key": api_key.name, "agent_id": x_agent_id},
     )
     db.commit()
     db.refresh(task)
@@ -114,6 +117,7 @@ async def api_update_task(
     body: TaskUpdate,
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(_get_api_key),
+    x_agent_id: str | None = Header(None, alias="X-Agent-Id"),
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
@@ -124,15 +128,16 @@ async def api_update_task(
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(task, field, value)
 
+    actor = _build_actor(api_key, x_agent_id)
     if body.status and body.status != old_status:
         log_activity(
             db,
             "task.status_changed",
             project_id=project_id,
             task_id=task_id,
-            actor=f"api:{api_key.name}",
+            actor=actor,
             detail=f'Task "{task.title}" changed from {old_status} to {body.status} via API',
-            meta={"old_status": old_status, "new_status": body.status, "api_key": api_key.name},
+            meta={"old_status": old_status, "new_status": body.status, "api_key": api_key.name, "agent_id": x_agent_id},
         )
 
     db.commit()

@@ -34,6 +34,20 @@ X-API-Key: tdp_<your_key>
 
 API keys have scopes: `read`, `write`, `admin`. Create keys via the web UI (Settings > API Keys).
 
+### Agent Identity (optional)
+
+Include an `X-Agent-Id` header to identify your agent instance in activity logs:
+
+```
+X-Agent-Id: claude-code-session-abc123
+```
+
+This makes it easy to trace which agent performed which actions. The value is free-form — use something like `<agent-type>-<session-id>`.
+
+## Rate Limits
+
+The External API enforces a sliding window of **120 requests per minute** per API key. If exceeded, the API returns `429 Too Many Requests` with a `Retry-After: 60` header.
+
 ## Quick Start
 
 Every agent session should begin with:
@@ -337,9 +351,8 @@ The MCP server exposes these tools:
 - **Add comments** to explain non-obvious decisions
 - **Check dependencies** before marking a task as done — blocked tasks should not be completed
 
-## Rate Limits
+## Best Practices
 
-The API currently has no rate limiting, but agents should:
 - Batch operations where possible (use bulk endpoints)
 - Avoid polling in tight loops (use webhooks or check periodically)
 - Cache `agent-context` for the session duration (it rarely changes)

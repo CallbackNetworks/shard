@@ -5,7 +5,7 @@ All endpoints require an `X-API-Key` header.
 Scopes: read (GET), write (POST/PATCH/DELETE), admin (all).
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.routers.external_api.activity import sub_router as activity_router
 from app.routers.external_api.agent_context import sub_router as agent_context_router
@@ -22,8 +22,9 @@ from app.routers.external_api.stats import sub_router as stats_router
 from app.routers.external_api.summary import sub_router as summary_router
 from app.routers.external_api.tasks import sub_router as tasks_router
 from app.routers.external_api.tools_schema import sub_router as tools_schema_router
+from app.services.rate_limiter import api_rate_limit
 
-router = APIRouter(prefix="/api/v1", tags=["External API v1"])
+router = APIRouter(prefix="/api/v1", tags=["External API v1"], dependencies=[Depends(api_rate_limit)])
 
 router.include_router(projects_router)
 router.include_router(tasks_router)

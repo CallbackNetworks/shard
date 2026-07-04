@@ -37,9 +37,23 @@ class RateLimiter:
 
 
 _share_limiter = RateLimiter(max_requests=60, window_seconds=60)
+_api_limiter = RateLimiter(max_requests=120, window_seconds=60)
 
 
 async def share_rate_limit(request: Request):
     client_ip = request.client.host if request.client else "unknown"
     if not _share_limiter.check(client_ip):
         raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+
+
+async def api_rate_limit(request: Request):
+    """Rate limit for External API v1 — keyed by API key value."""
+    api_key = request.headers.get("x-api-key", "")
+    if not api_key:
+        return
+    if not _api_limiter.check(api_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Max 120 requests per minute.",
+            headers={"Retry-After": "60"},
+        )
