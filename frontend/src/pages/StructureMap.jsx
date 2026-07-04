@@ -46,7 +46,7 @@ function Stat({ label, value, color }) {
   )
 }
 
-function GraphNode({ children, active, muted, color, label, onClick, className = '', style }) {
+function GraphNode({ children, active, muted, color, label, onClick, onDoubleClick, className = '', style }) {
   return (
     <button
       type="button"
@@ -61,6 +61,7 @@ function GraphNode({ children, active, muted, color, label, onClick, className =
       ].filter(Boolean).join(' ')}
       style={{ '--node-color': color, ...style }}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       {children}
     </button>
@@ -408,7 +409,6 @@ export default function StructureMap() {
   )
 
   const search = query.trim().toLowerCase()
-  const selectedProjectId = selected?.type === 'project' ? selected.id : selected?.projectId
   const taskById = useMemo(() => {
     const tasks = [...(graph.dependencyTaskNodes || []), ...graph.taskNodes]
     return new Map(tasks.map(task => [task.id, task]))
@@ -589,6 +589,29 @@ export default function StructureMap() {
   const isLinkMuted = (link) => {
     if (!selected) return false
     return !relatedNodeKeys.has(link.from) || !relatedNodeKeys.has(link.to)
+  }
+
+  const jumpTo = (node) => {
+    if (!node) return
+    switch (node.type) {
+      case 'project':
+        navigate(`/projects/${node.id}`)
+        break
+      case 'task':
+        if (node.projectId) navigate(`/projects/${node.projectId}`)
+        break
+      case 'identity':
+        navigate('/identities')
+        break
+      case 'goal':
+        navigate('/goals')
+        break
+      case 'decision':
+        navigate('/decisions')
+        break
+      default:
+        break
+    }
   }
 
   const zoomBy = (delta) => {
@@ -835,8 +858,9 @@ export default function StructureMap() {
                   color={node.color}
                   active={selectedNodeKey === node.id}
                   muted={shouldMute(node.data)}
-                  label={`${node.name} · ${node.data.status || node.data.risk || node.type}`}
+                  label={`${node.name} · ${node.data.status || node.data.risk || node.type} — ${t('structure.doubleClickOpen')}`}
                   onClick={() => setSelected(node.data)}
+                  onDoubleClick={() => jumpTo(node.data)}
                   className={`is-${node.type}`}
                   style={{ left: node.x, top: node.y, width: node.w, minHeight: node.h }}
                 >
@@ -984,9 +1008,9 @@ export default function StructureMap() {
                     </div>
                   </div>
                 )}
-                {selectedProjectId && (
-                  <button onClick={() => navigate(`/projects/${selectedProjectId}`)}>
-                    {t('structure.openProject')}
+                {['project', 'task', 'identity', 'goal', 'decision'].includes(selected.type) && (
+                  <button className="kt-map-open" onClick={() => jumpTo(selected)}>
+                    {t(`structure.open.${selected.type}`)}
                   </button>
                 )}
                 <button onClick={() => setSelected(null)}>{t('clear')}</button>

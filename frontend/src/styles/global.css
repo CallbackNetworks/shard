@@ -2076,6 +2076,16 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   width: 100%;
   margin-top: 8px;
 }
+.kt-map-inspector button.kt-map-open {
+  border-color: rgba(129,140,248,0.5);
+  background: rgba(129,140,248,0.12);
+  color: #c7d2fe;
+}
+.kt-map-inspector button.kt-map-open:hover {
+  border-color: rgba(129,140,248,0.85);
+  background: rgba(129,140,248,0.2);
+  color: #e0e7ff;
+}
 .kt-alert-strip {
   position: relative;
   height: 30px;
