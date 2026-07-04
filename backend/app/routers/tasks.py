@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ApiKey, Task, TaskDependency
 from app.routers.deps import get_project_or_404 as _get_project_or_404
+from app.routers.issue_sync import sync_task_closure_to_external
 from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate, TaskWithSubtasksOut
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications
@@ -31,6 +32,7 @@ def list_tasks(
     want_subtasks = include and "subtasks" in include.split(",")
     if want_subtasks:
         from sqlalchemy.orm import selectinload
+
         q = q.options(selectinload(Task.subtasks))
     tasks = q.order_by(Task.position.asc(), Task.created_at.asc()).offset(offset).limit(limit).all()
     if want_subtasks:
@@ -137,6 +139,8 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
 
     if "status" in changes and changes["status"] != old_status:
         await fire_notifications(db, task, "task.status_changed")
+        if changes["status"] == "done":
+            await sync_task_closure_to_external(task, db)
     if "assignee" in changes and changes["assignee"] != old_assignee:
         await fire_notifications(db, task, "task.assigned")
 

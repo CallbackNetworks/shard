@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bot } from 'lucide-react'
+import { formatMinutes } from '../utils/formatTime'
 import {
   DndContext,
   PointerSensor,
@@ -24,7 +25,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
   const taskLabels = task.labels || []
 
   const style = {
-    background: isDragging ? 'rgba(129,140,248,0.08)' : 'transparent',
+    background: isDragging ? 'rgba(250,204,21,0.08)' : 'transparent',
     opacity: isDragging ? 0.6 : 1,
     transform: CSS.Transform.toString(transform),
     transition,
@@ -104,8 +105,8 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(129,140,248,0.12)', color: DARK.info,
-            border: '1px solid rgba(129,140,248,0.25)', whiteSpace: 'nowrap',
+            background: 'rgba(250,204,21,0.12)', color: DARK.info,
+            border: '1px solid rgba(250,204,21,0.25)', whiteSpace: 'nowrap',
           }}>
             <Bot size={9} />
             {task.assigned_agent_name}
@@ -115,7 +116,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
       <td style={tdStyle}>
         {cycle ? (
           <span style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(30,215,96,0.12)', color: BRAND,
+            fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(250,204,21,0.12)', color: BRAND,
             fontWeight: 500, whiteSpace: 'nowrap',
           }}>
             {cycle.name}
@@ -133,8 +134,8 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
       <td style={tdStyle}>
         {(task.time_spent || task.time_estimate) ? (
           <span style={{ fontSize: 11, whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.5)' }}>
-            {task.time_spent ? `${Math.floor(task.time_spent / 60)}h${task.time_spent % 60 ? `${task.time_spent % 60}m` : ''}` : '\u2014'}
-            {task.time_estimate ? ` / ${Math.floor(task.time_estimate / 60)}h${task.time_estimate % 60 ? `${task.time_estimate % 60}m` : ''}` : ''}
+            {task.time_spent ? formatMinutes(task.time_spent) : '\u2014'}
+            {task.time_estimate ? ` / ${formatMinutes(task.time_estimate)}` : ''}
           </span>
         ) : <span style={{ color: 'rgba(255,255,255,0.15)' }}>{'\u2014'}</span>}
       </td>

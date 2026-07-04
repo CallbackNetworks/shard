@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { DARK } from '../constants/theme'
+import { DARK, STATUS_COLOR } from '../constants/theme'
 import { createTask } from '../api/client'
+import { formatMinutes } from '../utils/formatTime'
 
 export const FONT = '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif'
 export const BG   = '#121212'
@@ -108,13 +109,6 @@ function PinButton({ projectId, pinned, onToggle }) {
   )
 }
 
-function formatMinutes(mins) {
-  if (mins == null) return null
-  if (mins < 60) return `${mins}m`
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return m > 0 ? `${h}h ${m}m` : `${h}h`
-}
 
 function formatDate(dateStr) {
   if (!dateStr) return null
@@ -132,10 +126,10 @@ export function urgencyScore(project) {
 }
 
 export function urgencyColor(u) {
-  if (u > 0.55) return '#ff5533'
+  if (u > 0.55) return STATUS_COLOR.failed
   if (u > 0.28) return '#f0b429'
-  if (u > 0.08) return '#1ed760'
-  return '#1ed760'
+  if (u > 0.08) return STATUS_COLOR.in_progress
+  return '#facc15'
 }
 
 export function useCountUp(target, ms = 700) {
@@ -182,9 +176,9 @@ export function StackedBar({ done, active, failed, total, height = 14 }) {
   const offset = height * 1.2
   return (
     <div style={{ width: '100%', height, display: 'flex', background: 'rgba(255,255,255,0.04)', clipPath: PARA_R(offset) }}>
-      <div style={{ width: `${d}%`, height: '100%', background: '#22c55e', transition: 'width 0.04s' }} />
-      <div style={{ width: `${a}%`, height: '100%', background: '#38bdf8', transition: 'width 0.04s' }} />
-      <div style={{ width: `${f}%`, height: '100%', background: '#f87171', transition: 'width 0.04s' }} />
+      <div style={{ width: `${d}%`, height: '100%', background: STATUS_COLOR.done, transition: 'width 0.04s' }} />
+      <div style={{ width: `${a}%`, height: '100%', background: STATUS_COLOR.in_progress, transition: 'width 0.04s' }} />
+      <div style={{ width: `${f}%`, height: '100%', background: STATUS_COLOR.failed, transition: 'width 0.04s' }} />
     </div>
   )
 }
@@ -210,7 +204,7 @@ export function Label({ children, color }) {
 export function TabBtn({ label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? 'rgba(30,215,96,0.1)' : 'transparent',
+      background: active ? 'rgba(250,204,21,0.1)' : 'transparent',
       border: 'none',
       borderTop: `2px solid ${active ? DARK.success : 'transparent'}`,
       cursor: 'pointer',
@@ -275,7 +269,7 @@ export function ViewProgress({ projects, pinned, onTogglePin }) {
                 }}>
                   {p.name}
                 </span>
-                {overdue > 0 && <Label color="#ff5533">⚠ {overdue} overdue</Label>}
+                {overdue > 0 && <Label color={STATUS_COLOR.failed}>! {overdue} overdue</Label>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', fontVariantNumeric: 'tabular-nums' }}>
@@ -311,7 +305,7 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
   return (
     <div style={{ paddingTop: 8 }}>
       <div style={{ display: 'flex', gap: 20, paddingBottom: 14, marginBottom: 4 }}>
-        {[['#22c55e', 'DONE'], ['#38bdf8', 'ACTIVE'], ['#f87171', 'FAILED']].map(([c, l]) => (
+        {[[STATUS_COLOR.done, 'DONE'], [STATUS_COLOR.in_progress, 'ACTIVE'], [STATUS_COLOR.failed, 'FAILED']].map(([c, l]) => (
           <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: DIM, fontWeight: 700, letterSpacing: '0.1em' }}>
             <span style={{ width: 12, height: 4, background: c, clipPath: PARA(4) }} />{l}
           </span>
@@ -351,7 +345,7 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
             )}
             <StackedBar done={done} active={active} failed={failed} total={total} height={12} />
             <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
-              {[['#22c55e', done, 'done'], ['#38bdf8', active, 'active'], ['#f87171', failed, 'failed']].map(([c, n, l]) => (
+              {[[STATUS_COLOR.done, done, 'done'], [STATUS_COLOR.in_progress, active, 'active'], [STATUS_COLOR.failed, failed, 'failed']].map(([c, n, l]) => (
                 <span key={l} style={{ fontSize: 11, color: n > 0 ? c : 'rgba(255,255,255,0.15)', fontWeight: 700, letterSpacing: '0.04em' }}>
                   {n} <span style={{ fontWeight: 400, opacity: 0.6 }}>{l}</span>
                 </span>
@@ -365,9 +359,9 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
 }
 
 /* ── ViewTasks ─────────────────────────────────────────────────────── */
-const STATUS_COLOR = { done: '#22c55e', in_progress: '#38bdf8', failed: '#f87171', todo: 'rgba(255,255,255,0.2)' }
+const STATUS_COLOR_MAP = STATUS_COLOR
 const STATUS_LABEL = { done: 'DONE', in_progress: 'ACTIVE', failed: 'FAILED', todo: 'TODO' }
-const PRI_COLOR    = { high: '#f87171', medium: '#f0b429', low: '#1ed760' }
+const PRI_COLOR    = { high: '#facc15', medium: '#f0b429', low: '#facc15' }
 
 export function ViewTasks({ projects }) {
   const [open, setOpen] = useState({})
@@ -414,7 +408,7 @@ export function ViewTasks({ projects }) {
             </div>
             {/* Task rows */}
             {isOpen && topTasks.map((t, i) => {
-              const sc = STATUS_COLOR[t.status] || DIM
+              const sc = STATUS_COLOR_MAP[t.status] || DIM
               const isOverdue = t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()
               const isExpanded = expandedTask === t.id
               const subtasks = allTasks.filter(sub => sub.parent_id === t.id)
@@ -453,7 +447,7 @@ export function ViewTasks({ projects }) {
                       {t.title}
                     </span>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-                      {isOverdue && <Label color="#ff5533">OVERDUE</Label>}
+                      {isOverdue && <Label color={STATUS_COLOR.failed}>OVERDUE</Label>}
                       <span style={{ fontSize: 10, fontWeight: 700, color: PRI_COLOR[t.priority] || DIM, letterSpacing: '0.06em' }}>
                         {(t.priority || '').toUpperCase()}
                       </span>
@@ -488,7 +482,7 @@ export function ViewTasks({ projects }) {
                           <span style={{ color: DIM }}>Start: <span style={{ color: MID }}>{formatDate(t.start_date)}</span></span>
                         )}
                         {t.due_date && (
-                          <span style={{ color: DIM }}>Due: <span style={{ color: isOverdue ? '#ff5533' : MID }}>{formatDate(t.due_date)}</span></span>
+                          <span style={{ color: DIM }}>Due: <span style={{ color: isOverdue ? STATUS_COLOR.failed : MID }}>{formatDate(t.due_date)}</span></span>
                         )}
                         {t.progress_pct != null && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -516,7 +510,7 @@ export function ViewTasks({ projects }) {
                             SUBTASKS ({subtasks.length})
                           </div>
                           {subtasks.map(s => {
-                            const sColor = STATUS_COLOR[s.status] || DIM
+                            const sColor = STATUS_COLOR_MAP[s.status] || DIM
                             return (
                               <div key={s.id} style={{
                                 display: 'flex', alignItems: 'center', gap: 8,
@@ -557,7 +551,7 @@ export function ViewTasks({ projects }) {
                             </span>
                           )}
                           {t.blocking?.length > 0 && (
-                            <span style={{ color: '#38bdf8' }}>
+                            <span style={{ color: STATUS_COLOR.in_progress }}>
                               Blocking: {t.blocking.map(id => {
                                 const blocked = allTasks.find(bt => bt.id === id)
                                 return blocked ? blocked.title : id.slice(-8)
@@ -607,7 +601,7 @@ export function ViewCompare({ projects }) {
         const u       = urgencyScore(p)
         const color   = urgencyColor(u)
         const vals    = [total, done, active, failed, overdue, `${pct}%`]
-        const vColors = [MID, '#22c55e', '#38bdf8', failed > 0 ? '#f87171' : DIM, overdue > 0 ? '#ff5533' : DIM, color]
+        const vColors = [MID, STATUS_COLOR.done, STATUS_COLOR.in_progress, failed > 0 ? STATUS_COLOR.failed : DIM, overdue > 0 ? STATUS_COLOR.failed : DIM, color]
         return (
           <GlassRow key={p.id} accentColor={color} style={{ padding: '12px 20px 12px 24px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr repeat(6, 52px)', alignItems: 'center' }}>

@@ -248,6 +248,9 @@ export const importTasks = (projectId, data) =>
 // Settings
 export const getSettings = () => api.get('/settings').then(r => r.data)
 export const changePassword = (data) => api.post('/settings/change-password', data).then(r => r.data)
+export const getDashboardWidgets = () => api.get('/settings/dashboard-widgets').then(r => r.data)
+export const getPreference = (key) => api.get(`/settings/preferences/${key}`).then(r => r.data)
+export const setPreference = (key, value) => api.put(`/settings/preferences/${key}`, { value }).then(r => r.data)
 
 // Analytics
 export const getAnalyticsOverview = () => api.get('/analytics/overview').then(r => r.data)
@@ -257,7 +260,8 @@ export const getAnalyticsVelocity = (projectId) => api.get('/analytics/velocity'
 export const getAnalyticsStatusTrend = (projectId, days) => api.get('/analytics/status-trend', { params: { project_id: projectId, days } }).then(r => r.data)
 
 // Share (public, no auth — uses plain axios to avoid the auth interceptor)
-export const getShareData = (token) => axios.get(`/share/identity/${token}`, { withCredentials: true }).then(r => r.data)
+export const getShareData = (token, scope = 'identity') =>
+  axios.get(`/share/${scope}/${token}`, { withCredentials: true }).then(r => r.data)
 export const rotateShareToken = (identityId) => api.post(`/identities/${identityId}/rotate-share-token`).then(r => r.data)
 
 // Share PIN & expiry management (authenticated)

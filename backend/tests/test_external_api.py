@@ -336,7 +336,12 @@ class TestAgentIdTracking:
 
         from app.models import ActivityLog
 
-        log = db.query(ActivityLog).filter(ActivityLog.action == "task.created").order_by(ActivityLog.created_at.desc()).first()
+        log = (
+            db.query(ActivityLog)
+            .filter(ActivityLog.action == "task.created")
+            .order_by(ActivityLog.created_at.desc())
+            .first()
+        )
         assert log is not None
         assert "claude-code-session-123" in log.actor
 
@@ -352,7 +357,12 @@ class TestAgentIdTracking:
 
         from app.models import ActivityLog
 
-        log = db.query(ActivityLog).filter(ActivityLog.action == "task.created").order_by(ActivityLog.created_at.desc()).first()
+        log = (
+            db.query(ActivityLog)
+            .filter(ActivityLog.action == "task.created")
+            .order_by(ActivityLog.created_at.desc())
+            .first()
+        )
         assert log is not None
         assert log.actor == f"api:{key.name}"
 

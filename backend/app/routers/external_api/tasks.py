@@ -224,7 +224,21 @@ async def api_bulk_update_tasks(
     """Bulk update tasks. Each item needs 'id' and fields to update."""
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    _ALLOWED_FIELDS = {"title", "description", "status", "priority", "assignee", "due_date", "start_date", "time_estimate", "time_spent", "is_pinned", "parent_id", "position", "progress_pct"}
+    _ALLOWED_FIELDS = {
+        "title",
+        "description",
+        "status",
+        "priority",
+        "assignee",
+        "due_date",
+        "start_date",
+        "time_estimate",
+        "time_spent",
+        "is_pinned",
+        "parent_id",
+        "position",
+        "progress_pct",
+    }
     results = []
     for update in updates:
         task_id = update.pop("id", None)

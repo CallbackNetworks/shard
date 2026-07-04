@@ -1,13 +1,14 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp, BarChart2, TrendingUp, Shield, ListChecks, GitCompare } from 'lucide-react'
-import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats } from '../api/client'
+import { Plus, FolderOpen, Archive, Clock, User, Activity, ChevronDown, ChevronUp, BarChart2, TrendingUp, Shield, ListChecks, GitCompare, AlertTriangle, CheckCircle2, Radio, Settings, Eye, EyeOff } from 'lucide-react'
+import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats, getGoals, getDecisions, getPreference, setPreference } from '../api/client'
 import AgentTasksPanel from '../components/AgentTasksPanel'
 import IdentityChartsView from '../components/IdentityChartsView'
 import { ViewProgress, ViewHealth, ViewTasks, ViewCompare, getPinnedIds, togglePin } from '../components/OverviewViews'
-import { BRAND, STATUS_MAP, PRIORITY, DARK } from '../constants/theme'
+import { BRAND, STATUS_MAP, PRIORITY, DARK, STATUS_COLOR } from '../constants/theme'
+import { deriveCommandCenter } from '../utils/commandCenter'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Dashboard.module.css'
 
@@ -120,13 +121,13 @@ function ProjectCard({ project, onDelete, index }) {
 
 /* ── Activity feed ────────────────────────────────────────────────── */
 const ACTION_COLORS = {
-  'task.created':        '#10b981',
+  'task.created':        BRAND,
   'task.status_changed': '#f59e0b',
   'task.assigned':       '#3b82f6',
-  'task.deleted':        '#ef4444',
-  'project.created':     '#10b981',
+  'task.deleted':        STATUS_COLOR.failed,
+  'project.created':     BRAND,
   'project.archived':    '#9ca3af',
-  'project.deleted':     '#ef4444',
+  'project.deleted':     STATUS_COLOR.failed,
 }
 
 function timeAgo(dateStr) {
@@ -173,6 +174,177 @@ function ActivityFeed({ activities }) {
   )
 }
 
+function CommandHero({ command, onNewProject }) {
+  const { t } = useTranslation()
+  const { metrics } = command
+  return (
+    <div className={s.commandHero}>
+      <div className={s.commandHeroMain}>
+        <div className={s.commandEyebrow}>
+          <Radio size={12} />
+          {t('dashboard.commandCenter')}
+        </div>
+        <div className={s.commandHeadline}>
+          <span>{metrics.activeTasks}</span>
+          <em>ACTIVE</em>
+        </div>
+        <div className={s.commandSubline}>
+          {metrics.overdue} {t('overdue')} / {metrics.failed} {t('failed')} / {metrics.inMotion} {t('dashboard.inMotion')}
+        </div>
+      </div>
+      <div className={s.commandMetrics}>
+        <div className={s.commandMetric}>
+          <span>{metrics.completion}%</span>
+          <small>{t('dashboard.completionRate')}</small>
+        </div>
+        <div className={s.commandMetric}>
+          <span>{metrics.projects}</span>
+          <small>{t('nav.projects')}</small>
+        </div>
+        <div className={s.commandMetricWide}>
+          <small>{t('dashboard.latestSignal')}</small>
+          <strong>{metrics.latestSignal}</strong>
+        </div>
+        <button onClick={onNewProject} className={s.commandAction}>
+          <Plus size={14} /> {t('dashboard.newProject')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PriorityLane({ title, tone, icon, tasks, empty, navigate }) {
+  return (
+    <div className={`${s.priorityLane} ${s[`priorityLane${tone}`] || ''}`}>
+      <div className={s.priorityLaneHeader}>
+        {icon}
+        <span>{title}</span>
+        <b>{tasks.length}</b>
+      </div>
+      <div className={s.priorityLaneList}>
+        {tasks.length === 0 ? (
+          <div className={s.priorityLaneEmpty}>{empty}</div>
+        ) : tasks.slice(0, 5).map((task, index) => (
+          <button
+            key={`${task.projectId}-${task.id}`}
+            className={s.priorityTask}
+            onClick={() => navigate(`/projects/${task.projectId}`)}
+            style={{ animationDelay: `${index * 0.045}s` }}
+          >
+            <span className={s.priorityTaskTitle}>{task.title}</span>
+            <span className={s.priorityTaskMeta}>{task.projectName}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PriorityWall({ command }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { lanes } = command
+
+  return (
+    <div className={s.priorityWall}>
+      <PriorityLane
+        title={t('dashboard.critical')}
+        tone="Risk"
+        icon={<AlertTriangle size={14} />}
+        tasks={lanes.critical}
+        empty={t('dashboard.noCritical')}
+        navigate={navigate}
+      />
+      <PriorityLane
+        title={t('dashboard.inMotion')}
+        tone="Motion"
+        icon={<Activity size={14} />}
+        tasks={lanes.inMotion}
+        empty={t('dashboard.noInMotion')}
+        navigate={navigate}
+      />
+      <PriorityLane
+        title={t('dashboard.waiting')}
+        tone="Waiting"
+        icon={<Clock size={14} />}
+        tasks={lanes.waiting}
+        empty={t('dashboard.noWaiting')}
+        navigate={navigate}
+      />
+      <PriorityLane
+        title={t('dashboard.doneToday')}
+        tone="Shipped"
+        icon={<CheckCircle2 size={14} />}
+        tasks={lanes.doneToday}
+        empty={t('dashboard.noDoneToday')}
+        navigate={navigate}
+      />
+    </div>
+  )
+}
+
+function BriefingList({ items, renderItem, empty }) {
+  if (!items.length) return <div className={s.briefingEmpty}>{empty}</div>
+  return (
+    <div className={s.briefingList}>
+      {items.map(renderItem)}
+    </div>
+  )
+}
+
+function OpsSidebar({ command }) {
+  const { t } = useTranslation()
+  const { metrics, briefing } = command
+
+  return (
+    <aside className={s.opsSidebar}>
+      <div className={s.opsPanel}>
+        <div className={s.opsPanelTitle}>{t('dashboard.liveSignals')}</div>
+        <ActivityFeed activities={briefing.recentActivity} />
+      </div>
+      <div className={s.opsPanel}>
+        <div className={s.opsPanelTitle}>{t('dashboard.queuePressure')}</div>
+        <div className={s.pressureRows}>
+          <div><span>{command.lanes.critical.length}</span><em>{t('dashboard.critical')}</em></div>
+          <div><span>{metrics.failed}</span><em>{t('failed')}</em></div>
+          <div><span>{metrics.projects}</span><em>{t('active')} {t('nav.projects')}</em></div>
+        </div>
+      </div>
+      <div className={s.opsPanel}>
+        <div className={s.opsPanelTitle}>{t('dashboard.briefing')}</div>
+        <div className={s.briefingGrid}>
+          <section>
+            <b>{t('nav.goals')}</b>
+            <BriefingList
+              items={briefing.activeGoals}
+              empty={t('dashboard.noGoalSignals')}
+              renderItem={(goal, index) => (
+                <div key={goal.id || index} className={s.briefingItem}>
+                  <span>{goal.title || goal.name || goal.description || 'Goal'}</span>
+                  <em>{goal.status || 'active'}</em>
+                </div>
+              )}
+            />
+          </section>
+          <section>
+            <b>{t('nav.decisions')}</b>
+            <BriefingList
+              items={briefing.pendingDecisions}
+              empty={t('dashboard.noDecisionSignals')}
+              renderItem={(decision, index) => (
+                <div key={decision.id || index} className={s.briefingItem}>
+                  <span>{decision.name || decision.title || 'Decision'}</span>
+                  <em>{decision.decision_status || 'proposed'}</em>
+                </div>
+              )}
+            />
+          </section>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
 /* ── Task row (reused in Due Soon section) ────────────────────────── */
 function TaskRow({ t: task, i, total, onClick }) {
   const [hov, setHov] = useState(false)
@@ -204,7 +376,7 @@ function TaskRow({ t: task, i, total, onClick }) {
       <span className={s.taskProject}>{task.projectName}</span>
       {task.due_date && (
         <span className={s.taskDueDate} style={{
-          color: overdue ? '#f87171' : DARK.textDim,
+          color: overdue ? STATUS_COLOR.failed : DARK.textDim,
         }}>
           <Clock size={9} />
           {new Date(task.due_date).toLocaleDateString()}
@@ -250,6 +422,33 @@ function Sparkline({ activities }) {
   )
 }
 
+function CountUpValue({ value }) {
+  const numeric = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && /^\d+%?$/.test(value)
+    ? Number(value.replace('%', ''))
+    : null
+  const suffix = typeof value === 'string' && value.endsWith('%') ? '%' : ''
+  const [shown, setShown] = useState(0)
+
+  useEffect(() => {
+    if (numeric == null) return
+    let raf = 0
+    const start = performance.now()
+    const duration = 620
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setShown(Math.round(numeric * eased))
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [numeric])
+
+  return numeric == null ? value : `${shown}${suffix}`
+}
+
 /* ── Summary stat cards ───────────────────────────────────────────── */
 function StatCards({ projects, activities }) {
   const { t } = useTranslation()
@@ -285,7 +484,7 @@ function StatCards({ projects, activities }) {
     {
       label: t('dashboard.overdueCount'),
       value: overdueTasks,
-      color: overdueTasks > 0 ? '#f87171' : DARK.text,
+      color: overdueTasks > 0 ? STATUS_COLOR.failed : DARK.text,
       delay: 0.12,
     },
     {
@@ -306,7 +505,9 @@ function StatCards({ projects, activities }) {
           style={{ animationDelay: `${card.delay}s` }}
         >
           <div className={s.statCardLabel}>{card.label}</div>
-          <div className={s.statCardValue} style={{ color: card.color }}>{card.value}</div>
+          <div className={s.statCardValue} style={{ color: card.color }}>
+            <CountUpValue value={card.value} />
+          </div>
           {card.sparkline && <Sparkline activities={activities} />}
         </div>
       ))}
@@ -328,13 +529,12 @@ function DueSoonPanel({ projects }) {
       .map(task => ({ ...task, projectName: p.name, projectId: p.id }))
   ).sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
 
-  if (dueSoonTasks.length === 0) return null
-
   return (
     <div className={s.dueSoonPanel}>
       <button
         onClick={() => setCollapsed(v => !v)}
         className={s.dueSoonToggle}
+        disabled={dueSoonTasks.length === 0}
       >
         <Clock size={13} color="#ffa42b" />
         <span className={s.dueSoonTitle}>
@@ -343,10 +543,12 @@ function DueSoonPanel({ projects }) {
         <span className={s.dueSoonCount}>
           {dueSoonTasks.length}
         </span>
-        {collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+        {dueSoonTasks.length > 0 && (collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />)}
       </button>
 
-      {!collapsed && (
+      {dueSoonTasks.length === 0 ? (
+        <div className={s.dueSoonEmpty}>{t('dashboard.noTasksDue')}</div>
+      ) : !collapsed && (
         <div className={s.dueSoonList}>
           {dueSoonTasks.map((task, i) => (
             <TaskRow
@@ -481,7 +683,7 @@ function GettingStarted({ onNewProject, isMobile }) {
       num: 1,
       title: t('dashboard.step1Title'),
       desc: t('dashboard.step1Desc'),
-      gradient: 'linear-gradient(135deg, #ef4444, #dc2626)',
+      gradient: 'linear-gradient(135deg, #facc15, #eab308)',
       action: <button
         onClick={onNewProject}
         className={s.stepActionBtn}
@@ -494,7 +696,7 @@ function GettingStarted({ onNewProject, isMobile }) {
       num: 2,
       title: t('dashboard.step2Title'),
       desc: t('dashboard.step2Desc'),
-      gradient: 'linear-gradient(135deg, #10b981, #059669)',
+      gradient: 'linear-gradient(135deg, #facc15, #eab308)',
     },
     {
       num: 3,
@@ -506,7 +708,7 @@ function GettingStarted({ onNewProject, isMobile }) {
       num: 4,
       title: t('dashboard.step4Title'),
       desc: t('dashboard.step4Desc'),
-      gradient: 'linear-gradient(135deg, #f87171, #dc2626)',
+      gradient: 'linear-gradient(135deg, #fde047, #ca8a04)',
     },
   ]
 
@@ -551,11 +753,40 @@ export default function Dashboard() {
     queryFn: () => getActivity({ limit: 50 }),
     staleTime: 10000,
   })
+  const { data: goals = [] } = useQuery({
+    queryKey: ['goals', 'command-center'],
+    queryFn: () => getGoals(),
+    staleTime: 30000,
+  })
+  const { data: decisions = [] } = useQuery({
+    queryKey: ['decisions', 'command-center'],
+    queryFn: () => getDecisions(),
+    staleTime: 30000,
+  })
   const { data: hubStats } = useQuery({
     queryKey: ['identity-hub-stats'],
     queryFn: getIdentityHubStats,
     staleTime: 60000,
   })
+  const DEFAULT_WIDGETS = { 'stat-cards': true, 'command-hero': true, 'priority-wall': true, 'agent-tasks': true, 'due-soon': true, 'ops-sidebar': true, 'projects-grid': true }
+  const { data: savedWidgets } = useQuery({
+    queryKey: ['preference', 'dashboard-widgets'],
+    queryFn: () => getPreference('dashboard-widgets'),
+    staleTime: 60000,
+  })
+  const [widgetVis, setWidgetVis] = useState(DEFAULT_WIDGETS)
+  const [showWidgetConfig, setShowWidgetConfig] = useState(false)
+  useEffect(() => {
+    if (savedWidgets?.value) setWidgetVis({ ...DEFAULT_WIDGETS, ...savedWidgets.value })
+  }, [savedWidgets])
+  const toggleWidget = useCallback((id) => {
+    setWidgetVis(prev => {
+      const next = { ...prev, [id]: !prev[id] }
+      setPreference('dashboard-widgets', next).catch(() => {})
+      return next
+    })
+  }, [])
+  const w = (id) => widgetVis[id] !== false
   const [chartIdentityId, setChartIdentityId] = useState(null)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
@@ -580,6 +811,7 @@ export default function Dashboard() {
   const active = projects.filter(p => p.status === 'active')
   const archived = projects.filter(p => p.status === 'archived')
   const displayed = filter === 'all' ? projects : filter === 'archived' ? archived : active
+  const command = deriveCommandCenter(projects, activities, goals, decisions)
 
   // Time-of-day greeting
   const hour = new Date().getHours()
@@ -603,15 +835,63 @@ export default function Dashboard() {
             <span className={s.headerStatsArchived}>{archived.length}</span> {t('archived')}
           </div>
         </div>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className={s.newProjectBtn}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#dc2626' }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
-        >
-          <Plus size={14} /> {t('dashboard.newProject')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={() => setShowWidgetConfig(v => !v)}
+            title="Configure widgets"
+            style={{
+              background: showWidgetConfig ? 'rgba(255,255,255,0.1)' : 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
+              padding: '7px 10px', cursor: 'pointer', color: DARK.textMid,
+              display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+            }}
+          >
+            <Settings size={14} />
+          </button>
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className={s.newProjectBtn}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#eab308' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
+          >
+            <Plus size={14} /> {t('dashboard.newProject')}
+          </button>
+        </div>
       </div>
+
+      {/* Widget configuration panel */}
+      {showWidgetConfig && (
+        <div style={{
+          background: DARK.surface, border: `1px solid ${DARK.border}`, borderRadius: 10,
+          padding: '12px 16px', margin: '0 0 16px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 12, color: DARK.textMid, fontWeight: 600, marginRight: 8 }}>Widgets:</span>
+          {[
+            { id: 'stat-cards', label: 'Stats' },
+            { id: 'command-hero', label: 'Command Center' },
+            { id: 'priority-wall', label: 'Priority Lanes' },
+            { id: 'agent-tasks', label: 'Agent Tasks' },
+            { id: 'due-soon', label: 'Due Soon' },
+            { id: 'ops-sidebar', label: 'Signals & Briefing' },
+            { id: 'projects-grid', label: 'Projects' },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => toggleWidget(item.id)}
+              style={{
+                background: w(item.id) ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${w(item.id) ? 'rgba(250,204,21,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                fontSize: 11, color: w(item.id) ? BRAND : DARK.textDim,
+                display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
+              }}
+            >
+              {w(item.id) ? <Eye size={11} /> : <EyeOff size={11} />}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Create form */}
       {showForm && (
@@ -634,8 +914,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stat cards (always visible, all tabs) */}
-      {!isLoading && projects.length > 0 && (
+      {/* Stat cards */}
+      {w('stat-cards') && !isLoading && projects.length > 0 && (
         <StatCards projects={projects} activities={activities} />
       )}
 
@@ -703,42 +983,50 @@ export default function Dashboard() {
         ) : isEmptyState ? (
           <GettingStarted onNewProject={() => setShowForm(true)} isMobile={isMobile} />
         ) : (
-          <>
-            {/* Agent Workload panel */}
-            <AgentTasksPanel />
+          <div className={`${s.commandLayout} ${isMobile ? s.commandLayoutMobile : s.commandLayoutDesktop}`}>
+            <div className={s.commandMainColumn}>
+              {w('command-hero') && <CommandHero
+                command={command}
+                onNewProject={() => setShowForm(true)}
+              />}
 
-            {/* Due Soon panel */}
-            <DueSoonPanel projects={projects} />
+              {w('priority-wall') && <PriorityWall command={command} />}
 
-            {/* Filter buttons */}
-            <div className={s.filterRow}>
-              {[
-                { key: 'active',   label: t('active'),   icon: <FolderOpen size={11} />, count: active.length },
-                { key: 'archived', label: t('archived'), icon: <Archive size={11} />,    count: archived.length },
-                { key: 'all',      label: t('all'),      icon: null,                     count: projects.length },
-              ].map(f => (
-                <button key={f.key} onClick={() => setFilter(f.key)}
-                  className={`${s.filterBtn} ${filter === f.key ? s.filterBtnActive : s.filterBtnInactive}`}>
-                  {f.icon}{f.label}
-                  <span className={s.filterCount}>{f.count}</span>
-                </button>
-              ))}
-            </div>
+              {w('agent-tasks') && <AgentTasksPanel />}
 
-            {displayed.length === 0 ? (
-              <div className={s.emptyState}>
-                <FolderOpen size={36} className={s.emptyIcon} />
-                <p className={s.emptyTitle}>{t('dashboard.noProjectsEmpty')}</p>
-                <p className={s.emptySubtitle}>{t('dashboard.createFirstProject')}</p>
-              </div>
-            ) : (
-              <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
-                {displayed.map((p, i) => (
-                  <ProjectCard key={p.id} project={p} index={i} onDelete={id => deleteMut.mutate(id)} />
+              {w('due-soon') && <DueSoonPanel projects={projects} />}
+
+              {/* Filter buttons */}
+              <div className={s.filterRow}>
+                {[
+                  { key: 'active',   label: t('active'),   icon: <FolderOpen size={11} />, count: active.length },
+                  { key: 'archived', label: t('archived'), icon: <Archive size={11} />,    count: archived.length },
+                  { key: 'all',      label: t('all'),      icon: null,                     count: projects.length },
+                ].map(f => (
+                  <button key={f.key} onClick={() => setFilter(f.key)}
+                    className={`${s.filterBtn} ${filter === f.key ? s.filterBtnActive : s.filterBtnInactive}`}>
+                    {f.icon}{f.label}
+                    <span className={s.filterCount}>{f.count}</span>
+                  </button>
                 ))}
               </div>
-            )}
-          </>
+
+              {displayed.length === 0 ? (
+                <div className={s.emptyState}>
+                  <FolderOpen size={36} className={s.emptyIcon} />
+                  <p className={s.emptyTitle}>{t('dashboard.noProjectsEmpty')}</p>
+                  <p className={s.emptySubtitle}>{t('dashboard.createFirstProject')}</p>
+                </div>
+              ) : (
+                <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
+                  {displayed.map((p, i) => (
+                    <ProjectCard key={p.id} project={p} index={i} onDelete={id => deleteMut.mutate(id)} />
+                  ))}
+                </div>
+              )}
+            </div>
+            {w('ops-sidebar') && <OpsSidebar command={command} />}
+          </div>
         )}
       </div>
     </div>

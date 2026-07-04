@@ -19,6 +19,7 @@ from app.routers.external_api.progress import sub_router as progress_router
 from app.routers.external_api.projects import sub_router as projects_router
 from app.routers.external_api.search import sub_router as search_router
 from app.routers.external_api.stats import sub_router as stats_router
+from app.routers.external_api.subscriptions import sub_router as subscriptions_router
 from app.routers.external_api.summary import sub_router as summary_router
 from app.routers.external_api.tasks import sub_router as tasks_router
 from app.routers.external_api.tools_schema import sub_router as tools_schema_router
@@ -41,3 +42,4 @@ router.include_router(notifications_router)
 router.include_router(agent_context_router)
 router.include_router(progress_router)
 router.include_router(tools_schema_router)
+router.include_router(subscriptions_router)

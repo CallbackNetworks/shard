@@ -174,6 +174,51 @@ TOOLS = [
             "required": ["task_id", "decision_label_id", "reason"],
         },
     },
+    {
+        "name": "batch_create_tasks",
+        "description": (
+            "Create multiple tasks at once from a parsed list. Use this when the user provides "
+            "a block of text (meeting notes, a plan, a todo list) and you need to create "
+            "several tasks from it. Parse the text into structured tasks first, then call this tool."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Project ID to create tasks in"},
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string", "description": "Task title (imperative form)"},
+                            "priority": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
+                                "description": "Default: medium",
+                            },
+                            "description": {"type": "string", "description": "Optional description"},
+                            "due_date": {"type": "string", "description": "Optional due date (YYYY-MM-DD)"},
+                            "subtasks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "title": {"type": "string"},
+                                        "priority": {"type": "string", "enum": ["low", "medium", "high"]},
+                                    },
+                                    "required": ["title"],
+                                },
+                                "description": "Optional subtasks",
+                            },
+                        },
+                        "required": ["title"],
+                    },
+                    "description": "Array of tasks to create",
+                },
+            },
+            "required": ["project_id", "tasks"],
+        },
+    },
 ]
 
 
@@ -207,6 +252,8 @@ async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
             return _tool_create_decision(db, **tool_input)
         elif tool_name == "tag_task_with_decision":
             return _tool_tag_task_with_decision(db, **tool_input)
+        elif tool_name == "batch_create_tasks":
+            return await _tool_batch_create_tasks(db, **tool_input)
         else:
             return f"Unknown tool: {tool_name}"
     except Exception as exc:
@@ -583,3 +630,62 @@ def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: s
     db.add(comment)
     db.commit()
     return json.dumps({"status": "tagged", "task_id": task_id, "decision": label.name, "reason": reason})
+
+
+async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dict]) -> str:
+    from app.services.ws_manager import ws_manager
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        return f"Project {project_id} not found"
+
+    if not tasks:
+        return "No tasks provided"
+    if len(tasks) > 50:
+        return "Maximum 50 tasks per batch"
+
+    created_ids = []
+    for item in tasks:
+        title = (item.get("title") or "").strip()
+        if not title:
+            continue
+        if len(title) > 500:
+            title = title[:500]
+
+        task = Task(
+            project_id=project_id,
+            title=title,
+            priority=item.get("priority", "medium"),
+            description=item.get("description"),
+        )
+        if item.get("due_date"):
+            try:
+                task.due_date = datetime.fromisoformat(item["due_date"])
+            except (ValueError, TypeError):
+                pass
+        db.add(task)
+        db.flush()
+        created_ids.append(task.id)
+
+        for sub in item.get("subtasks") or []:
+            sub_title = (sub.get("title") or "").strip()
+            if not sub_title:
+                continue
+            subtask = Task(
+                project_id=project_id,
+                title=sub_title,
+                priority=sub.get("priority", "medium"),
+                parent_id=task.id,
+            )
+            db.add(subtask)
+            db.flush()
+            created_ids.append(subtask.id)
+
+    db.commit()
+
+    try:
+        await ws_manager.broadcast("task.imported", {"project_id": project_id, "count": len(created_ids)})
+    except Exception:
+        pass
+
+    return json.dumps({"created": len(created_ids), "task_ids": created_ids})

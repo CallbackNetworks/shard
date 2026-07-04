@@ -1,14 +1,17 @@
 """Tests for app.services.llm module."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 
 
 @pytest.fixture(autouse=True)
 def reset_module():
     """Ensure fresh import each test."""
     import importlib
+
     import app.services.llm as llm_mod
+
     yield
     importlib.reload(llm_mod)
 
@@ -16,7 +19,9 @@ def reset_module():
 def test_get_provider_default_stub():
     with patch.dict("os.environ", {"LLM_PROVIDER": "stub"}, clear=False):
         import importlib
+
         import app.services.llm as llm_mod
+
         importlib.reload(llm_mod)
         provider = llm_mod.get_provider()
         assert isinstance(provider, llm_mod.StubProvider)
@@ -25,7 +30,9 @@ def test_get_provider_default_stub():
 def test_get_provider_unset_returns_stub():
     with patch.dict("os.environ", {}, clear=False):
         import importlib
+
         import app.services.llm as llm_mod
+
         importlib.reload(llm_mod)
         provider = llm_mod.get_provider()
         assert isinstance(provider, llm_mod.StubProvider)
@@ -37,7 +44,9 @@ def test_get_provider_claude():
         mock_anthropic.AsyncAnthropic.return_value = MagicMock()
         with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
             import importlib
+
             import app.services.llm as llm_mod
+
             importlib.reload(llm_mod)
             provider = llm_mod.get_provider()
             assert isinstance(provider, llm_mod.ClaudeProvider)
@@ -49,7 +58,9 @@ def test_get_provider_openai():
         mock_openai.AsyncOpenAI.return_value = MagicMock()
         with patch.dict("sys.modules", {"openai": mock_openai}):
             import importlib
+
             import app.services.llm as llm_mod
+
             importlib.reload(llm_mod)
             provider = llm_mod.get_provider()
             assert isinstance(provider, llm_mod.OpenAIProvider)
@@ -58,6 +69,7 @@ def test_get_provider_openai():
 @pytest.mark.asyncio
 async def test_stub_provider_chat():
     from app.services.llm import StubProvider
+
     provider = StubProvider()
     events = []
     async for event in provider.chat(messages=[], tools=[]):

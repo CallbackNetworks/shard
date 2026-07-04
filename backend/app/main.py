@@ -27,6 +27,7 @@ from app.routers import (
     goals,
     identities,
     integrations,
+    issue_sync,
     labels,
     notifications,
     projects,
@@ -155,6 +156,7 @@ app.include_router(auth_router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(webhooks.router)
+app.include_router(issue_sync.router)
 app.include_router(integrations.router)
 app.include_router(labels.router)
 app.include_router(task_label_router)

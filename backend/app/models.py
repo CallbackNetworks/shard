@@ -21,6 +21,7 @@ class Project(Base):
     status: Mapped[str] = mapped_column(SAEnum("active", "archived", name="project_status"), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+    share_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
 
     agent_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
@@ -67,6 +68,10 @@ class Task(Base):
     progress_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     agent_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_provider: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    external_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    external_repo: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
@@ -479,6 +484,14 @@ class GoalProject(Base):
 
     goal: Mapped["Goal"] = relationship("Goal", back_populates="goal_projects")
     project: Mapped["Project"] = relationship("Project")
+
+
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[dict | list] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
 
 class WorkflowRule(Base):

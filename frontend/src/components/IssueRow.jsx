@@ -1,6 +1,6 @@
 import { useState, memo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, Clock } from 'lucide-react'
+import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { regenerateToken } from '../api/client'
 import { PRIORITY, DARK } from '../constants/theme'
@@ -12,6 +12,7 @@ import RecurrencePanel from './RecurrencePanel'
 import AttachmentsPanel from './AttachmentsPanel'
 import BuildHistoryPanel from './BuildHistoryPanel'
 import MarkdownPreview from './MarkdownPreview'
+import TimeTracker from './TimeTracker'
 
 export default memo(function IssueRow({
   task, projectId, projectCode, onUpdate, onDelete,
@@ -183,8 +184,8 @@ export default memo(function IssueRow({
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(129,140,248,0.12)', color: DARK.info,
-            border: '1px solid rgba(129,140,248,0.25)', flexShrink: 0, whiteSpace: 'nowrap',
+            background: 'rgba(250,204,21,0.12)', color: DARK.info,
+            border: '1px solid rgba(250,204,21,0.25)', flexShrink: 0, whiteSpace: 'nowrap',
           }}>
             <Bot size={9} />
             {task.assigned_agent_name}
@@ -221,16 +222,7 @@ export default memo(function IssueRow({
         )}
 
         {/* Time tracking */}
-        {(task.time_estimate || task.time_spent) ? (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 3,
-            fontSize: 10, color: 'rgba(255,255,255,0.3)', flexShrink: 0, whiteSpace: 'nowrap',
-          }}>
-            <Clock size={10} />
-            {task.time_spent != null ? `${task.time_spent}m` : '0m'}
-            {task.time_estimate != null && <span style={{ color: 'rgba(255,255,255,0.15)' }}>/ {task.time_estimate}m</span>}
-          </span>
-        ) : null}
+        <TimeTracker task={task} onUpdate={onUpdate} />
 
         {task.due_date && (
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -249,28 +241,28 @@ export default memo(function IssueRow({
         {hovered ? (
           <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
             {task.description && (
-              <button onClick={(e) => { e.stopPropagation(); setShowDescription(v => !v) }} title="Toggle description" style={{ background: showDescription ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDescription ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              <button onClick={(e) => { e.stopPropagation(); setShowDescription(v => !v) }} title="Toggle description" style={{ background: showDescription ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDescription ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
                 <FileText size={12} />
               </button>
             )}
             <button onClick={(e) => { e.stopPropagation(); setShowComments(v => !v) }} title="Comments"
-              style={{ background: showComments ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showComments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showComments ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showComments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <MessageSquare size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowDeps(v => !v) }} title="Dependencies"
-              style={{ background: showDeps ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDeps ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showDeps ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDeps ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <GitBranch size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowRecurrence(v => !v) }} title="Recurrence"
-              style={{ background: showRecurrence ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showRecurrence ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showRecurrence ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showRecurrence ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Repeat2 size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowAttachments(v => !v) }} title="Attachments"
-              style={{ background: showAttachments ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showAttachments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showAttachments ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showAttachments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Paperclip size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowBuildHistory(v => !v) }} title="Build History"
-              style={{ background: showBuildHistory ? 'rgba(30,215,96,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showBuildHistory ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showBuildHistory ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showBuildHistory ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Activity size={12} />
             </button>
             <button onClick={copyWebhook} title="Copy webhook URL" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
@@ -302,7 +294,7 @@ export default memo(function IssueRow({
                 <Plus size={12} />
               </button>
             )}
-            <button onClick={() => { if (confirm(t('issue.deleteConfirm', { title: task.title }))) onDelete(task.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(243,114,127,0.7)', padding: '2px 5px', borderRadius: 4 }}>
+            <button onClick={() => { if (confirm(t('issue.deleteConfirm', { title: task.title }))) onDelete(task.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(250,204,21,0.7)', padding: '2px 5px', borderRadius: 4 }}>
               <Trash2 size={12} />
             </button>
           </div>

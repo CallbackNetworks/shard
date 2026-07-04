@@ -177,6 +177,10 @@ class TaskOut(BaseModel):
     position: int = 0
     progress_pct: int | None = None
     agent_notes: str | None = None
+    external_provider: str | None = None
+    external_id: str | None = None
+    external_url: str | None = None
+    external_repo: str | None = None
     created_at: datetime
     updated_at: datetime
     labels: list[LabelOut] = []
