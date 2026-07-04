@@ -42,47 +42,64 @@ function formatTimelineTime(value) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function relativeTimelineTime(value) {
-  const diff = Date.now() - value
-  const mins = Math.max(0, Math.floor(diff / 60000))
-  if (mins < 1) return 'NOW'
-  if (mins < 60) return `${mins}M AGO`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}H AGO`
-  return `${Math.floor(hours / 24)}D AGO`
+const HEATMAP_KINDS = ['task', 'project', 'decision', 'goal', 'webhook', 'alert']
+const HEATMAP_COLOR = {
+  task: '#facc15',
+  project: '#e5e7eb',
+  decision: '#a78bfa',
+  goal: '#34d399',
+  webhook: '#60a5fa',
+  alert: '#fb7185',
 }
+const HEATMAP_BUCKETS = 24
 
-function buildTimelineItems(activities) {
-  const source = activities.slice(0, 12)
+// Bucket recent activity into a kind x time grid so the strip reads as a
+// heatmap (colour intensity = volume) instead of a wall of event text.
+function buildHeatmap(activities) {
   const now = Date.now()
-  const fallbackStart = now - (6 * 60 * 60 * 1000)
-  const times = source.map(eventTime)
+  const times = activities.map(eventTime)
+  const fallbackStart = now - 6 * 60 * 60 * 1000
   const minTime = times.length ? Math.min(...times, fallbackStart) : fallbackStart
-  const maxTime = times.length ? Math.max(...times, now) : now
-  const span = Math.max(maxTime - minTime, 60 * 60 * 1000)
+  const span = Math.max(now - minTime, 60 * 60 * 1000)
+  const bucketMs = span / HEATMAP_BUCKETS
 
-  return source
-    .map((entry, index) => {
-      const time = eventTime(entry)
-      const position = Math.max(2, Math.min(98, ((time - minTime) / span) * 100))
-      return {
-        id: entry.id || `${entry.action || 'event'}-${time}-${index}`,
-        kind: eventKind(entry),
-        label: eventLabel(entry) || 'ACTIVITY',
-        time,
-        position,
-        relative: relativeTimelineTime(time),
-      }
-    })
-    .sort((a, b) => b.time - a.time)
-}
+  const grid = {}
+  for (const kind of HEATMAP_KINDS) grid[kind] = new Array(HEATMAP_BUCKETS).fill(0)
 
-function summarizeTimelineKinds(items) {
-  const counts = {}
-  for (const item of items) counts[item.kind] = (counts[item.kind] || 0) + 1
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 4)
+  let total = 0
+  for (const entry of activities) {
+    const kind = eventKind(entry)
+    if (!grid[kind]) continue
+    const bucket = Math.max(0, Math.min(HEATMAP_BUCKETS - 1, Math.floor((eventTime(entry) - minTime) / bucketMs)))
+    grid[kind][bucket] += 1
+    total += 1
+  }
+
+  let peak = 0
+  for (const kind of HEATMAP_KINDS) {
+    for (const count of grid[kind]) if (count > peak) peak = count
+  }
+  peak = Math.max(peak, 1)
+
+  const rows = HEATMAP_KINDS
+    .map(kind => ({
+      kind,
+      color: HEATMAP_COLOR[kind],
+      total: grid[kind].reduce((sum, count) => sum + count, 0),
+      cells: grid[kind].map((count, i) => ({
+        count,
+        intensity: count === 0 ? 0 : 0.28 + 0.72 * (count / peak),
+        time: minTime + i * bucketMs,
+      })),
+    }))
+    .filter(row => row.total > 0)
+
+  return { rows: rows.length ? rows : HEATMAP_KINDS.slice(0, 4).map(kind => ({
+    kind,
+    color: HEATMAP_COLOR[kind],
+    total: 0,
+    cells: new Array(HEATMAP_BUCKETS).fill(0).map((_, i) => ({ count: 0, intensity: 0, time: minTime + i * bucketMs })),
+  })), total, minTime, maxTime: now }
 }
 
 export default function GlobalActivityTicker() {
@@ -121,20 +138,7 @@ export default function GlobalActivityTicker() {
   const activityItems = activities.map(eventLabel).filter(Boolean)
   const tickerItems = activityItems.length > 0 ? activityItems : FALLBACK_ITEMS
   const loopItems = [...tickerItems, ...tickerItems]
-  const timelineItems = buildTimelineItems(activities)
-  const timelineStart = timelineItems[0]?.time
-  const timelineEnd = timelineItems[timelineItems.length - 1]?.time
-  const fallbackMarkers = ['task', 'project', 'decision', 'goal', 'webhook'].map((kind, index) => ({
-    id: `fallback-${kind}`,
-    kind,
-    label: FALLBACK_ITEMS[index],
-    time: Date.now(),
-    position: 12 + index * 18,
-    relative: index === 0 ? 'NOW' : 'READY',
-  }))
-  const signalItems = timelineItems.length > 0 ? timelineItems : fallbackMarkers
-  const visibleSignals = signalItems.slice(0, 5)
-  const kindSummary = summarizeTimelineKinds(signalItems)
+  const heatmap = useMemo(() => buildHeatmap(activities), [activities])
 
   return (
     <>
@@ -159,36 +163,32 @@ export default function GlobalActivityTicker() {
           </div>
         </div>
       </div>
-      <div className="kt-signal-timeline" aria-label="Activity signal timeline">
+      <div className="kt-signal-timeline" aria-label="Activity heatmap">
         <div className="kt-signal-timeline-head">
-          <span>LIVE TIMELINE</span>
-          <strong>{signalItems.length}</strong>
-          <em>
-            {timelineStart && timelineEnd
-              ? `${formatTimelineTime(timelineStart)} / ${formatTimelineTime(timelineEnd)}`
-              : 'LIVE / NOW'}
-          </em>
+          <span>LIVE</span>
+          <strong>{heatmap.total}</strong>
+          <em>{`${formatTimelineTime(heatmap.minTime)} / ${formatTimelineTime(heatmap.maxTime)}`}</em>
         </div>
-        <div className="kt-signal-event-list">
-          {visibleSignals.map((item, index) => (
-            <article key={item.id} className={`kt-signal-event is-${item.kind}`}>
-              <div className="kt-signal-event-time">
-                <span>{index === 0 ? 'NOW' : item.relative}</span>
-                <em>{formatTimelineTime(item.time)}</em>
+        <div className="kt-heatmap" role="img" aria-label={`${heatmap.total} recent events by type and time`}>
+          {heatmap.rows.map(row => (
+            <div key={row.kind} className="kt-heatmap-row">
+              <i className="kt-heatmap-key" style={{ background: row.color }} title={row.kind} />
+              <div className="kt-heatmap-cells">
+                {row.cells.map((cell, i) => (
+                  <span
+                    key={i}
+                    className="kt-heatmap-cell"
+                    style={cell.count ? { background: row.color, opacity: cell.intensity } : undefined}
+                    title={cell.count ? `${cell.count} ${row.kind} · ${formatTimelineTime(cell.time)}` : undefined}
+                  />
+                ))}
               </div>
-              <div className="kt-signal-event-line" aria-hidden="true">
-                <i />
-              </div>
-              <div className="kt-signal-event-body">
-                <b>{item.kind}</b>
-                <span>{item.label}</span>
-              </div>
-            </article>
+            </div>
           ))}
         </div>
-        <div className="kt-signal-summary" aria-label="Activity type summary">
-          {kindSummary.map(([kind, count]) => (
-            <span key={kind}><i className={`is-${kind}`} />{count} {kind}</span>
+        <div className="kt-signal-summary" aria-label="Activity type legend">
+          {heatmap.rows.map(row => (
+            <span key={row.kind}><i style={{ background: row.color, borderColor: row.color }} />{row.total} {row.kind}</span>
           ))}
         </div>
       </div>
