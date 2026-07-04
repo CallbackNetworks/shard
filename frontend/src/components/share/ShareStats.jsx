@@ -1,43 +1,21 @@
-import { DIM, useCountUp } from '../OverviewViews'
-
-const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
+import { useCountUp } from '../OverviewViews'
+import { STATUS_COLOR } from '../../constants/theme'
 
 function StatCard({ label, value, sub, color, delay = 0 }) {
   const animated = useCountUp(value)
   const done = animated === value && value > 0
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.018)',
-      borderTop: `1px solid ${color}33`,
-      borderBottom: '1px solid rgba(255,255,255,0.03)',
-      padding: '18px 20px',
-      clipPath: PARA_R(12),
-      position: 'relative',
-      overflow: 'hidden',
-      opacity: 0,
-      animation: `shareReveal 0.5s ease-out ${delay}s forwards`,
-    }}>
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
-        background: color,
-      }} />
-      <div style={{
-        fontSize: 9, fontWeight: 800, letterSpacing: '0.16em',
-        textTransform: 'uppercase', color: DIM, marginBottom: 8,
-      }}>
+    <div className="kt-share-stat" style={{ '--share-accent': color, animationDelay: `${delay}s` }}>
+      <div className="kt-share-stat-label">
         {label}
       </div>
-      <div style={{
-        fontSize: 28, fontWeight: 900, color,
-        letterSpacing: '-0.04em', lineHeight: 1,
-        animation: done ? 'statPulse 0.4s ease-out' : 'none',
-      }}>
+      <div className="kt-share-stat-value" style={{ animation: done ? 'statPulse 0.4s ease-out' : 'none' }}>
         {animated}
-        {label === 'PROGRESS' && <span style={{ fontSize: 14, fontWeight: 500, color: DIM }}>%</span>}
+        {label === 'PROGRESS' && <span>%</span>}
       </div>
       {sub && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
+        <div className="kt-share-stat-sub">
           {sub}
         </div>
       )}
@@ -64,19 +42,14 @@ function ProgressRing({ pct, color, size = 48, stroke = 4 }) {
 }
 
 export default function ShareStats({ summary, color, bp }) {
-  const cols = bp === 'mobile' ? '1fr 1fr' : bp === 'tablet' ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)'
-
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: cols, gap: 8,
-      marginBottom: 28,
-    }}>
+    <div className={`kt-share-stats is-${bp}`}>
       <StatCard label="PROJECTS" value={summary.total_projects} color={color} delay={0.15} />
       <StatCard label="TASKS" value={summary.total_tasks}
-        sub={`${summary.done_tasks} completed`} color="#22c55e" delay={0.2} />
+        sub={`${summary.done_tasks} completed`} color={STATUS_COLOR.done} delay={0.2} />
       <StatCard label="PROGRESS" value={Math.round(summary.overall_progress)} color={color} delay={0.25} />
       <StatCard label="OVERDUE" value={summary.overdue_tasks}
-        color={summary.overdue_tasks > 0 ? '#f87171' : DIM} delay={0.3} />
+        color={summary.overdue_tasks > 0 ? STATUS_COLOR.failed : 'rgba(255,255,255,0.28)'} delay={0.3} />
     </div>
   )
 }

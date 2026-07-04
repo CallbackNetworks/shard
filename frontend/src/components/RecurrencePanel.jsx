@@ -69,7 +69,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
                 await removeRecurrence(projectId, task.id)
                 qc.invalidateQueries({ queryKey: ['project', projectId] })
               }}
-              style={{ padding: '4px 14px', border: '1px solid rgba(243,114,127,0.4)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.danger, textTransform: 'uppercase', letterSpacing: '1px' }}
+              style={{ padding: '4px 14px', border: '1px solid rgba(250,204,21,0.4)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.danger, textTransform: 'uppercase', letterSpacing: '1px' }}
             >
               {t('remove')}
             </button>

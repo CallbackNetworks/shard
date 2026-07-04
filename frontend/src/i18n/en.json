@@ -7,6 +7,7 @@
   "loading": "Loading…",
   "creating": "Creating…",
   "active": "Active",
+  "inactive": "Inactive",
   "archived": "Archived",
   "all": "All",
   "done": "Done",
@@ -53,8 +54,8 @@
   "noResults": "No results",
   "copied": "Copied",
   "copy": "Copy",
-
   "nav.myIssues": "My Issues",
+  "nav.commandCenter": "Command Center",
   "nav.identities": "Identities",
   "nav.integrations": "Integrations",
   "nav.apiKeys": "API Keys",
@@ -70,8 +71,8 @@
   "nav.language": "Language",
   "nav.lightMode": "Switch to light mode",
   "nav.darkMode": "Switch to dark mode",
-
-  "dashboard.title": "My Issues",
+  "dashboard.title": "Command Center",
+  "dashboard.commandCenter": "Command Center",
   "dashboard.newProject": "New Project",
   "dashboard.projectNamePlaceholder": "Project name *",
   "dashboard.descriptionPlaceholder": "Description (optional)",
@@ -109,7 +110,20 @@
   "dashboard.step3Desc": "Get notified via webhook, email, or CI/CD when tasks change.",
   "dashboard.step4Title": "Share with identities",
   "dashboard.step4Desc": "Create role-based identities to organize work across contexts.",
-
+  "dashboard.critical": "Critical",
+  "dashboard.inMotion": "In Motion",
+  "dashboard.waiting": "Waiting",
+  "dashboard.doneToday": "Done Today",
+  "dashboard.latestSignal": "Latest Signal",
+  "dashboard.briefing": "Briefing",
+  "dashboard.liveSignals": "Live Signals",
+  "dashboard.queuePressure": "Queue Pressure",
+  "dashboard.noCritical": "No critical work",
+  "dashboard.noInMotion": "No active task flow",
+  "dashboard.noWaiting": "No waiting queue",
+  "dashboard.noDoneToday": "Nothing shipped yet",
+  "dashboard.noGoalSignals": "No active goal signals",
+  "dashboard.noDecisionSignals": "No pending decisions",
   "project.notFound": "Project not found",
   "project.done": "done",
   "project.newIssue": "New Issue",
@@ -140,7 +154,6 @@
   "project.createLabel": "Create Label",
   "project.projectLabels": "Project Labels",
   "project.filter": "Filter",
-
   "integrations.title": "Integrations",
   "integrations.subtitle": "Configure outbound CI/CD notifications",
   "integrations.new": "+ New Integration",
@@ -208,7 +221,6 @@
   "integrations.noBuildHistory": "No build events yet.",
   "integrations.viewSetup": "View Setup",
   "integrations.taskCreated": "task.created",
-
   "apiKeys.title": "API Keys",
   "apiKeys.subtitle": "Manage API keys for external service access",
   "apiKeys.new": "+ New API Key",
@@ -225,7 +237,6 @@
   "apiKeys.savedConfirm": "I have saved this key",
   "apiKeys.usage": "API Usage",
   "apiKeys.availableEndpoints": "Available Endpoints",
-
   "identities.title": "Identities",
   "identities.subtitle": "Manage your roles and identities across projects",
   "identities.new": "New Identity",
@@ -252,7 +263,6 @@
   "identities.color": "Color",
   "identities.avatar": "Avatar",
   "identities.active": "(Active)",
-
   "analytics.title": "Analytics",
   "analytics.subtitle": "Insights from your task activity",
   "analytics.allProjects": "All Projects",
@@ -283,7 +293,6 @@
   "analytics.burndownBehind": "Behind schedule by {{count}} tasks",
   "analytics.burndownOnTrack": "On track",
   "analytics.velocityAvg": "Average {{count}} completed per cycle",
-
   "rules.title": "Workflow Rules",
   "rules.subtitle": "Automate task actions with if-this-then-that rules",
   "rules.new": "+ New Rule",
@@ -314,7 +323,6 @@
   "rules.taskIdPlaceholder": "task ID",
   "rules.wouldFire": "Would fire {{count}} action(s)",
   "rules.wouldNotFire": "Would not fire",
-
   "templates.title": "Task Templates",
   "templates.subtitle": "Reusable task blueprints with default priority, subtasks, and labels.",
   "templates.new": "+ New Template",
@@ -331,7 +339,6 @@
   "templates.addLabel": "Add label name...",
   "templates.saveChanges": "Save Changes",
   "templates.createTemplate": "Create Template",
-
   "webhookLogs.title": "Webhook Delivery Logs",
   "webhookLogs.subtitle": "Outbound webhook delivery history and retry management.",
   "webhookLogs.purgeOld": "Purge Old",
@@ -346,12 +353,10 @@
   "webhookLogs.payload": "Payload",
   "webhookLogs.purgeConfirm": "Purge deliveries older than 30 days?",
   "webhookLogs.integration": "Integration",
-
   "login.password": "Password",
   "login.incorrectPassword": "INCORRECT PASSWORD",
   "login.enter": "ENTER",
   "login.verifying": "VERIFYING",
-
   "notifications.title": "Notifications",
   "notifications.markAllRead": "Mark all read",
   "notifications.empty": "No notifications",
@@ -359,13 +364,11 @@
   "notifications.minutesAgo": "{{n}}m ago",
   "notifications.hoursAgo": "{{n}}h ago",
   "notifications.daysAgo": "{{n}}d ago",
-
   "palette.placeholder": "Search or jump to...",
   "palette.noResults": "No results",
   "palette.navigate": "navigate",
   "palette.select": "select",
   "palette.close": "close",
-
   "assistant.title": "AI Assistant",
   "assistant.newChat": "New Chat",
   "assistant.conversations": "Conversations",
@@ -388,8 +391,6 @@
   "assistant.selectConversation": "Select a conversation",
   "assistant.selectOrCreate": "Select a conversation or start a new one",
   "assistant.startPrompt": "Or try a quick prompt:",
-  "assistant.noMatches": "No matches",
-
   "cycle.title": "Cycles / Sprints",
   "cycle.new": "+ New Cycle",
   "cycle.namePlaceholder": "Cycle name *",
@@ -407,7 +408,6 @@
   "cycle.addIssues": "Add issues",
   "cycle.loadingChart": "Loading chart…",
   "cycle.noBurndownData": "No burndown data available.",
-
   "gantt.zoom": "Zoom:",
   "gantt.day": "Day",
   "gantt.week": "Week",
@@ -417,38 +417,30 @@
   "gantt.today": "Today",
   "gantt.noIssues": "No issues yet",
   "gantt.noDates": "No dates",
-
   "board.noIssues": "No issues",
-
   "table.cycle": "Cycle",
   "table.time": "Time",
   "table.noIssues": "No issues yet.",
-
   "issue.subtask": "sub",
   "issue.blocked": "blocked",
   "issue.deleteConfirm": "Delete \"{{title}}\"?",
   "issue.subtaskTitlePlaceholder": "Subtask title…",
-
   "taskCreate.templatePlaceholder": "Template...",
   "taskCreate.issueTitlePlaceholder": "Issue title *",
-
   "taskEdit.issueTitlePlaceholder": "Issue title",
   "taskEdit.estimated": "Est:",
   "taskEdit.spent": "Spent:",
   "taskEdit.descriptionPlaceholder": "Description (optional, supports Markdown)",
-
   "comments.title": "Comments",
   "comments.noComments": "No comments yet.",
   "comments.anonymous": "Anonymous",
   "comments.yourName": "Your name (optional)",
   "comments.addComment": "Add a comment… (⌘Enter to submit)",
   "comments.post": "Post",
-
   "deps.blockedBy": "Blocked by",
   "deps.noBlockers": "No blockers.",
   "deps.pickBlocker": "— pick a blocker task —",
   "deps.block": "Block",
-
   "recurrence.title": "Recurrence",
   "recurrence.repeats": "Repeats {{frequency}}",
   "recurrence.active": "● Active",
@@ -460,14 +452,11 @@
   "recurrence.monthly": "Monthly",
   "recurrence.everyNDays": "Every N days",
   "recurrence.setRecurrence": "Set Recurrence",
-
   "attachments.title": "Attachments",
   "attachments.addFile": "Add file",
   "attachments.uploading": "Uploading…",
   "attachments.noAttachments": "No attachments.",
-
   "projectCard.tasksDone": "{{done}}/{{total}} tasks done",
-
   "agent.label": "Agent",
   "agent.assignment": "Agent Assignment",
   "agent.none": "No agent",
@@ -511,9 +500,18 @@
   "decisions.descriptionLabel": "Description (Markdown)",
   "decisions.projectLabel": "Project",
   "decisions.pendingReview": "{{count}} pending review",
-
+  "decisions.room": "Decision Room",
+  "decisions.archived": "Archived",
+  "decisions.pendingQueue": "Pending Queue",
+  "decisions.outcomes": "Outcomes",
+  "decisions.noPendingQueue": "No pending decisions",
+  "decisions.noOutcomes": "No accepted or archived decisions",
+  "decisions.snippet.context": "Context",
+  "decisions.snippet.decision": "Decision",
+  "decisions.snippet.consequences": "Consequences",
+  "decisions.snippet.tradeoffs": "Tradeoffs",
+  "decisions.snippet.followups": "Follow-ups",
   "nav.goals": "Goals",
-
   "goals.title": "Goals",
   "goals.subtitle": "Track and measure progress across projects",
   "goals.create": "New Goal",
@@ -540,9 +538,7 @@
   "goals.empty": "No goals yet",
   "goals.emptyFiltered": "No goals match this filter",
   "goals.emptyHint": "Create a goal to track progress across projects",
-
   "project.calendar": "Calendar",
-
   "cal.sun": "Sun",
   "cal.mon": "Mon",
   "cal.tue": "Tue",
@@ -550,7 +546,6 @@
   "cal.thu": "Thu",
   "cal.fri": "Fri",
   "cal.sat": "Sat",
-
   "shortcuts.title": "Keyboard Shortcuts",
   "shortcuts.createTask": "Create task",
   "shortcuts.createProject": "Create project",
@@ -560,18 +555,17 @@
   "shortcuts.goAnalytics": "Go to analytics",
   "shortcuts.goIdentities": "Go to identities",
   "shortcuts.goGoals": "Go to goals",
-
   "issue.pin": "Pin",
   "issue.unpin": "Unpin",
-
   "nav.activity": "Activity",
   "nav.assistant": "Assistant",
   "nav.settings": "Settings",
-
   "activity.title": "Activity Log",
   "activity.allProjects": "All Projects",
   "activity.noActivity": "No activity found",
-
+  "activity.view.log": "Log",
+  "activity.view.timeline": "Timeline",
+  "activity.view.wall": "Wall",
   "settings.title": "Settings",
   "settings.systemStatus": "System Status",
   "settings.authentication": "Authentication",
@@ -589,32 +583,25 @@
   "settings.newPassword": "New password",
   "settings.updatePassword": "Update Password",
   "settings.passwordChanged": "Password changed. Redirecting to login...",
-
   "goals.created": "Goal created",
   "goals.updated": "Goal updated",
   "goals.deleted": "Goal deleted",
-
   "apiKeys.createdSuccess": "API key created",
   "apiKeys.updatedSuccess": "API key updated",
   "apiKeys.deletedSuccess": "API key deleted",
-
   "integrations.createdSuccess": "Integration created",
   "integrations.updatedSuccess": "Integration updated",
   "integrations.deletedSuccess": "Integration deleted",
-
   "rules.createdSuccess": "Rule created",
   "rules.updatedSuccess": "Rule updated",
   "rules.deletedSuccess": "Rule deleted",
-
   "templates.createdSuccess": "Template created",
   "templates.updatedSuccess": "Template updated",
   "templates.deletedSuccess": "Template deleted",
-
   "dashboard.charts": "Charts",
   "dashboard.progress": "Progress",
   "dashboard.health": "Health",
   "dashboard.compare": "Compare",
-
   "hub.all": "All",
   "hub.overview": "Overview",
   "hub.activity": "Activity",
@@ -646,5 +633,48 @@
   "hub.byIdentity": "By Identity",
   "hub.byStatus": "By Status",
   "hub.byPriority": "By Priority",
-  "hub.noIdentities": "No identities yet. Create identities to see charts here."
+  "hub.noIdentities": "No identities yet. Create identities to see charts here.",
+  "nav.structureMap": "Structure Map",
+  "structure.title": "Structure Map",
+  "structure.subtitle": "Topology view of identities, projects, signal tasks, goals, and decisions.",
+  "structure.search": "Search identities, projects, tasks...",
+  "structure.filter.all": "All",
+  "structure.filter.active": "Active",
+  "structure.filter.risk": "Risk",
+  "structure.filter.unowned": "Unowned",
+  "structure.identities": "Identities",
+  "structure.projects": "Projects",
+  "structure.signalTasks": "Signal Tasks",
+  "structure.risk": "Risk",
+  "structure.unowned": "Unowned",
+  "structure.openProject": "Open Project",
+  "structure.inspector": "Inspector",
+  "structure.selectNode": "Select Node",
+  "structure.selectHint": "Click any node to highlight its relationships.",
+  "structure.viewControls": "View controls",
+  "structure.zoomIn": "Zoom in",
+  "structure.zoomOut": "Zoom out",
+  "structure.fitView": "Fit view",
+  "structure.noMatches": "No matching structure",
+  "structure.noMatchesHint": "Try a broader search or switch back to all projects.",
+  "structure.clearFilters": "Clear filters",
+  "structure.noDependencies": "No visible dependencies",
+  "structure.noDependenciesHint": "Select another filter or add blockers to tasks to build a dependency graph.",
+  "structure.progress": "Progress",
+  "structure.share": "Share",
+  "structure.decisionState": "Decision State",
+  "structure.liveMap": "Live map",
+  "structure.viewMode": "View mode",
+  "structure.view.map": "Map",
+  "structure.view.dependencies": "Dependencies",
+  "structure.dependencies": "Dependencies",
+  "structure.dependsOn": "Depends on",
+  "structure.blocks": "Blocks",
+  "structure.noBlocking": "Blocks nothing.",
+  "structure.legend": "Map legend",
+  "structure.legend.ownership": "Ownership",
+  "structure.legend.signal": "Signal",
+  "structure.legend.dependency": "Dependency",
+  "structure.linkedProjects": "Linked projects",
+  "structure.graphLabel": "Structure graph. Use arrow keys to pan, plus and minus to zoom, and 0 to reset."
 }

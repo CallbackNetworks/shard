@@ -8,7 +8,7 @@ import {
   getIntegrationTemplate, getIntegrationHealth, bulkRetryDeliveries,
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
-import { BRAND, DARK } from '../constants/theme'
+import { BRAND, DARK, STATUS_COLOR, STATUS_BG } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Integrations.module.css'
 
@@ -25,10 +25,10 @@ const ALL_EVENTS = [...EVENT_GROUPS.task, ...EVENT_GROUPS.project, ...EVENT_GROU
 const CRITICAL_EVENTS = ['task.done', 'task.failed', 'task.overdue', 'project.complete']
 
 const STATUS_COLORS = {
-  success: { bg: 'rgba(16,185,129,0.1)',  color: '#10b981', dot: '#10b981' },
-  failed:  { bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', dot: '#ef4444' },
-  dead:    { bg: 'rgba(239,68,68,0.1)',   color: '#fca5a5', dot: '#b91c1c' },
-  pending: { bg: 'rgba(251,191,36,0.1)',  color: '#fbbf24', dot: '#f59e0b' },
+  success: { bg: STATUS_BG.done, color: STATUS_COLOR.done, dot: STATUS_COLOR.done },
+  failed:  { bg: STATUS_BG.failed, color: STATUS_COLOR.failed, dot: STATUS_COLOR.failed },
+  dead:    { bg: STATUS_BG.failed, color: STATUS_COLOR.failed, dot: STATUS_COLOR.failed },
+  pending: { bg: STATUS_BG.in_progress, color: STATUS_COLOR.in_progress, dot: STATUS_COLOR.in_progress },
 }
 
 /* ── Delivery Detail Modal ── */
@@ -97,7 +97,7 @@ function HealthStats({ integrationId }) {
   })
   if (!health || health.total_deliveries === 0) return null
 
-  const rateColor = health.success_rate >= 90 ? '#10b981' : health.success_rate >= 50 ? '#f59e0b' : '#ef4444'
+  const rateColor = health.success_rate >= 90 ? BRAND : health.success_rate >= 50 ? '#f59e0b' : BRAND
 
   return (
     <div className={s.healthStats}>
@@ -324,9 +324,9 @@ function CustomHeadersEditor({ headers, onChange }) {
         {entries.map(([k, v], i) => (
           <div key={i} className={s.headerRow}>
             <input value={k} onChange={e => updateKey(k, e.target.value)} placeholder={t('integrations.headerKey')}
-              className={`${s.inputStyle} ${s.headerKeyInput}`} />
+              className={`kt-input ${s.inputStyle} ${s.headerKeyInput}`} />
             <input value={v} onChange={e => updateValue(k, e.target.value)} placeholder={t('integrations.headerValue')}
-              className={`${s.inputStyle} ${s.headerValueInput}`} />
+              className={`kt-input ${s.inputStyle} ${s.headerValueInput}`} />
             <button onClick={() => removeHeader(k)}
               className={s.removeHeaderBtn}>
               <Trash2 size={14} />
@@ -379,12 +379,12 @@ function IntegrationModal({ initial, onSave, onClose }) {
         <div className={s.formColumn}>
           {/* Name */}
           <label className={s.labelStyle}>{t('name')}
-            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder={t('integrations.namePlaceholder')} className={s.inputStyle} />
+            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder={t('integrations.namePlaceholder')} className={`kt-input ${s.inputStyle}`} />
           </label>
 
           {/* Type */}
           <label className={s.labelStyle}>{t('type')}
-            <select value={form.type} onChange={e => set('type', e.target.value)} className={s.selectStyle}>
+            <select value={form.type} onChange={e => set('type', e.target.value)} className={`kt-input ${s.selectStyle}`}>
               {Object.entries(typeLabels).map(([val, label]) => (
                 <option key={val} value={val}>{label}</option>
               ))}
@@ -394,22 +394,22 @@ function IntegrationModal({ initial, onSave, onClose }) {
           {form.type === 'email' ? (
             <>
               <label className={s.labelStyle}>{t('integrations.recipients')}
-                <input value={form.email_to} onChange={e => set('email_to', e.target.value)} placeholder={t('integrations.recipientsPlaceholder')} className={s.inputStyle} />
+                <input value={form.email_to} onChange={e => set('email_to', e.target.value)} placeholder={t('integrations.recipientsPlaceholder')} className={`kt-input ${s.inputStyle}`} />
               </label>
               <label className={s.labelStyle}>{t('integrations.subjectPrefix')}
-                <input value={form.email_subject_prefix} onChange={e => set('email_subject_prefix', e.target.value)} placeholder="[Shard]" className={s.inputStyle} />
+                <input value={form.email_subject_prefix} onChange={e => set('email_subject_prefix', e.target.value)} placeholder="[Shard]" className={`kt-input ${s.inputStyle}`} />
               </label>
             </>
           ) : (
             <>
               {/* URL */}
               <label className={s.labelStyle}>{t('integrations.webhookUrl')}
-                <input value={form.url} onChange={e => set('url', e.target.value)} placeholder={t('integrations.webhookUrlPlaceholder')} className={s.inputStyle} />
+                <input value={form.url} onChange={e => set('url', e.target.value)} placeholder={t('integrations.webhookUrlPlaceholder')} className={`kt-input ${s.inputStyle}`} />
               </label>
 
               {/* Auth Type */}
               <label className={s.labelStyle}>{t('integrations.authType')}
-                <select value={form.auth_type || 'bearer'} onChange={e => set('auth_type', e.target.value)} className={s.selectStyle}>
+                <select value={form.auth_type || 'bearer'} onChange={e => set('auth_type', e.target.value)} className={`kt-input ${s.selectStyle}`}>
                   <option value="bearer">{t('integrations.authBearer')}</option>
                   <option value="basic">{t('integrations.authBasic')}</option>
                   <option value="api_key">{t('integrations.authApiKey')}</option>
@@ -422,26 +422,26 @@ function IntegrationModal({ initial, onSave, onClose }) {
                 <label className={s.labelStyle}>
                   {form.type === 'webhook' ? t('integrations.signingSecret') : t('integrations.bearerToken')}
                   <input value={form.secret} onChange={e => set('secret', e.target.value)}
-                    placeholder={form.type === 'webhook' ? t('integrations.signingSecretPlaceholder') : 'token...'} className={s.inputStyle} />
+                    placeholder={form.type === 'webhook' ? t('integrations.signingSecretPlaceholder') : 'token...'} className={`kt-input ${s.inputStyle}`} />
                 </label>
               )}
               {form.auth_type === 'basic' && (
                 <>
                   <label className={s.labelStyle}>{t('integrations.basicUsername')}
-                    <input value={form.auth_config?.username || ''} onChange={e => set('auth_config', { ...form.auth_config, username: e.target.value })} className={s.inputStyle} />
+                    <input value={form.auth_config?.username || ''} onChange={e => set('auth_config', { ...form.auth_config, username: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
                   <label className={s.labelStyle}>{t('integrations.basicPassword')}
-                    <input type="password" value={form.auth_config?.password || ''} onChange={e => set('auth_config', { ...form.auth_config, password: e.target.value })} className={s.inputStyle} />
+                    <input type="password" value={form.auth_config?.password || ''} onChange={e => set('auth_config', { ...form.auth_config, password: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
                 </>
               )}
               {form.auth_type === 'api_key' && (
                 <>
                   <label className={s.labelStyle}>{t('integrations.apiKeyHeader')}
-                    <input value={form.auth_config?.header_name || 'X-API-Key'} onChange={e => set('auth_config', { ...form.auth_config, header_name: e.target.value })} className={s.inputStyle} />
+                    <input value={form.auth_config?.header_name || 'X-API-Key'} onChange={e => set('auth_config', { ...form.auth_config, header_name: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
                   <label className={s.labelStyle}>{t('integrations.apiKeyValue')}
-                    <input value={form.auth_config?.header_value || ''} onChange={e => set('auth_config', { ...form.auth_config, header_value: e.target.value })} className={s.inputStyle} />
+                    <input value={form.auth_config?.header_value || ''} onChange={e => set('auth_config', { ...form.auth_config, header_value: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
                 </>
               )}
@@ -459,7 +459,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
 
           {/* Project ID */}
           <label className={s.labelStyle}>{t('integrations.projectIdLabel')}
-            <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder={t('integrations.projectIdPlaceholder')} className={s.inputStyle} />
+            <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder={t('integrations.projectIdPlaceholder')} className={`kt-input ${s.inputStyle}`} />
           </label>
 
           {/* Events */}
@@ -467,11 +467,11 @@ function IntegrationModal({ initial, onSave, onClose }) {
             {/* Quick presets */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, marginTop: 4 }}>
               <button type="button" onClick={() => set('events', [...ALL_EVENTS])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.allEvents')}
               </button>
               <button type="button" onClick={() => set('events', [...CRITICAL_EVENTS])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', color: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? '#ef4444' : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.04)', color: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? '#facc15' : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.criticalOnly')}
               </button>
               <button type="button" onClick={() => set('events', [])}
@@ -566,50 +566,50 @@ export default function Integrations() {
     })
   }
 
-  if (isLoading) return <p className={s.loadingText}>{t('loading')}</p>
+  if (isLoading) return <p className="kt-muted" style={{ padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div className={`page-content ${isMobile ? s.pageContentMobile : s.pageContent}`}>
+    <div className={`kt-page ${isMobile ? s.pageContentMobile : s.pageContent}`} style={{ maxWidth: 1120 }}>
       {modal && <IntegrationModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
       {templatePicker && <TemplatePicker onSelect={handleTemplateSelect} onClose={() => setTemplatePicker(false)} />}
       {setupModal && <SetupModal templateId={setupModal} onClose={() => setSetupModal(null)} />}
 
-      <div className={isMobile ? s.pageHeaderMobile : s.pageHeader}>
-        <div>
-          <h1 className={s.pageTitle}>{t('integrations.title')}</h1>
-          <p className={s.pageSubtitle}>{t('integrations.subtitle')}</p>
+      <div className={`kt-page-header ${isMobile ? s.pageHeaderMobile : s.pageHeader}`}>
+        <div className="kt-page-heading">
+          <h1 className="kt-page-title">{t('integrations.title')}</h1>
+          <p className="kt-page-subtitle">{t('integrations.subtitle')}</p>
         </div>
         <div className={s.headerButtons}>
           <button onClick={() => setTemplatePicker(true)}
-            className={`btn-ghost ${s.flexCenter}`}>
+            className={`kt-btn ${s.flexCenter}`}>
             <BookOpen size={14} /> {t('integrations.fromTemplate')}
           </button>
-          <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">
+          <button onClick={() => setModal({ mode: 'create' })} className="kt-btn kt-btn-primary">
             {t('integrations.new')}
           </button>
         </div>
       </div>
 
       {integrations.length === 0 ? (
-        <div className={s.emptyState}>
-          <Zap size={36} className={s.emptyIcon} style={{ color: BRAND }} />
-          <p className={s.emptyTitle}>{t('integrations.empty')}</p>
-          <p className={s.emptyHint}>{t('integrations.emptyHint')}</p>
+        <div className={`kt-empty ${s.emptyState}`}>
+          <Zap size={36} className="kt-empty-icon" />
+          <p className="kt-empty-title">{t('integrations.empty')}</p>
+          <p style={{ marginTop: 6, fontSize: 13 }}>{t('integrations.emptyHint')}</p>
           <div className={s.emptyActions}>
             <button onClick={() => setTemplatePicker(true)}
-              className={`btn-ghost ${s.inlineFlex}`}>
+              className={`kt-btn ${s.inlineFlex}`}>
               <BookOpen size={14} /> {t('integrations.fromTemplate')}
             </button>
             <button onClick={() => setModal({ mode: 'create' })}
-              className={`btn-primary ${s.inlineFlex}`}>
+              className={`kt-btn kt-btn-primary ${s.inlineFlex}`}>
               {t('integrations.new')}
             </button>
           </div>
         </div>
       ) : (
-        <div className={s.cardList}>
+        <div className={`kt-stack ${s.cardList}`}>
           {integrations.map((intg, intgIdx) => (
-            <div key={intg.id} className={s.card}
+            <div key={intg.id} className={`kt-card ${s.card}`}
               style={{ animationDelay: `${intgIdx * 0.06}s` }}>
               <div className={isMobile ? s.cardBodyMobile : s.cardBody}>
                 <div>

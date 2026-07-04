@@ -1,31 +1,45 @@
-export const BRAND = '#ef4444'
-export const BRAND_2 = '#dc2626'
+export const BRAND = '#facc15'
+export const BRAND_2 = '#eab308'
+
+export const STATUS_COLOR = {
+  todo: '#737373',
+  in_progress: '#facc15',
+  done: '#34d399',
+  failed: '#fb7185',
+}
+
+export const STATUS_BG = {
+  todo: 'rgba(115,115,115,0.14)',
+  in_progress: 'rgba(250,204,21,0.12)',
+  done: 'rgba(52,211,153,0.12)',
+  failed: 'rgba(251,113,133,0.12)',
+}
 
 export const SHADOW_SM = '0 1px 2px rgba(0,0,0,0.3)'
 export const SHADOW_LG = '0 4px 12px rgba(0,0,0,0.4)'
 export const INSET_SHADOW = 'inset 0 1px 2px rgba(0,0,0,0.2)'
 
 export const DARK = {
-  bg:        '#000000',
-  bgAlt:     '#000000',
-  surface:   '#111111',
-  elevated:  '#1a1a1a',
-  overlay:   '#222222',
+  bg:        '#171717',
+  bgAlt:     '#141414',
+  surface:   '#1f1f1f',
+  elevated:  '#262626',
+  overlay:   '#303030',
   text:      '#ffffff',
   textMid:   '#9ca3af',
   textDim:   '#4b5563',
   textFaint: 'rgba(255,255,255,0.15)',
-  border:    '#1f2937',
-  borderMid: '#374151',
-  borderStrong: '#4b5563',
+  border:    '#3a3a3a',
+  borderMid: '#525252',
+  borderStrong: '#737373',
   hover:     'rgba(255,255,255,0.05)',
   active:    'rgba(255,255,255,0.08)',
-  danger:    '#ef4444',
-  dangerBg:  'rgba(239,68,68,0.12)',
+  danger:    STATUS_COLOR.failed,
+  dangerBg:  STATUS_BG.failed,
   warning:   '#f59e0b',
   warningBg: 'rgba(245,158,11,0.12)',
-  success:   '#10b981',
-  successBg: 'rgba(16,185,129,0.12)',
+  success:   STATUS_COLOR.done,
+  successBg: STATUS_BG.done,
   info:      '#3b82f6',
   infoBg:    'rgba(59,130,246,0.12)',
 }
@@ -40,8 +54,8 @@ export const SPACE = {
 }
 
 export const FONT = {
-  family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  display: "'Bebas Neue', 'Impact', sans-serif",
+  family: "'Inter', 'Arial Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  display: "'Impact', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif",
   mono: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
   xs: 10,
   sm: 11,
@@ -60,16 +74,16 @@ export const RADIUS = {
 }
 
 export const STATUS_COLS = [
-  { key: 'todo',        label: 'Todo',        color: '#6b7280' },
-  { key: 'in_progress', label: 'In Progress', color: '#3b82f6' },
-  { key: 'done',        label: 'Done',        color: '#10b981' },
-  { key: 'failed',      label: 'Failed',      color: '#ef4444' },
+  { key: 'todo',        label: 'Todo',        color: STATUS_COLOR.todo, bg: STATUS_BG.todo },
+  { key: 'in_progress', label: 'In Progress', color: STATUS_COLOR.in_progress, bg: STATUS_BG.in_progress },
+  { key: 'done',        label: 'Done',        color: STATUS_COLOR.done, bg: STATUS_BG.done },
+  { key: 'failed',      label: 'Failed',      color: STATUS_COLOR.failed, bg: STATUS_BG.failed },
 ]
 
 export const STATUS_MAP = Object.fromEntries(STATUS_COLS.map(s => [s.key, s]))
 
 export const PRIORITY = {
-  high:   { label: 'High',   color: '#ef4444', bg: 'rgba(239,68,68,0.12)', icon: '▲' },
+  high:   { label: 'High',   color: '#facc15', bg: 'rgba(250,204,21,0.12)', icon: '▲' },
   medium: { label: 'Medium', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', icon: '■' },
   low:    { label: 'Low',    color: '#6b7280', bg: 'rgba(107,114,128,0.12)', icon: '▼' },
 }
@@ -89,19 +103,19 @@ export const LIGHT = {
   borderStrong: '#9ca3af',
   hover:     'rgba(0,0,0,0.03)',
   active:    'rgba(0,0,0,0.06)',
-  danger:    '#dc2626',
-  dangerBg:  'rgba(220,38,38,0.08)',
+  danger:    STATUS_COLOR.failed,
+  dangerBg:  STATUS_BG.failed,
   warning:   '#d97706',
   warningBg: 'rgba(217,119,6,0.08)',
-  success:   '#059669',
-  successBg: 'rgba(5,150,105,0.08)',
+  success:   STATUS_COLOR.done,
+  successBg: STATUS_BG.done,
   info:      '#2563eb',
   infoBg:    'rgba(37,99,235,0.08)',
 }
 
 export const FORM_INPUT = {
-  background: '#111111',
-  border: '1px solid #1f2937',
+  background: '#262626',
+  border: '1px solid #3a3a3a',
   borderRadius: 0,
   padding: '7px 10px',
   fontSize: 13,
@@ -111,6 +125,6 @@ export const FORM_INPUT = {
 }
 
 export const LABEL_PALETTE = [
-  '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#6b7280',
-  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316',
+  '#facc15', '#3b82f6', '#eab308', '#f59e0b', '#6b7280',
+  '#a3a3a3', '#d4d4d4', '#06b6d4', '#ca8a04', '#f97316',
 ]

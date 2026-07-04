@@ -7,11 +7,12 @@ import PWAInstallPrompt from './components/PWAInstallPrompt'
 import OfflineIndicator from './components/OfflineIndicator'
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp'
 import Sidebar from './components/Sidebar'
+import GlobalActivityTicker from './components/GlobalActivityTicker'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import ErrorBoundary from './components/ErrorBoundary'
-import { BRAND, DARK } from './constants/theme'
+import { BRAND, DARK, FONT } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import './styles/global.css'
@@ -28,6 +29,7 @@ const WebhookLogs = lazy(() => import('./pages/WebhookLogs'))
 const Decisions = lazy(() => import('./pages/Decisions'))
 const Goals = lazy(() => import('./pages/Goals'))
 const Activity = lazy(() => import('./pages/Activity'))
+const StructureMap = lazy(() => import('./pages/StructureMap'))
 const Assistant = lazy(() => import('./pages/Assistant'))
 const Settings = lazy(() => import('./pages/Settings'))
 const ShareView = lazy(() => import('./pages/ShareView'))
@@ -35,15 +37,13 @@ const Login = lazy(() => import('./pages/Login'))
 
 function LoadingSpinner() {
   return (
-    <div style={{
+    <div className="kt-loading" style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100%', width: '100%', color: DARK.textMid, fontSize: 13,
+      height: '100%', width: '100%', color: DARK.textMid,
     }}>
-      <div style={{
-        width: 20, height: 20, border: `2px solid ${DARK.border}`,
-        borderTopColor: BRAND, borderRadius: '50%',
-        animation: 'spin 0.6s linear infinite',
-      }} />
+      <span>LOADING</span>
+      <span>SYNC</span>
+      <span>FETCH</span>
     </div>
   )
 }
@@ -80,6 +80,9 @@ function Layout() {
   // Close sidebar on route change (mobile)
   const location = useLocation()
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
+  useEffect(() => {
+    document.documentElement.dataset.motion = 'full'
+  }, [])
 
   if (isLoading) return null
 
@@ -91,7 +94,7 @@ function Layout() {
   return (
     <div style={{
       display: 'flex', height: '100vh',
-      fontFamily: "'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, sans-serif",
+      fontFamily: FONT.family,
       fontSize: 14, background: theme.bgAlt,
       color: theme.text,
     }}>
@@ -139,24 +142,28 @@ function Layout() {
         <Sidebar onOpenPalette={openPalette} />
       </div>
       <main id="main-content" className="layout-main" role="main" style={{ flex: 1, overflow: 'auto', background: theme.bgAlt }}>
-        <Suspense fallback={<LoadingSpinner />}>
-          <Routes>
-            <Route index element={<Dashboard />} />
-            <Route path="projects/:id" element={<ProjectDetail />} />
-            <Route path="integrations" element={<Integrations />} />
-            <Route path="api-keys" element={<ApiKeys />} />
-            <Route path="identities" element={<Identities />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="workflow-rules" element={<WorkflowRules />} />
-            <Route path="decisions" element={<Decisions />} />
-            <Route path="goals" element={<Goals />} />
-            <Route path="templates" element={<Templates />} />
-            <Route path="webhook-logs" element={<WebhookLogs />} />
-            <Route path="activity" element={<Activity />} />
-            <Route path="assistant" element={<Assistant />} />
-            <Route path="settings" element={<Settings />} />
-          </Routes>
-        </Suspense>
+        <GlobalActivityTicker />
+        <div key={location.pathname} className="kt-route-shell">
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              <Route index element={<Dashboard />} />
+              <Route path="projects/:id" element={<ProjectDetail />} />
+              <Route path="integrations" element={<Integrations />} />
+              <Route path="api-keys" element={<ApiKeys />} />
+              <Route path="identities" element={<Identities />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="workflow-rules" element={<WorkflowRules />} />
+              <Route path="decisions" element={<Decisions />} />
+              <Route path="goals" element={<Goals />} />
+              <Route path="templates" element={<Templates />} />
+              <Route path="webhook-logs" element={<WebhookLogs />} />
+              <Route path="activity" element={<Activity />} />
+              <Route path="structure" element={<StructureMap />} />
+              <Route path="assistant" element={<Assistant />} />
+              <Route path="settings" element={<Settings />} />
+            </Routes>
+          </Suspense>
+        </div>
       </main>
       <CommandPalette open={paletteOpen} onClose={closePalette} />
       <NotificationCenter />
@@ -177,7 +184,8 @@ export default function App() {
             <ToastProvider>
               <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
-                  <Route path="/share/:token" element={<ShareView />} />
+                  <Route path="/share/:token" element={<ShareView scope="identity" />} />
+                  <Route path="/share/p/:token" element={<ShareView scope="project" />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/*" element={<Layout />} />
                 </Routes>

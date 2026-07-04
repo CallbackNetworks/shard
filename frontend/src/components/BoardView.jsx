@@ -49,8 +49,8 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(129,140,248,0.12)', color: DARK.info,
-            border: '1px solid rgba(129,140,248,0.25)',
+            background: 'rgba(250,204,21,0.12)', color: DARK.info,
+            border: '1px solid rgba(250,204,21,0.25)',
           }}>
             <Bot size={9} />
             {task.assigned_agent_name}
@@ -156,12 +156,12 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
   return (
     <div key={colKey} style={{ width: 258, minWidth: 258, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', marginBottom: 2 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: overWip ? '#f37280' : colColor }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: overWip ? '#f37280' : DARK.text }}>{translatedLabel}</span>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: overWip ? '#facc15' : colColor }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: overWip ? '#facc15' : DARK.text }}>{translatedLabel}</span>
         <span style={{
           marginLeft: 'auto', fontSize: 11, padding: '1px 6px', borderRadius: 10,
-          background: overWip ? 'rgba(243,114,127,0.15)' : 'rgba(255,255,255,0.06)',
-          color: overWip ? '#f37280' : 'rgba(255,255,255,0.35)',
+          background: overWip ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)',
+          color: overWip ? '#facc15' : 'rgba(255,255,255,0.35)',
           fontWeight: overWip ? 700 : 400,
         }}>
           {tasks.length}{wipLimit ? ` / ${wipLimit}` : ''}
@@ -298,7 +298,7 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onRe
             background: DARK.surface, borderRadius: 8,
             padding: '10px 12px', width: 258,
             boxShadow: '0 12px 28px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1)',
-            transform: 'rotate(2deg)',
+            transform: 'translateY(-2px)',
           }}>
             <CardContent
               task={activeTask}

@@ -5,7 +5,7 @@ External API v1 — Analytics endpoints.
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Date, cast, func, text
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db

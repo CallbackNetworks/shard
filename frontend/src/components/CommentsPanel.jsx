@@ -86,7 +86,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
                     {new Date(c.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
-                  <button onClick={() => handleDelete(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(248,113,113,0.5)', padding: 0, display: 'flex' }}>
+                  <button onClick={() => handleDelete(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(250,204,21,0.5)', padding: 0, display: 'flex' }}>
                     <X size={10} />
                   </button>
                 </div>

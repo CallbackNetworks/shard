@@ -9,8 +9,8 @@ export function globalAddToast(msg, type = 'error') { _addToast?.(msg, type) }
 let _nextId = 0
 
 const TOAST_COLORS = {
-  error:   { bg: '#ef4444', border: '#dc2626' },
-  success: { bg: '#22c55e', border: '#16a34a' },
+  error:   { bg: '#facc15', border: '#eab308' },
+  success: { bg: '#facc15', border: '#eab308' },
   warning: { bg: '#f59e0b', border: '#d97706' },
 }
 
@@ -51,8 +51,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ addToast }}>
       {children}
       {toasts.length > 0 && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+        <div className="kt-toast-stack" style={{
           display: 'flex', flexDirection: 'column', gap: 8,
           pointerEvents: 'none',
         }}>
@@ -61,6 +60,7 @@ export function ToastProvider({ children }) {
             return (
               <div
                 key={toast.id}
+                className="kt-toast"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '10px 16px', borderRadius: 8,
@@ -68,7 +68,7 @@ export function ToastProvider({ children }) {
                   fontSize: 13, fontWeight: 500,
                   boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
                   pointerEvents: 'auto', maxWidth: 360,
-                  animation: 'toast-in 0.2s ease-out',
+                  animation: 'toastImpact 0.24s cubic-bezier(.2,.8,.2,1)',
                 }}
               >
                 <span style={{ flex: 1 }}>{toast.message}</span>
@@ -87,12 +87,6 @@ export function ToastProvider({ children }) {
           })}
         </div>
       )}
-      <style>{`
-        @keyframes toast-in {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </ToastContext.Provider>
   )
 }

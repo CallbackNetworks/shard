@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import DonutChart from './charts/DonutChart'
 import EmptyState from './shared/EmptyState'
 import TabBar from './shared/TabBar'
+import { STATUS_COLOR } from '../constants/theme'
 
 const HeatmapChart = lazy(() => import('./charts/HeatmapChart'))
 const TrendLineChart = lazy(() => import('./charts/TrendLineChart'))
@@ -19,10 +20,10 @@ const ChartFallback = () => (
 )
 
 const STATUS_COLORS = {
-  done: '#10b981',
-  in_progress: '#3b82f6',
-  todo: 'rgba(255,255,255,0.3)',
-  failed: '#ef4444',
+  done: STATUS_COLOR.done,
+  in_progress: STATUS_COLOR.in_progress,
+  todo: STATUS_COLOR.todo,
+  failed: STATUS_COLOR.failed,
 }
 
 function StatCard({ label, value, color, delay = 0 }) {
@@ -129,8 +130,8 @@ function IdentityCard({ identity, onNavigate }) {
           {[
             { label: t('hub.done'), value: identity.done, color: STATUS_COLORS.done },
             { label: t('hub.inProgress'), value: identity.in_progress, color: STATUS_COLORS.in_progress },
-            { label: t('hub.todoLabel'), value: identity.todo, color: 'rgba(255,255,255,0.3)' },
-            { label: t('hub.overdueCount'), value: identity.overdue, color: '#ef4444' },
+            { label: t('hub.todoLabel'), value: identity.todo, color: STATUS_COLOR.todo },
+            { label: t('hub.overdueCount'), value: identity.overdue, color: identity.overdue > 0 ? STATUS_COLOR.failed : STATUS_COLOR.todo },
           ].map(s => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
@@ -243,7 +244,7 @@ function buildTreesByStatus(data) {
 
 function buildTreesByPriority(data) {
   const priorities = [
-    { key: 'high', label: 'HIGH', color: '#ef4444' },
+    { key: 'high', label: 'HIGH', color: '#facc15' },
     { key: 'medium', label: 'MEDIUM', color: '#f59e0b' },
     { key: 'low', label: 'LOW', color: '#9ca3af' },
   ]
@@ -386,9 +387,9 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
         marginBottom: 4, flexWrap: 'wrap',
       }}>
         <button onClick={() => onSelectIdentity?.(null)} style={{
-          background: !selectedIdentityId ? 'rgba(239,68,68,0.1)' : 'transparent',
+          background: !selectedIdentityId ? 'rgba(250,204,21,0.1)' : 'transparent',
           border: 'none',
-          borderBottom: `2px solid ${!selectedIdentityId ? '#ef4444' : 'transparent'}`,
+          borderBottom: `2px solid ${!selectedIdentityId ? '#facc15' : 'transparent'}`,
           cursor: 'pointer', padding: '8px 16px',
           fontSize: 11, fontWeight: !selectedIdentityId ? 700 : 400,
           color: !selectedIdentityId ? '#fff' : 'rgba(255,255,255,0.4)',
@@ -418,9 +419,9 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             gap: 10, marginBottom: 24,
           }}>
             <StatCard label={t('hub.totalTasks')} value={selectedIdent ? selectedIdent.total_tasks : totals.total_tasks} color="#fff" delay={0} />
-            <StatCard label={t('hub.completed')} value={selectedIdent ? selectedIdent.done : totals.done} color="#10b981" delay={0.06} />
-            <StatCard label={t('hub.inProgress')} value={selectedIdent ? selectedIdent.in_progress : totals.in_progress} color="#3b82f6" delay={0.12} />
-            <StatCard label={t('hub.overdueCount')} value={selectedIdent ? selectedIdent.overdue : totals.overdue} color={(selectedIdent ? selectedIdent.overdue : totals.overdue) > 0 ? '#ef4444' : '#fff'} delay={0.18} />
+            <StatCard label={t('hub.completed')} value={selectedIdent ? selectedIdent.done : totals.done} color={STATUS_COLOR.done} delay={0.06} />
+            <StatCard label={t('hub.inProgress')} value={selectedIdent ? selectedIdent.in_progress : totals.in_progress} color={STATUS_COLOR.in_progress} delay={0.12} />
+            <StatCard label={t('hub.overdueCount')} value={selectedIdent ? selectedIdent.overdue : totals.overdue} color={(selectedIdent ? selectedIdent.overdue : totals.overdue) > 0 ? STATUS_COLOR.failed : '#fff'} delay={0.18} />
           </div>
 
           <div style={{
@@ -486,7 +487,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             <Section title={t('hub.activityHeatmap')}>
               <HeatmapChart
                 data={heatmapData}
-                color={selectedIdent?.color || '#ef4444'}
+                color={selectedIdent?.color || '#facc15'}
               />
             </Section>
 

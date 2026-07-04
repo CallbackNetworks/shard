@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getShareData } from '../api/client'
-import { FONT, BG, DIM, HI, Bar } from '../components/OverviewViews'
 
 import ShareHero from '../components/share/ShareHero'
 import ShareStats from '../components/share/ShareStats'
@@ -14,7 +13,7 @@ import ShareFooter from '../components/share/ShareFooter'
 import useBreakpoint from '../components/share/useBreakpoint'
 import EmptyState from '../components/shared/EmptyState'
 
-export default function ShareView() {
+export default function ShareView({ scope = 'identity' }) {
   const { token } = useParams()
   const bp = useBreakpoint()
   const [now, setNow] = useState(new Date())
@@ -27,8 +26,8 @@ export default function ShareView() {
   }, [])
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['share', token],
-    queryFn: () => getShareData(token),
+    queryKey: ['share', scope, token],
+    queryFn: () => getShareData(token, scope),
     refetchInterval: pinData ? false : 30000,
     retry: false,
   })
@@ -65,37 +64,17 @@ export default function ShareView() {
   }
   const recentActivity = effectiveData?.recent_activity || []
   const meta = effectiveData?.meta || {}
-  const color = identity?.color || '#ef4444'
+  const color = identity?.color || '#facc15'
 
   // Error state
   if (isError) {
     return (
-      <div style={{
-        minHeight: '100vh', background: BG, fontFamily: FONT,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{
-          textAlign: 'center',
-          animation: 'shareReveal 0.5s ease-out forwards',
-        }}>
-          <div style={{
-            display: 'inline-block', padding: '20px 40px',
-            background: 'rgba(255,255,255,0.02)',
-            borderTop: '1px solid rgba(255,85,51,0.3)',
-            clipPath: 'polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%)',
-          }}>
-            <div style={{
-              fontSize: 13, letterSpacing: '0.14em',
-              textTransform: 'uppercase', color: DIM,
-            }}>
+      <div className="kt-share-page kt-share-center">
+        <div className="kt-share-empty-block">
+          <div className="kt-share-kicker">
               Share link not found
-            </div>
-            <div style={{
-              fontSize: 11, marginTop: 8, color: 'rgba(255,255,255,0.1)',
-            }}>
-              This link may have been revoked, expired, or is invalid.
-            </div>
           </div>
+          <div className="kt-share-muted">This link may have been revoked, expired, or is invalid.</div>
         </div>
       </div>
     )
@@ -115,29 +94,15 @@ export default function ShareView() {
   // Loading state
   if (isLoading && !effectiveData) {
     return (
-      <div style={{
-        minHeight: '100vh', background: BG, fontFamily: FONT,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{
-          fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase',
-          color: DIM, animation: 'shareReveal 0.5s ease-out forwards',
-        }}>
-          Loading...
-        </div>
+      <div className="kt-share-page kt-share-center">
+        <div className="kt-share-loading">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', background: BG, fontFamily: FONT, color: HI,
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-    }}>
-      <div style={{
-        width: '100%', maxWidth: 860,
-        padding: bp === 'mobile' ? '32px 16px 48px' : '48px 32px 64px',
-      }}>
+    <div className="kt-share-page" style={{ '--share-accent': color }}>
+      <div className="kt-share-shell">
 
         {/* Section: Overview */}
         <div id="share-section-overview">
@@ -145,12 +110,8 @@ export default function ShareView() {
           <ShareHero identity={identity} summary={summary} now={now} bp={bp} />
 
           {/* Global progress bar */}
-          <div style={{
-            marginBottom: 20,
-            opacity: 0,
-            animation: 'shareReveal 0.5s ease-out 0.1s forwards',
-          }}>
-            <Bar pct={Math.round(summary.overall_progress)} color={color} height={3} bg="rgba(255,255,255,0.04)" />
+          <div className="kt-share-global-progress" aria-label={`Overall progress ${Math.round(summary.overall_progress)}%`}>
+            <span style={{ width: `${Math.round(summary.overall_progress)}%` }} />
           </div>
 
           {/* Summary stats */}

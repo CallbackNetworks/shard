@@ -3,26 +3,27 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Activity as ActivityIcon, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getActivity, getProjects } from '../api/client'
-import { DARK } from '../constants/theme'
+import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
+import { actionGroup, buildActivitySignals, bucketActivitySignals, summarizeActivitySignals } from '../utils/activitySignals'
 import useBreakpoint from '../hooks/useBreakpoint'
 
 const PAGE_SIZE = 50
 
 const ACTION_COLORS = {
-  'task.created':        DARK.success,
-  'task.status_changed': DARK.warning,
+  'task.created':        BRAND,
+  'task.status_changed': BRAND,
   'task.assigned':       DARK.info,
   'task.deleted':        DARK.danger,
-  'task.done':           DARK.success,
-  'task.failed':         DARK.danger,
-  'task.due_soon':       DARK.warning,
-  'task.overdue':        '#ff5533',
-  'project.created':     DARK.success,
+  'task.done':           STATUS_COLOR.done,
+  'task.failed':         STATUS_COLOR.failed,
+  'task.due_soon':       BRAND,
+  'task.overdue':        STATUS_COLOR.failed,
+  'project.created':     BRAND,
   'project.archived':    DARK.textDim,
-  'project.complete':    DARK.success,
+  'project.complete':    STATUS_COLOR.done,
   'share.viewed':        DARK.textDim,
   'comment.created':     DARK.info,
-  'rule.triggered':      '#dda0dd',
+  'rule.triggered':      BRAND,
 }
 
 const ACTION_GROUPS = [
@@ -54,27 +55,113 @@ function formatTime(dateStr) {
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-const sel = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 6,
-  padding: '5px 10px',
-  fontSize: 12,
-  color: DARK.text,
-  outline: 'none',
-}
-
 const chip = (active) => ({
-  borderRadius: 9999,
   padding: '5px 12px',
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 700,
-  background: active ? 'rgba(30,215,96,0.12)' : 'rgba(255,255,255,0.04)',
-  color: active ? DARK.success : DARK.textMid,
-  border: `1px solid ${active ? 'rgba(30,215,96,0.3)' : 'rgba(255,255,255,0.08)'}`,
+  background: active ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.04)',
+  color: active ? BRAND : DARK.textMid,
+  border: `1px solid ${active ? 'rgba(250,204,21,0.32)' : 'rgba(255,255,255,0.08)'}`,
   transition: 'all 0.15s',
 })
+
+const VIEW_MODES = ['log', 'timeline', 'wall']
+
+function SignalMarker({ signal }) {
+  return (
+    <span
+      className={`kt-activity-signal-marker is-${signal.marker}`}
+      style={{ '--signal-color': signal.color }}
+      title={`${signal.action} / ${signal.detail}`}
+    />
+  )
+}
+
+function ActivityTimeline({ signals, isMobile }) {
+  const buckets = bucketActivitySignals(signals, isMobile ? 12 : 24)
+  const max = Math.max(...buckets.map(bucket => bucket.count), 1)
+
+  if (isMobile) {
+    return (
+      <div className="kt-activity-timeline-mobile">
+        {signals.map(signal => (
+          <article key={signal.id} className="kt-activity-timeline-row">
+            <SignalMarker signal={signal} />
+            <div>
+              <strong>{signal.detail}</strong>
+              <span>{signal.action}{signal.projectName ? ` / ${signal.projectName}` : ''}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="kt-activity-timeline-view">
+      <div className="kt-activity-density">
+        {buckets.map(bucket => (
+          <span
+            key={bucket.index}
+            style={{ height: `${Math.max(8, (bucket.count / max) * 74)}%` }}
+            title={`${bucket.count} events`}
+          />
+        ))}
+      </div>
+      <div className="kt-activity-rail">
+        {signals.map(signal => (
+          <button
+            key={signal.id}
+            className={`kt-activity-rail-marker is-${signal.marker}`}
+            style={{ left: `${signal.position}%`, '--signal-color': signal.color }}
+            title={`${signal.action} / ${signal.detail}`}
+          >
+            <span className="kt-sr-only">{signal.detail}</span>
+          </button>
+        ))}
+      </div>
+      <div className="kt-activity-timeline-feed">
+        {signals.slice(0, 8).map(signal => (
+          <article key={signal.id}>
+            <SignalMarker signal={signal} />
+            <div>
+              <strong>{signal.detail}</strong>
+              <span>{signal.action}{signal.projectName ? ` / ${signal.projectName}` : ''}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ActivityWall({ signals }) {
+  const groups = summarizeActivitySignals(signals)
+  return (
+    <div className="kt-activity-wall">
+      {groups.map(group => (
+        <section key={group.group} className="kt-activity-wall-panel">
+          <div className="kt-activity-wall-head">
+            <span>{group.group}</span>
+            <b>{group.count}</b>
+          </div>
+          <div className="kt-activity-wall-grid">
+            {signals.filter(signal => signal.group === group.group).slice(0, 18).map(signal => (
+              <SignalMarker key={signal.id} signal={signal} />
+            ))}
+          </div>
+          {group.latest && (
+            <div className="kt-activity-wall-latest">
+              <strong>{group.latest.detail}</strong>
+              <span>{group.latest.projectName || group.latest.action}</span>
+            </div>
+          )}
+        </section>
+      ))}
+    </div>
+  )
+}
 
 export default function Activity() {
   const { t } = useTranslation()
@@ -82,6 +169,7 @@ export default function Activity() {
   const isMobile = bp === 'mobile'
   const [projectFilter, setProjectFilter] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
+  const [viewMode, setViewMode] = useState('log')
   const [page, setPage] = useState(0)
 
   const { data: projects = [] } = useQuery({
@@ -103,135 +191,126 @@ export default function Activity() {
     : activities.filter(a => a.action.startsWith(actionFilter + '.'))
 
   const projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]))
+  const signals = buildActivitySignals(filtered, projectMap)
+  const groupCounts = Object.fromEntries(ACTION_GROUPS.map(group => [
+    group.key,
+    group.key === 'all' ? activities.length : activities.filter(a => actionGroup(a) === group.key).length,
+  ]))
+  const latest = filtered[0]
 
   return (
-    <div style={{ padding: isMobile ? '20px 16px' : '28px 40px', maxWidth: 900 }}>
+    <div className="kt-page kt-activity-page" style={{ maxWidth: 1120, margin: 0 }}>
       {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20,
-        flexWrap: 'wrap',
-      }}>
-        <ActivityIcon size={20} color={DARK.success} />
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK.text }}>
-          {t('activity.title')}
-        </h2>
+      <div className="kt-page-header">
+        <div className="kt-page-heading">
+          <h1 className="kt-page-title">{t('activity.title')}</h1>
+          <div className="kt-page-subtitle">
+            {filtered.length} events / {latest ? `${latest.action} ${relativeTime(latest.created_at)}` : 'no signal'}
+          </div>
+        </div>
+        <ActivityIcon size={22} color={BRAND} />
       </div>
 
-      {/* Filters */}
-      <div style={{
-        display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center',
-        flexWrap: 'wrap',
-      }}>
-        <Filter size={14} color={DARK.textDim} />
-        <select
-          value={projectFilter}
-          onChange={e => { setProjectFilter(e.target.value); setPage(0) }}
-          style={sel}
-        >
-          <option value="">{t('activity.allProjects')}</option>
-          {projects.filter(p => p.status === 'active').map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Action type chips */}
-      <div role="group" aria-label="Filter by type" style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
-        {ACTION_GROUPS.map(g => (
-          <button
-            key={g.key}
-            onClick={() => { setActionFilter(g.key); setPage(0) }}
-            style={chip(actionFilter === g.key)}
-            aria-pressed={actionFilter === g.key}
+      <div className={isMobile ? 'kt-activity-shell kt-activity-shell-mobile' : 'kt-activity-shell'}>
+        <aside className="kt-activity-console">
+          <div className="kt-activity-console-title">
+            <Filter size={13} />
+            Signal Filter
+          </div>
+          <select
+            value={projectFilter}
+            onChange={e => { setProjectFilter(e.target.value); setPage(0) }}
+            className="kt-input"
           >
-            {g.label}
-          </button>
-        ))}
+            <option value="">{t('activity.allProjects')}</option>
+            {projects.filter(p => p.status === 'active').map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+
+          <div role="group" aria-label="Filter by type" className="kt-activity-filter-list">
+            {ACTION_GROUPS.map(g => (
+              <button
+                key={g.key}
+                onClick={() => { setActionFilter(g.key); setPage(0) }}
+                style={chip(actionFilter === g.key)}
+                className={actionFilter === g.key ? 'kt-activity-filter is-active' : 'kt-activity-filter'}
+                aria-pressed={actionFilter === g.key}
+              >
+                <span>{g.label}</span>
+                <b>{groupCounts[g.key] || 0}</b>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="kt-activity-log">
+          <div className="kt-activity-view-toggle" role="group" aria-label="Activity view mode">
+            {VIEW_MODES.map(mode => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={viewMode === mode ? 'is-active' : ''}
+                aria-pressed={viewMode === mode}
+              >
+                {t(`activity.view.${mode}`)}
+              </button>
+            ))}
+          </div>
+
+          {isLoading && (
+            <div className="kt-loading" style={{ minHeight: 220 }}>
+              <span>{t('loading')}</span>
+              <span>EVENTS</span>
+              <span>SIGNAL</span>
+            </div>
+          )}
+
+          {!isLoading && filtered.length === 0 && (
+            <div className="kt-empty">
+              <ActivityIcon size={32} className="kt-empty-icon" />
+              <div className="kt-empty-title">{t('activity.noActivity')}</div>
+            </div>
+          )}
+
+          {!isLoading && filtered.length > 0 && viewMode === 'timeline' && (
+            <ActivityTimeline signals={signals} isMobile={isMobile} />
+          )}
+
+          {!isLoading && filtered.length > 0 && viewMode === 'wall' && (
+            <ActivityWall signals={signals} />
+          )}
+
+          {!isLoading && filtered.length > 0 && viewMode === 'log' && (
+            <div className="kt-activity-list">
+              {filtered.map((entry, i) => {
+                const color = ACTION_COLORS[entry.action] || DARK.textDim
+                const group = actionGroup(entry).toUpperCase()
+                return (
+                  <article key={entry.id || i} className="kt-activity-event" style={{ animationDelay: `${i * 0.035}s` }}>
+                    <div className="kt-activity-event-index">{String(page * PAGE_SIZE + i + 1).padStart(2, '0')}</div>
+                    <div className="kt-activity-event-body">
+                      <div className="kt-activity-event-detail">
+                        {entry.detail || entry.action}
+                      </div>
+                      <div className="kt-activity-event-meta">
+                        <span className="kt-chip" style={{ color, borderColor: `${color}55` }}>{entry.action}</span>
+                        <span>{group}</span>
+                        {entry.project_id && projectMap[entry.project_id] && <span>{projectMap[entry.project_id]}</span>}
+                        {entry.actor && <span>by {entry.actor}</span>}
+                      </div>
+                    </div>
+                    <time className="kt-activity-event-time">
+                      <span>{relativeTime(entry.created_at)}</span>
+                      <small>{formatTime(entry.created_at)}</small>
+                    </time>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
       </div>
-
-      {/* Timeline */}
-      {isLoading && (
-        <div style={{ padding: 40, textAlign: 'center', color: DARK.textDim, fontSize: 12 }}>
-          {t('loading')}
-        </div>
-      )}
-
-      {!isLoading && filtered.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: DARK.textDim, fontSize: 12 }}>
-          {t('activity.noActivity')}
-        </div>
-      )}
-
-      {!isLoading && filtered.length > 0 && (
-        <div style={{ position: 'relative', paddingLeft: isMobile ? 20 : 28 }}>
-          {/* Timeline line */}
-          <div style={{
-            position: 'absolute', left: isMobile ? 7 : 11, top: 8, bottom: 8,
-            width: 1, background: 'rgba(255,255,255,0.06)',
-          }} />
-
-          {filtered.map((entry, i) => {
-            const color = ACTION_COLORS[entry.action] || DARK.textDim
-            return (
-              <div key={entry.id || i} style={{
-                position: 'relative', padding: '10px 0',
-                borderBottom: '1px solid rgba(255,255,255,0.03)',
-              }}>
-                {/* Dot */}
-                <div style={{
-                  position: 'absolute', left: isMobile ? -17 : -21,
-                  top: 14, width: 9, height: 9, borderRadius: '50%',
-                  background: color, boxShadow: `0 0 6px ${color}44`,
-                }} />
-
-                <div style={{
-                  display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-                  gap: isMobile ? 4 : 12, alignItems: isMobile ? 'flex-start' : 'center',
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13, color: DARK.text, lineHeight: 1.4,
-                      overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
-                      {entry.detail || entry.action}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, color,
-                        background: `${color}18`, padding: '1px 6px',
-                        borderRadius: 4, letterSpacing: '0.04em',
-                      }}>
-                        {entry.action}
-                      </span>
-                      {entry.project_id && projectMap[entry.project_id] && (
-                        <span style={{ fontSize: 10, color: DARK.textDim }}>
-                          {projectMap[entry.project_id]}
-                        </span>
-                      )}
-                      {entry.actor && (
-                        <span style={{ fontSize: 10, color: DARK.textDim }}>
-                          by {entry.actor}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: 11, color: DARK.textDim, flexShrink: 0,
-                    fontVariantNumeric: 'tabular-nums',
-                    display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'flex-end',
-                    gap: 2,
-                  }}>
-                    <span>{relativeTime(entry.created_at)}</span>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>
-                      {formatTime(entry.created_at)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {/* Pagination */}
       {!isLoading && (

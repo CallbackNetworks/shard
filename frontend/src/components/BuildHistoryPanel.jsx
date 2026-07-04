@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, ExternalLink, GitCommit, GitBranch, Clock, User } from 'lucide-react'
 import { getWebhookEvents } from '../api/client'
-import { DARK } from '../constants/theme'
+import { DARK, STATUS_COLOR } from '../constants/theme'
 
 const STATUS_COLORS = {
-  done: '#22c55e',
-  failed: '#ef4444',
-  in_progress: '#f59e0b',
-  todo: '#6b7280',
+  done: STATUS_COLOR.done,
+  failed: STATUS_COLOR.failed,
+  in_progress: STATUS_COLOR.in_progress,
+  todo: STATUS_COLOR.todo,
 }
 
 const PROVIDER_ICONS = {
@@ -166,8 +166,8 @@ export default function BuildHistoryPanel({ taskId }) {
                       <div style={{ display: 'flex', gap: 8 }}>
                         <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 80 }}>Tests</span>
                         <span style={{ color: DARK.textMid }}>
-                          {ev.test_summary.passed && <span style={{ color: '#22c55e' }}>{ev.test_summary.passed} passed</span>}
-                          {ev.test_summary.failed > 0 && <span style={{ color: '#ef4444', marginLeft: 8 }}>{ev.test_summary.failed} failed</span>}
+                          {ev.test_summary.passed && <span style={{ color: STATUS_COLOR.done }}>{ev.test_summary.passed} passed</span>}
+                          {ev.test_summary.failed > 0 && <span style={{ color: STATUS_COLOR.failed, marginLeft: 8 }}>{ev.test_summary.failed} failed</span>}
                           {ev.test_summary.skipped > 0 && <span style={{ color: '#6b7280', marginLeft: 8 }}>{ev.test_summary.skipped} skipped</span>}
                         </span>
                       </div>

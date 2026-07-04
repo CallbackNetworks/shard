@@ -4,41 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, X, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
 import { useToast } from '../context/ToastContext'
-import { DARK } from '../constants/theme'
-import useBreakpoint from '../hooks/useBreakpoint'
+import { BRAND, DARK } from '../constants/theme'
 import useFocusTrap from '../hooks/useFocusTrap'
 
 const STATUS_COLORS = {
-  active:    { bg: 'rgba(83,157,245,0.12)', color: DARK.info },
-  completed: { bg: 'rgba(30,215,96,0.12)', color: DARK.success },
-  cancelled: { bg: 'rgba(243,114,127,0.12)', color: DARK.danger },
+  active:    { bg: 'rgba(250,204,21,0.14)', color: BRAND },
+  completed: { bg: 'rgba(250,204,21,0.12)', color: BRAND },
+  cancelled: { bg: 'rgba(250,204,21,0.12)', color: DARK.danger },
 }
-
-const inp = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 6,
-  padding: '5px 10px',
-  fontSize: 12,
-  color: DARK.text,
-  outline: 'none',
-  width: '100%',
-  boxSizing: 'border-box',
-}
-
-const btn = (variant = 'default') => ({
-  border: 'none',
-  borderRadius: 9999,
-  padding: '6px 14px',
-  cursor: 'pointer',
-  fontSize: 12,
-  fontWeight: 700,
-  ...(variant === 'primary'
-    ? { background: DARK.success, color: '#000' }
-    : variant === 'danger'
-    ? { background: 'rgba(243,114,127,0.12)', color: DARK.danger, border: '1px solid rgba(243,114,127,0.2)' }
-    : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: DARK.textMid }),
-})
 
 /* ── Goal Form Modal ── */
 function GoalForm({ projects, initial, onSave, onClose }) {
@@ -76,67 +49,59 @@ function GoalForm({ projects, initial, onSave, onClose }) {
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={initial ? t('goals.editTitle') : t('goals.createTitle')} style={{
-      position: 'fixed', inset: 0, zIndex: 300,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.6)',
-    }}>
-      <div ref={trapRef} style={{
-        background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-        padding: 24, width: 520, maxWidth: '95vw', maxHeight: '85vh', overflow: 'auto',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>
+    <div role="dialog" aria-modal="true" aria-label={initial ? t('goals.editTitle') : t('goals.createTitle')} className="kt-modal-backdrop">
+      <div ref={trapRef} className="kt-modal">
+        <div className="kt-modal-header">
+          <span className="kt-modal-title">
             {initial ? t('goals.editTitle') : t('goals.createTitle')}
           </span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+          <button onClick={onClose} className="kt-icon-btn">
             <X size={16} />
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="kt-form-stack">
           {/* Title */}
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('goals.titleLabel')} *</div>
+            <div className="kt-field-label">{t('goals.titleLabel')} *</div>
             <input
               value={form.title}
               onChange={e => set('title', e.target.value)}
               placeholder={t('goals.titlePlaceholder')}
-              style={inp}
+              className="kt-input"
               autoFocus
             />
           </div>
 
           {/* Description */}
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('goals.descriptionLabel')}</div>
+            <div className="kt-field-label">{t('goals.descriptionLabel')}</div>
             <textarea
               value={form.description}
               onChange={e => set('description', e.target.value)}
               placeholder={t('goals.descriptionPlaceholder')}
               rows={3}
-              style={{ ...inp, resize: 'vertical' }}
+              className="kt-input"
+              style={{ resize: 'vertical' }}
             />
           </div>
 
           {/* Target Date */}
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{t('goals.targetDate')}</div>
+            <div className="kt-field-label">{t('goals.targetDate')}</div>
             <input
               type="date"
               value={form.target_date}
               onChange={e => set('target_date', e.target.value)}
-              style={{ ...inp, colorScheme: 'dark' }}
+              className="kt-input"
+              style={{ colorScheme: 'dark' }}
             />
           </div>
 
           {/* Projects multi-select */}
           <div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6 }}>{t('goals.linkProjects')}</div>
-            <div style={{
-              maxHeight: 180, overflow: 'auto', borderRadius: 6,
-              border: '1px solid rgba(255,255,255,0.08)', padding: 4,
-            }}>
+            <div className="kt-field-label">{t('goals.linkProjects')}</div>
+            <div className="kt-panel" style={{ maxHeight: 180, overflow: 'auto', padding: 4 }}>
               {projects.length === 0 ? (
                 <div style={{ padding: 12, fontSize: 12, color: '#4b5563', textAlign: 'center' }}>
                   {t('goals.noProjects')}
@@ -145,13 +110,13 @@ function GoalForm({ projects, initial, onSave, onClose }) {
                 <label key={p.id} style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
                   borderRadius: 4, cursor: 'pointer',
-                  background: form.project_ids.includes(p.id) ? 'rgba(83,157,245,0.08)' : 'transparent',
+                  background: form.project_ids.includes(p.id) ? 'rgba(250,204,21,0.1)' : 'transparent',
                 }}>
                   <input
                     type="checkbox"
                     checked={form.project_ids.includes(p.id)}
                     onChange={() => toggleProject(p.id)}
-                    style={{ cursor: 'pointer', accentColor: DARK.info }}
+                    style={{ cursor: 'pointer', accentColor: BRAND }}
                   />
                   <span style={{ fontSize: 12, color: form.project_ids.includes(p.id) ? DARK.text : DARK.textMid }}>
                     {p.name}
@@ -167,11 +132,11 @@ function GoalForm({ projects, initial, onSave, onClose }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
-          <button onClick={onClose} style={btn()}>{t('cancel')}</button>
+        <div className="kt-toolbar" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
+          <button onClick={onClose} className="kt-btn">{t('cancel')}</button>
           <button
             onClick={handleSubmit}
-            style={btn('primary')}
+            className="kt-btn kt-btn-primary"
             disabled={!form.title.trim()}
           >
             {initial ? t('save') : t('create')}
@@ -196,15 +161,8 @@ function GoalCard({ goal, onEdit, onDelete }) {
 
   return (
     <div
-      style={{
-        background: DARK.elevated,
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 10,
-        padding: 16,
-        position: 'relative',
-        transition: 'border-color 0.15s ease',
-        ...(hovered ? { borderColor: 'rgba(255,255,255,0.16)' } : {}),
-      }}
+      className="kt-card"
+      style={hovered ? { borderColor: BRAND } : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -213,21 +171,17 @@ function GoalCard({ goal, onEdit, onDelete }) {
         <Target size={14} style={{ color: statusStyle.color, marginTop: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: DARK.text }}>
+            <span className="kt-card-title">
               {goal.title}
             </span>
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9999,
-              background: statusStyle.bg, color: statusStyle.color,
-              textTransform: 'capitalize',
-            }}>
+            <span className="kt-badge" style={{ background: statusStyle.bg, color: statusStyle.color, textTransform: 'capitalize' }}>
               {t(`goals.status.${goal.status}`)}
             </span>
           </div>
 
           {/* Description (truncated) */}
           {goal.description && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
+            <div className="kt-card-description">
               {goal.description.length > 120
                 ? goal.description.slice(0, 120) + '...'
                 : goal.description}
@@ -263,16 +217,16 @@ function GoalCard({ goal, onEdit, onDelete }) {
                 {progress}%
               </span>
             </div>
-            <div style={{
-              height: 4, borderRadius: 9999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+            <div className="kt-progress-track" style={{
+              height: 4, borderRadius: 0, background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
             }}>
-              <div style={{
-                height: '100%', borderRadius: 9999,
+              <div className="kt-progress-fill" style={{
+                height: '100%', borderRadius: 0,
                 width: `${Math.min(progress, 100)}%`,
                 background: progress >= 100
                   ? DARK.success
                   : progress >= 50
-                  ? DARK.info
+                  ? BRAND
                   : DARK.warning,
                 transition: 'width 0.3s ease',
               }} />
@@ -283,17 +237,12 @@ function GoalCard({ goal, onEdit, onDelete }) {
           {goal.projects && goal.projects.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
               {goal.projects.map(p => (
-                <span key={p.project_id} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 8px', borderRadius: 9999, fontSize: 10,
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: DARK.textMid,
-                }}>
+                <span key={p.project_id} className="kt-chip" style={{ color: DARK.textMid }}>
                   <Link2 size={9} />
                   <span>{p.project_name}</span>
                   <span style={{
                     fontWeight: 700,
-                    color: p.progress >= 100 ? DARK.success : p.progress >= 50 ? DARK.info : DARK.warning,
+                    color: p.progress >= 100 ? DARK.success : p.progress >= 50 ? BRAND : DARK.warning,
                   }}>
                     {Math.round(p.progress || 0)}%
                   </span>
@@ -310,14 +259,15 @@ function GoalCard({ goal, onEdit, onDelete }) {
         }}>
           <button
             onClick={() => onEdit(goal)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+            className="kt-icon-btn"
             title={t('edit')}
           >
             <Edit2 size={13} />
           </button>
           <button
             onClick={() => onDelete(goal)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.danger, padding: 4 }}
+            className="kt-icon-btn"
+            style={{ color: DARK.danger }}
             title={t('delete')}
           >
             <Trash2 size={13} />
@@ -339,7 +289,7 @@ function StatusTabs({ active, onChange, counts }) {
   ]
 
   return (
-    <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
+    <div className="kt-toolbar" style={{ marginBottom: 16 }}>
       {tabs.map(tab => {
         const isActive = active === tab.key
         const count = tab.key === '' ? counts.all : counts[tab.key] || 0
@@ -348,22 +298,18 @@ function StatusTabs({ active, onChange, counts }) {
           <button
             key={tab.key}
             onClick={() => onChange(tab.key)}
+            className={`kt-btn${isActive ? ' kt-badge-accent' : ''}`}
             style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 12px', borderRadius: 9999,
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              border: isActive ? '1px solid rgba(255,255,255,0.15)' : '1px solid transparent',
-              background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
+              borderColor: isActive ? BRAND : 'transparent',
+              background: isActive ? 'rgba(250,204,21,0.12)' : 'transparent',
               color: isActive ? DARK.text : DARK.textMid,
-              transition: 'all 0.15s ease',
             }}
           >
             {Icon && <Icon size={11} />}
             <span>{tab.label}</span>
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: '0 5px', borderRadius: 9999,
-              background: isActive ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
-              color: isActive ? DARK.text : '#4b5563',
+            <span className="kt-badge" style={{
+              background: isActive ? 'rgba(250,204,21,0.16)' : 'rgba(255,255,255,0.04)',
+              color: isActive ? BRAND : '#4b5563',
             }}>
               {count}
             </span>
@@ -377,8 +323,6 @@ function StatusTabs({ active, onChange, counts }) {
 /* ── Main Goals Page ── */
 export default function Goals() {
   const { t } = useTranslation()
-  const bp = useBreakpoint()
-  const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   const { addToast } = useToast()
   const [showForm, setShowForm] = useState(false)
@@ -441,18 +385,18 @@ export default function Goals() {
   }
 
   return (
-    <div style={{ padding: isMobile ? '20px 16px' : 28, maxWidth: 800, margin: '0 auto' }}>
+    <div className="kt-page">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', marginBottom: 24, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0 }}>
-        <div>
-          <h1 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, margin: 0, color: DARK.text }}>{t('goals.title')}</h1>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+      <div className="kt-page-header">
+        <div className="kt-page-heading">
+          <h1 className="kt-page-title">{t('goals.title')}</h1>
+          <div className="kt-page-subtitle">
             {t('goals.subtitle')}
           </div>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          style={{ ...btn('primary'), display: 'flex', alignItems: 'center', gap: 6 }}
+          className="kt-btn kt-btn-primary"
         >
           <Plus size={13} /> {t('goals.create')}
         </button>
@@ -465,24 +409,20 @@ export default function Goals() {
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>{t('loading')}</div>
       ) : goals.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: 64, color: '#4b5563',
-          border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12,
-          animation: 'fadeIn 0.4s ease',
-        }}>
-          <Target size={36} style={{ marginBottom: 14, opacity: 0.3, display: 'block', margin: '0 auto 14px', color: DARK.info }} />
-          <div style={{ fontSize: 16, fontWeight: 700, color: DARK.text, marginBottom: 6 }}>
+        <div className="kt-empty">
+          <Target size={36} className="kt-empty-icon" />
+          <div className="kt-empty-title">
             {statusFilter ? t('goals.emptyFiltered') : t('goals.empty')}
           </div>
           <div style={{ fontSize: 13, marginBottom: 16 }}>{t('goals.emptyHint')}</div>
           {!statusFilter && (
-            <button onClick={() => setShowForm(true)} style={btn('primary')}>
+            <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
               {t('goals.create')}
             </button>
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="kt-stack">
           {goals.map((goal, i) => (
             <div key={goal.id} style={{
               animation: 'fadeUpIn 0.35s ease forwards',

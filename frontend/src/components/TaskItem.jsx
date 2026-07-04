@@ -1,27 +1,27 @@
 import { useState } from 'react'
-import { DARK } from '../constants/theme'
+import { DARK, STATUS_BG, STATUS_COLOR } from '../constants/theme'
 
 const STATUS_COLORS = {
-  todo: 'rgba(255,255,255,0.08)',
-  in_progress: 'rgba(59,130,246,0.15)',
-  done: 'rgba(16,185,129,0.12)',
-  failed: 'rgba(239,68,68,0.12)',
+  todo: STATUS_BG.todo,
+  in_progress: STATUS_BG.in_progress,
+  done: STATUS_BG.done,
+  failed: STATUS_BG.failed,
 }
 const STATUS_TEXT = {
-  todo: 'rgba(255,255,255,0.5)',
-  in_progress: '#3b82f6',
-  done: '#10b981',
-  failed: '#ef4444',
+  todo: STATUS_COLOR.todo,
+  in_progress: STATUS_COLOR.in_progress,
+  done: STATUS_COLOR.done,
+  failed: STATUS_COLOR.failed,
 }
 const PRIORITY_COLORS = {
   low: 'rgba(156,163,175,0.12)',
   medium: 'rgba(245,158,11,0.12)',
-  high: 'rgba(239,68,68,0.12)',
+  high: 'rgba(250,204,21,0.12)',
 }
 const PRIORITY_TEXT = {
   low: '#9ca3af',
   medium: '#f59e0b',
-  high: '#ef4444',
+  high: '#facc15',
 }
 
 export default function TaskItem({ task, projectId: _projectId, onUpdate, onDelete }) {
@@ -37,7 +37,7 @@ export default function TaskItem({ task, projectId: _projectId, onUpdate, onDele
 
   const badge = (text, bg, color) => (
     <span style={{
-      background: bg, color, borderRadius: 9999,
+      background: bg, color, borderRadius: 0,
       padding: '2px 10px', fontSize: 11, fontWeight: 700,
       textTransform: 'capitalize', letterSpacing: '0.05em',
     }}>{text}</span>
@@ -45,8 +45,8 @@ export default function TaskItem({ task, projectId: _projectId, onUpdate, onDele
 
   return (
     <div style={{
-      background: DARK.surface, borderRadius: 8, padding: '14px 16px',
-      boxShadow: 'rgba(0,0,0,0.3) 0px 4px 8px',
+      background: DARK.surface, borderRadius: 0, padding: '14px 16px',
+      boxShadow: '6px 6px 0 rgba(0,0,0,0.3)',
       display: 'flex', flexDirection: 'column', gap: 10
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -66,7 +66,7 @@ export default function TaskItem({ task, projectId: _projectId, onUpdate, onDele
           onChange={e => onUpdate(task.id, { status: e.target.value })}
           onClick={e => e.stopPropagation()}
           style={{
-            fontSize: 13, fontWeight: 600, borderRadius: 9999,
+            fontSize: 13, fontWeight: 600, borderRadius: 0,
             border: '1px solid rgba(255,255,255,0.15)', padding: '4px 12px',
             cursor: 'pointer', background: DARK.elevated, color: DARK.text,
           }}
@@ -91,7 +91,7 @@ export default function TaskItem({ task, projectId: _projectId, onUpdate, onDele
           onClick={e => { e.stopPropagation(); onDelete(task.id) }}
           style={{
             fontSize: 12, fontWeight: 700, background: 'none',
-            border: '1px solid rgba(239,68,68,0.4)', borderRadius: 9999,
+            border: '1px solid rgba(250,204,21,0.4)', borderRadius: 9999,
             padding: '4px 14px', cursor: 'pointer', color: DARK.danger, marginLeft: 'auto',
             textTransform: 'uppercase', letterSpacing: '1px',
           }}

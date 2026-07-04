@@ -106,7 +106,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
   const availableTasks = tasks.filter(t => !cycle.task_ids.includes(t.id))
   const progress = cycle.total_tasks > 0 ? Math.round(cycle.done_tasks / cycle.total_tasks * 100) : 0
 
-  const statusColors = { draft: '#94a3b8', active: '#22c55e', completed: '#5e6ad2' }
+  const statusColors = { draft: '#94a3b8', active: '#facc15', completed: '#5e6ad2' }
   const sColor = statusColors[cycle.status] || '#94a3b8'
 
   const saveEdit = () => {
@@ -124,7 +124,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
     <div style={{
       border: cycle.status === 'active' ? `2px solid ${BRAND}` : '1px solid rgba(255,255,255,0.08)',
       borderRadius: 10, padding: 16, background: 'rgba(255,255,255,0.03)',
-      boxShadow: cycle.status === 'active' ? '0 0 0 4px rgba(30,215,96,0.1)' : 'none',
+      boxShadow: cycle.status === 'active' ? '0 0 0 4px rgba(250,204,21,0.1)' : 'none',
     }}>
       {editing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -187,7 +187,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                 <Copy size={11} />
               </button>
               <button onClick={() => { if (confirm(t('cycle.deleteConfirm', { name: cycle.name }))) onDelete(cycle.id) }}
-                style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 6, cursor: 'pointer', color: '#f87171', padding: '4px 10px', fontSize: 11 }}>
+                style={{ background: 'none', border: '1px solid rgba(250,204,21,0.4)', borderRadius: 6, cursor: 'pointer', color: '#facc15', padding: '4px 10px', fontSize: 11 }}>
                 {t('delete')}
               </button>
             </div>
@@ -211,7 +211,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                 style={{
                   display: 'flex', alignItems: 'center', gap: 4,
                   fontSize: 11, color: showBurndown ? BRAND : 'rgba(255,255,255,0.35)',
-                  background: showBurndown ? 'rgba(30,215,96,0.1)' : 'none',
+                  background: showBurndown ? 'rgba(250,204,21,0.1)' : 'none',
                   border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
                   padding: '3px 10px', cursor: 'pointer', fontWeight: 500,
                 }}
@@ -293,7 +293,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
 
           <button
             onClick={() => setShowTaskPicker(v => !v)}
-            style={{ fontSize: 11, color: BRAND, background: 'rgba(30,215,96,0.1)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500 }}
+            style={{ fontSize: 11, color: BRAND, background: 'rgba(250,204,21,0.1)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500 }}
           >
             <Plus size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} />
             {t('cycle.addIssues')}

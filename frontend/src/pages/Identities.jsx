@@ -7,22 +7,14 @@ import {
   getProjects, linkProjectIdentity, unlinkProjectIdentity, rotateShareToken,
   setSharePin, clearSharePin, setShareExpiry, getShareViewCount,
 } from '../api/client'
-import { BRAND, INSET_SHADOW, SHADOW_SM, DARK } from '../constants/theme'
+import { BRAND, DARK } from '../constants/theme'
 import EmptyState from '../components/shared/EmptyState'
 
 const COLORS = [
-  '#5e6ad2', '#22c55e', '#ef4444', '#f59e0b', '#3b82f6',
+  '#5e6ad2', '#facc15', '#facc15', '#f59e0b', '#3b82f6',
   '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316',
   '#14b8a6', '#a855f7', '#e11d48', '#0ea5e9',
 ]
-
-const inputStyle = {
-  border: 'none',
-  boxShadow: INSET_SHADOW,
-  borderRadius: 4, padding: '8px 12px',
-  fontSize: 14, background: DARK.elevated, color: DARK.text,
-  boxSizing: 'border-box', display: 'block', width: '100%', marginTop: 4, outline: 'none',
-}
 
 function IdentityForm({ initial, onSave, onCancel }) {
   const { t } = useTranslation()
@@ -30,26 +22,27 @@ function IdentityForm({ initial, onSave, onCancel }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   return (
-    <div style={{ background: DARK.surface, borderRadius: 8, padding: 20, marginBottom: 16, boxShadow: SHADOW_SM }}>
+    <div className="kt-panel" style={{ padding: 20, marginBottom: 16 }}>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label style={{ fontSize: 13, fontWeight: 700, color: DARK.text, flex: '0 0 auto' }}>
           {t('identities.avatar')}
           <input value={form.avatar} onChange={e => set('avatar', e.target.value)}
             placeholder={t('identities.avatarPlaceholder')}
             maxLength={2}
-            style={{ ...inputStyle, width: 48, textAlign: 'center', fontSize: 16 }} />
+            className="kt-input"
+            style={{ width: 48, textAlign: 'center', fontSize: 16, marginTop: 4 }} />
         </label>
         <label style={{ fontSize: 13, fontWeight: 700, color: DARK.text, flex: '1 1 160px' }}>
           {t('name')} *
           <input value={form.name} onChange={e => set('name', e.target.value)}
             placeholder={t('identities.namePlaceholder')}
-            style={inputStyle} />
+            className="kt-input" style={{ marginTop: 4 }} />
         </label>
         <label style={{ fontSize: 13, fontWeight: 600, color: DARK.text, flex: '2 1 200px' }}>
           {t('description')}
           <input value={form.description} onChange={e => set('description', e.target.value)}
             placeholder={t('identities.descriptionPlaceholder')}
-            style={inputStyle} />
+            className="kt-input" style={{ marginTop: 4 }} />
         </label>
       </div>
       <div style={{ marginTop: 12 }}>
@@ -57,7 +50,7 @@ function IdentityForm({ initial, onSave, onCancel }) {
         <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
           {COLORS.map(c => (
             <button key={c} onClick={() => set('color', c)} style={{
-              width: 24, height: 24, borderRadius: 6, background: c,
+              width: 24, height: 24, borderRadius: 0, background: c,
               border: form.color === c ? '2px solid #fff' : '2px solid transparent',
               cursor: 'pointer', transition: 'border 0.1s',
             }} />
@@ -66,11 +59,10 @@ function IdentityForm({ initial, onSave, onCancel }) {
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
         <button onClick={() => onSave(form)} disabled={!form.name}
-          style={{ background: BRAND, color: '#000', border: 'none', borderRadius: 9999, padding: '8px 22px', cursor: 'pointer', fontWeight: 700, opacity: form.name ? 1 : 0.5, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
+          className="kt-btn kt-btn-primary" style={{ opacity: form.name ? 1 : 0.5 }}>
           {t('save')}
         </button>
-        <button onClick={onCancel}
-          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, padding: '8px 20px', cursor: 'pointer', color: DARK.text, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
+        <button onClick={onCancel} className="kt-btn">
           {t('cancel')}
         </button>
       </div>
@@ -144,13 +136,14 @@ function ShareSettings({ identity, onUpdate }) {
             maxLength={6} value={pinInput}
             onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
             placeholder={t('identities.pinPlaceholder')}
-            style={{ ...inputStyle, width: 120, marginTop: 0 }}
+            className="kt-input"
+            style={{ width: 120, marginTop: 0 }}
           />
           <button onClick={handleSetPin} disabled={pinInput.length < 4}
             style={{
               background: pinInput.length >= 4 ? BRAND : 'rgba(255,255,255,0.06)',
               color: pinInput.length >= 4 ? '#000' : 'rgba(255,255,255,0.3)',
-              border: 'none', borderRadius: 6, padding: '6px 14px',
+              border: 'none', borderRadius: 0, padding: '6px 14px',
               cursor: pinInput.length >= 4 ? 'pointer' : 'default',
               fontSize: 12, fontWeight: 700,
             }}>
@@ -159,14 +152,14 @@ function ShareSettings({ identity, onUpdate }) {
           {identity.share_pin_set && (
             <button onClick={handleClearPin}
               style={{
-                background: 'none', border: '1px solid rgba(248,113,113,0.4)',
-                color: '#f87171', borderRadius: 6, padding: '5px 12px',
+                background: 'none', border: '1px solid rgba(250,204,21,0.4)',
+                color: '#facc15', borderRadius: 0, padding: '5px 12px',
                 cursor: 'pointer', fontSize: 12, fontWeight: 600,
               }}>
               {t('remove')}
             </button>
           )}
-          {pinMsg && <span style={{ fontSize: 11, color: pinMsg.includes('Error') ? '#f87171' : DARK.success, fontWeight: 600 }}>{pinMsg}</span>}
+          {pinMsg && <span style={{ fontSize: 11, color: pinMsg.includes('Error') ? '#facc15' : DARK.success, fontWeight: 600 }}>{pinMsg}</span>}
         </div>
       </div>
 
@@ -183,13 +176,14 @@ function ShareSettings({ identity, onUpdate }) {
           <input
             type="datetime-local" value={expiryInput}
             onChange={e => setExpiryInput(e.target.value)}
-            style={{ ...inputStyle, width: 220, marginTop: 0, colorScheme: 'dark' }}
+            className="kt-input"
+            style={{ width: 220, marginTop: 0, colorScheme: 'dark' }}
           />
           <button onClick={handleSetExpiry}
             style={{
               background: 'rgba(255,255,255,0.06)',
               color: DARK.text, border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 6, padding: '5px 14px', cursor: 'pointer',
+              borderRadius: 0, padding: '5px 14px', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
             }}>
             {expiryInput ? t('set') : t('clear')}
@@ -270,17 +264,17 @@ export default function Identities() {
     return linked
   }
 
-  if (isLoading) return <p style={{ color: 'rgba(255,255,255,0.35)', padding: 24 }}>{t('loading')}</p>
+  if (isLoading) return <p className="kt-muted" style={{ padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div className="page-content" style={{ padding: '32px 40px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: DARK.text }}>{t('identities.title')}</h1>
-          <p style={{ color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('identities.subtitle')}</p>
+    <div className="kt-page" style={{ maxWidth: 980 }}>
+      <div className="kt-page-header">
+        <div className="kt-page-heading">
+          <h1 className="kt-page-title">{t('identities.title')}</h1>
+          <p className="kt-page-subtitle">{t('identities.subtitle')}</p>
         </div>
         <button onClick={() => setShowCreate(true)}
-          style={{ background: BRAND, color: '#000', border: 'none', borderRadius: 9999, padding: '10px 24px', cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          className="kt-btn kt-btn-primary">
           <Plus size={14} />{t('identities.new')}
         </button>
       </div>
@@ -295,7 +289,7 @@ export default function Identities() {
       {identities.length === 0 && !showCreate ? (
         <EmptyState message={t('identities.empty')} hint={t('identities.emptyHint')} />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="kt-stack" style={{ gap: 12 }}>
           {identities.map(identity => {
             const linked = linkedProjectIds(identity.id)
             const isEditing = editingId === identity.id
@@ -313,10 +307,10 @@ export default function Identities() {
             }
 
             return (
-              <div key={identity.id} style={{ background: DARK.surface, borderRadius: 8, padding: '16px 20px', boxShadow: SHADOW_SM }}>
+              <div key={identity.id} className="kt-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
-                    width: 40, height: 40, borderRadius: 10, background: identity.color,
+                    width: 40, height: 40, borderRadius: 0, background: identity.color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#fff', fontWeight: 700, fontSize: identity.avatar?.length > 1 ? 16 : 18,
                     flexShrink: 0,
@@ -329,12 +323,12 @@ export default function Identities() {
                       <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{identity.description}</div>
                     )}
                   </div>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 4 }}>
+                  <span className="kt-badge" style={{ color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)' }}>
                     {identity.project_count} project{identity.project_count !== 1 ? 's' : ''}
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <a href={`/?identity=${identity.id}`} target="_blank" rel="noreferrer"
-                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', color: DARK.text }}>
+                      className="kt-btn" style={{ fontSize: 13, textDecoration: 'none', color: DARK.text }}>
                       <ExternalLink size={13} /> {t('identities.overview')}
                     </a>
                     {identity.share_token && (
@@ -343,8 +337,8 @@ export default function Identities() {
                           onClick={() => copyShareLink(identity)}
                           title="Copy guest share link"
                           style={{
-                            background: copiedId === identity.id ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.06)',
-                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
+                            background: copiedId === identity.id ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)',
+                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
                             color: copiedId === identity.id ? DARK.success : DARK.text,
                           }}>
                           {copiedId === identity.id ? <Check size={13} /> : <Share2 size={13} />}
@@ -353,33 +347,33 @@ export default function Identities() {
                         <button
                           onClick={() => { if (confirm('Revoke current share link and generate a new one?')) rotateMut.mutate(identity.id) }}
                           title="Revoke share link"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+                          className="kt-btn" style={{ padding: '6px 8px', color: 'rgba(255,255,255,0.4)' }}>
                           <RefreshCw size={13} />
                         </button>
                       </>
                     )}
                     <button onClick={() => setSettingsId(settingsId === identity.id ? null : identity.id)}
                       style={{
-                        background: settingsId === identity.id ? 'rgba(30,215,96,0.12)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
+                        background: settingsId === identity.id ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
                         color: settingsId === identity.id ? BRAND : DARK.text,
                       }}>
                       <Shield size={13} /> {t('identities.settings')}
                     </button>
                     <button onClick={() => setLinkingId(isLinking ? null : identity.id)}
                       style={{
-                        background: isLinking ? 'rgba(30,215,96,0.12)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
+                        background: isLinking ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
                         color: isLinking ? BRAND : DARK.text,
                       }}>
                       <Link2 size={13} /> {t('identities.projects')}
                     </button>
                     <button onClick={() => setEditingId(identity.id)}
-                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: DARK.text }}>
+                      className="kt-btn" style={{ padding: '6px 10px', color: DARK.text }}>
                       <Edit3 size={13} />
                     </button>
                     <button onClick={() => { if (confirm(`Delete identity "${identity.name}"?`)) deleteMut.mutate(identity.id) }}
-                      style={{ background: 'none', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>
+                      className="kt-btn" style={{ background: 'none', border: '1px solid rgba(250,204,21,0.4)', color: '#facc15', padding: '6px 10px' }}>
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -390,7 +384,7 @@ export default function Identities() {
                   <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
                     {projects.filter(p => linked.has(p.id)).map(p => (
                       <span key={p.id} style={{
-                        fontSize: 12, padding: '3px 10px', borderRadius: 6,
+                        fontSize: 12, padding: '3px 10px', borderRadius: 0,
                         background: identity.color + '18', color: identity.color,
                         border: `1px solid ${identity.color}33`, fontWeight: 500,
                       }}>
@@ -407,7 +401,7 @@ export default function Identities() {
 
                 {/* Project linking panel */}
                 {isLinking && (
-                  <div style={{ marginTop: 12, padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div className="kt-panel" style={{ marginTop: 12, padding: '12px 16px' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: DARK.text }}>{t('identities.linkUnlinkProjects')}</div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {projects.map(p => {
@@ -420,7 +414,7 @@ export default function Identities() {
                             }
                             style={{
                               display: 'flex', alignItems: 'center', gap: 4,
-                              fontSize: 12, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                              fontSize: 12, padding: '4px 10px', borderRadius: 0, cursor: 'pointer',
                               background: isLinked ? identity.color + '18' : 'rgba(255,255,255,0.05)',
                               color: isLinked ? identity.color : 'rgba(255,255,255,0.4)',
                               border: isLinked ? `1px solid ${identity.color}55` : '1px solid rgba(255,255,255,0.1)',

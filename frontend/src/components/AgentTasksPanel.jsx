@@ -34,7 +34,7 @@ function AgentCard({ agent, index }) {
 
   return (
     <div style={{
-      background: '#0f1117',
+      background: '#1f1f1f',
       border: '1px solid rgba(255,255,255,0.08)',
       borderRadius: 10,
       padding: 14,
@@ -45,9 +45,9 @@ function AgentCard({ agent, index }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 30, height: 30, borderRadius: '50%',
-          background: agent.active ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.06)',
+          background: agent.active ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          border: `1px solid ${agent.active ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.1)'}`,
+          border: `1px solid ${agent.active ? 'rgba(250,204,21,0.3)' : 'rgba(255,255,255,0.1)'}`,
         }}>
           <Bot size={14} color={agent.active ? DARK.info : '#6b7280'} />
         </div>
@@ -57,7 +57,7 @@ function AgentCard({ agent, index }) {
             <span style={{ fontWeight: 600, fontSize: 13, color: DARK.text }}>{agent.agent_name}</span>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 9999,
-              background: agent.active ? 'rgba(30,215,96,0.1)' : 'rgba(255,255,255,0.05)',
+              background: agent.active ? 'rgba(250,204,21,0.1)' : 'rgba(255,255,255,0.05)',
               color: agent.active ? DARK.success : '#6b7280',
             }}>
               {agent.active ? t('agent.active') : t('agent.inactive')}
@@ -135,16 +135,12 @@ function AgentCard({ agent, index }) {
 
 export default function AgentTasksPanel() {
   const { t } = useTranslation()
-  const { data: agents = [], isLoading } = useQuery({
+  const { data: agents = [], isLoading, isError } = useQuery({
     queryKey: ['agent-summary'],
     queryFn: getAgentSummary,
   })
 
-  if (isLoading) return null
-
   const relevant = agents.filter(a => a.active || Object.values(a.task_counts).some(c => c > 0))
-
-  if (relevant.length === 0) return null
 
   return (
     <div style={{ marginBottom: 32 }}>
@@ -152,11 +148,28 @@ export default function AgentTasksPanel() {
         <Bot size={14} color={DARK.info} />
         <span style={{ fontWeight: 700, fontSize: 14 }}>{t('agent.workload')}</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {relevant.map((agent, i) => (
-          <AgentCard key={agent.agent_id} agent={agent} index={i} />
-        ))}
-      </div>
+      {isLoading || isError || relevant.length === 0 ? (
+        <div style={{
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.018)',
+          color: '#6b7280',
+          fontSize: 12,
+          padding: '18px 14px',
+          textAlign: 'center',
+        }}>
+          {isLoading
+            ? t('loading')
+            : isError
+            ? t('agent.noAgents')
+            : t('agent.noTasks')}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {relevant.map((agent, i) => (
+            <AgentCard key={agent.agent_id} agent={agent} index={i} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

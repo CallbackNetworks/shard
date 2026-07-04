@@ -4,9 +4,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { DARK, BRAND } from '../constants/theme'
 
 const PRIORITY_COLORS = {
-  high: '#f37280',
+  high: '#facc15',
   medium: '#ffa42b',
-  low: '#4ade80',
+  low: '#facc15',
 }
 
 const GRID_BORDER = 'rgba(255,255,255,0.06)'
@@ -269,7 +269,7 @@ export default function CalendarView({ tasks, onUpdateTask, projectId: _projectI
                 borderRight: (idx + 1) % 7 !== 0 ? `1px solid ${GRID_BORDER}` : 'none',
                 borderBottom:
                   idx < calendarCells.length - 7 ? `1px solid ${GRID_BORDER}` : 'none',
-                background: isToday ? 'rgba(30,215,96,0.04)' : 'transparent',
+                background: isToday ? 'rgba(250,204,21,0.04)' : 'transparent',
                 border: isToday ? `2px solid ${BRAND}` : undefined,
                 boxSizing: 'border-box',
               }}

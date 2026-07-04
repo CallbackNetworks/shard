@@ -97,7 +97,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
               >
                 <Download size={11} />
               </a>
-              <button onClick={() => handleDelete(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(248,113,113,0.5)', padding: 0, display: 'flex' }}>
+              <button onClick={() => handleDelete(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(250,204,21,0.5)', padding: 0, display: 'flex' }}>
                 <X size={10} />
               </button>
             </div>

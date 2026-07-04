@@ -48,7 +48,11 @@ def api_project_stats(
     for t in tasks:
         by_status[t.status] = by_status.get(t.status, 0) + 1
         by_priority[t.priority] = by_priority.get(t.priority, 0) + 1
-        if t.due_date and t.due_date.replace(tzinfo=None) < now.replace(tzinfo=None) and t.status not in ("done", "failed"):
+        if (
+            t.due_date
+            and t.due_date.replace(tzinfo=None) < now.replace(tzinfo=None)
+            and t.status not in ("done", "failed")
+        ):
             overdue += 1
 
     done = by_status.get("done", 0)

@@ -3,10 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart2, TrendingUp, Activity, Flame, Download } from 'lucide-react'
 import { getProjects, getCycles, getAnalyticsOverview, getAnalyticsHeatmap, getAnalyticsBurndown, getAnalyticsVelocity, getAnalyticsStatusTrend } from '../api/client'
-import useBreakpoint from '../hooks/useBreakpoint'
+import { BRAND, STATUS_COLOR } from '../constants/theme'
 
-const BRAND = '#ef4444'
-const STATUS_COLORS = { done: '#10b981', in_progress: '#3b82f6', todo: '#94a3b8', failed: '#ef4444' }
+const STATUS_COLORS = STATUS_COLOR
 
 // ——— Tooltip component ———
 function SvgTooltip({ x, y, text, svgWidth }) {
@@ -99,7 +98,7 @@ function Heatmap({ data }) {
             const intensity = cell.count === 0 ? 0 : 0.15 + (cell.count / maxCount) * 0.85
             const fill = cell.count === 0
               ? 'rgba(255,255,255,0.05)'
-              : `rgba(239,68,68,${intensity})`
+              : `rgba(250,204,21,${intensity})`
             const isHovered = hover && hover.date === cell.date
             return (
               <rect
@@ -136,7 +135,7 @@ function Heatmap({ data }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
         {t('analytics.less')}
         {[0.05, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
-          <span key={i} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: `rgba(239,68,68,${op})` }} />
+          <span key={i} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: `rgba(250,204,21,${op})` }} />
         ))}
         {t('analytics.more')}
       </div>
@@ -250,7 +249,7 @@ function VelocityChart({ data }) {
               fill={isHovered ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}
             />
             <rect x={padding.l} y={y} width={doneW} height={barH} rx={4}
-              fill={isHovered ? 'rgba(34,197,94,0.7)' : 'rgba(34,197,94,0.5)'}
+              fill={isHovered ? 'rgba(250,204,21,0.7)' : 'rgba(250,204,21,0.5)'}
             />
             <text x={padding.l + totalW + 6} y={y + barH / 2 + 4} fontSize={10} fill="rgba(255,255,255,0.3)">
               {d.completed_tasks}/{d.total_tasks}
@@ -350,9 +349,8 @@ function StatusTrendChart({ data }) {
 
 function StatCard({ icon, label, value, sub, color, delay }) {
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 6,
+    <div className="kt-card" style={{
+      padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 6,
       animation: 'fadeUpIn 0.35s ease forwards',
       animationDelay: delay != null ? `${delay}s` : '0s',
       opacity: 0,
@@ -368,9 +366,8 @@ function StatCard({ icon, label, value, sub, color, delay }) {
 
 function Section({ title, icon, children, delay, summary, actions }) {
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 12, padding: '20px 24px',
+    <div className="kt-panel" style={{
+      padding: '20px 24px',
       animation: 'fadeUpIn 0.35s ease forwards',
       animationDelay: delay != null ? `${delay}s` : '0s',
       opacity: 0,
@@ -395,12 +392,8 @@ function ExportButton({ onClick, label }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 6, padding: '4px 10px', fontSize: 11, color: 'rgba(255,255,255,0.4)',
-        cursor: 'pointer', fontWeight: 600,
-      }}
+      className="kt-btn"
+      style={{ padding: '4px 10px', fontSize: 11 }}
     >
       <Download size={11} />
       {label}
@@ -425,8 +418,6 @@ function downloadCsv(filename, headers, rows) {
 
 export default function Analytics() {
   const { t } = useTranslation()
-  const bp = useBreakpoint()
-  const isMobile = bp === 'mobile'
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedCycleId, setSelectedCycleId] = useState('')
   const [trendDays, setTrendDays] = useState(30)
@@ -463,31 +454,28 @@ export default function Analytics() {
     downloadCsv('status-trend.csv', ['Date', 'Todo', 'In Progress', 'Done', 'Failed'], trend.map(d => [d.date, d.todo, d.in_progress, d.done, d.failed]))
   }, [trend])
 
-  const selectStyle = {
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 6, padding: '5px 10px', fontSize: 12, color: '#ffffff', outline: 'none', cursor: 'pointer',
-  }
-
   return (
-    <div className="page-content" style={{ padding: isMobile ? '20px 16px' : '32px 40px' }}>
-      <div style={{ marginBottom: isMobile ? 20 : 28 }}>
-        <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight: 700, color: '#ffffff', margin: 0 }}>{t('analytics.title')}</h1>
-        <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: 4, fontSize: 13 }}>{t('analytics.subtitle')}</p>
+    <div className="kt-page" style={{ maxWidth: 1120 }}>
+      <div className="kt-page-header">
+        <div className="kt-page-heading">
+          <h1 className="kt-page-title">{t('analytics.title')}</h1>
+          <p className="kt-page-subtitle">{t('analytics.subtitle')}</p>
+        </div>
       </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
-        <select value={selectedProjectId} onChange={e => { setSelectedProjectId(e.target.value); setSelectedCycleId('') }} style={selectStyle}>
+        <select value={selectedProjectId} onChange={e => { setSelectedProjectId(e.target.value); setSelectedCycleId('') }} className="kt-input" style={{ width: 'auto', cursor: 'pointer' }}>
           <option value="">{t('analytics.allProjects')}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         {selectedProjectId && cycles.length > 0 && (
-          <select value={selectedCycleId} onChange={e => setSelectedCycleId(e.target.value)} style={selectStyle}>
+          <select value={selectedCycleId} onChange={e => setSelectedCycleId(e.target.value)} className="kt-input" style={{ width: 'auto', cursor: 'pointer' }}>
             <option value="">{t('analytics.selectCycle')}</option>
             {cycles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
-        <select value={trendDays} onChange={e => setTrendDays(Number(e.target.value))} style={selectStyle}>
+        <select value={trendDays} onChange={e => setTrendDays(Number(e.target.value))} className="kt-input" style={{ width: 'auto', cursor: 'pointer' }}>
           <option value={7}>{t('analytics.last7Days')}</option>
           <option value={30}>{t('analytics.last30Days')}</option>
           <option value={90}>{t('analytics.last90Days')}</option>
@@ -498,16 +486,16 @@ export default function Analytics() {
       {overview && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
           <StatCard icon={<BarChart2 size={13}/>} label={t('analytics.totalTasks')} value={overview.total_tasks} delay={0} />
-          <StatCard icon={<Activity size={13}/>} label={t('analytics.done')} value={overview.done_tasks} color="#10b981" delay={0.08} />
-          <StatCard icon={<TrendingUp size={13}/>} label={t('analytics.inProgress')} value={overview.in_progress_tasks} color="#3b82f6" delay={0.16} />
-          <StatCard icon={<Flame size={13}/>} label={t('analytics.overdueCount')} value={overview.overdue_tasks} color="#ef4444" delay={0.24} />
+          <StatCard icon={<Activity size={13}/>} label={t('analytics.done')} value={overview.done_tasks} color={STATUS_COLOR.done} delay={0.08} />
+          <StatCard icon={<TrendingUp size={13}/>} label={t('analytics.inProgress')} value={overview.in_progress_tasks} color={STATUS_COLOR.in_progress} delay={0.16} />
+          <StatCard icon={<Flame size={13}/>} label={t('analytics.overdueCount')} value={overview.overdue_tasks} color={overview.overdue_tasks > 0 ? STATUS_COLOR.failed : STATUS_COLOR.todo} delay={0.24} />
           {overview.most_active_project && (
             <StatCard
               icon={<Activity size={13}/>}
               label={t('analytics.mostActive')}
               value={overview.most_active_project.name}
               sub={t('analytics.eventsThisWeek', { count: overview.most_active_project.activity_count })}
-              color="#ef4444"
+              color="#facc15"
               delay={0.32}
             />
           )}

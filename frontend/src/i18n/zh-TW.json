@@ -7,6 +7,7 @@
   "loading": "載入中…",
   "creating": "建立中…",
   "active": "進行中",
+  "inactive": "未啟用",
   "archived": "已封存",
   "all": "全部",
   "done": "完成",
@@ -53,8 +54,8 @@
   "noResults": "無結果",
   "copied": "已複製",
   "copy": "複製",
-
   "nav.myIssues": "我的任務",
+  "nav.commandCenter": "總控台",
   "nav.identities": "身份",
   "nav.integrations": "整合",
   "nav.apiKeys": "API 金鑰",
@@ -70,8 +71,8 @@
   "nav.language": "語言",
   "nav.lightMode": "切換為淺色模式",
   "nav.darkMode": "切換為深色模式",
-
-  "dashboard.title": "我的任務",
+  "dashboard.title": "總控台",
+  "dashboard.commandCenter": "Command Center",
   "dashboard.newProject": "新增專案",
   "dashboard.projectNamePlaceholder": "專案名稱 *",
   "dashboard.descriptionPlaceholder": "說明（選填）",
@@ -109,7 +110,20 @@
   "dashboard.step3Desc": "透過 Webhook、Email 或 CI/CD 在任務變更時接收通知。",
   "dashboard.step4Title": "透過身份分享",
   "dashboard.step4Desc": "建立基於角色的身份，在不同情境中組織工作。",
-
+  "dashboard.critical": "關鍵",
+  "dashboard.inMotion": "進行中",
+  "dashboard.waiting": "等待中",
+  "dashboard.doneToday": "今日完成",
+  "dashboard.latestSignal": "最新訊號",
+  "dashboard.briefing": "簡報",
+  "dashboard.liveSignals": "即時訊號",
+  "dashboard.queuePressure": "隊列壓力",
+  "dashboard.noCritical": "沒有關鍵工作",
+  "dashboard.noInMotion": "沒有進行中任務",
+  "dashboard.noWaiting": "沒有等待隊列",
+  "dashboard.noDoneToday": "尚無完成項目",
+  "dashboard.noGoalSignals": "沒有進行中目標訊號",
+  "dashboard.noDecisionSignals": "沒有待決決策",
   "project.notFound": "找不到專案",
   "project.done": "完成",
   "project.newIssue": "新增議題",
@@ -140,7 +154,6 @@
   "project.createLabel": "建立標籤",
   "project.projectLabels": "專案標籤",
   "project.filter": "篩選",
-
   "integrations.title": "整合",
   "integrations.subtitle": "設定對外 CI/CD 通知",
   "integrations.new": "+ 新增整合",
@@ -208,7 +221,6 @@
   "integrations.noBuildHistory": "尚無建置事件。",
   "integrations.viewSetup": "查看設定",
   "integrations.taskCreated": "task.created",
-
   "apiKeys.title": "API 金鑰",
   "apiKeys.subtitle": "管理外部服務的 API 存取金鑰",
   "apiKeys.new": "+ 新增 API 金鑰",
@@ -225,7 +237,6 @@
   "apiKeys.savedConfirm": "我已儲存此金鑰",
   "apiKeys.usage": "API 使用說明",
   "apiKeys.availableEndpoints": "可用端點",
-
   "identities.title": "身份",
   "identities.subtitle": "管理您在各專案中的角色與身份",
   "identities.new": "新增身份",
@@ -252,7 +263,6 @@
   "identities.color": "顏色",
   "identities.avatar": "頭像",
   "identities.active": "（使用中）",
-
   "analytics.title": "分析",
   "analytics.subtitle": "從任務活動中獲取洞察",
   "analytics.allProjects": "所有專案",
@@ -283,7 +293,6 @@
   "analytics.burndownBehind": "比計畫落後 {{count}} 個任務",
   "analytics.burndownOnTrack": "進度正常",
   "analytics.velocityAvg": "平均每衝刺完成 {{count}} 個任務",
-
   "rules.title": "工作流規則",
   "rules.subtitle": "以「如果-那麼」規則自動化任務操作",
   "rules.new": "+ 新增規則",
@@ -314,7 +323,6 @@
   "rules.taskIdPlaceholder": "任務 ID",
   "rules.wouldFire": "將執行 {{count}} 個操作",
   "rules.wouldNotFire": "不會觸發",
-
   "templates.title": "任務範本",
   "templates.subtitle": "可重複使用的任務藍圖，包含預設優先度、子任務和標籤。",
   "templates.new": "+ 新增範本",
@@ -331,7 +339,6 @@
   "templates.addLabel": "新增標籤名稱...",
   "templates.saveChanges": "儲存變更",
   "templates.createTemplate": "建立範本",
-
   "webhookLogs.title": "Webhook 傳送記錄",
   "webhookLogs.subtitle": "對外 Webhook 傳送歷史與重試管理。",
   "webhookLogs.purgeOld": "清除舊記錄",
@@ -346,12 +353,10 @@
   "webhookLogs.payload": "酬載",
   "webhookLogs.purgeConfirm": "清除 30 天前的傳送記錄？",
   "webhookLogs.integration": "整合",
-
   "login.password": "密碼",
   "login.incorrectPassword": "密碼錯誤",
   "login.enter": "進入",
   "login.verifying": "驗證中",
-
   "notifications.title": "通知",
   "notifications.markAllRead": "全部標為已讀",
   "notifications.empty": "沒有通知",
@@ -359,13 +364,11 @@
   "notifications.minutesAgo": "{{n}} 分鐘前",
   "notifications.hoursAgo": "{{n}} 小時前",
   "notifications.daysAgo": "{{n}} 天前",
-
   "palette.placeholder": "搜尋或跳轉至...",
   "palette.noResults": "無結果",
   "palette.navigate": "導航",
   "palette.select": "選擇",
   "palette.close": "關閉",
-
   "assistant.title": "AI 助手",
   "assistant.newChat": "新對話",
   "assistant.conversations": "對話",
@@ -388,7 +391,6 @@
   "assistant.selectConversation": "選擇對話",
   "assistant.selectOrCreate": "選擇對話或開始新對話",
   "assistant.startPrompt": "或試試快速提示：",
-
   "cycle.title": "衝刺 / Sprint",
   "cycle.new": "+ 新增衝刺",
   "cycle.namePlaceholder": "衝刺名稱 *",
@@ -406,7 +408,6 @@
   "cycle.addIssues": "新增議題",
   "cycle.loadingChart": "載入圖表…",
   "cycle.noBurndownData": "此衝刺沒有燃盡資料。",
-
   "gantt.zoom": "縮放：",
   "gantt.day": "日",
   "gantt.week": "週",
@@ -416,38 +417,30 @@
   "gantt.today": "今日",
   "gantt.noIssues": "尚無議題",
   "gantt.noDates": "無日期",
-
   "board.noIssues": "無議題",
-
   "table.cycle": "衝刺",
   "table.time": "時間",
   "table.noIssues": "尚無議題。",
-
   "issue.subtask": "子任務",
   "issue.blocked": "被阻擋",
   "issue.deleteConfirm": "刪除「{{title}}」？",
   "issue.subtaskTitlePlaceholder": "子任務標題…",
-
   "taskCreate.templatePlaceholder": "範本...",
   "taskCreate.issueTitlePlaceholder": "議題標題 *",
-
   "taskEdit.issueTitlePlaceholder": "議題標題",
   "taskEdit.estimated": "預估：",
   "taskEdit.spent": "已花費：",
   "taskEdit.descriptionPlaceholder": "說明（選填，支援 Markdown）",
-
   "comments.title": "留言",
   "comments.noComments": "尚無留言。",
   "comments.anonymous": "匿名",
   "comments.yourName": "您的名稱（選填）",
   "comments.addComment": "新增留言…（⌘Enter 送出）",
   "comments.post": "送出",
-
   "deps.blockedBy": "被阻擋於",
   "deps.noBlockers": "無阻擋項目。",
   "deps.pickBlocker": "— 選擇阻擋任務 —",
   "deps.block": "阻擋",
-
   "recurrence.title": "重複",
   "recurrence.repeats": "重複 {{frequency}}",
   "recurrence.active": "● 進行中",
@@ -459,14 +452,11 @@
   "recurrence.monthly": "每月",
   "recurrence.everyNDays": "每 N 天",
   "recurrence.setRecurrence": "設定重複",
-
   "attachments.title": "附件",
   "attachments.addFile": "新增檔案",
   "attachments.uploading": "上傳中…",
   "attachments.noAttachments": "沒有附件。",
-
   "projectCard.tasksDone": "{{done}}/{{total}} 任務完成",
-
   "agent.label": "代理",
   "agent.assignment": "代理指派",
   "agent.none": "無代理",
@@ -510,9 +500,18 @@
   "decisions.descriptionLabel": "描述（Markdown）",
   "decisions.projectLabel": "專案",
   "decisions.pendingReview": "{{count}} 個待審核",
-
+  "decisions.room": "決策室",
+  "decisions.archived": "已歸檔",
+  "decisions.pendingQueue": "待決隊列",
+  "decisions.outcomes": "決策結果",
+  "decisions.noPendingQueue": "沒有待決決策",
+  "decisions.noOutcomes": "尚無已採納或歸檔決策",
+  "decisions.snippet.context": "背景",
+  "decisions.snippet.decision": "決策",
+  "decisions.snippet.consequences": "影響",
+  "decisions.snippet.tradeoffs": "取捨",
+  "decisions.snippet.followups": "後續",
   "nav.goals": "目標",
-
   "goals.title": "目標",
   "goals.subtitle": "追蹤並衡量跨專案進度",
   "goals.create": "新增目標",
@@ -539,9 +538,7 @@
   "goals.empty": "尚無目標",
   "goals.emptyFiltered": "沒有符合篩選條件的目標",
   "goals.emptyHint": "建立目標以追蹤跨專案進度",
-
   "project.calendar": "日曆",
-
   "cal.sun": "日",
   "cal.mon": "一",
   "cal.tue": "二",
@@ -549,7 +546,6 @@
   "cal.thu": "四",
   "cal.fri": "五",
   "cal.sat": "六",
-
   "shortcuts.title": "鍵盤快捷鍵",
   "shortcuts.createTask": "建立任務",
   "shortcuts.createProject": "建立專案",
@@ -559,18 +555,17 @@
   "shortcuts.goAnalytics": "前往分析",
   "shortcuts.goIdentities": "前往身份",
   "shortcuts.goGoals": "前往目標",
-
   "issue.pin": "釘選",
   "issue.unpin": "取消釘選",
-
   "nav.activity": "活動紀錄",
   "nav.assistant": "AI 助理",
   "nav.settings": "設定",
-
   "activity.title": "活動紀錄",
   "activity.allProjects": "所有專案",
   "activity.noActivity": "尚無活動紀錄",
-
+  "activity.view.log": "紀錄",
+  "activity.view.timeline": "時間軸",
+  "activity.view.wall": "訊號牆",
   "settings.title": "設定",
   "settings.systemStatus": "系統狀態",
   "settings.authentication": "身份驗證",
@@ -588,32 +583,25 @@
   "settings.newPassword": "新密碼",
   "settings.updatePassword": "更新密碼",
   "settings.passwordChanged": "密碼已變更，正在重新導向至登入頁面...",
-
   "goals.created": "目標已建立",
   "goals.updated": "目標已更新",
   "goals.deleted": "目標已刪除",
-
   "apiKeys.createdSuccess": "API 金鑰已建立",
   "apiKeys.updatedSuccess": "API 金鑰已更新",
   "apiKeys.deletedSuccess": "API 金鑰已刪除",
-
   "integrations.createdSuccess": "整合已建立",
   "integrations.updatedSuccess": "整合已更新",
   "integrations.deletedSuccess": "整合已刪除",
-
   "rules.createdSuccess": "規則已建立",
   "rules.updatedSuccess": "規則已更新",
   "rules.deletedSuccess": "規則已刪除",
-
   "templates.createdSuccess": "範本已建立",
   "templates.updatedSuccess": "範本已更新",
   "templates.deletedSuccess": "範本已刪除",
-
   "dashboard.charts": "圖表",
   "dashboard.progress": "進度",
   "dashboard.health": "健康度",
   "dashboard.compare": "比較",
-
   "hub.all": "全部",
   "hub.overview": "總覽",
   "hub.activity": "活動",
@@ -645,5 +633,48 @@
   "hub.byIdentity": "依身份",
   "hub.byStatus": "依狀態",
   "hub.byPriority": "依優先順序",
-  "hub.noIdentities": "尚無身份。建立身份後即可查看圖表。"
+  "hub.noIdentities": "尚無身份。建立身份後即可查看圖表。",
+  "nav.structureMap": "結構圖",
+  "structure.title": "結構圖",
+  "structure.subtitle": "以拓撲方式查看身份、專案、關鍵任務、目標與決策的關係。",
+  "structure.search": "搜尋身份、專案、任務...",
+  "structure.filter.all": "全部",
+  "structure.filter.active": "進行中",
+  "structure.filter.risk": "風險",
+  "structure.filter.unowned": "無歸屬",
+  "structure.identities": "身份",
+  "structure.projects": "專案",
+  "structure.signalTasks": "訊號任務",
+  "structure.risk": "風險",
+  "structure.unowned": "無歸屬",
+  "structure.openProject": "開啟專案",
+  "structure.inspector": "檢視器",
+  "structure.selectNode": "選取節點",
+  "structure.selectHint": "點擊任一節點以高亮其關聯。",
+  "structure.viewControls": "視圖控制",
+  "structure.zoomIn": "放大",
+  "structure.zoomOut": "縮小",
+  "structure.fitView": "符合畫面",
+  "structure.noMatches": "找不到符合的結構",
+  "structure.noMatchesHint": "請放寬搜尋條件，或切回全部專案。",
+  "structure.clearFilters": "清除篩選",
+  "structure.noDependencies": "目前沒有可見依賴",
+  "structure.noDependenciesHint": "請切換篩選條件，或為任務新增阻擋關係以建立依賴圖。",
+  "structure.progress": "進度",
+  "structure.share": "分享",
+  "structure.decisionState": "決策狀態",
+  "structure.liveMap": "即時結構圖",
+  "structure.viewMode": "視圖模式",
+  "structure.view.map": "地圖",
+  "structure.view.dependencies": "依賴",
+  "structure.dependencies": "依賴",
+  "structure.dependsOn": "依賴於",
+  "structure.blocks": "阻擋",
+  "structure.noBlocking": "未阻擋其他任務。",
+  "structure.legend": "結構圖圖例",
+  "structure.legend.ownership": "歸屬",
+  "structure.legend.signal": "訊號",
+  "structure.legend.dependency": "依賴",
+  "structure.linkedProjects": "關聯專案",
+  "structure.graphLabel": "結構圖。使用方向鍵平移，加號和減號縮放，0 重置。"
 }

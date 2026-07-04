@@ -78,6 +78,27 @@ describe('Activity', () => {
     expect(screen.getByText('Added comment')).toBeTruthy()
   })
 
+  it('renders view mode toggles', () => {
+    setup()
+    expect(screen.getByText('activity.view.log')).toBeTruthy()
+    expect(screen.getByText('activity.view.timeline')).toBeTruthy()
+    expect(screen.getByText('activity.view.wall')).toBeTruthy()
+  })
+
+  it('switches to timeline view', () => {
+    setup()
+    fireEvent.click(screen.getByText('activity.view.timeline'))
+    expect(screen.getAllByTitle('task.created / Created task: Write tests').length).toBeGreaterThan(0)
+  })
+
+  it('switches to wall view', () => {
+    setup()
+    fireEvent.click(screen.getByText('activity.view.wall'))
+    expect(screen.getByText('task')).toBeTruthy()
+    expect(screen.getByText('project')).toBeTruthy()
+    expect(screen.getByText('comment')).toBeTruthy()
+  })
+
   it('filters activities when a filter chip is clicked', () => {
     setup()
     // Click Tasks chip to filter

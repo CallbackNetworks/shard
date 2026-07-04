@@ -1,14 +1,12 @@
 import { useState } from 'react'
-import { DIM, HI, MID, Bar, Label, urgencyScore, urgencyColor } from '../OverviewViews'
+import { Bar, Label, urgencyScore, urgencyColor } from '../OverviewViews'
+import { STATUS_COLOR } from '../../constants/theme'
 import useScrollReveal from './useScrollReveal'
 import { relativeTime, formatMinutes, formatDate } from './utils'
 
-const PARA_R = (px = 14) => `polygon(0 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
-const PARA = (px = 8) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
-
-const STATUS_COLOR = { done: '#22c55e', in_progress: '#38bdf8', failed: '#f87171', todo: 'rgba(255,255,255,0.2)' }
+const STATUS_COLOR_MAP = STATUS_COLOR
 const STATUS_LABEL = { done: 'DONE', in_progress: 'ACTIVE', failed: 'FAILED', todo: 'TODO' }
-const PRI_COLOR = { high: '#f87171', medium: '#f0b429', low: 'rgba(255,255,255,0.35)' }
+const PRI_COLOR = { high: '#facc15', medium: '#f0b429', low: 'rgba(255,255,255,0.35)' }
 
 function hasDetails(task) {
   return task.description || task.progress_pct != null || task.start_date ||
@@ -20,7 +18,7 @@ function hasDetails(task) {
 
 function TaskRow({ task, index, bp }) {
   const [open, setOpen] = useState(false)
-  const sc = STATUS_COLOR[task.status] || DIM
+  const sc = STATUS_COLOR_MAP[task.status] || 'rgba(255,255,255,0.28)'
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
   const isMobile = bp === 'mobile'
   const expandable = hasDetails(task)
@@ -29,79 +27,51 @@ function TaskRow({ task, index, bp }) {
     <div>
       <div
         onClick={expandable ? () => setOpen(v => !v) : undefined}
-        style={{
-          display: 'flex', alignItems: isMobile ? 'flex-start' : 'center',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? 4 : 12,
-          padding: isMobile ? '8px 16px 8px 24px' : '7px 20px 7px 28px',
-          background: index % 2 === 0 ? 'rgba(255,255,255,0.008)' : 'transparent',
-          borderLeft: `2px solid ${sc}22`,
-          cursor: expandable ? 'pointer' : 'default',
-          transition: 'background 0.15s',
-        }}
+        className={[
+          'kt-share-task-row',
+          isMobile ? 'is-mobile' : '',
+          index % 2 === 0 ? 'is-alt' : '',
+          expandable ? 'is-expandable' : '',
+        ].filter(Boolean).join(' ')}
+        style={{ '--task-color': sc }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, width: '100%' }}>
+        <div className="kt-share-task-main">
           {expandable && (
-            <span style={{ fontSize: 9, color: DIM, flexShrink: 0, width: 8 }}>
+            <span className="kt-share-task-chevron">
               {open ? '▾' : '▸'}
             </span>
           )}
-          <span style={{
-            width: 7, height: 7, flexShrink: 0,
-            background: sc, clipPath: PARA(3),
-          }} />
-          <span style={{
-            flex: 1, fontSize: 12,
-            color: task.status === 'done' ? 'rgba(255,255,255,0.2)' : MID,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            textDecoration: task.status === 'done' ? 'line-through' : 'none',
-          }}>
+          <span className="kt-share-task-dot" />
+          <span className={task.status === 'done' ? 'kt-share-task-title is-done' : 'kt-share-task-title'}>
             {task.title}
           </span>
         </div>
-        <div style={{
-          display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
-          paddingLeft: isMobile ? 17 : 0,
-          flexWrap: 'wrap',
-        }}>
-          {isOverdue && <Label color="#ff5533">OVERDUE</Label>}
+        <div className="kt-share-task-meta">
+          {isOverdue && <Label color={STATUS_COLOR.failed}>OVERDUE</Label>}
           {task.labels?.map((l, i) => (
-            <span key={i} style={{
-              fontSize: 9, fontWeight: 700, color: l.color,
-              background: `${l.color}14`, padding: '1px 5px',
-              letterSpacing: '0.06em',
-            }}>
+            <span key={i} className="kt-share-label" style={{ '--label-color': l.color }}>
               {l.name}
             </span>
           ))}
           {task.subtask_count > 0 && (
-            <span style={{ fontSize: 10, color: DIM }}>
+            <span>
               {task.subtask_count} sub
             </span>
           )}
           {task.comment_count > 0 && (
-            <span style={{ fontSize: 10, color: DIM }}>
+            <span>
               {task.comment_count} cmt
             </span>
           )}
-          <span style={{
-            fontSize: 10, fontWeight: 700, color: PRI_COLOR[task.priority] || DIM,
-            letterSpacing: '0.06em',
-          }}>
+          <span style={{ color: PRI_COLOR[task.priority] || 'rgba(255,255,255,0.28)' }}>
             {(task.priority || '').toUpperCase()}
           </span>
           {task.due_date && (
-            <span style={{
-              fontSize: 10, color: isOverdue ? '#ff5533' : 'rgba(255,255,255,0.2)',
-              fontVariantNumeric: 'tabular-nums',
-            }}>
+            <span className={isOverdue ? 'is-overdue' : ''}>
               {relativeTime(task.due_date)}
             </span>
           )}
-          <span style={{
-            fontSize: 10, fontWeight: 700, color: sc,
-            letterSpacing: '0.06em', minWidth: 44, textAlign: 'right',
-          }}>
+          <span className="kt-share-task-status" style={{ color: sc }}>
             {STATUS_LABEL[task.status] || task.status}
           </span>
         </div>
@@ -109,39 +79,32 @@ function TaskRow({ task, index, bp }) {
 
       {/* Expanded detail panel */}
       {open && (
-        <div style={{
-          padding: isMobile ? '10px 16px 12px 32px' : '10px 20px 12px 46px',
-          background: 'rgba(255,255,255,0.015)',
-          borderLeft: `2px solid ${sc}33`,
-          borderBottom: '1px solid rgba(255,255,255,0.04)',
-        }}>
+        <div className="kt-share-task-detail" style={{ '--task-color': sc }}>
           {task.description && (
-            <div style={{
-              fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, marginBottom: 8,
-            }}>
+            <div className="kt-share-task-description">
               {task.description.length > 200 ? task.description.slice(0, 200) + '...' : task.description}
             </div>
           )}
 
           {/* Metadata row */}
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: 11 }}>
+          <div className="kt-share-task-detail-grid">
             {task.start_date && (
-              <span style={{ color: DIM }}>Start: <span style={{ color: MID }}>{formatDate(task.start_date)}</span></span>
+              <span>Start: <b>{formatDate(task.start_date)}</b></span>
             )}
             {task.due_date && (
-              <span style={{ color: DIM }}>Due: <span style={{ color: isOverdue ? '#ff5533' : MID }}>{formatDate(task.due_date)}</span></span>
+              <span>Due: <b className={isOverdue ? 'is-overdue' : ''}>{formatDate(task.due_date)}</b></span>
             )}
             {task.progress_pct != null && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 60 }}>
+              <span className="kt-share-task-progress">
+                <span>
                   <Bar pct={task.progress_pct} color={sc} height={3} bg="rgba(255,255,255,0.06)" />
                 </span>
-                <span style={{ color: MID, fontSize: 11 }}>{task.progress_pct}%</span>
+                <b>{task.progress_pct}%</b>
               </span>
             )}
             {(task.time_estimate || task.time_spent) && (
-              <span style={{ color: DIM }}>
-                Time: <span style={{ color: MID }}>{formatMinutes(task.time_spent || 0)}</span>
+              <span>
+                Time: <b>{formatMinutes(task.time_spent || 0)}</b>
                 {task.time_estimate && <span> / {formatMinutes(task.time_estimate)} est</span>}
               </span>
             )}
@@ -149,37 +112,21 @@ function TaskRow({ task, index, bp }) {
 
           {/* Subtask list */}
           {task.subtasks && task.subtasks.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              <div style={{
-                fontSize: 9, fontWeight: 800, letterSpacing: '0.14em',
-                textTransform: 'uppercase', color: DIM, marginBottom: 4,
-              }}>
+            <div className="kt-share-subtasks">
+              <div className="kt-share-mini-label">
                 SUBTASKS ({task.subtasks.length})
               </div>
               {task.subtasks.map(s => {
-                const sColor = STATUS_COLOR[s.status] || DIM
+                const sColor = STATUS_COLOR_MAP[s.status] || 'rgba(255,255,255,0.28)'
                 return (
-                  <div key={s.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '3px 0', fontSize: 11,
-                  }}>
-                    <span style={{
-                      width: 6, height: 6, flexShrink: 0,
-                      background: sColor, clipPath: PARA(2),
-                    }} />
-                    <span style={{
-                      flex: 1, color: s.status === 'done' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.45)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      textDecoration: s.status === 'done' ? 'line-through' : 'none',
-                    }}>
+                  <div key={s.id} className="kt-share-subtask" style={{ '--task-color': sColor }}>
+                    <span />
+                    <b className={s.status === 'done' ? 'is-done' : ''}>
                       {s.title}
-                    </span>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, color: sColor,
-                      letterSpacing: '0.06em', flexShrink: 0,
-                    }}>
+                    </b>
+                    <em>
                       {STATUS_LABEL[s.status] || s.status}
-                    </span>
+                    </em>
                   </div>
                 )
               })}
@@ -188,14 +135,14 @@ function TaskRow({ task, index, bp }) {
 
           {/* Dependencies */}
           {(task.blocked_by?.length > 0 || task.blocking?.length > 0) && (
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11 }}>
+            <div className="kt-share-dependencies">
               {task.blocked_by?.length > 0 && (
-                <span style={{ color: '#ffa42b' }}>
+                <span>
                   Blocked by: {task.blocked_by.map(d => d.title || d.id).join(', ')}
                 </span>
               )}
               {task.blocking?.length > 0 && (
-                <span style={{ color: '#38bdf8' }}>
+                <span className="is-info">
                   Blocking: {task.blocking.map(d => d.title || d.id).join(', ')}
                 </span>
               )}
@@ -224,66 +171,39 @@ export default function ShareProjectCard({ project, index: _index, bp }) {
   const isMobile = bp === 'mobile'
 
   return (
-    <div ref={ref} style={{
-      marginBottom: 10,
-      opacity: visible ? 1 : 0,
-      transform: visible ? 'translateY(0)' : 'translateY(24px)',
-      transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
-    }}>
-      <div style={{
-        position: 'relative',
-        background: 'rgba(255,255,255,0.022)',
-        borderTop: `1px solid ${color}33`,
-        borderBottom: '1px solid rgba(255,255,255,0.03)',
-        padding: isMobile ? '16px 16px 14px 20px' : '16px 24px 14px 28px',
-        clipPath: isMobile ? 'none' : PARA_R(18),
-        transition: 'background 0.2s, transform 0.2s',
-      }}>
-        <div style={{
-          position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
-          background: color, transition: 'width 0.2s',
-        }} />
-
-        <div style={{
-          display: 'flex', alignItems: isMobile ? 'flex-start' : 'center',
-          flexDirection: isMobile ? 'column' : 'row',
-          justifyContent: 'space-between', gap: 10, marginBottom: 12,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: 13, fontWeight: 800, color: HI, letterSpacing: '0.05em',
-              textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
+    <div
+      ref={ref}
+      className={visible ? 'kt-share-project is-visible' : 'kt-share-project'}
+      style={{ '--share-accent': color }}
+    >
+      <div className={isMobile ? 'kt-share-project-head is-mobile' : 'kt-share-project-head'}>
+        <div className="kt-share-project-topline">
+          <div className="kt-share-project-title-row">
+            <span className="kt-share-project-name">
               {project.name}
             </span>
-            {overdue > 0 && <Label color="#ff5533">{'⚠'} {overdue} overdue</Label>}
+            {overdue > 0 && <Label color={STATUS_COLOR.failed}>{overdue} overdue</Label>}
             {project.active_cycle && (
-              <Label color="#38bdf8">
+              <Label color={STATUS_COLOR.in_progress}>
                 {project.active_cycle.name} {Math.round(project.active_cycle.progress)}%
                 {project.active_cycle.start_date && project.active_cycle.end_date && (
-                  <span style={{ fontSize: 8, opacity: 0.7, marginLeft: 4 }}>
-                    {formatDate(project.active_cycle.start_date)} — {formatDate(project.active_cycle.end_date)}
+                  <span className="kt-share-cycle-date">
+                    {formatDate(project.active_cycle.start_date)} - {formatDate(project.active_cycle.end_date)}
                   </span>
                 )}
               </Label>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexShrink: 0 }}>
-            <span style={{
-              fontSize: 26, fontWeight: 900, color, letterSpacing: '-0.04em', lineHeight: 1,
-            }}>
-              {pct}<span style={{ fontSize: 12, fontWeight: 500, color: DIM }}>%</span>
+          <div className="kt-share-project-score">
+            <span>
+              {pct}<b>%</b>
             </span>
-            <span style={{ fontSize: 11, color: DIM }}>{project.done_tasks}/{total}</span>
+            <em>{project.done_tasks}/{total}</em>
           </div>
         </div>
 
         {project.description && (
-          <div style={{
-            fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5,
-            marginBottom: 10, maxWidth: 600,
-          }}>
+          <div className="kt-share-project-description">
             {project.description.length > 150
               ? project.description.slice(0, 150) + '...'
               : project.description}
@@ -292,45 +212,30 @@ export default function ShareProjectCard({ project, index: _index, bp }) {
 
         <Bar pct={pct} color={color} height={5} />
 
-        <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
-          {[['#22c55e', done, 'done'], ['#38bdf8', active, 'active'], ['#f87171', failed, 'failed']].map(([c, n, l]) => (
-            <span key={l} style={{
-              fontSize: 11, color: n > 0 ? c : 'rgba(255,255,255,0.15)',
-              fontWeight: 700, letterSpacing: '0.04em',
-            }}>
-              {n} <span style={{ fontWeight: 400, opacity: 0.6 }}>{l}</span>
+        <div className="kt-share-project-counts">
+          {[[STATUS_COLOR.done, done, 'done'], [STATUS_COLOR.in_progress, active, 'active'], [STATUS_COLOR.failed, failed, 'failed']].map(([c, n, l]) => (
+            <span key={l} style={{ color: n > 0 ? c : 'rgba(255,255,255,0.18)' }}>
+              {n} <b>{l}</b>
             </span>
           ))}
         </div>
 
         {project.labels?.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          <div className="kt-share-project-labels">
             {project.labels.map((l, i) => (
-              <span key={i} style={{
-                fontSize: 9, fontWeight: 700, color: l.color,
-                background: `${l.color}14`, border: `1px solid ${l.color}33`,
-                padding: '1px 7px', letterSpacing: '0.08em', textTransform: 'uppercase',
-                transform: 'skewX(-4deg)',
-              }}>
-                <span style={{ display: 'inline-block', transform: 'skewX(4deg)' }}>{l.name}</span>
+              <span key={i} className="kt-share-label" style={{ '--label-color': l.color }}>
+                {l.name}
               </span>
             ))}
           </div>
         )}
 
         {project.repo_url && (
-          <div style={{ marginTop: 8 }}>
+          <div className="kt-share-repo">
             <a
               href={project.repo_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                fontSize: 10, color: DIM, textDecoration: 'none',
-                letterSpacing: '0.04em',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                paddingBottom: 1,
-                transition: 'color 0.15s',
-              }}
             >
               {project.repo_url.replace(/^https?:\/\//, '')}
             </a>
@@ -343,15 +248,7 @@ export default function ShareProjectCard({ project, index: _index, bp }) {
       ))}
 
       {hasMore && (
-        <button onClick={() => setExpanded(!expanded)} style={{
-          width: '100%', background: 'rgba(255,255,255,0.015)',
-          border: 'none', borderTop: '1px solid rgba(255,255,255,0.04)',
-          padding: '8px 0', cursor: 'pointer',
-          fontSize: 10, fontWeight: 700, color: DIM,
-          letterSpacing: '0.12em', textTransform: 'uppercase',
-          transition: 'color 0.15s, background 0.15s',
-          fontFamily: 'inherit',
-        }}>
+        <button onClick={() => setExpanded(!expanded)} className="kt-share-show-more">
           {expanded ? 'SHOW LESS' : `SHOW ALL ${tasks.length} TASKS`}
         </button>
       )}

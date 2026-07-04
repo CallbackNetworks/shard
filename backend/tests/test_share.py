@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from app.models import ActivityLog
+from app.models import ActivityLog, Project, ProjectIdentity, Task
 
 
 def test_get_share_valid_token(client, sample_identity, sample_project):
@@ -10,6 +10,23 @@ def test_get_share_valid_token(client, sample_identity, sample_project):
     assert data["identity"]["name"] == "Test User"
     assert data["meta"]["requires_pin"] is False
     assert data["summary"]["total_projects"] == 1
+
+
+def test_get_project_share_only_returns_that_project(client, db, sample_identity, sample_project):
+    other = Project(name="Other Project")
+    db.add(other)
+    db.flush()
+    db.add(ProjectIdentity(project_id=other.id, identity_id=sample_identity.id))
+    db.commit()
+    db.refresh(sample_project)
+
+    resp = client.get(f"/share/project/{sample_project.share_token}")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["meta"]["scope"] == "project"
+    assert data["summary"]["total_projects"] == 1
+    assert [p["id"] for p in data["projects"]] == [sample_project.id]
 
 
 def test_get_share_invalid_token(client):
@@ -48,6 +65,30 @@ def test_verify_pin_correct(client, pinned_identity):
     data = resp.json()
     assert data["meta"]["requires_pin"] is False
     assert "share_session" in resp.cookies
+
+
+def test_verify_pin_handles_naive_due_date(client, db, pinned_identity):
+    project = Project(name="Pinned Project")
+    db.add(project)
+    db.flush()
+    db.add(ProjectIdentity(project_id=project.id, identity_id=pinned_identity.id))
+    db.add(
+        Task(
+            project_id=project.id,
+            title="Overdue naive task",
+            status="todo",
+            due_date=datetime.now() - timedelta(days=1),
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        f"/share/identity/{pinned_identity.share_token}/verify",
+        json={"pin": "1234"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["summary"]["overdue_tasks"] == 1
 
 
 def test_verify_pin_wrong(client, pinned_identity):

@@ -4,12 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash } from 'lucide-react'
 import { getProjects, search } from '../api/client'
-import { SHADOW_LG, DARK } from '../constants/theme'
+import { BRAND, DARK } from '../constants/theme'
 
 const BACKDROP = 'rgba(0,0,0,0.8)'
 const PANEL_BG = DARK.surface
 const BORDER   = DARK.border
-const ACCENT   = DARK.success
+const ACCENT   = BRAND
 const ITEM_HOVER = DARK.active
 
 const STATIC_COMMANDS = [
@@ -51,7 +51,7 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
       onClick={onSelect}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: '8px 14px', cursor: 'pointer', borderRadius: 6, margin: '1px 6px',
+        padding: '8px 14px', cursor: 'pointer', borderRadius: 0, margin: '1px 6px',
         background: isActive ? ITEM_HOVER : 'transparent',
         borderLeft: isActive ? `3px solid ${ACCENT}` : '3px solid transparent',
         transition: 'background 0.1s',
@@ -229,19 +229,20 @@ export default function CommandPalette({ open, onClose }) {
       }}
     >
       <div
+        className="kt-command-panel"
         onClick={e => e.stopPropagation()}
         style={{
           width: 560, maxWidth: '90vw',
           background: PANEL_BG,
           border: `1px solid ${BORDER}`,
-          borderRadius: 12,
-          boxShadow: SHADOW_LG,
+          borderRadius: 0,
+          boxShadow: '10px 10px 0 rgba(0,0,0,0.42)',
           overflow: 'hidden',
           animation: 'fadeUpIn 0.15s ease',
         }}
       >
         {/* Input */}
-        <div style={{
+        <div className="kt-command-header" style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '12px 16px',
           borderBottom: `1px solid ${BORDER}`,
@@ -259,7 +260,7 @@ export default function CommandPalette({ open, onClose }) {
             }}
           />
           <kbd style={{
-            padding: '2px 6px', borderRadius: 4,
+            padding: '2px 6px', borderRadius: 0,
             background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`,
             color: 'rgba(255,255,255,0.25)', fontSize: 11,
           }}>esc</kbd>
@@ -295,7 +296,7 @@ export default function CommandPalette({ open, onClose }) {
           {[['↑↓', t('palette.navigate')], ['↵', t('palette.select')], ['esc', t('palette.close')]].map(([key, label]) => (
             <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <kbd style={{
-                padding: '1px 5px', borderRadius: 3,
+                padding: '1px 5px', borderRadius: 0,
                 background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}`,
                 fontSize: 10,
               }}>{key}</kbd>

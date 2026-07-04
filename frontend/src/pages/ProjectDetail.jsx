@@ -1,7 +1,7 @@
 import { useState, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2 } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -138,6 +138,7 @@ export default function ProjectDetail() {
   const [showImport, setShowImport] = useState(false)
   const [importJson, setImportJson] = useState('')
   const [copiedIcal, setCopiedIcal] = useState(false)
+  const [copiedShare, setCopiedShare] = useState(false)
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -372,6 +373,21 @@ export default function ProjectDetail() {
               {copiedIcal ? <Check size={12} /> : <Rss size={12} />}
               {copiedIcal ? 'Copied!' : 'iCal'}
             </button>
+            <button
+              onClick={() => {
+                if (!project.share_token) return
+                const url = `${window.location.origin}/share/p/${project.share_token}`
+                navigator.clipboard.writeText(url)
+                setCopiedShare(true)
+                setTimeout(() => setCopiedShare(false), 2000)
+              }}
+              disabled={!project.share_token}
+              className={s.archiveBtn}
+              title="Copy public project share URL"
+            >
+              {copiedShare ? <Check size={12} /> : <Share2 size={12} />}
+              {copiedShare ? 'Copied!' : 'Share'}
+            </button>
             <LabelManager
               labels={labels}
               onCreateLabel={data => createLabelMut.mutate(data)}
@@ -537,7 +553,7 @@ export default function ProjectDetail() {
                 <button
                   onClick={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
                   style={{
-                    background: bulkMode ? 'rgba(129,140,248,0.12)' : 'none',
+                    background: bulkMode ? 'rgba(250,204,21,0.12)' : 'none',
                     border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
                     color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
                   }}
@@ -562,7 +578,7 @@ export default function ProjectDetail() {
                 <button
                   onClick={() => setShowImport(v => !v)}
                   title="Import tasks"
-                  style={{ background: showImport ? 'rgba(129,140,248,0.12)' : 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
+                  style={{ background: showImport ? 'rgba(250,204,21,0.12)' : 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
                 >
                   <Upload size={11} />
                 </button>
@@ -640,7 +656,7 @@ export default function ProjectDetail() {
 
             {/* Bulk action bar */}
             {bulkMode && selectedTasks.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(129,140,248,0.08)', borderBottom: '1px solid rgba(129,140,248,0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(250,204,21,0.08)', borderBottom: '1px solid rgba(250,204,21,0.2)' }}>
                 <span style={{ fontSize: 12, color: DARK.info, fontWeight: 600 }}>{selectedTasks.size} selected</span>
                 <select
                   onChange={e => { if (e.target.value) { bulkUpdateMut.mutate({ task_ids: [...selectedTasks], status: e.target.value }); e.target.value = '' } }}

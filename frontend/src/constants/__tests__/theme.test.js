@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DARK, BRAND, STATUS_COLS, STATUS_MAP, PRIORITY, LABEL_PALETTE } from '../theme'
+import { DARK, BRAND, STATUS_COLS, STATUS_MAP, PRIORITY, LABEL_PALETTE, STATUS_COLOR } from '../theme'
 
 describe('theme constants', () => {
   it('DARK has all required color tokens', () => {
@@ -23,7 +23,8 @@ describe('theme constants', () => {
   })
 
   it('STATUS_MAP maps keys correctly', () => {
-    expect(STATUS_MAP.done.color).toBe('#10b981')
+    expect(STATUS_MAP.done.color).toBe(STATUS_COLOR.done)
+    expect(STATUS_MAP.failed.color).toBe(STATUS_COLOR.failed)
     expect(STATUS_MAP.todo.label).toBe('Todo')
   })
 

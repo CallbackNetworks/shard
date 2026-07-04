@@ -1,56 +1,36 @@
-import { DIM, MID } from '../OverviewViews'
 import useScrollReveal from './useScrollReveal'
 import { relativeTime } from './utils'
+import { STATUS_COLOR } from '../../constants/theme'
 
 const ACTION_COLORS = {
-  'task.done': '#10b981',
+  'task.done': STATUS_COLOR.done,
   'task.status_changed': '#3b82f6',
   'task.created': '#3b82f6',
-  'task.deleted': '#ef4444',
-  'task.failed': '#ef4444',
+  'task.deleted': STATUS_COLOR.failed,
+  'task.failed': STATUS_COLOR.failed,
   'project.created': '#3b82f6',
-  'project.archived': DIM,
+  'project.archived': 'rgba(255,255,255,0.28)',
 }
 
 function ActivityEntry({ entry, index }) {
-  const color = ACTION_COLORS[entry.action] || DIM
+  const color = ACTION_COLORS[entry.action] || 'rgba(255,255,255,0.28)'
   return (
-    <div style={{
-      display: 'flex', gap: 14, padding: '10px 0',
-      borderBottom: '1px solid rgba(255,255,255,0.03)',
-      opacity: 0,
-      animation: `slideInLeft 0.4s ease-out ${0.05 * index}s forwards`,
-    }}>
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        width: 16, flexShrink: 0, paddingTop: 4,
-      }}>
-        <div style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: color, flexShrink: 0,
-          boxShadow: `0 0 8px ${color}44`,
-        }} />
-        <div style={{
-          width: 1, flex: 1, background: 'rgba(255,255,255,0.05)',
-          marginTop: 4,
-        }} />
+    <div className="kt-share-activity-entry" style={{ '--share-accent': color, animationDelay: `${0.05 * index}s` }}>
+      <div className="kt-share-activity-mark">
+        <div />
+        <span />
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 12, color: MID, lineHeight: 1.4,
-          overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
+      <div className="kt-share-activity-copy">
+        <div className="kt-share-activity-detail">
           {entry.detail || entry.action}
         </div>
-        <div style={{
-          display: 'flex', gap: 10, marginTop: 3,
-        }}>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', fontVariantNumeric: 'tabular-nums' }}>
+        <div className="kt-share-activity-meta">
+          <span>
             {relativeTime(entry.created_at)}
           </span>
           {entry.actor && !entry.actor.startsWith('visitor:') && (
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
+            <span>
               {entry.actor}
             </span>
           )}
@@ -70,19 +50,11 @@ export default function ShareActivityFeed({ activity, bp: _bp }) {
   if (filtered.length === 0) return null
 
   return (
-    <div ref={ref} style={{
-      opacity: visible ? 1 : 0,
-      transform: visible ? 'translateY(0)' : 'translateY(24px)',
-      transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
-    }}>
-      <div style={{
-        fontSize: 10, fontWeight: 800, letterSpacing: '0.18em',
-        textTransform: 'uppercase', color: DIM, marginBottom: 12,
-        paddingLeft: 4,
-      }}>
+    <div ref={ref} className={visible ? 'kt-share-activity is-visible' : 'kt-share-activity'}>
+      <div className="kt-share-section-label">
         RECENT ACTIVITY
       </div>
-      <div style={{ paddingLeft: 4 }}>
+      <div className="kt-share-activity-list">
         {filtered.map((entry, i) => (
           <ActivityEntry key={i} entry={entry} index={i} />
         ))}

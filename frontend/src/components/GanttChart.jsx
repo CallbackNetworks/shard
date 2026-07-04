@@ -103,7 +103,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             style={{
               padding: '3px 10px', borderRadius: 9999, fontSize: 11, cursor: 'pointer',
               border: zoom === i ? 'none' : '1px solid rgba(255,255,255,0.15)',
-              background: zoom === i ? 'rgba(30,215,96,0.12)' : 'transparent',
+              background: zoom === i ? 'rgba(250,204,21,0.12)' : 'transparent',
               color: zoom === i ? DARK.success : DARK.textMid,
               fontWeight: zoom === i ? 700 : 400,
             }}
@@ -143,7 +143,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             )
           })}
           <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 4 }}>
-            <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700, marginLeft: 3, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 10, color: '#facc15', fontWeight: 700, marginLeft: 3, whiteSpace: 'nowrap' }}>
               {t('gantt.today')}
             </span>
           </div>
@@ -231,7 +231,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
                   {weeks.map((week, i) => (
                     <div key={i} style={{ position: 'absolute', left: `${getLeft(week)}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.03)' }} />
                   ))}
-                  <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 0, bottom: 0, width: 1.5, background: 'rgba(248,113,113,0.5)', zIndex: 1 }} />
+                  <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 0, bottom: 0, width: 1.5, background: 'rgba(250,204,21,0.5)', zIndex: 1 }} />
                   {hasDates ? (
                     <div
                       title={`${fmtDate(task.start_date)} \u2192 ${fmtDate(task.due_date)}`}

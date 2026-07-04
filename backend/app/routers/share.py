@@ -55,6 +55,16 @@ def _hash_ip(ip: str) -> str:
     return hashlib.sha256(f"{daily_salt}:{ip}".encode()).hexdigest()[:16]
 
 
+def _as_utc(value: datetime | str | None) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _load_identity(db: Session, token: str) -> Identity | None:
     """Load identity with all relationships eagerly to avoid N+1 queries."""
     return (
@@ -95,95 +105,113 @@ def _load_identity(db: Session, token: str) -> Identity | None:
     )
 
 
-def _build_response(identity: Identity, db: Session):
-    project_ids = []
-    projects = []
+def _project_eager_options():
+    return [
+        selectinload(Project.tasks).selectinload(Task.task_labels).selectinload(TaskLabel.label),
+        selectinload(Project.tasks).selectinload(Task.subtasks),
+        selectinload(Project.tasks).selectinload(Task.comments),
+        selectinload(Project.tasks).selectinload(Task.blocked_by_deps),
+        selectinload(Project.tasks).selectinload(Task.blocking_deps),
+        selectinload(Project.labels),
+        selectinload(Project.cycles).selectinload(Cycle.cycle_tasks).selectinload(CycleTask.task),
+        selectinload(Project.project_identities).selectinload(ProjectIdentity.identity),
+    ]
 
-    for pi in identity.project_identities:
-        p = pi.project
+
+def _load_project(db: Session, token: str) -> Project | None:
+    return db.query(Project).filter(Project.share_token == token).options(*_project_eager_options()).first()
+
+
+def _serialize_project(p: Project):
+    tasks = p.tasks
+    total = len(tasks)
+    done = sum(1 for t in tasks if t.status == "done")
+
+    project_labels = []
+    seen_labels = set()
+    for lbl in p.labels:
+        if lbl.id not in seen_labels:
+            seen_labels.add(lbl.id)
+            project_labels.append({"name": lbl.name, "color": lbl.color})
+
+    active_cycle = None
+    for c in p.cycles:
+        if c.status == "active":
+            ct_total = len(c.cycle_tasks)
+            ct_done = sum(1 for ct in c.cycle_tasks if ct.task and ct.task.status == "done")
+            active_cycle = {
+                "name": c.name,
+                "total_tasks": ct_total,
+                "done_tasks": ct_done,
+                "progress": round(ct_done / ct_total * 100, 1) if ct_total > 0 else 0.0,
+                "start_date": c.start_date.isoformat() if c.start_date else None,
+                "end_date": c.end_date.isoformat() if c.end_date else None,
+            }
+            break
+
+    comment_count = sum(len(t.comments) for t in tasks)
+
+    task_map = {t.id: t.title for t in tasks}
+
+    task_list = []
+    for t in tasks:
+        if t.parent_id is not None:
+            continue
+        t_labels = [{"name": tl.label.name, "color": tl.label.color} for tl in t.task_labels if tl.label]
+        subtask_details = [
+            {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority} for s in t.subtasks
+        ]
+        blocked_by = [
+            {"id": d.depends_on_id, "title": task_map.get(d.depends_on_id, "Unknown")} for d in t.blocked_by_deps
+        ]
+        blocking = [{"id": d.task_id, "title": task_map.get(d.task_id, "Unknown")} for d in t.blocking_deps]
+        task_list.append(
+            {
+                "id": t.id,
+                "title": t.title,
+                "description": t.description,
+                "status": t.status,
+                "priority": t.priority,
+                "assignee": t.assignee,
+                "start_date": t.start_date.isoformat() if t.start_date else None,
+                "due_date": t.due_date.isoformat() if t.due_date else None,
+                "progress_pct": t.progress_pct,
+                "time_estimate": t.time_estimate,
+                "time_spent": t.time_spent,
+                "labels": t_labels,
+                "subtask_count": len(t.subtasks),
+                "subtasks": subtask_details,
+                "comment_count": len(t.comments),
+                "blocked_by": blocked_by,
+                "blocking": blocking,
+            }
+        )
+
+    return {
+        "id": p.id,
+        "name": p.name,
+        "description": p.description,
+        "status": p.status,
+        "repo_url": p.repo_url,
+        "total_tasks": total,
+        "done_tasks": done,
+        "progress": round(done / total * 100, 1) if total > 0 else 0.0,
+        "labels": project_labels,
+        "active_cycle": active_cycle,
+        "comment_count": comment_count,
+        "tasks": task_list,
+    }
+
+
+def _build_payload(owner: dict, source_projects: list[Project], db: Session, scope: str):
+    projects = []
+    project_ids = []
+
+    for p in source_projects:
         if not p or p.status != "active":
             continue
         project_ids.append(p.id)
-        tasks = p.tasks
-        total = len(tasks)
-        done = sum(1 for t in tasks if t.status == "done")
-
-        project_labels = []
-        seen_labels = set()
-        for lbl in p.labels:
-            if lbl.id not in seen_labels:
-                seen_labels.add(lbl.id)
-                project_labels.append({"name": lbl.name, "color": lbl.color})
-
-        active_cycle = None
-        for c in p.cycles:
-            if c.status == "active":
-                ct_total = len(c.cycle_tasks)
-                ct_done = sum(1 for ct in c.cycle_tasks if ct.task and ct.task.status == "done")
-                active_cycle = {
-                    "name": c.name,
-                    "total_tasks": ct_total,
-                    "done_tasks": ct_done,
-                    "progress": round(ct_done / ct_total * 100, 1) if ct_total > 0 else 0.0,
-                    "start_date": c.start_date.isoformat() if c.start_date else None,
-                    "end_date": c.end_date.isoformat() if c.end_date else None,
-                }
-                break
-
-        comment_count = sum(len(t.comments) for t in tasks)
-
-        task_map = {t.id: t.title for t in tasks}
-
-        task_list = []
-        for t in tasks:
-            if t.parent_id is not None:
-                continue
-            t_labels = [{"name": tl.label.name, "color": tl.label.color} for tl in t.task_labels if tl.label]
-            subtask_details = [
-                {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority} for s in t.subtasks
-            ]
-            blocked_by = [
-                {"id": d.depends_on_id, "title": task_map.get(d.depends_on_id, "Unknown")} for d in t.blocked_by_deps
-            ]
-            blocking = [{"id": d.task_id, "title": task_map.get(d.task_id, "Unknown")} for d in t.blocking_deps]
-            task_list.append(
-                {
-                    "id": t.id,
-                    "title": t.title,
-                    "description": t.description,
-                    "status": t.status,
-                    "priority": t.priority,
-                    "assignee": t.assignee,
-                    "start_date": t.start_date.isoformat() if t.start_date else None,
-                    "due_date": t.due_date.isoformat() if t.due_date else None,
-                    "progress_pct": t.progress_pct,
-                    "time_estimate": t.time_estimate,
-                    "time_spent": t.time_spent,
-                    "labels": t_labels,
-                    "subtask_count": len(t.subtasks),
-                    "subtasks": subtask_details,
-                    "comment_count": len(t.comments),
-                    "blocked_by": blocked_by,
-                    "blocking": blocking,
-                }
-            )
-
-        projects.append(
-            {
-                "id": p.id,
-                "name": p.name,
-                "description": p.description,
-                "status": p.status,
-                "repo_url": p.repo_url,
-                "total_tasks": total,
-                "done_tasks": done,
-                "progress": round(done / total * 100, 1) if total > 0 else 0.0,
-                "labels": project_labels,
-                "active_cycle": active_cycle,
-                "comment_count": comment_count,
-                "tasks": task_list,
-            }
-        )
+        projects.append(_serialize_project(p))
 
     recent_activity = []
     if project_ids:
@@ -214,19 +242,14 @@ def _build_response(identity: Identity, db: Session):
         all_tasks_flat.extend(p_data["tasks"])
     total_tasks = sum(p["total_tasks"] for p in projects)
     done_tasks = sum(p["done_tasks"] for p in projects)
+    now = datetime.now(UTC)
     overdue_tasks = sum(
-        1
-        for t in all_tasks_flat
-        if t["due_date"] and t["status"] != "done" and datetime.fromisoformat(t["due_date"]) < datetime.now(UTC)
+        1 for t in all_tasks_flat if t["status"] != "done" and (due := _as_utc(t["due_date"])) and due < now
     )
 
     return {
         "identity": {
-            "id": identity.id,
-            "name": identity.name,
-            "color": identity.color,
-            "avatar": identity.avatar,
-            "description": identity.description,
+            **owner,
         },
         "projects": projects,
         "recent_activity": recent_activity,
@@ -240,8 +263,33 @@ def _build_response(identity: Identity, db: Session):
         "meta": {
             "generated_at": datetime.now(UTC).isoformat(),
             "requires_pin": False,
+            "scope": scope,
         },
     }
+
+
+def _build_response(identity: Identity, db: Session):
+    projects = [pi.project for pi in identity.project_identities]
+    owner = {
+        "id": identity.id,
+        "name": identity.name,
+        "color": identity.color,
+        "avatar": identity.avatar,
+        "description": identity.description,
+    }
+    return _build_payload(owner, projects, db, scope="identity")
+
+
+def _build_project_response(project: Project, db: Session):
+    identity = project.project_identities[0].identity if project.project_identities else None
+    owner = {
+        "id": project.id,
+        "name": project.name,
+        "color": identity.color if identity else "#facc15",
+        "avatar": project.name[:1].upper(),
+        "description": project.description,
+    }
+    return _build_payload(owner, [project], db, scope="project")
 
 
 def _maybe_log_view(db: Session, identity: Identity, ip_hash: str):
@@ -280,9 +328,7 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Share link not found")
 
     if identity.share_expires_at:
-        exp = identity.share_expires_at
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=UTC)
+        exp = _as_utc(identity.share_expires_at)
         if datetime.now(UTC) > exp:
             raise HTTPException(status_code=410, detail="Share link has expired")
 
@@ -299,6 +345,19 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
     _maybe_log_view(db, identity, ip_hash)
 
     return _build_response(identity, db)
+
+
+@router.get("/project/{token}", dependencies=[Depends(share_rate_limit)])
+def get_share_project(token: str, request: Request, db: Session = Depends(get_db)):
+    project = _load_project(db, token)
+    if not project or project.status != "active":
+        raise HTTPException(status_code=404, detail="Share link not found")
+
+    client_ip = request.client.host if request.client else "unknown"
+    ip_hash = _hash_ip(client_ip)
+    _maybe_log_view(db, project.project_identities[0].identity, ip_hash) if project.project_identities else None
+
+    return _build_project_response(project, db)
 
 
 class PinVerifyRequest(BaseModel):

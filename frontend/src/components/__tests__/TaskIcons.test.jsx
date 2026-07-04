@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { PriorityIcon, StatusIcon, LabelChip } from '../TaskIcons'
+import { STATUS_COLOR } from '../../constants/theme'
 
 describe('PriorityIcon', () => {
   it('renders high priority triangle', () => {
@@ -31,24 +32,24 @@ describe('PriorityIcon', () => {
 })
 
 describe('StatusIcon', () => {
-  it('renders done icon with green circle', () => {
+  it('renders done icon with complete circle', () => {
     const { container } = render(<StatusIcon status="done" />)
     const circle = container.querySelector('circle')
     expect(circle).toBeTruthy()
-    expect(circle.getAttribute('fill')).toBe('#10b981')
+    expect(circle.getAttribute('fill')).toBe(STATUS_COLOR.done)
   })
 
-  it('renders in_progress icon with blue stroke', () => {
+  it('renders in_progress icon with active stroke', () => {
     const { container } = render(<StatusIcon status="in_progress" />)
     const circle = container.querySelector('circle')
-    expect(circle.getAttribute('stroke')).toBe('#3b82f6')
+    expect(circle.getAttribute('stroke')).toBe(STATUS_COLOR.in_progress)
   })
 
-  it('renders failed icon with red X lines', () => {
+  it('renders failed icon with failed X lines', () => {
     const { container } = render(<StatusIcon status="failed" />)
     const lines = container.querySelectorAll('line')
     expect(lines.length).toBe(2)
-    expect(lines[0].getAttribute('stroke')).toBe('#ef4444')
+    expect(lines[0].getAttribute('stroke')).toBe(STATUS_COLOR.failed)
   })
 
   it('renders todo icon with dashed circle', () => {

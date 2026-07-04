@@ -20,9 +20,9 @@ export default function ProjectCard({ project, onDelete }) {
         <h3 style={{ fontWeight: 700, fontSize: 16, color: DARK.text, margin: 0 }}>{project.name}</h3>
         <span style={{
           fontSize: 10, padding: '2px 9px', borderRadius: 9999, fontWeight: 600, flexShrink: 0,
-          background: project.status === 'archived' ? 'rgba(255,255,255,0.06)' : 'rgba(30,215,96,0.1)',
+          background: project.status === 'archived' ? 'rgba(255,255,255,0.06)' : 'rgba(250,204,21,0.1)',
           color: project.status === 'archived' ? DARK.textMid : DARK.success,
-          border: `1px solid ${project.status === 'archived' ? DARK.border : 'rgba(30,215,96,0.3)'}`,
+          border: `1px solid ${project.status === 'archived' ? DARK.border : 'rgba(250,204,21,0.3)'}`,
           textTransform: 'capitalize', letterSpacing: '0.05em',
         }}>{project.status}</span>
       </div>
@@ -36,7 +36,7 @@ export default function ProjectCard({ project, onDelete }) {
         onClick={e => { e.stopPropagation(); onDelete(project.id) }}
         style={{
           alignSelf: 'flex-end', background: 'none',
-          border: '1px solid rgba(243,114,127,0.4)', color: DARK.danger,
+          border: '1px solid rgba(250,204,21,0.4)', color: DARK.danger,
           borderRadius: 9999, padding: '4px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
           textTransform: 'uppercase', letterSpacing: '1px',
         }}

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { MessageCircle, Plus, Send, Trash2, Wrench, ChevronDown, Loader, Search } from 'lucide-react'
 import axios from 'axios'
-import { DARK, INSET_SHADOW } from '../constants/theme'
+import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 
 const _api = axios.create({ baseURL: '' })
@@ -30,10 +30,11 @@ const PROMPT_TEMPLATES = [
 function ToolBlock({ name, result }) {
   const [open, setOpen] = useState(false)
   return (
-    <div style={{ background: 'rgba(30,215,96,0.06)', border: '1px solid rgba(30,215,96,0.15)', borderRadius: 8, marginBottom: 6, overflow: 'hidden' }}>
+    <div className="kt-panel" style={{ background: 'rgba(250,204,21,0.07)', borderColor: 'rgba(250,204,21,0.18)', marginBottom: 6, overflow: 'hidden' }}>
       <button
         onClick={() => setOpen(v => !v)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', color: DARK.success, fontSize: 11 }}
+        className="kt-btn"
+        style={{ width: '100%', justifyContent: 'flex-start', color: BRAND, fontSize: 11, padding: '6px 10px', background: 'transparent', border: 'none' }}
       >
         <Wrench size={10} />
         <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>{name}</span>
@@ -58,10 +59,10 @@ function MessageBubble({ msg }) {
         </div>
       )}
       {msg.content && (
-        <div style={{
-          maxWidth: '70%', padding: '10px 14px', borderRadius: 12, fontSize: 14, lineHeight: 1.6,
-          background: isUser ? 'rgba(30,215,96,0.12)' : DARK.elevated,
-          border: `1px solid ${isUser ? 'rgba(30,215,96,0.25)' : DARK.border}`,
+        <div className={isUser ? 'kt-assistant-bubble kt-assistant-bubble-user' : 'kt-assistant-bubble'} style={{
+          maxWidth: '70%', padding: '10px 14px', fontSize: 14, lineHeight: 1.6,
+          background: isUser ? 'rgba(250,204,21,0.14)' : DARK.elevated,
+          border: `1px solid ${isUser ? 'rgba(250,204,21,0.34)' : DARK.border}`,
           color: DARK.text, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
           {msg.content}
@@ -82,13 +83,13 @@ function StreamingMessage({ events }) {
         return <ToolBlock key={i} name={ts.name} result={result?.result} />
       })}
       {text && (
-        <div style={{
-          maxWidth: '70%', padding: '10px 14px', borderRadius: 12, fontSize: 14, lineHeight: 1.6,
+        <div className="kt-assistant-bubble" style={{
+          maxWidth: '70%', padding: '10px 14px', fontSize: 14, lineHeight: 1.6,
           background: DARK.elevated, border: `1px solid ${DARK.border}`,
           color: DARK.text, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
           {text}
-          <span style={{ display: 'inline-block', width: 2, height: 16, background: DARK.success, marginLeft: 2, verticalAlign: 'text-bottom', animation: 'pulseRing 1s infinite' }} />
+          <span style={{ display: 'inline-block', width: 2, height: 16, background: BRAND, marginLeft: 2, verticalAlign: 'text-bottom', animation: 'kineticBlink 1s infinite' }} />
         </div>
       )}
     </div>
@@ -197,10 +198,10 @@ export default function Assistant() {
   const sidebarWidth = 260
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div className="kt-assistant-page" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Conversation sidebar */}
       {showSidebar && (
-        <div style={{
+        <div className="kt-assistant-rail" style={{
           width: isMobile ? '100%' : sidebarWidth, flexShrink: 0,
           borderRight: isMobile ? 'none' : `1px solid ${DARK.border}`,
           display: 'flex', flexDirection: 'column',
@@ -209,19 +210,16 @@ export default function Assistant() {
           zIndex: isMobile ? 10 : 1,
           height: '100%',
         }}>
-          <div style={{ padding: '12px 12px 8px', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <MessageCircle size={16} color={DARK.success} />
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: DARK.text }}>
+          <div className="kt-assistant-rail-header" style={{ padding: '16px 14px 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <MessageCircle size={16} color={BRAND} />
+            <span style={{ flex: 1, fontSize: 22, fontWeight: 400, color: DARK.text, fontFamily: 'var(--kt-display)', textTransform: 'uppercase' }}>
               {t('assistant.title')}
             </span>
             <button
               onClick={() => createMut.mutate()}
               title={t('assistant.newChat')}
-              style={{
-                background: DARK.success, border: 'none', borderRadius: '50%',
-                width: 28, height: 28, cursor: 'pointer', color: '#000',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
+              className="kt-icon-btn kt-btn-primary"
+              style={{ width: 28, height: 28 }}
             >
               <Plus size={14} />
             </button>
@@ -234,11 +232,8 @@ export default function Assistant() {
                 value={convSearch}
                 onChange={e => setConvSearch(e.target.value)}
                 placeholder={t('assistant.searchConversations')}
-                style={{
-                  width: '100%', padding: '6px 8px 6px 26px', boxSizing: 'border-box',
-                  background: 'rgba(255,255,255,0.05)', border: `1px solid ${DARK.border}`,
-                  borderRadius: 6, fontSize: 12, color: DARK.text, outline: 'none',
-                }}
+                className="kt-input"
+                style={{ paddingLeft: 26, fontSize: 12 }}
               />
             </div>
           </div>
@@ -253,11 +248,12 @@ export default function Assistant() {
               <div
                 key={c.id}
                 onClick={() => { setConvId(c.id); if (isMobile) setShowSidebar(false) }}
+                className={c.id === convId ? 'kt-assistant-conversation is-active' : 'kt-assistant-conversation'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '10px 12px', cursor: 'pointer',
-                  background: c.id === convId ? 'rgba(30,215,96,0.08)' : 'transparent',
-                  borderLeft: c.id === convId ? `2px solid ${DARK.success}` : '2px solid transparent',
+                  background: c.id === convId ? 'rgba(250,204,21,0.1)' : 'transparent',
+                  borderLeft: c.id === convId ? `2px solid ${BRAND}` : '2px solid transparent',
                   transition: 'background 0.15s',
                 }}
               >
@@ -280,11 +276,11 @@ export default function Assistant() {
       )}
 
       {/* Chat area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="kt-assistant-stage" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Chat header */}
-        <div style={{
+        <div className="kt-page-header" style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 16px', borderBottom: `1px solid ${DARK.border}`,
+          padding: '14px 20px', borderBottom: `1px solid ${DARK.border}`, marginBottom: 0,
         }}>
           {isMobile && (
             <button
@@ -294,7 +290,7 @@ export default function Assistant() {
               <MessageCircle size={16} />
             </button>
           )}
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="kt-page-title" style={{ flex: 1, fontSize: 38, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {currentConv?.title || t('assistant.selectConversation')}
           </span>
         </div>
@@ -302,16 +298,12 @@ export default function Assistant() {
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 12px' : '20px 24px' }}>
           {!convId ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: DARK.textDim }}>
-              <MessageCircle size={40} style={{ marginBottom: 12, opacity: 0.2 }} />
-              <p style={{ fontSize: 14, marginBottom: 16 }}>{t('assistant.selectOrCreate')}</p>
+            <div className="kt-empty" style={{ margin: '30px auto', maxWidth: 520 }}>
+              <MessageCircle size={40} className="kt-empty-icon" />
+              <p className="kt-empty-title">{t('assistant.selectOrCreate')}</p>
               <button
                 onClick={() => createMut.mutate()}
-                style={{
-                  padding: '10px 24px', background: DARK.success, border: 'none',
-                  borderRadius: 9999, color: '#000', fontSize: 13, cursor: 'pointer',
-                  fontWeight: 700, letterSpacing: '0.05em',
-                }}
+                className="kt-btn kt-btn-primary"
               >
                 {t('assistant.newChat')}
               </button>
@@ -328,12 +320,8 @@ export default function Assistant() {
                       <button
                         key={tmpl.labelKey}
                         onClick={() => sendMessage(tmpl.prompt)}
-                        style={{
-                          padding: '8px 14px', borderRadius: 9999,
-                          border: `1px solid ${DARK.border}`, background: 'rgba(255,255,255,0.03)',
-                          fontSize: 12, color: DARK.textMid, cursor: 'pointer',
-                          transition: 'background 0.15s, color 0.15s',
-                        }}
+                        className="kt-chip"
+                        style={{ padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
                       >
                         {t(tmpl.labelKey)}
                       </button>
@@ -364,9 +352,9 @@ export default function Assistant() {
                 placeholder={t('assistant.askAnything')}
                 disabled={streaming}
                 rows={2}
+                className="kt-input"
                 style={{
-                  flex: 1, background: DARK.elevated, border: 'none',
-                  boxShadow: INSET_SHADOW, borderRadius: 10,
+                  flex: 1, background: DARK.elevated,
                   padding: '10px 14px', fontSize: 14, color: DARK.text,
                   outline: 'none', resize: 'none', minHeight: 44, maxHeight: 160,
                   lineHeight: 1.5,
@@ -375,13 +363,8 @@ export default function Assistant() {
               <button
                 onClick={() => sendMessage()}
                 disabled={!input.trim() || streaming}
-                style={{
-                  padding: 12, border: 'none', borderRadius: '50%',
-                  background: DARK.success, color: '#000', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  opacity: (!input.trim() || streaming) ? 0.4 : 1,
-                  flexShrink: 0, transition: 'opacity 0.15s',
-                }}
+                className="kt-btn kt-btn-primary"
+                style={{ padding: 12, opacity: (!input.trim() || streaming) ? 0.4 : 1, flexShrink: 0 }}
               >
                 <Send size={16} />
               </button>
