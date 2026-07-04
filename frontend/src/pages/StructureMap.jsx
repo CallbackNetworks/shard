@@ -108,12 +108,14 @@ function computePath(from, to, linkType) {
 }
 
 function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
+  const pad = { x: 120, y: 80 }
   const colDef = {
-    identity: { x: 24, w: 138 },
-    project: { x: 228, w: 196 },
-    task: { x: 490, w: 176 },
+    identity: { x: pad.x + 24, w: 138 },
+    project: { x: pad.x + 228, w: 196 },
+    task: { x: pad.x + 490, w: 176 },
   }
-  const canvasW = 710
+  const contentW = 710
+  const canvasW = contentW + pad.x * 2
   const labelH = 24
   const projectH = 62
   const taskH = 46
@@ -135,7 +137,7 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
   const goalRows = Math.ceil(goalLane.length / goalCols)
   const goalAreaH = goalLane.length > 0 ? goalRows * (goalH + 6) + 8 : 0
 
-  const bodyTop = labelH + goalAreaH + 6
+  const bodyTop = pad.y + labelH + goalAreaH + 6
 
   const projectRowData = []
   let bodyY = bodyTop
@@ -256,7 +258,7 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
       type: 'goal',
       name: goal.name,
       x: goalStartX + (i % goalCols) * (goalW + goalGapH),
-      y: labelH + Math.floor(i / goalCols) * (goalH + 6),
+      y: pad.y + labelH + Math.floor(i / goalCols) * (goalH + 6),
       w: goalW,
       h: goalH,
       color: goal.color,
@@ -300,7 +302,7 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
   })
 
   const decAreaH = decisionLane.length > 0 ? Math.ceil(decisionLane.length / decisionColCount) * (decisionH + 6) + 24 : 0
-  const canvasH = Math.max(520, bodyY + decAreaH + 40)
+  const canvasH = Math.max(520, bodyY + decAreaH + pad.y + 40)
 
   const nodeById = new Map(nodes.map(n => [n.id, n]))
   return {
@@ -311,6 +313,7 @@ function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTask
     height: canvasH,
     columns: colDef,
     labelH,
+    padY: pad.y,
   }
 }
 
@@ -456,7 +459,7 @@ export default function StructureMap() {
   const relatedNodeKeys = useMemo(() => {
     if (!selectedNodeKey) return new Set()
     if (viewMode === 'dependencies' && selected?.type === 'task') {
-      const keys = new Set(['root:structure', selectedNodeKey, `project:${selected.projectId}`])
+      const keys = new Set([selectedNodeKey, `project:${selected.projectId}`])
       const visit = (key) => {
         for (const link of mapLayout.links) {
           if (link.type !== 'dependency') continue
@@ -712,13 +715,13 @@ export default function StructureMap() {
 
               {mapLayout.columns && (
                 <>
-                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.identity.x, top: 6, width: mapLayout.columns.identity.w }}>
+                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.identity.x, top: mapLayout.padY || 6, width: mapLayout.columns.identity.w }}>
                     {t('structure.identities')}
                   </div>
-                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.project.x, top: 6, width: mapLayout.columns.project.w }}>
+                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.project.x, top: mapLayout.padY || 6, width: mapLayout.columns.project.w }}>
                     {t('structure.projects')}
                   </div>
-                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.task.x, top: 6, width: mapLayout.columns.task.w }}>
+                  <div className="kt-map-col-label" style={{ left: mapLayout.columns.task.x, top: mapLayout.padY || 6, width: mapLayout.columns.task.w }}>
                     {t('structure.signalTasks')}
                   </div>
                 </>
