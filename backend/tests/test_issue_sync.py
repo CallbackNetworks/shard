@@ -144,6 +144,38 @@ class TestNormalization:
         assert detect_issue_webhook({}, {}) is None
 
 
+class TestResolveApiBase:
+    """Unit tests for GitHub-compatible API base resolution (github.com / GHE / Gitea)."""
+
+    def test_default_when_empty(self):
+        from app.services.issue_sync import resolve_github_api_base
+
+        assert resolve_github_api_base(None, None) == "https://api.github.com"
+
+    def test_github_com_from_external_url(self):
+        from app.services.issue_sync import resolve_github_api_base
+
+        assert resolve_github_api_base("https://github.com/owner/repo/issues/1", None) == "https://api.github.com"
+
+    def test_gitea_host_from_external_url(self):
+        from app.services.issue_sync import resolve_github_api_base
+
+        result = resolve_github_api_base("https://gitea.example.com/owner/repo/issues/9", None)
+        assert result == "https://gitea.example.com/api/v1"
+
+    def test_explicit_api_base_integration_url_wins(self):
+        from app.services.issue_sync import resolve_github_api_base
+
+        result = resolve_github_api_base("https://ghe.corp.com/o/r/issues/3", "https://ghe.corp.com/api/v3")
+        assert result == "https://ghe.corp.com/api/v3"
+
+    def test_falls_back_to_integration_host(self):
+        from app.services.issue_sync import resolve_github_api_base
+
+        result = resolve_github_api_base(None, "https://gitea.internal")
+        assert result == "https://gitea.internal/api/v1"
+
+
 class TestInboundWebhook:
     """Integration tests for the issue webhook endpoint."""
 
@@ -345,6 +377,7 @@ class TestOutboundSync:
             external_provider="github",
             external_id="42",
             external_repo="owner/repo",
+            external_url="https://github.com/owner/repo/issues/42",
         )
         db.add(task)
         db.commit()
@@ -352,7 +385,37 @@ class TestOutboundSync:
 
         result = await sync_task_closure_to_external(task, db)
         assert result is True
-        mock_close.assert_called_once_with("owner/repo", "42", "ghp_testtoken123")
+        mock_close.assert_called_once_with("owner/repo", "42", "ghp_testtoken123", "https://api.github.com")
+
+    @pytest.mark.asyncio
+    @patch("app.routers.issue_sync.close_github_issue", new_callable=AsyncMock, return_value=True)
+    async def test_sync_closure_gitea(self, mock_close, client, sample_project, db):
+        """A Gitea-originated task (github-compatible provider) closes via the Gitea API base."""
+        integration = Integration(
+            name="gitea-sync",
+            type="issue_sync",
+            url="https://gitea.example.com",
+            project_id=sample_project.id,
+            secret="gitea_token",
+            active=True,
+        )
+        db.add(integration)
+
+        task = Task(
+            project_id=sample_project.id,
+            title="Gitea task",
+            external_provider="github",
+            external_id="5",
+            external_repo="owner/repo",
+            external_url="https://gitea.example.com/owner/repo/issues/5",
+        )
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+
+        result = await sync_task_closure_to_external(task, db)
+        assert result is True
+        mock_close.assert_called_once_with("owner/repo", "5", "gitea_token", "https://gitea.example.com/api/v1")
 
     @pytest.mark.asyncio
     @patch("app.routers.issue_sync.close_gitlab_issue", new_callable=AsyncMock, return_value=True)

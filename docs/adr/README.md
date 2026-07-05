@@ -11,3 +11,4 @@
 | [0007](0007-multi-database-support.md) | Multi-Database Support (SQLite / PostgreSQL / MySQL) | Accepted | 2026-06-05 |
 | [0008](0008-automated-docker-deployment.md) | Automated Docker Deployment via CD Pipeline | Accepted | 2026-06-19 |
 | [0009](0009-agent-integration-architecture.md) | Agent Integration Architecture | Accepted | 2026-07-04 |
+| [0010](0010-gitea-github-compatible-api-base.md) | Gitea Support via GitHub-Compatible API Base Resolution | Accepted | 2026-07-05 |

@@ -27,6 +27,7 @@ class GitHubTrigger(BaseModel):
     ref: str = "main"
     token: str  # GitHub personal access token
     inputs: dict | None = None
+    api_base: str = "https://api.github.com"  # e.g. "https://gitea.example.com/api/v1" for Gitea
 
 
 class GitLabTrigger(BaseModel):
@@ -60,6 +61,7 @@ async def trigger_github(body: GitHubTrigger, task_id: str | None = None, db: Se
         ref=body.ref,
         token=body.token,
         inputs=body.inputs,
+        api_base=body.api_base,
     )
 
     if task_id:

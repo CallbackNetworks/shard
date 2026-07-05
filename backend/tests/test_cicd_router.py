@@ -43,6 +43,7 @@ def test_trigger_github(client, db, monkeypatch):
         ref="main",
         token="ghp_faketoken",
         inputs=None,
+        api_base="https://api.github.com",
     )
 
 

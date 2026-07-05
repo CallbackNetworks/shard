@@ -23,12 +23,14 @@ Setup:
 5. Label-based status detection: issues labeled "In Progress" or "WIP" map to `in_progress`
 
 **Outbound sync (tasks → issues):**
-When you mark a Shard task as done, the linked GitHub/GitLab issue is automatically closed via API.
+When you mark a Shard task as done, the linked GitHub/GitLab/Gitea issue is automatically closed via API.
 
 Setup:
 1. Create an integration of type `issue_sync` for the project
-2. Store your GitHub PAT or GitLab token in the integration's `secret` field
-3. When a synced task transitions to `done`, Shard calls the GitHub/GitLab API to close the issue
+2. Store your GitHub/Gitea PAT or GitLab token in the integration's `secret` field
+3. When a synced task transitions to `done`, Shard calls the provider API to close the issue
+
+**Self-hosted Gitea / GitHub Enterprise:** Gitea and GHE expose the same REST shape as github.com, so outbound closure and CI/CD dispatch work against them too. The API base is auto-derived from the issue's host (any non-github.com host resolves to `{host}/api/v1`, Gitea's mount). To target a custom path such as GHE's `/api/v3`, set the integration's `url` to an explicit API base (any URL containing `/api/`). See [ADR-0010](adr/0010-gitea-github-compatible-api-base.md).
 
 **Why this matters:** You get a unified view of all your work — GitHub issues, GitLab issues, and standalone tasks — in one board, with completions reflected back to the source.
 

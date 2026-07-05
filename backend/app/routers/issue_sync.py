@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Integration, Project, Task
 from app.services.activity import log_activity
-from app.services.issue_sync import close_github_issue, close_gitlab_issue, detect_issue_webhook, detect_pr_webhook
+from app.services.issue_sync import (
+    close_github_issue,
+    close_gitlab_issue,
+    detect_issue_webhook,
+    detect_pr_webhook,
+    resolve_github_api_base,
+)
 from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -272,7 +278,8 @@ async def sync_task_closure_to_external(task: Task, db: Session) -> bool:
     token = integration.secret
 
     if task.external_provider == "github":
-        return await close_github_issue(task.external_repo, task.external_id, token)
+        api_base = resolve_github_api_base(task.external_url, integration.url)
+        return await close_github_issue(task.external_repo, task.external_id, token, api_base)
     elif task.external_provider == "gitlab":
         gitlab_url = integration.url or "https://gitlab.com"
         return await close_gitlab_issue(task.external_repo, task.external_id, token, gitlab_url)

@@ -8,10 +8,43 @@ Also handles GitHub pull request events for PR-to-task linking.
 
 import logging
 import re
+from urllib.parse import urlparse
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+GITHUB_API_BASE = "https://api.github.com"
+
+
+def resolve_github_api_base(external_url: str | None = None, integration_url: str | None = None) -> str:
+    """Resolve the GitHub-compatible API base for github.com, GitHub Enterprise, or Gitea.
+
+    Gitea and GitHub Enterprise expose the same ``/repos/{owner}/{repo}/...`` REST
+    shape as github.com, only under a different base URL. Priority:
+
+    1. ``integration_url`` when it already points at an API base (contains ``/api/``),
+       so power users can target GHE (``/api/v3``) or a custom mount explicitly.
+    2. Host derived from the issue's ``external_url`` (github.com -> api.github.com,
+       any other host -> ``{scheme}://{host}/api/v1`` for Gitea-compatible servers).
+    3. Default ``https://api.github.com``.
+    """
+    if integration_url and "/api/" in integration_url:
+        return integration_url.rstrip("/")
+
+    for candidate in (external_url, integration_url):
+        if not candidate:
+            continue
+        parsed = urlparse(candidate)
+        host = parsed.netloc
+        if not host:
+            continue
+        if host in ("github.com", "www.github.com", "api.github.com"):
+            return GITHUB_API_BASE
+        scheme = parsed.scheme or "https"
+        return f"{scheme}://{host}/api/v1"
+
+    return GITHUB_API_BASE
 
 
 def normalize_github_issue(payload: dict) -> dict | None:
@@ -125,9 +158,9 @@ def detect_issue_webhook(headers: dict, payload: dict) -> dict | None:
     return None
 
 
-async def close_github_issue(repo: str, issue_number: str, token: str) -> bool:
-    """Close a GitHub issue via the API."""
-    url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
+async def close_github_issue(repo: str, issue_number: str, token: str, api_base: str = GITHUB_API_BASE) -> bool:
+    """Close an issue via the GitHub-compatible API (github.com, GHE, or Gitea)."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/{issue_number}"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json",
@@ -136,12 +169,12 @@ async def close_github_issue(repo: str, issue_number: str, token: str) -> bool:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.patch(url, json={"state": "closed"}, headers=headers)
         if resp.is_success:
-            logger.info("Closed GitHub issue %s#%s", repo, issue_number)
+            logger.info("Closed issue %s#%s via %s", repo, issue_number, api_base)
             return True
-        logger.warning("Failed to close GitHub issue %s#%s: %s", repo, issue_number, resp.status_code)
+        logger.warning("Failed to close issue %s#%s via %s: %s", repo, issue_number, api_base, resp.status_code)
         return False
     except httpx.HTTPError as exc:
-        logger.warning("Error closing GitHub issue %s#%s: %s", repo, issue_number, exc)
+        logger.warning("Error closing issue %s#%s via %s: %s", repo, issue_number, api_base, exc)
         return False
 
 

@@ -17,13 +17,15 @@ async def trigger_github_workflow(
     ref: str = "main",
     token: str = "",
     inputs: dict | None = None,
+    api_base: str = "https://api.github.com",
 ) -> dict:
     """
-    Trigger a GitHub Actions workflow via workflow_dispatch.
+    Trigger a workflow via the GitHub-compatible Actions API (github.com, GHE, or Gitea).
     repo: "owner/repo"
     workflow_id: workflow filename or ID
+    api_base: API base URL, e.g. "https://api.github.com" or "https://gitea.example.com/api/v1"
     """
-    url = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_id}/dispatches"
+    url = f"{api_base.rstrip('/')}/repos/{repo}/actions/workflows/{workflow_id}/dispatches"
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github.v3+json",
