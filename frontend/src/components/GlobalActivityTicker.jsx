@@ -45,29 +45,14 @@ function formatTimelineTime(value) {
 const ACTIVITY_KINDS = ['task', 'project', 'decision', 'goal', 'webhook', 'alert']
 const ACTIVITY_BUCKETS = 52
 
-// Cool -> hot ramp: faint void, indigo, wine, ember, amber, white-hot.
-const HEAT_STOPS = [
-  [0.0, [34, 20, 52]],
-  [0.22, [76, 29, 149]],
-  [0.44, [157, 23, 77]],
-  [0.64, [194, 65, 12]],
-  [0.82, [245, 158, 11]],
-  [1.0, [254, 243, 199]],
-]
-
+// Single warm hue; intensity is carried purely by saturation + brightness so
+// the strip reads as one continuous heat ramp rather than distinct colours.
 function heatColor(t) {
-  if (t <= 0) return 'rgba(255,255,255,0.045)'
-  const clamped = Math.min(1, t)
-  for (let i = 1; i < HEAT_STOPS.length; i++) {
-    const [p1, c1] = HEAT_STOPS[i]
-    if (clamped <= p1) {
-      const [p0, c0] = HEAT_STOPS[i - 1]
-      const f = (clamped - p0) / (p1 - p0 || 1)
-      const mix = c0.map((v, k) => Math.round(v + (c1[k] - v) * f))
-      return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`
-    }
-  }
-  return 'rgb(254, 243, 199)'
+  if (t <= 0) return 'rgba(255,255,255,0.05)'
+  const c = Math.min(1, t)
+  const sat = 50 + 50 * c
+  const light = 20 + 52 * c
+  return `hsl(42, ${sat}%, ${light}%)`
 }
 
 // Bucket recent activity by time, then lightly smooth it so the strip reads

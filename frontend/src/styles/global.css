@@ -2304,7 +2304,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   flex: 1;
   height: 8px;
   min-width: 0;
-  background: linear-gradient(90deg, rgba(255,255,255,0.06), #4c1d95, #9d174d, #c2410c, #f59e0b, #fef3c7);
+  background: linear-gradient(90deg, hsl(42, 50%, 20%), hsl(42, 75%, 46%), hsl(42, 100%, 72%));
 }
 .kt-heatscale span {
   white-space: nowrap;
