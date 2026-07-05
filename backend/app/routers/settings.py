@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import UserPreference
 from app.routers.auth import AUTH_PASSWORD
+from app.services.runtime_settings import get_system_settings, update_system_settings
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -22,16 +23,30 @@ DASHBOARD_WIDGETS = [
 
 
 @router.get("")
-def get_settings(request: Request):
+def get_settings(request: Request, db: Session = Depends(get_db)):
     """Return current system settings (non-sensitive)."""
+    runtime = get_system_settings(db)
     return {
         "auth_enabled": bool(AUTH_PASSWORD),
         "llm_provider": os.getenv("LLM_PROVIDER", "stub"),
         "llm_model": os.getenv("LLM_MODEL", ""),
         "smtp_configured": bool(os.getenv("SMTP_HOST")),
-        "summary_hour": int(os.getenv("SUMMARY_HOUR", "8")),
         "mcp_transport": os.getenv("MCP_TRANSPORT", "stdio"),
+        **runtime,
     }
+
+
+class SystemSettingsUpdate(BaseModel):
+    summary_hour: int | None = None
+    due_soon_window_hours: int | None = None
+    reminder_cooldown_hours: int | None = None
+
+
+@router.put("/system")
+def put_system_settings(body: SystemSettingsUpdate, db: Session = Depends(get_db)):
+    """Update runtime-adjustable scheduler settings (persisted, no restart needed)."""
+    updated = update_system_settings(db, body.model_dump(exclude_none=True))
+    return updated
 
 
 class PasswordChangeRequest(BaseModel):

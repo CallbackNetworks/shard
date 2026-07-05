@@ -16,18 +16,18 @@ from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, 
 from app.services import email_sender
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications, retry_delivery
+from app.services.runtime_settings import get_system_settings
 
 logger = logging.getLogger(__name__)
 
 CHECK_INTERVAL_SECONDS = 3600  # every hour
-DUE_SOON_WINDOW_HOURS = 24  # fire "due_soon" when task is due within this many hours
-REMINDER_COOLDOWN_HOURS = 23  # don't re-send a reminder within this window
 
 
 async def _check_and_fire(db: Session) -> None:
+    settings = get_system_settings(db)
     now = datetime.utcnow()
-    due_soon_cutoff = now + timedelta(hours=DUE_SOON_WINDOW_HOURS)
-    cooldown_cutoff = now - timedelta(hours=REMINDER_COOLDOWN_HOURS)
+    due_soon_cutoff = now + timedelta(hours=settings["due_soon_window_hours"])
+    cooldown_cutoff = now - timedelta(hours=settings["reminder_cooldown_hours"])
 
     tasks = (
         db.query(Task)
@@ -146,7 +146,6 @@ async def _retry_failed_webhooks(db: Session) -> None:
             logger.warning("Retry failed for delivery %s: %s", delivery.id, exc)
 
 
-SUMMARY_HOUR = int(os.getenv("SUMMARY_HOUR", "8"))  # Send daily summary at this hour (UTC)
 DIGEST_DAY = int(os.getenv("DIGEST_DAY", "1"))  # Day of week for weekly digest (0=Mon, 6=Sun), default Monday
 _last_summary_date: str | None = None
 _last_weekly_digest_date: str | None = None
@@ -157,9 +156,10 @@ async def _send_daily_summary(db: Session) -> None:
     global _last_summary_date
     now = datetime.utcnow()
     today_str = now.strftime("%Y-%m-%d")
+    summary_hour = get_system_settings(db)["summary_hour"]
 
     # Only send once per day, at or after the configured hour
-    if _last_summary_date == today_str or now.hour < SUMMARY_HOUR:
+    if _last_summary_date == today_str or now.hour < summary_hour:
         return
     _last_summary_date = today_str
 
@@ -258,9 +258,10 @@ async def _send_weekly_digest(db: Session) -> None:
     """Generate and send a weekly digest email to all email-type integrations."""
     global _last_weekly_digest_date
     now = datetime.utcnow()
+    summary_hour = get_system_settings(db)["summary_hour"]
 
-    # Only send on the configured day of the week, at or after SUMMARY_HOUR
-    if now.weekday() != DIGEST_DAY or now.hour < SUMMARY_HOUR:
+    # Only send on the configured day of the week, at or after the summary hour
+    if now.weekday() != DIGEST_DAY or now.hour < summary_hour:
         return
 
     # Use ISO week identifier to ensure we only send once per week

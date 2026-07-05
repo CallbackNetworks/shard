@@ -7,13 +7,19 @@ import pytest
 
 from app.models import Integration, Project, RecurrenceRule, Task, WebhookDelivery
 from app.services.scheduler import (
-    REMINDER_COOLDOWN_HOURS,
     _check_and_fire,
     _check_recurring,
     _compute_next_run,
     _retry_failed_webhooks,
     _send_daily_summary,
 )
+
+
+def _settings(**overrides):
+    """Effective runtime settings for patching get_system_settings in tests."""
+    base = {"summary_hour": 8, "due_soon_window_hours": 24, "reminder_cooldown_hours": 23}
+    base.update(overrides)
+    return base
 
 
 def _now():
@@ -184,7 +190,7 @@ class TestCheckAndFire:
             title="Old reminder",
             status="todo",
             due_date=_now() + timedelta(hours=12),
-            reminder_sent_at=_now() - timedelta(hours=REMINDER_COOLDOWN_HOURS + 1),
+            reminder_sent_at=_now() - timedelta(hours=48),
         )
         db.add(t)
         db.commit()
@@ -378,7 +384,7 @@ class TestSendDailySummary:
 
         with (
             patch("app.services.scheduler.email_sender") as mock_email,
-            patch("app.services.scheduler.SUMMARY_HOUR", 0),
+            patch("app.services.scheduler.get_system_settings", return_value=_settings(summary_hour=0)),
         ):
             mock_email.send_email.return_value = True
             await _send_daily_summary(db)
@@ -395,7 +401,7 @@ class TestSendDailySummary:
         sched._last_summary_date = None
 
         with (
-            patch("app.services.scheduler.SUMMARY_HOUR", 23),
+            patch("app.services.scheduler.get_system_settings", return_value=_settings(summary_hour=23)),
             patch("app.services.scheduler.email_sender") as mock_email,
         ):
             # Unless current hour >= 23, it should skip
