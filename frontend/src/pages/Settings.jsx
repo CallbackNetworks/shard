@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle } from 'lucide-react'
-import { getSettings, changePassword } from '../api/client'
+import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal } from 'lucide-react'
+import { getSettings, changePassword, setPreference } from '../api/client'
 import { DARK } from '../constants/theme'
+import { useTheme } from '../context/ThemeContext'
+import { getUiPrefs, setUiPref, PROJECT_VIEWS, TASK_PRIORITIES } from '../utils/uiPrefs'
 
 function StatusBadge({ ok, label }) {
   return (
@@ -41,8 +43,62 @@ function InfoRow({ label, children }) {
   )
 }
 
+function ControlRow({ label, hint, children }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16,
+      padding: '12px 0', borderBottom: `1px solid ${DARK.border}`,
+    }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 13, color: DARK.textMid }}>{label}</span>
+        {hint && <span style={{ fontSize: 11, color: DARK.textDim }}>{hint}</span>}
+      </div>
+      <div style={{ flexShrink: 0 }}>{children}</div>
+    </div>
+  )
+}
+
+function Segmented({ options, value, onChange }) {
+  return (
+    <div style={{ display: 'inline-flex', border: `1px solid ${DARK.border}`, overflow: 'hidden' }}>
+      {options.map((opt, i) => {
+        const active = opt.value === value
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              border: 'none', borderLeft: i === 0 ? 'none' : `1px solid ${DARK.border}`,
+              background: active ? 'rgba(129,140,248,0.18)' : 'transparent',
+              color: active ? DARK.text : DARK.textDim,
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Settings() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const { mode, setMode } = useTheme()
+
+  const [uiPrefs, setUiPrefsState] = useState(() => getUiPrefs())
+
+  const persistPref = (key, value) => {
+    const next = setUiPref(key, value)
+    setUiPrefsState(next)
+    // Best-effort mirror to backend for cross-device sync.
+    setPreference('user-preferences', next).catch(() => {})
+  }
+
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng)
+    setPreference('user-preferences', { ...uiPrefs, language: lng }).catch(() => {})
+  }
 
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
@@ -87,6 +143,68 @@ export default function Settings() {
           {t('loading')}
         </div>
       )}
+
+      {/* Preferences (client-side, always available) */}
+      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        <SectionTitle
+          icon={<SlidersHorizontal size={16} color="#818cf8" />}
+          title={t('settings.preferences')}
+        />
+        <ControlRow label={t('settings.theme')} hint={t('settings.themeHint')}>
+          <Segmented
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'dark', label: t('settings.themeDark') },
+              { value: 'light', label: t('settings.themeLight') },
+            ]}
+          />
+        </ControlRow>
+        <ControlRow label={t('settings.language')} hint={t('settings.languageHint')}>
+          <Segmented
+            value={i18n.language}
+            onChange={changeLanguage}
+            options={[
+              { value: 'en', label: 'English' },
+              { value: 'zh-TW', label: '繁體中文' },
+            ]}
+          />
+        </ControlRow>
+        <ControlRow label={t('settings.defaultView')} hint={t('settings.defaultViewHint')}>
+          <select
+            value={uiPrefs.defaultView}
+            onChange={e => persistPref('defaultView', e.target.value)}
+            className="kt-input"
+            style={{ width: 'auto', minWidth: 140 }}
+          >
+            {PROJECT_VIEWS.map(v => (
+              <option key={v} value={v}>{t(`settings.view.${v}`)}</option>
+            ))}
+          </select>
+        </ControlRow>
+        <ControlRow label={t('settings.defaultPriority')} hint={t('settings.defaultPriorityHint')}>
+          <select
+            value={uiPrefs.defaultPriority}
+            onChange={e => persistPref('defaultPriority', e.target.value)}
+            className="kt-input"
+            style={{ width: 'auto', minWidth: 140 }}
+          >
+            {TASK_PRIORITIES.map(p => (
+              <option key={p} value={p}>{t(p)}</option>
+            ))}
+          </select>
+        </ControlRow>
+        <ControlRow label={t('settings.reduceMotion')} hint={t('settings.reduceMotionHint')}>
+          <Segmented
+            value={uiPrefs.reduceMotion ? 'on' : 'off'}
+            onChange={v => persistPref('reduceMotion', v === 'on')}
+            options={[
+              { value: 'off', label: t('settings.off') },
+              { value: 'on', label: t('settings.on') },
+            ]}
+          />
+        </ControlRow>
+      </div>
 
       {settings && (
         <>

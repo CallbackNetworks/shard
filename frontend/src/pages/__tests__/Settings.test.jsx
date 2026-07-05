@@ -27,6 +27,13 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../api/client', () => ({
   getSettings: vi.fn(),
   changePassword: vi.fn(),
+  setPreference: vi.fn(() => Promise.resolve()),
+}))
+
+// Mock ThemeContext
+const mockSetMode = vi.fn()
+vi.mock('../../context/ThemeContext', () => ({
+  useTheme: () => ({ mode: 'dark', setMode: mockSetMode }),
 }))
 
 import Settings from '../Settings'
@@ -155,5 +162,26 @@ describe('Settings', () => {
   it('shows disabled badge when auth is off', () => {
     setup({ settings: { ...mockSettings, auth_enabled: false } })
     expect(screen.getByText('settings.disabled')).toBeTruthy()
+  })
+
+  it('renders the preferences section with adjustable controls', () => {
+    setup()
+    expect(screen.getByText('settings.preferences')).toBeTruthy()
+    expect(screen.getByText('settings.theme')).toBeTruthy()
+    expect(screen.getByText('settings.language')).toBeTruthy()
+    expect(screen.getByText('settings.defaultView')).toBeTruthy()
+    expect(screen.getByText('settings.defaultPriority')).toBeTruthy()
+    expect(screen.getByText('settings.reduceMotion')).toBeTruthy()
+  })
+
+  it('renders preferences even while system settings load', () => {
+    setup({ isLoading: true })
+    expect(screen.getByText('settings.preferences')).toBeTruthy()
+  })
+
+  it('switches theme mode when the light button is clicked', () => {
+    setup()
+    fireEvent.click(screen.getByText('settings.themeLight'))
+    expect(mockSetMode).toHaveBeenCalledWith('light')
   })
 })

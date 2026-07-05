@@ -3408,6 +3408,21 @@ select[style*="border-radius"],
   }
 }
 
+/* ── User-opt-in reduced motion (independent of OS preference) ── */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.001ms !important;
+}
+:root[data-motion="reduced"] .kt-ticker-track,
+:root[data-motion="reduced"] .kt-alert-strip-track,
+:root[data-motion="reduced"] .kt-route-shell {
+  animation: none !important;
+}
+
 /* ── Light mode overrides ── */
 [data-theme="light"] body, [data-theme="light"] { background: #ffffff; color: #000000; }
 [data-theme="light"] .card-hover:hover {

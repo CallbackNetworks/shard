@@ -19,6 +19,7 @@ import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
 import { BRAND, DARK, LABEL_PALETTE } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
+import { getUiPrefs } from '../utils/uiPrefs'
 import s from './ProjectDetail.module.css'
 
 function LabelChip({ label, onRemove }) {
@@ -113,7 +114,8 @@ export default function ProjectDetail() {
   const navigate = useNavigate()
   const qc = useQueryClient()
 
-  const [tab, setTab] = useState('issues')
+  const uiPrefs = getUiPrefs()
+  const [tab, setTab] = useState(uiPrefs.defaultView)
   const [filter, setFilter] = useState('all')
   const [searchQ, setSearchQ] = useState('')
   const [filterPriority, setFilterPriority] = useState('all')
@@ -124,7 +126,7 @@ export default function ProjectDetail() {
   const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [newTask, setNewTask] = useState({
-    title: '', description: '', priority: 'medium', status: 'todo', assignee: '', start_date: '', due_date: '',
+    title: '', description: '', priority: uiPrefs.defaultPriority, status: 'todo', assignee: '', start_date: '', due_date: '',
     selectedLabels: [],
   })
   const [showCycleForm, setShowCycleForm] = useState(false)
@@ -174,7 +176,7 @@ export default function ProjectDetail() {
     onSuccess: () => {
       invalidate()
       setShowForm(false)
-      setNewTask({ title: '', description: '', priority: 'medium', status: 'todo', assignee: '', start_date: '', due_date: '', selectedLabels: [] })
+      setNewTask({ title: '', description: '', priority: getUiPrefs().defaultPriority, status: 'todo', assignee: '', start_date: '', due_date: '', selectedLabels: [] })
     },
   })
 
