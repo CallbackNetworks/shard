@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 import { getActivity, getProjects } from '../api/client'
+import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
 
 const FALLBACK_ITEMS = [
   'SHARD ONLINE',
@@ -96,10 +97,11 @@ function buildActivityHeat(activities) {
 }
 
 export default function GlobalActivityTicker() {
+  const prefs = useUiPrefs()
   const { data: activities = [] } = useQuery({
     queryKey: ['global-activity-ticker'],
     queryFn: () => getActivity({ limit: 34 }),
-    refetchInterval: 45000,
+    refetchInterval: refreshInterval(45000, prefs),
     staleTime: 30000,
   })
 

@@ -247,6 +247,7 @@ export const importTasks = (projectId, data) =>
 
 // Settings
 export const getSettings = () => api.get('/settings').then(r => r.data)
+export const updateSystemSettings = (data) => api.put('/settings/system', data).then(r => r.data)
 export const changePassword = (data) => api.post('/settings/change-password', data).then(r => r.data)
 export const getDashboardWidgets = () => api.get('/settings/dashboard-widgets').then(r => r.data)
 export const getPreference = (key) => api.get(`/settings/preferences/${key}`).then(r => r.data)

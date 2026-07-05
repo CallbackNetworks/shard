@@ -8,6 +8,7 @@ import {
   markNotificationRead, markAllNotificationsRead, dismissNotification,
 } from '../api/client'
 import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
+import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
 
 const TYPE_ICON = {
   'task.done': <CheckCircle2 size={13} style={{ color: STATUS_COLOR.done }} />,
@@ -32,11 +33,12 @@ export default function NotificationCenter() {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const panelRef = useRef(null)
+  const prefs = useUiPrefs()
 
   const { data: countData } = useQuery({
     queryKey: ['notification-count'],
     queryFn: getUnreadCount,
-    refetchInterval: 60000,
+    refetchInterval: refreshInterval(60000, prefs),
   })
 
   const { data: notifications = [] } = useQuery({

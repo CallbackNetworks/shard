@@ -31,6 +31,19 @@ export const UI_SCALES = [
   { value: 1.2, labelKey: 'settings.scaleLarge' },
 ]
 
+// Date/time display options.
+export const TIME_FORMATS = ['24h', '12h']
+export const WEEK_STARTS = ['sunday', 'monday']
+export const TIMESTAMP_STYLES = ['relative', 'absolute']
+
+// List density controls how many items compact lists show. `full` means show
+// all. `standard` keeps the original hardcoded counts.
+export const LIST_DENSITIES = ['compact', 'standard', 'full']
+const DENSITY_FACTOR = { compact: 0.6, standard: 1, full: Infinity }
+
+// Live-refresh cadence presets mapped against each query's baseline interval.
+export const REFRESH_RATES = ['live', 'standard', 'battery']
+
 export const DEFAULT_UI_PREFS = {
   defaultView: 'issues',
   defaultPriority: 'medium',
@@ -39,6 +52,27 @@ export const DEFAULT_UI_PREFS = {
   uiScale: 1.0,
   sidebarHidden: [], // list of nav `to` paths to hide
   sidebarOrder: [], // list of nav `to` paths giving explicit order
+  timeFormat: '24h',
+  weekStart: 'sunday',
+  timestampStyle: 'relative',
+  listDensity: 'standard',
+  refreshRate: 'standard',
+}
+
+// Adjust a list's standard item count by the active density. Returns Infinity
+// for `full` so callers can `.slice(0, count)` uniformly.
+export function densityCount(standard, prefs = current) {
+  const factor = DENSITY_FACTOR[prefs.listDensity] ?? 1
+  if (factor === Infinity) return Infinity
+  return Math.max(1, Math.ceil(standard * factor))
+}
+
+// Resolve a query's effective refetch interval (ms) from its baseline.
+// Returns false to disable auto-refetch (battery saver).
+export function refreshInterval(baselineMs, prefs = current) {
+  if (prefs.refreshRate === 'battery') return false
+  if (prefs.refreshRate === 'live') return Math.min(baselineMs, 15000)
+  return baselineMs
 }
 
 function readStorage() {

@@ -5,6 +5,8 @@ import { Activity as ActivityIcon, Filter, ChevronLeft, ChevronRight } from 'luc
 import { getActivity, getProjects } from '../api/client'
 import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
 import { actionGroup, buildActivitySignals, bucketActivitySignals, summarizeActivitySignals } from '../utils/activitySignals'
+import { formatTimestamp, absoluteTime } from '../utils/datetime'
+import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
 
 const PAGE_SIZE = 50
@@ -34,26 +36,6 @@ const ACTION_GROUPS = [
   { key: 'share', label: 'Share' },
   { key: 'rule', label: 'Rules' },
 ]
-
-function relativeTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now - d
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(mins / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (mins > 0) return `${mins}m ago`
-  return 'just now'
-}
-
-function formatTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
 
 const chip = (active) => ({
   padding: '5px 12px',
@@ -167,6 +149,7 @@ export default function Activity() {
   const { t } = useTranslation()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
+  useUiPrefs() // re-render when timestamp/time-format preferences change
   const [projectFilter, setProjectFilter] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
   const [viewMode, setViewMode] = useState('log')
@@ -205,7 +188,7 @@ export default function Activity() {
         <div className="kt-page-heading">
           <h1 className="kt-page-title">{t('activity.title')}</h1>
           <div className="kt-page-subtitle">
-            {filtered.length} events / {latest ? `${latest.action} ${relativeTime(latest.created_at)}` : 'no signal'}
+            {filtered.length} events / {latest ? `${latest.action} ${formatTimestamp(latest.created_at)}` : 'no signal'}
           </div>
         </div>
         <ActivityIcon size={22} color={BRAND} />
@@ -301,8 +284,8 @@ export default function Activity() {
                       </div>
                     </div>
                     <time className="kt-activity-event-time">
-                      <span>{relativeTime(entry.created_at)}</span>
-                      <small>{formatTime(entry.created_at)}</small>
+                      <span>{formatTimestamp(entry.created_at)}</span>
+                      <small>{absoluteTime(entry.created_at)}</small>
                     </time>
                   </article>
                 )

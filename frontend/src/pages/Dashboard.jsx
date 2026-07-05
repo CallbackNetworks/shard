@@ -9,6 +9,7 @@ import IdentityChartsView from '../components/IdentityChartsView'
 import { ViewProgress, ViewHealth, ViewTasks, ViewCompare, getPinnedIds, togglePin } from '../components/OverviewViews'
 import { BRAND, STATUS_MAP, PRIORITY, DARK, STATUS_COLOR } from '../constants/theme'
 import { deriveCommandCenter } from '../utils/commandCenter'
+import { useUiPrefs, densityCount } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Dashboard.module.css'
 
@@ -224,7 +225,7 @@ function PriorityLane({ title, tone, icon, tasks, empty, navigate }) {
       <div className={s.priorityLaneList}>
         {tasks.length === 0 ? (
           <div className={s.priorityLaneEmpty}>{empty}</div>
-        ) : tasks.slice(0, 5).map((task, index) => (
+        ) : tasks.slice(0, densityCount(5)).map((task, index) => (
           <button
             key={`${task.projectId}-${task.id}`}
             className={s.priorityTask}
@@ -569,7 +570,7 @@ function DueSoonPanel({ projects }) {
 function IdentityGroup({ ident, tasks, navigate }) {
   const { t } = useTranslation()
   const [showAll, setShowAll] = useState(false)
-  const visibleTasks = showAll ? tasks : tasks.slice(0, 8)
+  const visibleTasks = showAll ? tasks : tasks.slice(0, densityCount(8))
 
   return (
     <div style={{
@@ -664,7 +665,7 @@ function MyWorkSection({ projects }) {
           {hasIdentities && (
             <div className={s.otherLabel}>{t('dashboard.other')}</div>
           )}
-          {ungroupedTasks.slice(0, 8).map((task, i) => (
+          {ungroupedTasks.slice(0, densityCount(8)).map((task, i) => (
             <TaskRow key={task.id} t={task} i={i} total={Math.min(ungroupedTasks.length, 8)}
               onClick={() => navigate(`/projects/${task.projectId}`)} />
           ))}
@@ -747,6 +748,7 @@ export default function Dashboard() {
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
+  useUiPrefs() // re-render on list-density / timestamp preference changes
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const { data: activities = [] } = useQuery({
     queryKey: ['activity'],

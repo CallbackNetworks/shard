@@ -2,6 +2,8 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { DARK, BRAND } from '../constants/theme'
+import { useUiPrefs } from '../utils/uiPrefs'
+import { weekStartIndex } from '../utils/datetime'
 
 const PRIORITY_COLORS = {
   high: '#facc15',
@@ -37,14 +39,16 @@ function formatDateISO(date) {
 
 export default function CalendarView({ tasks, onUpdateTask, projectId: _projectId }) {
   const { t } = useTranslation()
+  const prefs = useUiPrefs()
+  const weekStart = weekStartIndex(prefs)
   const today = new Date()
   const [currentYear, setCurrentYear] = useState(today.getFullYear())
   const [currentMonth, setCurrentMonth] = useState(today.getMonth())
 
-  const dayKeys = useMemo(
-    () => ['cal.sun', 'cal.mon', 'cal.tue', 'cal.wed', 'cal.thu', 'cal.fri', 'cal.sat'],
-    [],
-  )
+  const dayKeys = useMemo(() => {
+    const base = ['cal.sun', 'cal.mon', 'cal.tue', 'cal.wed', 'cal.thu', 'cal.fri', 'cal.sat']
+    return [...base.slice(weekStart), ...base.slice(0, weekStart)]
+  }, [weekStart])
 
   const goToPrevMonth = useCallback(() => {
     setCurrentMonth((prev) => {
@@ -92,8 +96,11 @@ export default function CalendarView({ tasks, onUpdateTask, projectId: _projectI
 
     const cells = []
 
+    // Number of leading cells depends on which weekday the grid starts on.
+    const lead = (firstDay - weekStart + 7) % 7
+
     // Fill leading days from previous month
-    for (let i = firstDay - 1; i >= 0; i--) {
+    for (let i = lead - 1; i >= 0; i--) {
       const day = daysInPrevMonth - i
       cells.push({
         date: new Date(prevYear, prevMonth, day),
@@ -126,7 +133,7 @@ export default function CalendarView({ tasks, onUpdateTask, projectId: _projectI
     }
 
     return cells
-  }, [currentYear, currentMonth])
+  }, [currentYear, currentMonth, weekStart])
 
   const handleDragStart = useCallback((e, taskId) => {
     e.dataTransfer.setData('text/plain', String(taskId))

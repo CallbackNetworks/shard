@@ -21,6 +21,7 @@ const mockUseMutation = vi.fn()
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (...args) => mockUseQuery(...args),
   useMutation: (...args) => mockUseMutation(...args),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }))
 
 // Mock api/client
@@ -28,6 +29,7 @@ vi.mock('../../api/client', () => ({
   getSettings: vi.fn(),
   changePassword: vi.fn(),
   setPreference: vi.fn(() => Promise.resolve()),
+  updateSystemSettings: vi.fn(() => Promise.resolve()),
 }))
 
 // Mock ThemeContext
@@ -42,6 +44,8 @@ const mockSettings = {
   auth_enabled: true,
   smtp_configured: true,
   summary_hour: 8,
+  due_soon_window_hours: 24,
+  reminder_cooldown_hours: 23,
   llm_provider: 'claude',
   llm_model: 'claude-sonnet',
   mcp_transport: 'stdio',
@@ -96,9 +100,21 @@ describe('Settings', () => {
     expect(screen.getByText('settings.configured')).toBeTruthy()
   })
 
-  it('shows summary hour value', () => {
+  it('renders the notifications section with an editable summary hour', () => {
     setup()
-    expect(screen.getByText('8:00 UTC')).toBeTruthy()
+    expect(screen.getByText('settings.notifications')).toBeTruthy()
+    expect(screen.getByText('settings.dueSoonWindow')).toBeTruthy()
+    expect(screen.getByText('08:00 UTC')).toBeTruthy()
+  })
+
+  it('renders date/time and list preference sections', () => {
+    setup()
+    expect(screen.getByText('settings.dateTime')).toBeTruthy()
+    expect(screen.getByText('settings.timeFormat')).toBeTruthy()
+    expect(screen.getByText('settings.weekStart')).toBeTruthy()
+    expect(screen.getByText('settings.listsRefresh')).toBeTruthy()
+    expect(screen.getByText('settings.listDensity')).toBeTruthy()
+    expect(screen.getByText('settings.refreshRate')).toBeTruthy()
   })
 
   it('renders the AI assistant section', () => {

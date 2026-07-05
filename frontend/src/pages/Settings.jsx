@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check } from 'lucide-react'
-import { getSettings, changePassword, setPreference } from '../api/client'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock } from 'lucide-react'
+import { getSettings, changePassword, setPreference, updateSystemSettings } from '../api/client'
 import { DARK } from '../constants/theme'
 import { useTheme } from '../context/ThemeContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
 import {
   useUiPrefs, setUiPref, PROJECT_VIEWS, TASK_PRIORITIES,
-  ACCENT_PRESETS, UI_SCALES,
+  ACCENT_PRESETS, UI_SCALES, TIME_FORMATS, WEEK_STARTS, TIMESTAMP_STYLES,
+  LIST_DENSITIES, REFRESH_RATES,
 } from '../utils/uiPrefs'
 
 function StatusBadge({ ok, label }) {
@@ -89,6 +90,7 @@ function Segmented({ options, value, onChange }) {
 export default function Settings() {
   const { t, i18n } = useTranslation()
   const { mode, setMode } = useTheme()
+  const qc = useQueryClient()
 
   const uiPrefs = useUiPrefs()
 
@@ -132,6 +134,11 @@ export default function Settings() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: getSettings,
+  })
+
+  const systemMut = useMutation({
+    mutationFn: updateSystemSettings,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 
   const pwMut = useMutation({
@@ -260,6 +267,57 @@ export default function Settings() {
         </ControlRow>
       </div>
 
+      {/* Date & time display */}
+      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        <SectionTitle
+          icon={<Clock size={16} color="#818cf8" />}
+          title={t('settings.dateTime')}
+        />
+        <ControlRow label={t('settings.timeFormat')} hint={t('settings.timeFormatHint')}>
+          <Segmented
+            value={uiPrefs.timeFormat}
+            onChange={v => persistPref('timeFormat', v)}
+            options={TIME_FORMATS.map(f => ({ value: f, label: t(`settings.timeFormat.${f}`) }))}
+          />
+        </ControlRow>
+        <ControlRow label={t('settings.weekStart')} hint={t('settings.weekStartHint')}>
+          <Segmented
+            value={uiPrefs.weekStart}
+            onChange={v => persistPref('weekStart', v)}
+            options={WEEK_STARTS.map(w => ({ value: w, label: t(`settings.weekStart.${w}`) }))}
+          />
+        </ControlRow>
+        <ControlRow label={t('settings.timestampStyle')} hint={t('settings.timestampStyleHint')}>
+          <Segmented
+            value={uiPrefs.timestampStyle}
+            onChange={v => persistPref('timestampStyle', v)}
+            options={TIMESTAMP_STYLES.map(st => ({ value: st, label: t(`settings.timestampStyle.${st}`) }))}
+          />
+        </ControlRow>
+      </div>
+
+      {/* Lists & live updates */}
+      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        <SectionTitle
+          icon={<SlidersHorizontal size={16} color="#818cf8" />}
+          title={t('settings.listsRefresh')}
+        />
+        <ControlRow label={t('settings.listDensity')} hint={t('settings.listDensityHint')}>
+          <Segmented
+            value={uiPrefs.listDensity}
+            onChange={v => persistPref('listDensity', v)}
+            options={LIST_DENSITIES.map(d => ({ value: d, label: t(`settings.listDensity.${d}`) }))}
+          />
+        </ControlRow>
+        <ControlRow label={t('settings.refreshRate')} hint={t('settings.refreshRateHint')}>
+          <Segmented
+            value={uiPrefs.refreshRate}
+            onChange={v => persistPref('refreshRate', v)}
+            options={REFRESH_RATES.map(r => ({ value: r, label: t(`settings.refreshRate.${r}`) }))}
+          />
+        </ControlRow>
+      </div>
+
       {/* Sidebar modules: show/hide + reorder */}
       <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
         <SectionTitle
@@ -337,9 +395,33 @@ export default function Settings() {
             <InfoRow label={t('settings.email')}>
               <StatusBadge ok={settings.smtp_configured} label={settings.smtp_configured ? t('settings.configured') : t('settings.notConfigured')} />
             </InfoRow>
-            <InfoRow label={t('settings.summaryHour')}>
-              {settings.summary_hour}:00 UTC
-            </InfoRow>
+          </div>
+
+          {/* Notifications & Reminders (backend-persisted) */}
+          <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+            <SectionTitle
+              icon={<Bell size={16} color={DARK.warning} />}
+              title={t('settings.notifications')}
+            />
+            <ControlRow label={t('settings.summaryHour')} hint={t('settings.summaryHourHint')}>
+              <select
+                value={settings.summary_hour}
+                onChange={e => systemMut.mutate({ summary_hour: Number(e.target.value) })}
+                className="kt-input"
+                style={{ width: 'auto', minWidth: 110 }}
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{String(h).padStart(2, '0')}:00 UTC</option>
+                ))}
+              </select>
+            </ControlRow>
+            <ControlRow label={t('settings.dueSoonWindow')} hint={t('settings.dueSoonWindowHint')}>
+              <Segmented
+                value={settings.due_soon_window_hours}
+                onChange={v => systemMut.mutate({ due_soon_window_hours: v })}
+                options={[6, 12, 24, 48].map(h => ({ value: h, label: t('settings.hoursShort', { n: h }) }))}
+              />
+            </ControlRow>
           </div>
 
           {/* AI Assistant */}

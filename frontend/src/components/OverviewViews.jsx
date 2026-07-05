@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { DARK, STATUS_COLOR } from '../constants/theme'
 import { createTask } from '../api/client'
 import { formatMinutes } from '../utils/formatTime'
+import { formatTimestamp } from '../utils/datetime'
 
 export const FONT = '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif'
 export const BG   = '#121212'
@@ -19,18 +20,8 @@ const PARA_L = (px = 14) => `polygon(${px}px 0, 100% 0, 100% 100%, 0 100%)`
 // Full parallelogram (both sides)
 const PARA   = (px = 10) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100%, 0 100%)`
 
-function relativeTime(dateStr) {
-  if (!dateStr) return ''
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(mins / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 30) return `${Math.floor(days / 30)}mo ago`
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (mins > 0) return `${mins}m ago`
-  return 'just now'
-}
+// Preference-aware timestamp (relative vs. absolute, 12/24h). See utils/datetime.
+const relativeTime = formatTimestamp
 
 const PINNED_KEY = 'overview_pinned_projects'
 
