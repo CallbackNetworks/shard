@@ -184,4 +184,20 @@ describe('Settings', () => {
     fireEvent.click(screen.getByText('settings.themeLight'))
     expect(mockSetMode).toHaveBeenCalledWith('light')
   })
+
+  it('renders accent color and interface size controls', () => {
+    setup()
+    expect(screen.getByText('settings.accent')).toBeTruthy()
+    expect(screen.getByText('settings.uiScale')).toBeTruthy()
+    expect(screen.getByLabelText('indigo')).toBeTruthy()
+    expect(screen.getByText('settings.scaleCompact')).toBeTruthy()
+  })
+
+  it('renders the sidebar modules section with nav items', () => {
+    setup()
+    expect(screen.getByText('settings.sidebarModules')).toBeTruthy()
+    expect(screen.getByText('nav.commandCenter')).toBeTruthy()
+    expect(screen.getByText('nav.activity')).toBeTruthy()
+    expect(screen.getByText('nav.settings')).toBeTruthy()
+  })
 })

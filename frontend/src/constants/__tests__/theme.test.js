@@ -9,8 +9,8 @@ describe('theme constants', () => {
     }
   })
 
-  it('BRAND is a hex color', () => {
-    expect(BRAND).toMatch(/^#[0-9a-f]{6}$/i)
+  it('BRAND is a CSS accent var with a hex fallback', () => {
+    expect(BRAND).toMatch(/^var\(--accent, #[0-9a-f]{6}\)$/i)
   })
 
   it('STATUS_COLS has 4 statuses', () => {

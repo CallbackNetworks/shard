@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal } from 'lucide-react'
+import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check } from 'lucide-react'
 import { getSettings, changePassword, setPreference } from '../api/client'
 import { DARK } from '../constants/theme'
 import { useTheme } from '../context/ThemeContext'
-import { getUiPrefs, setUiPref, PROJECT_VIEWS, TASK_PRIORITIES } from '../utils/uiPrefs'
+import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
+import {
+  useUiPrefs, setUiPref, PROJECT_VIEWS, TASK_PRIORITIES,
+  ACCENT_PRESETS, UI_SCALES,
+} from '../utils/uiPrefs'
 
 function StatusBadge({ ok, label }) {
   return (
@@ -86,11 +90,10 @@ export default function Settings() {
   const { t, i18n } = useTranslation()
   const { mode, setMode } = useTheme()
 
-  const [uiPrefs, setUiPrefsState] = useState(() => getUiPrefs())
+  const uiPrefs = useUiPrefs()
 
   const persistPref = (key, value) => {
     const next = setUiPref(key, value)
-    setUiPrefsState(next)
     // Best-effort mirror to backend for cross-device sync.
     setPreference('user-preferences', next).catch(() => {})
   }
@@ -98,6 +101,28 @@ export default function Settings() {
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng)
     setPreference('user-preferences', { ...uiPrefs, language: lng }).catch(() => {})
+  }
+
+  const toggleSidebarItem = (to) => {
+    const hidden = uiPrefs.sidebarHidden.includes(to)
+      ? uiPrefs.sidebarHidden.filter(x => x !== to)
+      : [...uiPrefs.sidebarHidden, to]
+    persistPref('sidebarHidden', hidden)
+  }
+
+  const moveSidebarItem = (groupItems, index, dir) => {
+    const ordered = orderGroupItems(groupItems, uiPrefs.sidebarOrder)
+    const target = index + dir
+    if (target < 0 || target >= ordered.length) return
+    const swapped = [...ordered]
+    ;[swapped[index], swapped[target]] = [swapped[target], swapped[index]]
+    // Rebuild a full flat order across all groups, replacing this group's order.
+    const fullOrder = NAV_GROUPS.flatMap(g =>
+      g.items === groupItems
+        ? swapped.map(it => it.to)
+        : orderGroupItems(g.items, uiPrefs.sidebarOrder).map(it => it.to)
+    )
+    persistPref('sidebarOrder', fullOrder)
   }
 
   const [currentPw, setCurrentPw] = useState('')
@@ -194,6 +219,35 @@ export default function Settings() {
             ))}
           </select>
         </ControlRow>
+        <ControlRow label={t('settings.accent')} hint={t('settings.accentHint')}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {ACCENT_PRESETS.map(a => {
+              const active = uiPrefs.accent === a.key
+              return (
+                <button
+                  key={a.key}
+                  onClick={() => persistPref('accent', a.key)}
+                  aria-label={a.key}
+                  title={a.key}
+                  style={{
+                    width: 24, height: 24, cursor: 'pointer', padding: 0,
+                    background: a.main, border: `2px solid ${active ? DARK.text : 'transparent'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  {active && <Check size={13} color="#000" strokeWidth={3} />}
+                </button>
+              )
+            })}
+          </div>
+        </ControlRow>
+        <ControlRow label={t('settings.uiScale')} hint={t('settings.uiScaleHint')}>
+          <Segmented
+            value={uiPrefs.uiScale}
+            onChange={v => persistPref('uiScale', v)}
+            options={UI_SCALES.map(s => ({ value: s.value, label: t(s.labelKey) }))}
+          />
+        </ControlRow>
         <ControlRow label={t('settings.reduceMotion')} hint={t('settings.reduceMotionHint')}>
           <Segmented
             value={uiPrefs.reduceMotion ? 'on' : 'off'}
@@ -204,6 +258,69 @@ export default function Settings() {
             ]}
           />
         </ControlRow>
+      </div>
+
+      {/* Sidebar modules: show/hide + reorder */}
+      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        <SectionTitle
+          icon={<PanelLeft size={16} color="#818cf8" />}
+          title={t('settings.sidebarModules')}
+        />
+        <p style={{ margin: '0 0 12px', fontSize: 12, color: DARK.textDim }}>
+          {t('settings.sidebarModulesHint')}
+        </p>
+        {NAV_GROUPS.map(group => {
+          const ordered = orderGroupItems(group.items, uiPrefs.sidebarOrder)
+          return (
+            <div key={group.label} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: DARK.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                {group.label}
+              </div>
+              {ordered.map((item, i) => {
+                const isHidden = uiPrefs.sidebarHidden.includes(item.to)
+                const Icon = item.icon
+                return (
+                  <div
+                    key={item.to}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 10px', borderBottom: `1px solid ${DARK.border}`,
+                      opacity: isHidden ? 0.5 : 1,
+                    }}
+                  >
+                    <Icon size={15} color={DARK.textMid} />
+                    <span style={{ flex: 1, fontSize: 13, color: DARK.text }}>{t(item.labelKey)}</span>
+                    <button
+                      onClick={() => moveSidebarItem(group.items, i, -1)}
+                      disabled={i === 0}
+                      aria-label="Move up"
+                      style={{ opacity: i === 0 ? 0.3 : 1, cursor: i === 0 ? 'default' : 'pointer', background: 'none', border: 'none', color: DARK.textMid, padding: 4 }}
+                    >
+                      <ChevronUp size={15} />
+                    </button>
+                    <button
+                      onClick={() => moveSidebarItem(group.items, i, 1)}
+                      disabled={i === ordered.length - 1}
+                      aria-label="Move down"
+                      style={{ opacity: i === ordered.length - 1 ? 0.3 : 1, cursor: i === ordered.length - 1 ? 'default' : 'pointer', background: 'none', border: 'none', color: DARK.textMid, padding: 4 }}
+                    >
+                      <ChevronDown size={15} />
+                    </button>
+                    <button
+                      onClick={() => !item.locked && toggleSidebarItem(item.to)}
+                      disabled={item.locked}
+                      aria-label={isHidden ? 'Show' : 'Hide'}
+                      title={item.locked ? t('settings.moduleLocked') : (isHidden ? t('settings.show') : t('settings.hide'))}
+                      style={{ cursor: item.locked ? 'default' : 'pointer', background: 'none', border: 'none', color: item.locked ? DARK.textDim : (isHidden ? DARK.textDim : DARK.success), padding: 4 }}
+                    >
+                      {isHidden ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
 
       {settings && (

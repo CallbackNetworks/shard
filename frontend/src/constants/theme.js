@@ -1,5 +1,8 @@
-export const BRAND = '#facc15'
-export const BRAND_2 = '#eab308'
+// Accent colors resolve to CSS variables so the user-selected accent (see
+// utils/uiPrefs.js) recolors every inline usage at once. Fallbacks preserve
+// the original amber brand when no accent is applied.
+export const BRAND = 'var(--accent, #facc15)'
+export const BRAND_2 = 'var(--accent-2, #eab308)'
 
 export const STATUS_COLOR = {
   todo: '#737373',

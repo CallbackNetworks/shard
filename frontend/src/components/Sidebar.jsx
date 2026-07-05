@@ -1,52 +1,26 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Activity, BarChart2, ExternalLink, FileText, GitFork, GitMerge, Key, LayoutGrid, MessageCircle, Network, Search, Settings2, Sun, Moon, Target, Users, Zap, ScrollText } from 'lucide-react'
+import { ExternalLink, Search, Sun, Moon } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
-
-const NAV_GROUPS = [
-  {
-    label: 'Operate',
-    items: [
-      { to: '/', icon: LayoutGrid, labelKey: 'nav.commandCenter' },
-      { to: '/structure', icon: Network, labelKey: 'nav.structureMap' },
-      { to: '/activity', icon: Activity, labelKey: 'nav.activity' },
-      { to: '/analytics', icon: BarChart2, labelKey: 'nav.analytics' },
-    ],
-  },
-  {
-    label: 'Think',
-    items: [
-      { to: '/goals', icon: Target, labelKey: 'nav.goals' },
-      { to: '/decisions', icon: GitFork, labelKey: 'nav.decisions' },
-      { to: '/templates', icon: FileText, labelKey: 'nav.templates' },
-      { to: '/assistant', icon: MessageCircle, labelKey: 'nav.assistant' },
-    ],
-  },
-  {
-    label: 'Build',
-    items: [
-      { to: '/integrations', icon: Zap, labelKey: 'nav.integrations' },
-      { to: '/workflow-rules', icon: GitMerge, labelKey: 'nav.workflowRules' },
-      { to: '/webhook-logs', icon: ScrollText, labelKey: 'nav.webhookLogs' },
-      { to: '/api-keys', icon: Key, labelKey: 'nav.apiKeys' },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { to: '/identities', icon: Users, labelKey: 'nav.identities' },
-      { to: '/settings', icon: Settings2, labelKey: 'nav.settings' },
-    ],
-  },
-]
+import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
+import { useUiPrefs } from '../utils/uiPrefs'
 
 export default function Sidebar({ onOpenPalette }) {
   const { mode, toggle: toggleTheme } = useTheme()
   const location = useLocation()
   const { t, i18n } = useTranslation()
+  const prefs = useUiPrefs()
 
   const isActive = (path) =>
     location.pathname === path || location.pathname.startsWith(path + '/')
+
+  const hidden = new Set(prefs.sidebarHidden)
+  const groups = NAV_GROUPS
+    .map(g => ({
+      ...g,
+      items: orderGroupItems(g.items, prefs.sidebarOrder).filter(it => it.locked || !hidden.has(it.to)),
+    }))
+    .filter(g => g.items.length > 0)
 
   return (
     <aside className="kt-sidebar kt-mini-rail" aria-label="Sidebar navigation">
@@ -66,7 +40,7 @@ export default function Sidebar({ onOpenPalette }) {
       </button>
 
       <nav className="kt-mini-nav" aria-label="Rail module groups">
-        {NAV_GROUPS.map(group => (
+        {groups.map(group => (
           <div key={group.label} className="kt-mini-group">
             {group.items.map(({ to, icon: Icon, labelKey }) => (
               <Link
