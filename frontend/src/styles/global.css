@@ -2235,34 +2235,14 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   text-overflow: ellipsis;
 }
 .kt-actheat {
-  position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(52, minmax(0, 1fr));
-  align-items: stretch;
-  gap: 0;
+  display: block;
+  width: 100%;
   min-width: 0;
-  height: 14px;
+  height: 22px;
   align-self: center;
   padding: 0 12px;
   border-right: 1px solid var(--kt-line);
-}
-.kt-actheat-cell {
-  height: 100%;
-  transition: background 0.35s ease, box-shadow 0.35s ease;
-  animation: kineticHit 0.3s cubic-bezier(.2,.8,.2,1) both;
-}
-.kt-actheat-cell[title] {
-  cursor: help;
-}
-.kt-actheat-now {
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  right: 12px;
-  width: 2px;
-  background: var(--kt-hit);
-  box-shadow: 0 0 8px rgba(250,204,21,0.8);
 }
 .kt-heatscale {
   position: relative;

@@ -46,14 +46,32 @@ function formatTimelineTime(value) {
 const ACTIVITY_KINDS = ['task', 'project', 'decision', 'goal', 'webhook', 'alert']
 const ACTIVITY_BUCKETS = 52
 
-// Single warm hue; intensity is carried purely by saturation + brightness so
-// the strip reads as one continuous heat ramp rather than distinct colours.
-function heatColor(t) {
-  if (t <= 0) return 'rgba(255,255,255,0.05)'
-  const c = Math.min(1, t)
-  const sat = 50 + 50 * c
-  const light = 20 + 52 * c
-  return `hsl(42, ${sat}%, ${light}%)`
+// Build smooth SVG paths (line + filled area) from the bucketed intensities.
+// viewBox is 0..100 x 0..24; the SVG stretches to fill via preserveAspectRatio.
+function sparkPaths(cells) {
+  const n = cells.length
+  if (n < 2) return { line: '', area: '' }
+  const W = 100
+  const H = 24
+  const pts = cells.map((c, i) => ({
+    x: (i / (n - 1)) * W,
+    y: H - (0.12 + c.t * 0.8) * H, // keep a small margin off the top/bottom edges
+  }))
+  // Catmull-Rom -> cubic bezier for a smooth curve.
+  let line = `M ${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = pts[i - 1] || pts[i]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2] || p2
+    const c1x = p1.x + (p2.x - p0.x) / 6
+    const c1y = p1.y + (p2.y - p0.y) / 6
+    const c2x = p2.x - (p3.x - p1.x) / 6
+    const c2y = p2.y - (p3.y - p1.y) / 6
+    line += ` C ${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`
+  }
+  const area = `${line} L ${W},${H} L 0,${H} Z`
+  return { line, area }
 }
 
 // Bucket recent activity by time, then lightly smooth it so the strip reads
@@ -134,6 +152,7 @@ export default function GlobalActivityTicker() {
   const tickerItems = activityItems.length > 0 ? activityItems : FALLBACK_ITEMS
   const loopItems = [...tickerItems, ...tickerItems]
   const chart = useMemo(() => buildActivityHeat(activities), [activities])
+  const spark = useMemo(() => sparkPaths(chart.cells), [chart.cells])
 
   return (
     <>
@@ -164,17 +183,35 @@ export default function GlobalActivityTicker() {
           <strong>{chart.total}</strong>
           <em>{`${formatTimelineTime(chart.minTime)} / ${formatTimelineTime(chart.maxTime)}`}</em>
         </div>
-        <div className="kt-actheat" role="img" aria-label={`${chart.total} recent events over time`}>
-          {chart.cells.map((cell, i) => (
-            <span
-              key={i}
-              className="kt-actheat-cell"
-              style={{ background: heatColor(cell.t), boxShadow: cell.t > 0.66 ? `0 0 7px ${heatColor(cell.t)}` : undefined }}
-              title={cell.count ? `${cell.count} events · ${formatTimelineTime(cell.time)}` : undefined}
-            />
-          ))}
-          <em className="kt-actheat-now" aria-hidden="true" />
-        </div>
+        <svg
+          className="kt-actheat"
+          viewBox="0 0 100 24"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`${chart.total} recent events over time`}
+        >
+          <defs>
+            <linearGradient id="ktActArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#facc15" stopOpacity="0.32" />
+              <stop offset="100%" stopColor="#facc15" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="ktActLine" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#facc15" stopOpacity="0.22" />
+              <stop offset="70%" stopColor="#facc15" stopOpacity="0.75" />
+              <stop offset="100%" stopColor="#fde047" stopOpacity="1" />
+            </linearGradient>
+          </defs>
+          <path d={spark.area} fill="url(#ktActArea)" />
+          <path
+            d={spark.line}
+            fill="none"
+            stroke="url(#ktActLine)"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
         <div className="kt-heatscale" aria-label="Activity intensity scale">
           <span>LOW</span>
           <i />
