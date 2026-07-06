@@ -4,7 +4,7 @@
   --kt-surface: #1f1f1f;
   --kt-ink: #ffffff;
   --kt-muted: #9ca3af;
-  --kt-faint: #4b5563;
+  --kt-faint: #6b7280;
   --kt-line: #3a3a3a;
   --kt-hit: var(--accent, #facc15);
   --kt-display: 'Impact', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
@@ -2185,9 +2185,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   grid-template-columns: 96px minmax(0, 1fr) 118px;
   align-items: stretch;
   min-height: 40px;
-  border-top: 1px solid rgba(250,204,21,0.42);
+  border-top: 1px solid var(--kt-line);
   background:
-    linear-gradient(90deg, rgba(250,204,21,0.1), transparent 36%, rgba(255,255,255,0.025)),
+    linear-gradient(90deg, rgba(255,255,255,0.02), transparent 36%, rgba(255,255,255,0.02)),
     rgba(23,23,23,0.97);
   box-shadow: 0 -3px 0 rgba(0,0,0,0.22);
   color: #f3f4f6;
@@ -2445,7 +2445,7 @@ h1 {
   animation: kineticBlink 1.1s steps(1, end) infinite;
 }
 .kt-page-subtitle {
-  color: #6b7280;
+  color: #868e9c;
   font-size: 12px;
   margin-top: 4px;
 }

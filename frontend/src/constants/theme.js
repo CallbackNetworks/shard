@@ -30,7 +30,7 @@ export const DARK = {
   overlay:   '#303030',
   text:      '#ffffff',
   textMid:   '#9ca3af',
-  textDim:   '#4b5563',
+  textDim:   '#6b7280',
   textFaint: 'rgba(255,255,255,0.15)',
   border:    '#3a3a3a',
   borderMid: '#525252',
