@@ -755,5 +755,13 @@
   "focus.focusOn": "聚焦於 {{name}}",
   "focus.clear": "退出聚焦",
   "focus.focusedOn": "聚焦中：{{name}}",
-  "focus.empty": "這個身分還沒有專案"
+  "focus.empty": "這個身分還沒有專案",
+  "analytics.calibration": "估時校準",
+  "analytics.calibrationSummary": "平均實際花費是預估的 {{ratio}} 倍 — {{within}}% 的任務落在 ±20% 內",
+  "analytics.calibrationEmpty": "完成同時填有預估時間與實際計時的任務後，就能看到你的估時準確度",
+  "analytics.calibrationSample": "已測量 {{count}} 個完成任務",
+  "analytics.calibrationUnder": "低估",
+  "analytics.calibrationOver": "高估",
+  "analytics.calibrationOnTarget": "準確",
+  "analytics.calibrationAxis": "實際 / 預估"
 }

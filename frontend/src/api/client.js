@@ -259,6 +259,7 @@ export const getAnalyticsHeatmap = (params = {}) => api.get('/analytics/heatmap'
 export const getAnalyticsBurndown = (cycleId) => api.get('/analytics/burndown', { params: { cycle_id: cycleId } }).then(r => r.data)
 export const getAnalyticsVelocity = (projectId) => api.get('/analytics/velocity', { params: { project_id: projectId } }).then(r => r.data)
 export const getAnalyticsStatusTrend = (projectId, days) => api.get('/analytics/status-trend', { params: { project_id: projectId, days } }).then(r => r.data)
+export const getEstimationCalibration = (params = {}) => api.get('/analytics/estimation-calibration', { params }).then(r => r.data)
 
 // Share (public, no auth — uses plain axios to avoid the auth interceptor)
 export const getShareData = (token, scope = 'identity') =>

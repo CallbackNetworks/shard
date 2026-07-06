@@ -755,5 +755,13 @@
   "focus.focusOn": "Focus on {{name}}",
   "focus.clear": "Exit focus",
   "focus.focusedOn": "Focused: {{name}}",
-  "focus.empty": "No projects for this persona yet"
+  "focus.empty": "No projects for this persona yet",
+  "analytics.calibration": "Estimation Calibration",
+  "analytics.calibrationSummary": "On average you spend {{ratio}}x your estimate — {{within}}% of tasks land within ±20%",
+  "analytics.calibrationEmpty": "Complete tasks with both a time estimate and tracked time to see how well you estimate",
+  "analytics.calibrationSample": "{{count}} completed tasks measured",
+  "analytics.calibrationUnder": "underestimated",
+  "analytics.calibrationOver": "overestimated",
+  "analytics.calibrationOnTarget": "on target",
+  "analytics.calibrationAxis": "actual / estimated"
 }

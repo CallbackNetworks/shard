@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart2, TrendingUp, Activity, Flame, Download } from 'lucide-react'
-import { getProjects, getCycles, getAnalyticsOverview, getAnalyticsHeatmap, getAnalyticsBurndown, getAnalyticsVelocity, getAnalyticsStatusTrend } from '../api/client'
+import { BarChart2, TrendingUp, Activity, Flame, Download, Crosshair } from 'lucide-react'
+import { getProjects, getCycles, getAnalyticsOverview, getAnalyticsHeatmap, getAnalyticsBurndown, getAnalyticsVelocity, getAnalyticsStatusTrend, getEstimationCalibration } from '../api/client'
 import { BRAND, STATUS_COLOR } from '../constants/theme'
 
 const STATUS_COLORS = STATUS_COLOR
@@ -388,6 +388,64 @@ function Section({ title, icon, children, delay, summary, actions }) {
   )
 }
 
+// ——— Estimation calibration ———
+function ratioColor(ratio) {
+  if (ratio == null) return 'rgba(255,255,255,0.15)'
+  if (ratio > 1.2) return STATUS_COLOR.failed
+  if (ratio < 0.8) return STATUS_COLOR.in_progress
+  return STATUS_COLOR.done
+}
+
+function CalibrationChart({ data }) {
+  const { t } = useTranslation()
+
+  if (!data || data.sample_size === 0) {
+    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.calibrationEmpty')}</div>
+  }
+
+  const buckets = data.buckets.filter(b => b.count > 0)
+  const maxRatio = Math.max(2, ...buckets.map(b => b.avg_ratio || 0))
+  const W = 560
+  const labelW = 64
+  const countW = 40
+  const barMax = W - labelW - countW - 60
+  const rowH = 26
+
+  const scale = (ratio) => (ratio / maxRatio) * barMax
+  const refX = labelW + scale(1)
+
+  return (
+    <div>
+      <svg width="100%" height={buckets.length * rowH + 26} viewBox={`0 0 ${W} ${buckets.length * rowH + 26}`} style={{ maxWidth: W }}>
+        {/* reference line at ratio 1.0 (perfect estimate) */}
+        <line x1={refX} y1={0} x2={refX} y2={buckets.length * rowH} stroke="rgba(255,255,255,0.25)" strokeDasharray="3 3" />
+        <text x={refX} y={buckets.length * rowH + 14} fontSize={10} fill="rgba(255,255,255,0.3)" textAnchor="middle">1.0×</text>
+        <text x={W} y={buckets.length * rowH + 14} fontSize={10} fill="rgba(255,255,255,0.2)" textAnchor="end">{t('analytics.calibrationAxis')}</text>
+
+        {buckets.map((b, i) => {
+          const y = i * rowH
+          const color = ratioColor(b.avg_ratio)
+          return (
+            <g key={b.label}>
+              <text x={labelW - 8} y={y + rowH / 2 + 4} fontSize={11} fill="rgba(255,255,255,0.5)" textAnchor="end">{b.label}</text>
+              <rect x={labelW} y={y + 6} width={scale(b.avg_ratio)} height={rowH - 12} rx={3} fill={color} opacity={0.75} />
+              <text x={labelW + scale(b.avg_ratio) + 6} y={y + rowH / 2 + 4} fontSize={11} fill={color} fontWeight={700}>
+                {b.avg_ratio}×
+              </text>
+              <text x={W} y={y + rowH / 2 + 4} fontSize={10} fill="rgba(255,255,255,0.25)" textAnchor="end">n={b.count}</text>
+            </g>
+          )
+        })}
+      </svg>
+      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+        <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: STATUS_COLOR.failed, marginRight: 5 }} />{data.underestimated} {t('analytics.calibrationUnder')}</span>
+        <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: STATUS_COLOR.done, marginRight: 5 }} />{data.sample_size - data.underestimated - data.overestimated} {t('analytics.calibrationOnTarget')}</span>
+        <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: STATUS_COLOR.in_progress, marginRight: 5 }} />{data.overestimated} {t('analytics.calibrationOver')}</span>
+      </div>
+    </div>
+  )
+}
+
 function ExportButton({ onClick, label }) {
   return (
     <button
@@ -433,6 +491,7 @@ export default function Analytics() {
   const { data: burndown = [] } = useQuery({ queryKey: ['analytics-burndown', selectedCycleId], queryFn: () => getAnalyticsBurndown(selectedCycleId), enabled: !!selectedCycleId, staleTime: 30000 })
   const { data: velocity = [] } = useQuery({ queryKey: ['analytics-velocity', selectedProjectId], queryFn: () => getAnalyticsVelocity(selectedProjectId), enabled: !!selectedProjectId, staleTime: 30000 })
   const { data: trend = [] } = useQuery({ queryKey: ['analytics-trend', selectedProjectId, trendDays], queryFn: () => getAnalyticsStatusTrend(selectedProjectId || undefined, trendDays), staleTime: 30000 })
+  const { data: calibration } = useQuery({ queryKey: ['analytics-calibration', selectedProjectId], queryFn: () => getEstimationCalibration(selectedProjectId ? { project_id: selectedProjectId } : {}), staleTime: 60000 })
 
   const exportHeatmap = useCallback(() => {
     if (heatmap.length === 0) return
@@ -567,6 +626,18 @@ export default function Analytics() {
         >
           <StatusTrendChart data={trend} />
         </Section>
+
+        {/* Estimation calibration */}
+        {(() => {
+          const calibrationSummary = calibration && calibration.sample_size > 0
+            ? `${t('analytics.calibrationSummary', { ratio: calibration.overall_ratio, within: calibration.within_20_pct })} · ${t('analytics.calibrationSample', { count: calibration.sample_size })}`
+            : null
+          return (
+            <Section title={t('analytics.calibration')} icon={<Crosshair size={13}/>} delay={0.37} summary={calibrationSummary}>
+              <CalibrationChart data={calibration} />
+            </Section>
+          )
+        })()}
       </div>
     </div>
   )

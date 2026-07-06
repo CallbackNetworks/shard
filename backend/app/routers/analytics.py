@@ -214,6 +214,89 @@ def reset_usage():
     return {"status": "cleared"}
 
 
+ESTIMATE_BUCKETS = [
+    ("<=30m", 0, 30),
+    ("31-60m", 31, 60),
+    ("1-2h", 61, 120),
+    ("2-4h", 121, 240),
+    (">4h", 241, None),
+]
+
+
+@router.get("/estimation-calibration")
+def get_estimation_calibration(
+    project_id: str | None = None,
+    limit: int = Query(500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    """Compare time_estimate vs time_spent on completed tasks.
+
+    Returns overall calibration (spent/estimate ratio) plus accuracy grouped
+    by estimate size, so systematic under/over-estimation becomes visible.
+    """
+    q = db.query(Task).filter(
+        Task.status == "done",
+        Task.time_estimate.isnot(None),
+        Task.time_estimate > 0,
+        Task.time_spent.isnot(None),
+        Task.time_spent > 0,
+    )
+    if project_id:
+        q = q.filter(Task.project_id == project_id)
+    tasks = q.order_by(Task.updated_at.desc()).limit(limit).all()
+
+    if not tasks:
+        return {
+            "sample_size": 0,
+            "overall_ratio": None,
+            "median_ratio": None,
+            "within_20_pct": None,
+            "underestimated": 0,
+            "overestimated": 0,
+            "buckets": [],
+            "recent_tasks": [],
+        }
+
+    ratios = sorted(t.time_spent / t.time_estimate for t in tasks)
+    n = len(ratios)
+    median_ratio = ratios[n // 2] if n % 2 == 1 else (ratios[n // 2 - 1] + ratios[n // 2]) / 2
+    total_estimate = sum(t.time_estimate for t in tasks)
+    total_spent = sum(t.time_spent for t in tasks)
+    within = sum(1 for r in ratios if 0.8 <= r <= 1.2)
+
+    buckets = []
+    for label, low, high in ESTIMATE_BUCKETS:
+        bucket_tasks = [t for t in tasks if t.time_estimate >= low and (high is None or t.time_estimate <= high)]
+        if not bucket_tasks:
+            buckets.append({"label": label, "count": 0, "avg_ratio": None})
+            continue
+        bucket_ratio = sum(t.time_spent for t in bucket_tasks) / sum(t.time_estimate for t in bucket_tasks)
+        buckets.append({"label": label, "count": len(bucket_tasks), "avg_ratio": round(bucket_ratio, 2)})
+
+    recent = [
+        {
+            "id": t.id,
+            "title": t.title,
+            "project_id": t.project_id,
+            "time_estimate": t.time_estimate,
+            "time_spent": t.time_spent,
+            "ratio": round(t.time_spent / t.time_estimate, 2),
+        }
+        for t in tasks[:20]
+    ]
+
+    return {
+        "sample_size": n,
+        "overall_ratio": round(total_spent / total_estimate, 2),
+        "median_ratio": round(median_ratio, 2),
+        "within_20_pct": round(within / n * 100),
+        "underestimated": sum(1 for r in ratios if r > 1.2),
+        "overestimated": sum(1 for r in ratios if r < 0.8),
+        "buckets": buckets,
+        "recent_tasks": recent,
+    }
+
+
 @router.get("/status-trend")
 def get_status_trend(
     project_id: str | None = None,

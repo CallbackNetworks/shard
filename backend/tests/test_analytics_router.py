@@ -169,3 +169,84 @@ def test_status_trend_filter_project(client, db, sample_project):
     last = data[-1]
     assert last["todo"] == 1
     assert last["done"] == 0  # Other project's task excluded
+
+
+def test_estimation_calibration_empty(client):
+    resp = client.get("/analytics/estimation-calibration")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sample_size"] == 0
+    assert data["overall_ratio"] is None
+    assert data["buckets"] == []
+    assert data["recent_tasks"] == []
+
+
+def test_estimation_calibration_ignores_incomplete_data(client, db, sample_project):
+    tasks = [
+        # Not done -> excluded
+        Task(project_id=sample_project.id, title="Open", status="in_progress", time_estimate=60, time_spent=60),
+        # Missing spent -> excluded
+        Task(project_id=sample_project.id, title="No spent", status="done", time_estimate=60),
+        # Missing estimate -> excluded
+        Task(project_id=sample_project.id, title="No estimate", status="done", time_spent=60),
+    ]
+    db.add_all(tasks)
+    db.commit()
+
+    resp = client.get("/analytics/estimation-calibration")
+    assert resp.status_code == 200
+    assert resp.json()["sample_size"] == 0
+
+
+def test_estimation_calibration_with_data(client, db, sample_project):
+    tasks = [
+        # 30m estimated, 60m spent -> ratio 2.0, bucket <=30m
+        Task(project_id=sample_project.id, title="Small", status="done", time_estimate=30, time_spent=60),
+        # 60m estimated, 60m spent -> ratio 1.0, bucket 31-60m
+        Task(project_id=sample_project.id, title="Exact", status="done", time_estimate=60, time_spent=60),
+        # 120m estimated, 60m spent -> ratio 0.5, bucket 1-2h
+        Task(project_id=sample_project.id, title="Padded", status="done", time_estimate=120, time_spent=60),
+    ]
+    db.add_all(tasks)
+    db.commit()
+
+    resp = client.get("/analytics/estimation-calibration")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sample_size"] == 3
+    # 180 spent / 210 estimated
+    assert data["overall_ratio"] == round(180 / 210, 2)
+    assert data["median_ratio"] == 1.0
+    assert data["within_20_pct"] == 33
+    assert data["underestimated"] == 1
+    assert data["overestimated"] == 1
+
+    buckets = {b["label"]: b for b in data["buckets"]}
+    assert buckets["<=30m"]["count"] == 1
+    assert buckets["<=30m"]["avg_ratio"] == 2.0
+    assert buckets["31-60m"]["avg_ratio"] == 1.0
+    assert buckets["1-2h"]["avg_ratio"] == 0.5
+    assert buckets[">4h"]["count"] == 0
+    assert buckets[">4h"]["avg_ratio"] is None
+
+    assert len(data["recent_tasks"]) == 3
+    assert {t["title"] for t in data["recent_tasks"]} == {"Small", "Exact", "Padded"}
+
+
+def test_estimation_calibration_project_filter(client, db, sample_project):
+    other = Project(name="Other project")
+    db.add(other)
+    db.flush()
+    db.add_all(
+        [
+            Task(project_id=sample_project.id, title="Mine", status="done", time_estimate=60, time_spent=90),
+            Task(project_id=other.id, title="Theirs", status="done", time_estimate=60, time_spent=30),
+        ]
+    )
+    db.commit()
+
+    resp = client.get(f"/analytics/estimation-calibration?project_id={sample_project.id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sample_size"] == 1
+    assert data["recent_tasks"][0]["title"] == "Mine"
