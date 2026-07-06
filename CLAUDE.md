@@ -171,7 +171,7 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. Legacy `ALTER TABL
 
 ## Frontend architecture (`frontend/src/`)
 
-**Styling**: dark theme, all inline styles (no CSS modules or Tailwind). Background `#07080f`, sidebar `#03040a`. Brand color `#818cf8` (indigo). Animations defined in `GLOBAL_CSS` string in `App.jsx`.
+**Styling** (see ADR-0012): dark theme, no Tailwind or CSS-in-JS. Three layers: `src/styles/global.css` (tokens, keyframes, shared utilities), co-located CSS Modules (`Component.module.css`, imported as `s`) for component-scoped static styles, and inline `style={{...}}` only for dynamic values or legacy code. When significantly editing a component, migrate its static inline styles to a CSS Module. Background `#07080f`, sidebar `#03040a`. Brand color `#818cf8` (indigo).
 
 **State management**: React Query for all server state. Query keys: `['projects']`, `['project', projectId]`, `['integrations']`, `['deliveries', integrationId]`, `['workflow-rules']`, `['assistant-conversations']`, `['assistant-conv', convId]`. Mutations call `qc.invalidateQueries()` on success.
 
