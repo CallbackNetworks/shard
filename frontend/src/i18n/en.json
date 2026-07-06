@@ -763,5 +763,16 @@
   "analytics.calibrationUnder": "underestimated",
   "analytics.calibrationOver": "overestimated",
   "analytics.calibrationOnTarget": "on target",
-  "analytics.calibrationAxis": "actual / estimated"
+  "analytics.calibrationAxis": "actual / estimated",
+  "settings.backup": "Backup",
+  "settings.backupAuto": "Automatic daily backup",
+  "settings.backupAutoHint": "Write a full backup archive to the data directory every day",
+  "settings.backupHour": "Backup hour",
+  "settings.backupHourHint": "Hour (UTC) when the daily backup runs",
+  "settings.backupKeep": "Archives to keep",
+  "settings.backupKeepHint": "Older archives are deleted automatically",
+  "settings.backupNow": "Back up now",
+  "settings.backupDownload": "Download",
+  "settings.backupExisting": "Stored archives",
+  "settings.backupNone": "No server-side backups yet"
 }

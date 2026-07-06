@@ -30,6 +30,10 @@ vi.mock('../../api/client', () => ({
   changePassword: vi.fn(),
   setPreference: vi.fn(() => Promise.resolve()),
   updateSystemSettings: vi.fn(() => Promise.resolve()),
+  getBackupStatus: vi.fn(() => Promise.resolve({ backups: [] })),
+  runBackup: vi.fn(() => Promise.resolve({})),
+  exportBackup: vi.fn(() => Promise.resolve({ data: new Blob(), headers: {} })),
+  downloadBackupFile: vi.fn(() => Promise.resolve({ data: new Blob(), headers: {} })),
 }))
 
 // Mock ThemeContext
@@ -104,7 +108,15 @@ describe('Settings', () => {
     setup()
     expect(screen.getByText('settings.notifications')).toBeTruthy()
     expect(screen.getByText('settings.dueSoonWindow')).toBeTruthy()
-    expect(screen.getByText('08:00 UTC')).toBeTruthy()
+    // Both the summary-hour and backup-hour selects list every hour
+    expect(screen.getAllByText('08:00 UTC').length).toBeGreaterThan(0)
+  })
+
+  it('renders the backup section with controls', () => {
+    setup()
+    expect(screen.getByText('settings.backup')).toBeTruthy()
+    expect(screen.getByText('settings.backupAuto')).toBeTruthy()
+    expect(screen.getByText('settings.backupNow')).toBeTruthy()
   })
 
   it('renders date/time and list preference sections', () => {

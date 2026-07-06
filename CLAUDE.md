@@ -59,6 +59,10 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up
 | `LLM_API_KEY` | API key for the chosen LLM provider |
 | `LLM_MODEL` | Model name (e.g. `claude-sonnet-4-6` for Claude, `gpt-4o` for OpenAI) |
 | `SUMMARY_HOUR` | Hour (UTC) to send daily summary email (default `8`) |
+| `BACKUP_ENABLED` | Automatic daily backup on/off (default `1`; runtime-adjustable) |
+| `BACKUP_HOUR` | Hour (UTC) for the daily backup (default `3`; runtime-adjustable) |
+| `BACKUP_KEEP` | How many backup archives to retain (default `7`; runtime-adjustable) |
+| `BACKUP_DIR` | Where backup archives are written (default `/app/data/backups`) |
 | `AGENT_CONTEXT_INSTRUCTIONS` | Global instructions for AI agents (shown in `/api/v1/agent-context`) |
 | `MCP_API_KEY` | API key for MCP server to authenticate with backend |
 | `MCP_TRANSPORT` | `stdio` (default) or `http` for remote access |

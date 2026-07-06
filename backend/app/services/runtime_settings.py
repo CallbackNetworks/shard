@@ -29,6 +29,9 @@ def _defaults() -> dict[str, int]:
         "summary_hour": _env_int("SUMMARY_HOUR", 8),
         "due_soon_window_hours": _env_int("DUE_SOON_WINDOW_HOURS", 24),
         "reminder_cooldown_hours": _env_int("REMINDER_COOLDOWN_HOURS", 23),
+        "backup_enabled": _env_int("BACKUP_ENABLED", 1),
+        "backup_hour": _env_int("BACKUP_HOUR", 3),
+        "backup_keep": _env_int("BACKUP_KEEP", 7),
     }
 
 
@@ -37,6 +40,9 @@ FIELD_BOUNDS: dict[str, tuple[int, int]] = {
     "summary_hour": (0, 23),
     "due_soon_window_hours": (1, 336),  # up to 14 days
     "reminder_cooldown_hours": (1, 168),  # up to 7 days
+    "backup_enabled": (0, 1),
+    "backup_hour": (0, 23),
+    "backup_keep": (1, 90),
 }
 
 

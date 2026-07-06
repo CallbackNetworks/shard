@@ -50,6 +50,9 @@ class TestRuntimeSettingsService:
             "summary_hour": 8,
             "due_soon_window_hours": 24,
             "reminder_cooldown_hours": 23,
+            "backup_enabled": 1,
+            "backup_hour": 3,
+            "backup_keep": 7,
         }
 
     def test_ignores_unknown_keys(self, db):

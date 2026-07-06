@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock } from 'lucide-react'
-import { getSettings, changePassword, setPreference, updateSystemSettings } from '../api/client'
+import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, DatabaseBackup, Download } from 'lucide-react'
+import { getSettings, changePassword, setPreference, updateSystemSettings, getBackupStatus, runBackup, exportBackup, downloadBackupFile } from '../api/client'
 import { DARK } from '../constants/theme'
 import { useTheme } from '../context/ThemeContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
@@ -11,6 +11,23 @@ import {
   ACCENT_PRESETS, UI_SCALES, TIME_FORMATS, WEEK_STARTS, TIMESTAMP_STYLES,
   LIST_DENSITIES, REFRESH_RATES,
 } from '../utils/uiPrefs'
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function saveBlob(response, fallbackName) {
+  const disposition = response.headers?.['content-disposition'] || ''
+  const match = disposition.match(/filename="?([^";]+)"?/)
+  const url = URL.createObjectURL(response.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = match?.[1] || fallbackName
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 function StatusBadge({ ok, label }) {
   return (
@@ -140,6 +157,27 @@ export default function Settings() {
     mutationFn: updateSystemSettings,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
+
+  const { data: backupStatus } = useQuery({
+    queryKey: ['backup-status'],
+    queryFn: getBackupStatus,
+    staleTime: 30000,
+  })
+
+  const backupMut = useMutation({
+    mutationFn: runBackup,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['backup-status'] }),
+  })
+
+  const [exporting, setExporting] = useState(false)
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      saveBlob(await exportBackup(), 'shard-backup.zip')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const pwMut = useMutation({
     mutationFn: () => changePassword({ current_password: currentPw, new_password: newPw }),
@@ -423,6 +461,81 @@ export default function Settings() {
                 options={[6, 12, 24, 48].map(h => ({ value: h, label: t('settings.hoursShort', { n: h }) }))}
               />
             </ControlRow>
+          </div>
+
+          {/* Backup */}
+          <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+            <SectionTitle
+              icon={<DatabaseBackup size={16} color={DARK.info} />}
+              title={t('settings.backup')}
+            />
+            <ControlRow label={t('settings.backupAuto')} hint={t('settings.backupAutoHint')}>
+              <Segmented
+                value={settings.backup_enabled ? 'on' : 'off'}
+                onChange={v => systemMut.mutate({ backup_enabled: v === 'on' ? 1 : 0 })}
+                options={[
+                  { value: 'off', label: t('settings.off') },
+                  { value: 'on', label: t('settings.on') },
+                ]}
+              />
+            </ControlRow>
+            <ControlRow label={t('settings.backupHour')} hint={t('settings.backupHourHint')}>
+              <select
+                value={settings.backup_hour}
+                onChange={e => systemMut.mutate({ backup_hour: Number(e.target.value) })}
+                className="kt-input"
+                style={{ width: 'auto', minWidth: 110 }}
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{String(h).padStart(2, '0')}:00 UTC</option>
+                ))}
+              </select>
+            </ControlRow>
+            <ControlRow label={t('settings.backupKeep')} hint={t('settings.backupKeepHint')}>
+              <Segmented
+                value={settings.backup_keep}
+                onChange={v => systemMut.mutate({ backup_keep: v })}
+                options={[3, 7, 14, 30].map(n => ({ value: n, label: String(n) }))}
+              />
+            </ControlRow>
+            <div style={{ display: 'flex', gap: 10, margin: '14px 0' }}>
+              <button
+                onClick={() => backupMut.mutate()}
+                disabled={backupMut.isPending}
+                className="kt-btn kt-btn-primary"
+              >
+                {backupMut.isPending ? t('loading') : t('settings.backupNow')}
+              </button>
+              <button onClick={handleExport} disabled={exporting} className="kt-btn">
+                <Download size={12} /> {exporting ? t('loading') : t('settings.backupDownload')}
+              </button>
+            </div>
+            {backupStatus?.backups?.length > 0 ? (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: DARK.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+                  {t('settings.backupExisting')}
+                </div>
+                {backupStatus.backups.map(b => (
+                  <div key={b.filename} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '7px 0', borderBottom: `1px solid ${DARK.border}`, fontSize: 12,
+                  }}>
+                    <code style={{ flex: 1, color: DARK.textMid }}>{b.filename}</code>
+                    <span style={{ color: DARK.textDim }}>{formatBytes(b.size_bytes)}</span>
+                    <button
+                      onClick={async () => saveBlob(await downloadBackupFile(b.filename), b.filename)}
+                      aria-label={t('settings.backupDownload')}
+                      title={t('settings.backupDownload')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 4 }}
+                    >
+                      <Download size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: DARK.textDim }}>{t('settings.backupNone')}</div>
+            )}
           </div>
 
           {/* AI Assistant */}

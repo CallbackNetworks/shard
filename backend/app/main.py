@@ -18,6 +18,7 @@ from app.routers import (
     api_keys,
     assistant,
     attachments,
+    backup,
     bulk,
     cicd,
     comments,
@@ -184,6 +185,7 @@ app.include_router(goals.router)
 app.include_router(bulk.router)
 app.include_router(imports.router)
 app.include_router(settings.router)
+app.include_router(backup.router)
 app.include_router(ws_router.router)
 
 

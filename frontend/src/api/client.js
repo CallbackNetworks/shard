@@ -253,6 +253,12 @@ export const getDashboardWidgets = () => api.get('/settings/dashboard-widgets').
 export const getPreference = (key) => api.get(`/settings/preferences/${key}`).then(r => r.data)
 export const setPreference = (key, value) => api.put(`/settings/preferences/${key}`, { value }).then(r => r.data)
 
+// Backup
+export const getBackupStatus = () => api.get('/backup/status').then(r => r.data)
+export const runBackup = () => api.post('/backup/run').then(r => r.data)
+export const exportBackup = () => api.get('/backup/export', { responseType: 'blob' })
+export const downloadBackupFile = (filename) => api.get(`/backup/download/${filename}`, { responseType: 'blob' })
+
 // Analytics
 export const getAnalyticsOverview = () => api.get('/analytics/overview').then(r => r.data)
 export const getAnalyticsHeatmap = (params = {}) => api.get('/analytics/heatmap', { params }).then(r => r.data)

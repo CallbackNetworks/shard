@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, WebhookDelivery
+from app.services import backup as backup_service
 from app.services import email_sender
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications, retry_delivery
@@ -148,7 +149,24 @@ async def _retry_failed_webhooks(db: Session) -> None:
 
 DIGEST_DAY = int(os.getenv("DIGEST_DAY", "1"))  # Day of week for weekly digest (0=Mon, 6=Sun), default Monday
 _last_summary_date: str | None = None
+_last_backup_date: str | None = None
 _last_weekly_digest_date: str | None = None
+
+
+async def _run_daily_backup(db: Session) -> None:
+    """Write a full backup archive once per day at/after the configured hour."""
+    global _last_backup_date
+    now = datetime.utcnow()
+    today_str = now.strftime("%Y-%m-%d")
+    settings = get_system_settings(db)
+    if not settings["backup_enabled"] or _last_backup_date == today_str or now.hour < settings["backup_hour"]:
+        return
+    _last_backup_date = today_str
+    try:
+        backup_service.write_backup(db)
+        backup_service.prune_backups(settings["backup_keep"])
+    except Exception as exc:
+        logger.error("Daily backup failed: %s", exc)
 
 
 async def _send_daily_summary(db: Session) -> None:
@@ -486,6 +504,7 @@ async def due_date_reminder_loop() -> None:
             await _send_daily_summary(db)
             await _send_weekly_digest(db)
             await _check_sla_aging(db)
+            await _run_daily_backup(db)
         except Exception as exc:
             logger.error("Scheduler error: %s", exc)
         finally:

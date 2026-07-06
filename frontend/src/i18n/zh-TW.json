@@ -763,5 +763,16 @@
   "analytics.calibrationUnder": "低估",
   "analytics.calibrationOver": "高估",
   "analytics.calibrationOnTarget": "準確",
-  "analytics.calibrationAxis": "實際 / 預估"
+  "analytics.calibrationAxis": "實際 / 預估",
+  "settings.backup": "備份",
+  "settings.backupAuto": "每日自動備份",
+  "settings.backupAutoHint": "每天將完整備份壓縮檔寫入資料目錄",
+  "settings.backupHour": "備份時間",
+  "settings.backupHourHint": "每日備份執行的時間（UTC）",
+  "settings.backupKeep": "保留份數",
+  "settings.backupKeepHint": "超過份數的舊備份會自動刪除",
+  "settings.backupNow": "立即備份",
+  "settings.backupDownload": "下載",
+  "settings.backupExisting": "已儲存的備份",
+  "settings.backupNone": "尚無伺服器端備份"
 }

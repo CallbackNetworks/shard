@@ -40,6 +40,9 @@ class SystemSettingsUpdate(BaseModel):
     summary_hour: int | None = None
     due_soon_window_hours: int | None = None
     reminder_cooldown_hours: int | None = None
+    backup_enabled: int | None = None
+    backup_hour: int | None = None
+    backup_keep: int | None = None
 
 
 @router.put("/system")
