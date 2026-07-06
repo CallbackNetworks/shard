@@ -326,54 +326,58 @@ export default function Identities() {
                   <span className="kt-badge" style={{ color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)' }}>
                     {identity.project_count} project{identity.project_count !== 1 ? 's' : ''}
                   </span>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 4 }}>
                     <a href={`/?identity=${identity.id}`} target="_blank" rel="noreferrer"
-                      className="kt-btn" style={{ fontSize: 13, textDecoration: 'none', color: DARK.text }}>
-                      <ExternalLink size={13} /> {t('identities.overview')}
+                      title={t('identities.overview')} aria-label={t('identities.overview')}
+                      className="kt-btn" style={{ padding: '6px 8px', textDecoration: 'none', color: DARK.text }}>
+                      <ExternalLink size={13} />
                     </a>
                     {identity.share_token && (
                       <>
                         <button
                           onClick={() => copyShareLink(identity)}
-                          title="Copy guest share link"
+                          title={t('identities.share')} aria-label={t('identities.share')}
                           style={{
                             background: copiedId === identity.id ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)',
-                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
+                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                             color: copiedId === identity.id ? DARK.success : DARK.text,
                           }}>
                           {copiedId === identity.id ? <Check size={13} /> : <Share2 size={13} />}
-                          {copiedId === identity.id ? t('copied') : t('identities.share')}
                         </button>
                         <button
                           onClick={() => { if (confirm('Revoke current share link and generate a new one?')) rotateMut.mutate(identity.id) }}
-                          title="Revoke share link"
+                          title="Revoke share link" aria-label="Revoke share link"
                           className="kt-btn" style={{ padding: '6px 8px', color: 'rgba(255,255,255,0.4)' }}>
                           <RefreshCw size={13} />
                         </button>
                       </>
                     )}
                     <button onClick={() => setSettingsId(settingsId === identity.id ? null : identity.id)}
+                      title={t('identities.settings')} aria-label={t('identities.settings')}
                       style={{
                         background: settingsId === identity.id ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
+                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                         color: settingsId === identity.id ? BRAND : DARK.text,
                       }}>
-                      <Shield size={13} /> {t('identities.settings')}
+                      <Shield size={13} />
                     </button>
                     <button onClick={() => setLinkingId(isLinking ? null : identity.id)}
+                      title={t('identities.projects')} aria-label={t('identities.projects')}
                       style={{
                         background: isLinking ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 10px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
+                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                         color: isLinking ? BRAND : DARK.text,
                       }}>
-                      <Link2 size={13} /> {t('identities.projects')}
+                      <Link2 size={13} />
                     </button>
                     <button onClick={() => setEditingId(identity.id)}
-                      className="kt-btn" style={{ padding: '6px 10px', color: DARK.text }}>
+                      title={t('edit')} aria-label={t('edit')}
+                      className="kt-btn" style={{ padding: '6px 8px', color: DARK.text }}>
                       <Edit3 size={13} />
                     </button>
                     <button onClick={() => { if (confirm(`Delete identity "${identity.name}"?`)) deleteMut.mutate(identity.id) }}
-                      className="kt-btn" style={{ background: 'none', border: '1px solid rgba(250,204,21,0.4)', color: '#facc15', padding: '6px 10px' }}>
+                      title={t('delete')} aria-label={t('delete')}
+                      className="kt-btn" style={{ background: 'none', border: '1px solid rgba(250,204,21,0.4)', color: '#facc15', padding: '6px 8px' }}>
                       <Trash2 size={13} />
                     </button>
                   </div>
