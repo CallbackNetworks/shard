@@ -750,5 +750,10 @@
   "structure.legend.signal": "訊號",
   "structure.legend.dependency": "依賴",
   "structure.linkedProjects": "關聯專案",
-  "structure.graphLabel": "階層。使用方向鍵平移，加號和減號縮放，0 重置。"
+  "structure.graphLabel": "階層。使用方向鍵平移，加號和減號縮放，0 重置。",
+  "focus.title": "聚焦",
+  "focus.focusOn": "聚焦於 {{name}}",
+  "focus.clear": "退出聚焦",
+  "focus.focusedOn": "聚焦中：{{name}}",
+  "focus.empty": "這個身分還沒有專案"
 }

@@ -11,6 +11,7 @@ import GlobalActivityTicker from './components/GlobalActivityTicker'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { IdentityFocusProvider } from './context/IdentityFocusContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { BRAND, DARK, FONT } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
@@ -187,7 +188,7 @@ export default function App() {
                   <Route path="/share/:token" element={<ShareView scope="identity" />} />
                   <Route path="/share/p/:token" element={<ShareView scope="project" />} />
                   <Route path="/login" element={<Login />} />
-                  <Route path="/*" element={<Layout />} />
+                  <Route path="/*" element={<IdentityFocusProvider><Layout /></IdentityFocusProvider>} />
                 </Routes>
               </Suspense>
             </ToastProvider>

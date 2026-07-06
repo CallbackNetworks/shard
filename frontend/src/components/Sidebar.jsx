@@ -1,9 +1,54 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink, Search, Sun, Moon } from 'lucide-react'
+import { ExternalLink, Search, Sun, Moon, CircleSlash } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
+import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
 import { useUiPrefs } from '../utils/uiPrefs'
+
+function FocusRail() {
+  const { t } = useTranslation()
+  const { identities, focusId, toggleFocus, clearFocus } = useIdentityFocus()
+  if (identities.length === 0) return null
+
+  return (
+    <div className="kt-mini-group kt-focus-group">
+      <div className="kt-rail-grouplabel" aria-hidden="true">{t('focus.title')}</div>
+      {identities.map(identity => {
+        const focused = focusId === identity.id
+        return (
+          <button
+            key={identity.id}
+            type="button"
+            onClick={() => toggleFocus(identity.id)}
+            className={focused ? 'kt-mini-nav-button kt-focus-btn is-focused' : 'kt-mini-nav-button kt-focus-btn'}
+            style={{ '--focus-color': identity.color }}
+            aria-pressed={focused}
+            aria-label={focused ? t('focus.clear') : t('focus.focusOn', { name: identity.name })}
+            title={focused ? t('focus.clear') : t('focus.focusOn', { name: identity.name })}
+          >
+            <span className="kt-rail-ico">
+              <span className="kt-focus-avatar">{identity.avatar || identity.name.charAt(0)}</span>
+            </span>
+            <span className="kt-rail-label">{identity.name}</span>
+          </button>
+        )
+      })}
+      {focusId && (
+        <button
+          type="button"
+          onClick={clearFocus}
+          className="kt-mini-nav-button kt-focus-btn"
+          aria-label={t('focus.clear')}
+          title={t('focus.clear')}
+        >
+          <span className="kt-rail-ico"><CircleSlash size={16} /></span>
+          <span className="kt-rail-label">{t('focus.clear')}</span>
+        </button>
+      )}
+    </div>
+  )
+}
 
 export default function Sidebar({ onOpenPalette }) {
   const { mode, toggle: toggleTheme } = useTheme()
@@ -41,6 +86,7 @@ export default function Sidebar({ onOpenPalette }) {
       </button>
 
       <nav className="kt-mini-nav" aria-label="Rail module groups">
+        <FocusRail />
         {groups.map(group => (
           <div key={group.label} className="kt-mini-group">
             <div className="kt-rail-grouplabel" aria-hidden="true">{group.label}</div>

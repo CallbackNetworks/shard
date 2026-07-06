@@ -750,5 +750,10 @@
   "structure.legend.signal": "Signal",
   "structure.legend.dependency": "Dependency",
   "structure.linkedProjects": "Linked projects",
-  "structure.graphLabel": "Structure graph. Use arrow keys to pan, plus and minus to zoom, and 0 to reset."
+  "structure.graphLabel": "Structure graph. Use arrow keys to pan, plus and minus to zoom, and 0 to reset.",
+  "focus.title": "Focus",
+  "focus.focusOn": "Focus on {{name}}",
+  "focus.clear": "Exit focus",
+  "focus.focusedOn": "Focused: {{name}}",
+  "focus.empty": "No projects for this persona yet"
 }

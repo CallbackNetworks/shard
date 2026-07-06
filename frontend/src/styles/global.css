@@ -1199,6 +1199,46 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   border-top: 1px solid var(--kt-line);
   padding-top: 8px;
 }
+.kt-focus-group {
+  border-bottom: 1px solid var(--kt-line);
+  padding-bottom: 6px;
+}
+.kt-focus-btn {
+  cursor: pointer;
+}
+.kt-focus-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b0b0f;
+  background: var(--focus-color, #6b7280);
+  opacity: 0.72;
+  transition: opacity 0.14s ease, box-shadow 0.14s ease;
+}
+.kt-focus-btn:hover .kt-focus-avatar {
+  opacity: 1;
+}
+.kt-focus-btn.is-focused {
+  color: #ffffff;
+  background: rgba(255,255,255,0.06);
+}
+.kt-focus-btn.is-focused .kt-focus-avatar {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--focus-color), 0 0 10px var(--focus-color);
+}
+.kt-focus-btn.is-focused::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--focus-color);
+}
 .kt-mini-action {
   min-height: 32px;
   cursor: pointer;

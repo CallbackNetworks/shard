@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Maximize2, Minus, Plus, Search } from 'lucide-react'
 import { getDecisions, getGoals, getIdentities, getProjects } from '../api/client'
 import { STATUS_COLOR } from '../constants/theme'
+import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { dependencyNeighborhood, deriveStructureMap } from '../utils/structureMap'
 import { buildMindMapLayout, buildNetworkLayout, taskWeight } from '../utils/structureMapLayout'
 import useMapViewport from '../hooks/useMapViewport'
@@ -39,14 +40,18 @@ export default function StructureMap() {
   const [layoutStyle, setLayoutStyle] = useState('sankey')
   const [selected, setSelected] = useState(null)
 
-  const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects', 'structure-map'], queryFn: getProjects })
-  const { data: identities = [] } = useQuery({ queryKey: ['identities', 'structure-map'], queryFn: getIdentities })
+  const { filterProjects, focusId } = useIdentityFocus()
+  const { data: allProjects = [], isLoading } = useQuery({ queryKey: ['projects', 'structure-map'], queryFn: getProjects })
+  const { data: allIdentities = [] } = useQuery({ queryKey: ['identities', 'structure-map'], queryFn: getIdentities })
   const { data: goals = [] } = useQuery({ queryKey: ['goals', 'structure-map'], queryFn: getGoals })
   const { data: decisions = [] } = useQuery({ queryKey: ['decisions', 'structure-map'], queryFn: getDecisions })
+  const projects = filterProjects(allProjects)
+  const identities = focusId ? allIdentities.filter(identity => identity.id === focusId) : allIdentities
 
   const graph = useMemo(
     () => deriveStructureMap(projects, identities, goals, decisions),
-    [projects, identities, goals, decisions]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allProjects, allIdentities, goals, decisions, focusId]
   )
 
   const search = query.trim().toLowerCase()
