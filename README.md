@@ -134,6 +134,7 @@ docker compose up --build
 
 ## Documentation
 
+- [**Visual Tour**](docs/screenshots.md) — annotated screenshots of the main features
 - [**Highlights**](docs/highlights.md) — detailed feature descriptions and usage
 - [Architecture](docs/architecture.md) — system design, data models, data flow
 - [API Reference](docs/api.md) — all endpoints, request/response schemas
