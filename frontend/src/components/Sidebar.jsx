@@ -25,8 +25,8 @@ export default function Sidebar({ onOpenPalette }) {
   return (
     <aside className="kt-sidebar kt-mini-rail" aria-label="Sidebar navigation">
       <div className="kt-mini-brand" title="Shard">
-        <span>S</span>
-        <b className="kt-sr-only">Shard</b>
+        <span className="kt-rail-logo">S</span>
+        <b className="kt-rail-word">SHARD</b>
       </div>
 
       <button
@@ -35,13 +35,15 @@ export default function Sidebar({ onOpenPalette }) {
         className="kt-mini-search"
         title={`${t('search')} / ⌘K`}
       >
-        <Search size={16} />
-        <span className="kt-sr-only">{t('search')}</span>
+        <span className="kt-rail-ico"><Search size={16} /></span>
+        <span className="kt-rail-label">{t('search')}</span>
+        <kbd className="kt-rail-kbd">⌘K</kbd>
       </button>
 
       <nav className="kt-mini-nav" aria-label="Rail module groups">
         {groups.map(group => (
           <div key={group.label} className="kt-mini-group">
+            <div className="kt-rail-grouplabel" aria-hidden="true">{group.label}</div>
             {group.items.map(({ to, icon: Icon, labelKey }) => (
               <Link
                 key={to}
@@ -50,8 +52,8 @@ export default function Sidebar({ onOpenPalette }) {
                 aria-label={t(labelKey)}
                 title={t(labelKey)}
               >
-                <Icon size={16} />
-                <span className="kt-sr-only">{t(labelKey)}</span>
+                <span className="kt-rail-ico"><Icon size={16} /></span>
+                <span className="kt-rail-label">{t(labelKey)}</span>
               </Link>
             ))}
           </div>
@@ -67,8 +69,8 @@ export default function Sidebar({ onOpenPalette }) {
           title={t('nav.statusPage')}
           className="kt-mini-action"
         >
-          <ExternalLink size={14} />
-          <span className="kt-sr-only">{t('nav.statusPage')}</span>
+          <span className="kt-rail-ico"><ExternalLink size={14} /></span>
+          <span className="kt-rail-label">{t('nav.statusPage')}</span>
         </a>
         <button
           onClick={toggleTheme}
@@ -76,15 +78,16 @@ export default function Sidebar({ onOpenPalette }) {
           title={mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
           className="kt-mini-action"
         >
-          {mode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          <span className="kt-rail-ico">{mode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}</span>
+          <span className="kt-rail-label">{mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}</span>
         </button>
         <button
           onClick={() => i18n.changeLanguage(i18n.language === 'en' ? 'zh-TW' : 'en')}
           aria-label={t('nav.language')}
           className="kt-mini-action"
         >
-          <span className="kt-sr-only">{t('nav.language')}</span>
-          {i18n.language === 'en' ? 'EN' : '中'}
+          <span className="kt-rail-ico">{i18n.language === 'en' ? 'EN' : '中'}</span>
+          <span className="kt-rail-label">{t('nav.language')}</span>
         </button>
       </div>
     </aside>

@@ -25,9 +25,9 @@ function setup(options = {}) {
 }
 
 describe('Sidebar', () => {
-  it('renders the brand text "Shard"', () => {
+  it('renders the brand text', () => {
     setup()
-    expect(screen.getByText('Shard')).toBeTruthy()
+    expect(screen.getByText('SHARD')).toBeTruthy()
   })
 
   it('renders nav links for main sections', () => {

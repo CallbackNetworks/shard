@@ -1060,6 +1060,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   isolation: isolate;
 }
 .kt-mini-rail {
+  --rail-open: 224px;
+  position: relative;
   width: 72px;
   min-width: 72px;
   height: 100vh;
@@ -1069,66 +1071,159 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   padding: 10px 8px;
   border-right: 1px solid var(--kt-line);
   background:
-    linear-gradient(180deg, rgba(250,204,21,0.075), transparent 18%, rgba(255,255,255,0.02)),
+    linear-gradient(180deg, rgba(250,204,21,0.06), transparent 16%, rgba(255,255,255,0.02)),
     #171717;
-  overflow: visible;
+  overflow: hidden;
   user-select: none;
 }
+/* Inner content is laid out at the expanded width; the rail clips to a narrow
+   window when collapsed, so nothing reflows as it opens. */
+.kt-mini-brand,
+.kt-mini-search,
+.kt-mini-action,
+.kt-mini-nav-button {
+  width: calc(var(--rail-open) - 16px);
+  min-width: calc(var(--rail-open) - 16px);
+}
 .kt-mini-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 42px;
+}
+.kt-mini-brand .kt-rail-logo {
+  flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 42px;
-  border: 1px solid rgba(250,204,21,0.34);
+  width: 40px;
+  height: 40px;
+  margin-left: 4px;
   background: var(--kt-hit);
   color: #171717;
   font-family: var(--kt-display);
-  font-size: 30px;
+  font-size: 26px;
   line-height: 1;
+}
+.kt-mini-brand .kt-rail-word {
+  font-family: var(--kt-display);
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  color: #f3f4f6;
+  white-space: nowrap;
 }
 .kt-mini-search,
 .kt-mini-action,
 .kt-mini-nav-button {
-  width: 56px;
-  min-height: 34px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid var(--kt-line);
-  background: rgba(255,255,255,0.025);
+  gap: 12px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
   color: #9ca3af;
   text-decoration: none;
+  position: relative;
+}
+.kt-rail-ico {
+  flex-shrink: 0;
+  width: 56px;
+  display: grid;
+  place-items: center;
+}
+.kt-rail-label {
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.kt-rail-kbd {
+  margin-left: auto;
+  margin-right: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+  opacity: 0;
+  transition: opacity 0.14s ease;
 }
 .kt-mini-search:hover,
 .kt-mini-action:hover,
-.kt-mini-nav-button:hover,
+.kt-mini-nav-button:hover {
+  color: #ffffff;
+  background: rgba(255,255,255,0.05);
+}
 .kt-mini-nav-button.is-active {
   color: #ffffff;
-  border-color: rgba(250,204,21,0.45);
   background: rgba(250,204,21,0.1);
+}
+.kt-mini-nav-button.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--kt-hit);
 }
 .kt-mini-nav {
   display: grid;
   align-content: start;
-  gap: 8px;
-  overflow: auto;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 .kt-mini-group {
   display: grid;
-  gap: 4px;
+  gap: 2px;
+  padding-top: 6px;
+}
+.kt-rail-grouplabel {
+  height: 16px;
+  padding-left: 16px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b7280;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.14s ease;
 }
 .kt-mini-actions {
   display: grid;
-  gap: 5px;
+  gap: 2px;
   border-top: 1px solid var(--kt-line);
   padding-top: 8px;
 }
 .kt-mini-action {
-  min-height: 30px;
+  min-height: 32px;
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 900;
+  font-size: 13px;
+}
+@media (min-width: 769px) {
+  .kt-mini-rail {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: auto;
+    z-index: 90;
+    transition: width 0.2s cubic-bezier(.2,.8,.2,1), box-shadow 0.2s ease;
+  }
+  .kt-mini-rail:hover {
+    width: var(--rail-open);
+    box-shadow: 14px 0 36px rgba(0,0,0,0.5);
+  }
+  .kt-mini-rail:hover .kt-rail-label,
+  .kt-mini-rail:hover .kt-rail-grouplabel,
+  .kt-mini-rail:hover .kt-rail-kbd {
+    opacity: 1;
+    transform: none;
+  }
 }
 .kt-mini-drawer {
   position: fixed;
@@ -2135,20 +2230,19 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-ticker-track {
   display: flex;
   align-items: center;
-  justify-content: space-around;
   gap: 0;
-  width: 200%;
-  min-width: 200%;
+  width: max-content;
   height: 100%;
   animation: kineticTicker 40s linear infinite;
 }
 .kt-ticker-track span {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 11px;
   transform-origin: center;
-  max-width: min(520px, 24vw);
+  max-width: 460px;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
