@@ -375,7 +375,7 @@ export default function Identities() {
                       className="kt-btn" style={{ padding: '6px 8px', color: DARK.text }}>
                       <Edit3 size={13} />
                     </button>
-                    <button onClick={() => { if (confirm(`Delete identity "${identity.name}"?`)) deleteMut.mutate(identity.id) }}
+                    <button onClick={() => { if (confirm(`Delete persona "${identity.name}"?`)) deleteMut.mutate(identity.id) }}
                       title={t('delete')} aria-label={t('delete')}
                       className="kt-btn" style={{ background: 'none', border: '1px solid rgba(250,204,21,0.4)', color: '#facc15', padding: '6px 8px' }}>
                       <Trash2 size={13} />

@@ -870,7 +870,7 @@ export default function Dashboard() {
           <span style={{ fontSize: 12, color: DARK.textMid, fontWeight: 600, marginRight: 8 }}>Widgets:</span>
           {[
             { id: 'stat-cards', label: 'Stats' },
-            { id: 'command-hero', label: 'Command Center' },
+            { id: 'command-hero', label: 'Overview' },
             { id: 'priority-wall', label: 'Priority Lanes' },
             { id: 'agent-tasks', label: 'Agent Tasks' },
             { id: 'due-soon', label: 'Due Soon' },
