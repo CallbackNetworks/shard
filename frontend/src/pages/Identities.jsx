@@ -267,7 +267,7 @@ export default function Identities() {
   if (isLoading) return <p className="kt-muted" style={{ padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div className="kt-page" style={{ maxWidth: 980 }}>
+    <div className="kt-page">
       <div className="kt-page-header">
         <div className="kt-page-heading">
           <h1 className="kt-page-title">{t('identities.title')}</h1>

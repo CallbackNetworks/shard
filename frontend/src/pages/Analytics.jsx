@@ -455,7 +455,7 @@ export default function Analytics() {
   }, [trend])
 
   return (
-    <div className="kt-page" style={{ maxWidth: 1120 }}>
+    <div className="kt-page">
       <div className="kt-page-header">
         <div className="kt-page-heading">
           <h1 className="kt-page-title">{t('analytics.title')}</h1>

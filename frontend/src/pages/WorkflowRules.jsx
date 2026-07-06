@@ -167,7 +167,7 @@ export default function WorkflowRules() {
   const TRIGGER_LABELS = Object.fromEntries(TRIGGERS.map(t => [t.value, t.label]))
 
   return (
-    <div className="kt-page" style={{ maxWidth: 1080 }}>
+    <div className="kt-page">
       {modal && <RuleModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
 
       <div className="kt-page-header">

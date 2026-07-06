@@ -882,18 +882,6 @@
   animation: kineticCutIn 0.38s cubic-bezier(.2,.8,.2,1) both;
 }
 
-.commandHero::after {
-  content: 'ACTIVE ACTIVE ACTIVE';
-  position: absolute;
-  right: -24px;
-  bottom: -18px;
-  color: rgba(250,204,21,0.06);
-  font-family: var(--kt-display);
-  font-size: clamp(58px, 9vw, 132px);
-  line-height: 0.8;
-  pointer-events: none;
-}
-
 .commandHeroMain {
   padding: 22px 24px;
   position: relative;

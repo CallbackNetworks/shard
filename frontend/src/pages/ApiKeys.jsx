@@ -75,7 +75,7 @@ export default function ApiKeys() {
   if (isLoading) return <p className="kt-muted" style={{ padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div className="kt-page" style={{ maxWidth: 980 }}>
+    <div className="kt-page">
       {/* Show-once modal for newly created key */}
       {newKey && (
         <div className="kt-modal-backdrop">

@@ -569,7 +569,7 @@ export default function Integrations() {
   if (isLoading) return <p className="kt-muted" style={{ padding: 24 }}>{t('loading')}</p>
 
   return (
-    <div className={`kt-page ${isMobile ? s.pageContentMobile : s.pageContent}`} style={{ maxWidth: 1120 }}>
+    <div className={`kt-page ${isMobile ? s.pageContentMobile : s.pageContent}`}>
       {modal && <IntegrationModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
       {templatePicker && <TemplatePicker onSelect={handleTemplateSelect} onClose={() => setTemplatePicker(false)} />}
       {setupModal && <SetupModal templateId={setupModal} onClose={() => setSetupModal(null)} />}

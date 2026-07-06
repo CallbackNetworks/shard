@@ -1269,16 +1269,6 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   position: relative;
   overflow: hidden;
 }
-.kt-sidebar-search::before {
-  content: 'COMMAND';
-  position: absolute;
-  right: 8px;
-  bottom: -7px;
-  color: rgba(250,204,21,0.08);
-  font-family: var(--kt-display);
-  font-size: 28px;
-  pointer-events: none;
-}
 .kt-sidebar-nav {
   max-height: 47vh;
   overflow: auto;
@@ -2403,8 +2393,8 @@ h1 {
   letter-spacing: 0 !important;
 }
 .kt-page {
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 1120px;
+  margin: 0;
   padding: 36px 28px 28px;
   color: var(--kt-ink);
 }
@@ -2740,17 +2730,6 @@ h1 {
   position: relative;
   overflow: hidden;
 }
-.kt-assistant-rail::after {
-  content: 'ASSIST ASSIST ASSIST';
-  position: absolute;
-  left: 12px;
-  bottom: 18px;
-  color: rgba(250,204,21,0.04);
-  font-family: var(--kt-display);
-  font-size: 44px;
-  line-height: 0.85;
-  pointer-events: none;
-}
 .kt-assistant-rail-header {
   border-bottom: 1px solid var(--kt-line);
 }
@@ -2829,17 +2808,6 @@ h1 {
   padding: 12px;
   position: sticky;
   top: 12px;
-}
-.kt-activity-console::after {
-  content: 'FILTER FILTER FILTER';
-  position: absolute;
-  left: 10px;
-  bottom: -8px;
-  color: rgba(250,204,21,0.045);
-  font-family: var(--kt-display);
-  font-size: 34px;
-  line-height: 0.85;
-  pointer-events: none;
 }
 .kt-activity-console-title {
   display: flex;
@@ -3168,17 +3136,6 @@ h1 {
   position: sticky;
   top: 12px;
   padding: 12px;
-}
-.kt-decision-console::after {
-  content: 'DECIDE DECIDE DECIDE';
-  position: absolute;
-  left: 10px;
-  bottom: -10px;
-  color: rgba(250,204,21,0.045);
-  font-family: var(--kt-display);
-  font-size: 34px;
-  line-height: 0.85;
-  pointer-events: none;
 }
 .kt-decision-console-title,
 .kt-decision-section-head {

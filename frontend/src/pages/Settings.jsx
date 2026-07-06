@@ -162,7 +162,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="kt-page" style={{ maxWidth: 1080, margin: 0 }}>
+    <div className="kt-page">
       <div className="kt-page-header">
         <div className="kt-page-heading">
           <h1 className="kt-page-title">{t('settings.title')}</h1>

@@ -182,7 +182,7 @@ export default function Activity() {
   const latest = filtered[0]
 
   return (
-    <div className="kt-page kt-activity-page" style={{ maxWidth: 1120, margin: 0 }}>
+    <div className="kt-page kt-activity-page">
       {/* Header */}
       <div className="kt-page-header">
         <div className="kt-page-heading">
