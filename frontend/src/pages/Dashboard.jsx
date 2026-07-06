@@ -837,7 +837,7 @@ export default function Dashboard() {
             <span className={s.headerStatsArchived}>{archived.length}</span> {t('archived')}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative', zIndex: 1 }}>
           <button
             onClick={() => setShowWidgetConfig(v => !v)}
             title="Configure widgets"
