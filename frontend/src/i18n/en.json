@@ -391,6 +391,8 @@
   "assistant.selectConversation": "Select a conversation",
   "assistant.selectOrCreate": "Select a conversation or start a new one",
   "assistant.startPrompt": "Or try a quick prompt:",
+  "assistant.welcomeTitle": "How can I help?",
+  "assistant.welcomeSubtitle": "Ask about your projects, tasks, and activity — or let me create and update tasks for you. Pick a prompt to get started, or start a new chat.",
   "cycle.title": "Cycles / Sprints",
   "cycle.new": "+ New Cycle",
   "cycle.namePlaceholder": "Cycle name *",

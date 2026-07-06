@@ -144,16 +144,17 @@ export default function Assistant() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [currentConv?.messages, streamEvents])
 
-  const sendMessage = useCallback(async (text) => {
+  const sendMessage = useCallback(async (text, cidOverride) => {
+    const cid = cidOverride || convId
     const msg = (text || input).trim()
-    if (!msg || streaming || !convId) return
+    if (!msg || streaming || !cid) return
     setInput('')
     setStreaming(true)
     setStreamEvents([])
 
     try {
       const token = localStorage.getItem('auth_token')
-      const resp = await fetch(`/assistant/conversations/${convId}/messages`, {
+      const resp = await fetch(`/assistant/conversations/${cid}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ content: msg }),
@@ -173,7 +174,7 @@ export default function Assistant() {
               const event = JSON.parse(line.slice(6))
               setStreamEvents(prev => [...prev, event])
               if (event.type === 'done') {
-                qc.invalidateQueries({ queryKey: ['assistant-conv', convId] })
+                qc.invalidateQueries({ queryKey: ['assistant-conv', cid] })
                 qc.invalidateQueries({ queryKey: ['assistant-conversations'] })
               }
             } catch { /* ignore */ }
@@ -186,6 +187,15 @@ export default function Assistant() {
       setStreaming(false)
     }
   }, [input, streaming, convId, qc])
+
+  const startWithPrompt = useCallback(async (prompt) => {
+    if (streaming) return
+    const conv = await createConversation()
+    qc.invalidateQueries({ queryKey: ['assistant-conversations'] })
+    setConvId(conv.id)
+    if (isMobile) setShowSidebar(false)
+    sendMessage(prompt, conv.id)
+  }, [streaming, qc, isMobile, sendMessage])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
@@ -280,7 +290,7 @@ export default function Assistant() {
         {/* Chat header */}
         <div className="kt-page-header" style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '14px 20px', borderBottom: `1px solid ${DARK.border}`, marginBottom: 0,
+          padding: '22px 24px 16px', borderBottom: `1px solid ${DARK.border}`, marginBottom: 0,
         }}>
           {isMobile && (
             <button
@@ -298,9 +308,24 @@ export default function Assistant() {
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 12px' : '20px 24px' }}>
           {!convId ? (
-            <div className="kt-empty" style={{ margin: '30px auto', maxWidth: 520 }}>
-              <MessageCircle size={40} className="kt-empty-icon" />
-              <p className="kt-empty-title">{t('assistant.selectOrCreate')}</p>
+            <div className="kt-empty" style={{ margin: '48px auto 0', maxWidth: 680, textAlign: 'center' }}>
+              <MessageCircle size={44} className="kt-empty-icon" />
+              <p className="kt-empty-title">{t('assistant.welcomeTitle')}</p>
+              <p style={{ color: DARK.textMid, fontSize: 13, lineHeight: 1.6, maxWidth: 460, margin: '4px auto 22px' }}>
+                {t('assistant.welcomeSubtitle')}
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 620, margin: '0 auto 22px' }}>
+                {PROMPT_TEMPLATES.map(tmpl => (
+                  <button
+                    key={tmpl.labelKey}
+                    onClick={() => startWithPrompt(tmpl.prompt)}
+                    className="kt-chip"
+                    style={{ padding: '8px 14px', fontSize: 12, cursor: 'pointer' }}
+                  >
+                    {t(tmpl.labelKey)}
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={() => createMut.mutate()}
                 className="kt-btn kt-btn-primary"

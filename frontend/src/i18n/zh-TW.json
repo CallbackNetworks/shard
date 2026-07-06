@@ -391,6 +391,8 @@
   "assistant.selectConversation": "選擇對話",
   "assistant.selectOrCreate": "選擇對話或開始新對話",
   "assistant.startPrompt": "或試試快速提示：",
+  "assistant.welcomeTitle": "有什麼我能幫忙的？",
+  "assistant.welcomeSubtitle": "詢問你的專案、任務與活動，或讓我幫你建立與更新任務。挑一個提示開始，或開啟新對話。",
   "cycle.title": "衝刺 / Sprint",
   "cycle.new": "+ 新增衝刺",
   "cycle.namePlaceholder": "衝刺名稱 *",
