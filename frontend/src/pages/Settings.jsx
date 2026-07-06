@@ -162,7 +162,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="kt-page" style={{ maxWidth: 760, margin: 0 }}>
+    <div className="kt-page" style={{ maxWidth: 1080, margin: 0 }}>
       <div className="kt-page-header">
         <div className="kt-page-heading">
           <h1 className="kt-page-title">{t('settings.title')}</h1>
@@ -176,6 +176,7 @@ export default function Settings() {
         </div>
       )}
 
+      <div className="kt-settings-grid">
       {/* Preferences (client-side, always available) */}
       <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
         <SectionTitle
@@ -489,6 +490,7 @@ export default function Settings() {
           )}
         </>
       )}
+      </div>
     </div>
   )
 }

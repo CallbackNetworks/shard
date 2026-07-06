@@ -615,18 +615,6 @@
   overflow: hidden;
 }
 
-.header::after {
-  content: 'WORKFLOW';
-  position: absolute;
-  right: 20px;
-  top: -12px;
-  color: rgba(255,255,255,0.035);
-  font-family: var(--kt-display);
-  font-size: clamp(54px, 10vw, 124px);
-  line-height: 1;
-  pointer-events: none;
-}
-
 .headerContent {
   flex: 1;
   position: relative;
@@ -644,8 +632,8 @@
 
 .headerTitle {
   margin: 0;
-  font-size: clamp(38px, 6vw, 72px);
-  line-height: 0.98;
+  font-size: clamp(28px, 3.4vw, 46px);
+  line-height: 1;
   font-weight: 400;
   color: #f3f4f6;
   letter-spacing: 0;
