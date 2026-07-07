@@ -8,14 +8,16 @@ import { STATUS_COLOR } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { dependencyNeighborhood, deriveStructureMap } from '../utils/structureMap'
 import { buildMindMapLayout, buildNetworkLayout, taskWeight } from '../utils/structureMapLayout'
+import { buildTerritoryModel } from '../utils/territoryModel'
 import useMapViewport from '../hooks/useMapViewport'
 import MapCanvas from '../components/structure/MapCanvas'
 import MapInspector from '../components/structure/MapInspector'
+import TerritoryCanvas from '../components/structure/TerritoryCanvas'
 import EmptyState from '../components/shared/EmptyState'
 
 const FILTERS = ['all', 'active', 'risk', 'unowned']
 const VIEW_MODES = ['map', 'dependencies']
-const STYLE_MODES = ['sankey', 'lines', 'network']
+const STYLE_MODES = ['territory', 'sankey', 'lines', 'network']
 
 function nodeDataKey(node) {
   if (!node) return null
@@ -37,8 +39,9 @@ export default function StructureMap() {
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState('all')
   const [viewMode, setViewMode] = useState('map')
-  const [layoutStyle, setLayoutStyle] = useState('sankey')
+  const [layoutStyle, setLayoutStyle] = useState('territory')
   const [selected, setSelected] = useState(null)
+  const isTerritory = layoutStyle === 'territory'
 
   const { filterProjects, focusId } = useIdentityFocus()
   const { data: allProjects = [], isLoading } = useQuery({ queryKey: ['projects', 'structure-map'], queryFn: getProjects })
@@ -111,7 +114,33 @@ export default function StructureMap() {
   const visibleDependencyLinks = (graph.dependencyLinks || []).filter(link =>
     visibleTaskIds.has(link.from.replace('task:', '')) && visibleTaskIds.has(link.to.replace('task:', ''))
   )
-  const showDependencyNotice = visibleProjects.length > 0 && viewMode === 'dependencies' && visibleDependencyLinks.length === 0
+  const showDependencyNotice = !isTerritory && visibleProjects.length > 0 && viewMode === 'dependencies' && visibleDependencyLinks.length === 0
+
+  // Territory view shows every signal/dependency task inside its project card,
+  // so it works from the uncapped task set instead of the ranked slice above.
+  const territoryTaskNodes = (graph.dependencyTaskNodes || []).filter(task => visibleProjectIds.has(task.projectId))
+  const territoryTaskIds = new Set(territoryTaskNodes.map(task => task.id))
+  const territoryDependencyLinks = (graph.dependencyLinks || []).filter(link =>
+    territoryTaskIds.has(link.from.replace('task:', '')) && territoryTaskIds.has(link.to.replace('task:', ''))
+  )
+  const territorySignature = [
+    visibleIdentityNodes.map(n => `${n.id}:${n.color}:${n.name}`).join(','),
+    visibleProjects.map(n => `${n.id}:${n.risk}:${n.progress}:${n.doneTasks}:${n.identityIds.join('+')}`).join(','),
+    territoryTaskNodes.map(n => `${n.id}:${n.status}:${n.risk}`).join(','),
+    graph.goalNodes.map(n => `${n.id}:${n.progress}:${(n.projectIds || []).join('+')}`).join(','),
+    graph.decisionNodes.map(n => `${n.id}:${n.status}:${n.projectId}`).join(','),
+  ].join('|')
+  const territoryModel = useMemo(
+    () => buildTerritoryModel({
+      projects: visibleProjects,
+      identities: visibleIdentityNodes,
+      tasks: territoryTaskNodes,
+      goals: graph.goalNodes,
+      decisions: graph.decisionNodes,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [territorySignature]
+  )
 
   const laneNodes = [
     ...graph.goalNodes.map(node => ({ ...node, lane: 'goal', color: STATUS_COLOR.done })),
@@ -140,6 +169,9 @@ export default function StructureMap() {
 
   const mapLayout = useMemo(
     () => {
+      if (layoutStyle === 'territory') {
+        return { nodes: [], links: [], nodeById: new Map(), width: 960, height: 600, columns: null }
+      }
       const params = { visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks: visibleDependencyLinks, viewMode }
       return layoutStyle === 'network' ? buildNetworkLayout(params) : buildMindMapLayout(params)
     },
@@ -166,8 +198,10 @@ export default function StructureMap() {
   useEffect(() => {
     if (!selected) return
     const key = nodeDataKey(selected)
-    if (key && !mapLayout.nodeById.has(key)) setSelected(null)
-  }, [mapLayout.nodeById, selected])
+    if (!key) return
+    const exists = isTerritory ? territoryModel.keys.has(key) : mapLayout.nodeById.has(key)
+    if (!exists) setSelected(null)
+  }, [mapLayout.nodeById, territoryModel, isTerritory, selected])
 
   const selectedNodeKey = nodeDataKey(selected)
   const relatedNodeKeys = useMemo(() => {
@@ -297,29 +331,33 @@ export default function StructureMap() {
             </button>
           ))}
         </div>
-        <div className="kt-map-segment" aria-label={t('structure.viewMode')}>
-          {VIEW_MODES.map(key => (
-            <button key={key} type="button" onClick={() => setViewMode(key)} className={viewMode === key ? 'is-active' : ''}>
-              {t(`structure.view.${key}`)}
-            </button>
-          ))}
-        </div>
+        {!isTerritory && (
+          <div className="kt-map-segment" aria-label={t('structure.viewMode')}>
+            {VIEW_MODES.map(key => (
+              <button key={key} type="button" onClick={() => setViewMode(key)} className={viewMode === key ? 'is-active' : ''}>
+                {t(`structure.view.${key}`)}
+              </button>
+            ))}
+          </div>
+        )}
         {FILTERS.map(key => (
           <button key={key} onClick={() => setMode(key)} className={mode === key ? 'is-active' : ''}>
             {t(`structure.filter.${key}`)}
           </button>
         ))}
-        <div className="kt-map-controls" aria-label={t('structure.viewControls')}>
-          <button type="button" onClick={() => zoomBy(0.14)} title={t('structure.zoomIn')} aria-label={t('structure.zoomIn')}>
-            <Plus size={14} />
-          </button>
-          <button type="button" onClick={() => zoomBy(-0.14)} title={t('structure.zoomOut')} aria-label={t('structure.zoomOut')}>
-            <Minus size={14} />
-          </button>
-          <button type="button" onClick={resetView} title={t('structure.fitView')} aria-label={t('structure.fitView')}>
-            <Maximize2 size={14} />
-          </button>
-        </div>
+        {!isTerritory && (
+          <div className="kt-map-controls" aria-label={t('structure.viewControls')}>
+            <button type="button" onClick={() => zoomBy(0.14)} title={t('structure.zoomIn')} aria-label={t('structure.zoomIn')}>
+              <Plus size={14} />
+            </button>
+            <button type="button" onClick={() => zoomBy(-0.14)} title={t('structure.zoomOut')} aria-label={t('structure.zoomOut')}>
+              <Minus size={14} />
+            </button>
+            <button type="button" onClick={resetView} title={t('structure.fitView')} aria-label={t('structure.fitView')}>
+              <Maximize2 size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="kt-map-stats">
@@ -331,11 +369,13 @@ export default function StructureMap() {
         <Stat label={t('structure.dependencies')} value={graph.stats.dependencies || 0} color={STATUS_COLOR.failed} />
       </div>
 
-      <div className="kt-map-legend" aria-label={t('structure.legend')}>
-        <span><i className="is-ownership" />{t('structure.legend.ownership')}</span>
-        <span><i className="is-signal" />{t('structure.legend.signal')}</span>
-        <span><i className="is-dependency" />{t('structure.legend.dependency')}</span>
-      </div>
+      {!isTerritory && (
+        <div className="kt-map-legend" aria-label={t('structure.legend')}>
+          <span><i className="is-ownership" />{t('structure.legend.ownership')}</span>
+          <span><i className="is-signal" />{t('structure.legend.signal')}</span>
+          <span><i className="is-dependency" />{t('structure.legend.dependency')}</span>
+        </div>
+      )}
       {showDependencyNotice && (
         <div className="kt-map-notice">
           <strong>{t('structure.noDependencies')}</strong>
@@ -347,34 +387,47 @@ export default function StructureMap() {
         <EmptyState message={t('dashboard.noProjectsEmpty')} hint={t('dashboard.createFirstProject')} />
       ) : (
         <div className="kt-map-surface">
-          <div
-            ref={graphRef}
-            className="kt-map-graph"
-            role="region"
-            aria-label={t('structure.graphLabel')}
-            tabIndex={0}
-            onKeyDown={handleGraphKeyDown}
-            onPointerDown={startPan}
-            onPointerMove={movePan}
-            onPointerUp={endPan}
-            onPointerCancel={endPan}
-            onLostPointerCapture={endPan}
-            onWheel={zoomMap}
-          >
-            <MapCanvas
-              layout={mapLayout}
-              layoutStyle={layoutStyle}
-              viewMode={viewMode}
-              transform={transform}
+          {isTerritory ? (
+            <TerritoryCanvas
+              model={territoryModel}
+              dependencyLinks={territoryDependencyLinks}
+              selected={selected}
               selectedNodeKey={selectedNodeKey}
-              isNodeMuted={shouldMute}
-              isLinkMuted={isLinkMuted}
               onSelect={setSelected}
               onOpen={jumpTo}
               showEmpty={visibleProjects.length === 0}
               onClearFilters={clearFilters}
             />
-          </div>
+          ) : (
+            <div
+              ref={graphRef}
+              className="kt-map-graph"
+              role="region"
+              aria-label={t('structure.graphLabel')}
+              tabIndex={0}
+              onKeyDown={handleGraphKeyDown}
+              onPointerDown={startPan}
+              onPointerMove={movePan}
+              onPointerUp={endPan}
+              onPointerCancel={endPan}
+              onLostPointerCapture={endPan}
+              onWheel={zoomMap}
+            >
+              <MapCanvas
+                layout={mapLayout}
+                layoutStyle={layoutStyle}
+                viewMode={viewMode}
+                transform={transform}
+                selectedNodeKey={selectedNodeKey}
+                isNodeMuted={shouldMute}
+                isLinkMuted={isLinkMuted}
+                onSelect={setSelected}
+                onOpen={jumpTo}
+                showEmpty={visibleProjects.length === 0}
+                onClearFilters={clearFilters}
+              />
+            </div>
+          )}
 
           <MapInspector
             selected={selected}
