@@ -1924,7 +1924,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   transition: opacity 0.16s ease, stroke-width 0.16s ease;
 }
 .kt-map-links path.is-muted {
-  opacity: 0.12;
+  animation: none;
+  opacity: 0.1;
 }
 .kt-map-links path.is-dependency {
   opacity: 0.9;
@@ -1933,6 +1934,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   filter: drop-shadow(0 0 8px rgba(251,113,133,0.18));
 }
 .kt-map-links path.is-dependency.is-muted {
+  animation: none;
   opacity: 0.08;
 }
 .kt-map-links path.kt-ribbon {
@@ -1945,6 +1947,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   opacity: 0.55;
 }
 .kt-map-links path.kt-ribbon.is-muted {
+  animation: none;
   opacity: 0.06;
 }
 .kt-map-node {
@@ -1979,7 +1982,10 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   animation-iteration-count: 1, infinite;
 }
 .kt-map-node.is-muted {
-  opacity: 0.32;
+  /* Kill the enter animation: its fill-mode otherwise pins opacity at the
+     100% keyframe and the muted value below would never apply. */
+  animation: none;
+  opacity: 0.18;
 }
 .kt-map-node svg,
 .kt-map-avatar {
@@ -2014,6 +2020,11 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   text-transform: uppercase;
   letter-spacing: 0.12em;
   pointer-events: none;
+}
+.kt-map-col-label.is-band {
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  color: #6b7280;
 }
 .kt-map-node.is-goal,
 .kt-map-node.is-decision {

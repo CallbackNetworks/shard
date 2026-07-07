@@ -148,12 +148,13 @@ export default function StructureMap() {
   ].filter(node => {
     const linkedProjectIds = node.projectIds || (node.projectId ? [node.projectId] : [])
     const linkedVisible = linkedProjectIds.some(projectId => visibleProjectIds.has(projectId))
-    // Network view exists to expose every non-tree relation, so keep any goal
-    // or decision touching a visible project; column views stay compact.
+    // The network view stays readable by showing only linked goals and still
+    // undecided decisions; settled decisions are noise there.
+    if (layoutStyle === 'network' && node.lane === 'decision' && node.status !== 'proposed') return false
     if (layoutStyle === 'network' && !search) return linkedVisible
     if (!search) return true
     return node.name.toLowerCase().includes(search) || linkedVisible
-  }).slice(0, layoutStyle === 'network' ? 60 : 10)
+  }).slice(0, layoutStyle === 'network' ? 18 : 12)
 
   // Stable structural signature so the (potentially expensive force) layout
   // only rebuilds when the graph actually changes, not on pan/zoom/select.

@@ -53,6 +53,10 @@ export default function MapCanvas({
           const from = layout.nodeById.get(link.from)
           const to = layout.nodeById.get(link.to)
           const muted = isLinkMuted(link)
+          // Goal/decision arcs stay hidden until a linked node is selected, so
+          // the resting picture only shows the ownership/task hierarchy.
+          const accent = link.type === 'goal' || link.type === 'decision'
+          if (accent && (!selectedNodeKey || muted)) return null
           if (layoutStyle === 'sankey' && link.flow) {
             return (
               <path
@@ -65,16 +69,16 @@ export default function MapCanvas({
             )
           }
           const d = layoutStyle === 'network' ? networkPath(from, to) : computePath(from, to, link.type)
-          const dependencyDash = link.type === 'dependency' ? '1.75 1.75' : undefined
+          const dash = link.type === 'dependency' ? '1.75 1.75' : accent ? '4 4' : undefined
           return (
             <path
               key={`${link.from}-${link.to}-${index}`}
               className={[`is-${link.type}`, muted ? 'is-muted' : ''].filter(Boolean).join(' ')}
               d={d}
               stroke={link.color}
-              strokeWidth={link.type === 'goal' || link.type === 'decision' ? 1.6 : 1.35}
-              strokeDasharray={dependencyDash}
-              style={dependencyDash ? { '--kt-map-dash': dependencyDash, strokeDasharray: dependencyDash } : undefined}
+              strokeWidth={accent ? 1.6 : 1.35}
+              strokeDasharray={dash}
+              style={dash ? { '--kt-map-dash': dash, strokeDasharray: dash } : undefined}
               fill="none"
               strokeLinecap="round"
             />
@@ -82,15 +86,24 @@ export default function MapCanvas({
         })}
       </svg>
 
+      {(layout.bands || []).map(band => (
+        <div
+          key={band.key}
+          className="kt-map-col-label is-band"
+          style={{ left: band.x, top: band.y, width: band.w }}
+        >
+          {t(band.key === 'goals' ? 'structure.goals' : 'structure.decisionsLabel')}
+        </div>
+      ))}
       {layout.columns && (
         <>
-          <div className="kt-map-col-label" style={{ left: layout.columns.identity.x, top: layout.padY || 6, width: layout.columns.identity.w }}>
+          <div className="kt-map-col-label" style={{ left: layout.columns.identity.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.identity.w }}>
             {t('structure.identities')}
           </div>
-          <div className="kt-map-col-label" style={{ left: layout.columns.project.x, top: layout.padY || 6, width: layout.columns.project.w }}>
+          <div className="kt-map-col-label" style={{ left: layout.columns.project.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.project.w }}>
             {t('structure.projects')}
           </div>
-          <div className="kt-map-col-label" style={{ left: layout.columns.task.x, top: layout.padY || 6, width: layout.columns.task.w }}>
+          <div className="kt-map-col-label" style={{ left: layout.columns.task.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.task.w }}>
             {t('structure.signalTasks')}
           </div>
         </>

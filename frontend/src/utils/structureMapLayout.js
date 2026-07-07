@@ -58,14 +58,14 @@ export function computePath(from, to, linkType) {
 }
 
 export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
-  const pad = { x: 120, y: 80 }
+  const pad = { x: 56, y: 46 }
   const colDef = {
-    identity: { x: pad.x + 24, w: 138 },
-    project: { x: pad.x + 228, w: 196 },
-    task: { x: pad.x + 490, w: 176 },
+    identity: { x: pad.x + 16, w: 150 },
+    project: { x: pad.x + 262, w: 208 },
+    task: { x: pad.x + 556, w: 190 },
   }
-  const contentW = 710
-  const canvasW = contentW + pad.x * 2
+  const contentW = colDef.task.x + colDef.task.w - colDef.identity.x
+  const canvasW = contentW + pad.x * 2 + 32
   const labelH = 24
   const projectH = 62
   const taskH = 46
@@ -74,6 +74,8 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
   const decisionH = 38
   const taskGapV = 4
   const rowPad = 10
+  const goalW = 168
+  const goalGapH = 10
 
   const tasksByProject = new Map()
   visibleTaskNodes.forEach(task => {
@@ -81,13 +83,17 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
     tasksByProject.get(task.projectId).push(task)
   })
 
+  // Goals live in a full-width labelled band above the columns; decisions get
+  // a matching band below. Relations stay data-only: their arcs render only
+  // while a linked node is selected (mirrors the territory view language).
   const goalLane = laneNodes.filter(n => n.lane === 'goal')
   const decisionLane = laneNodes.filter(n => n.lane === 'decision')
-  const goalCols = Math.min(goalLane.length, 3) || 1
+  const bandCols = Math.max(1, Math.floor((contentW + goalGapH) / (goalW + goalGapH)))
+  const goalCols = Math.min(goalLane.length, bandCols) || 1
   const goalRows = Math.ceil(goalLane.length / goalCols)
-  const goalAreaH = goalLane.length > 0 ? goalRows * (goalH + 6) + 8 : 0
+  const goalAreaH = goalLane.length > 0 ? labelH + goalRows * (goalH + 6) + 12 : 0
 
-  const bodyTop = pad.y + labelH + goalAreaH + 6
+  const bodyTop = pad.y + goalAreaH + labelH + 6
 
   const projectRowData = []
   let bodyY = bodyTop
@@ -200,11 +206,13 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
     })
   }
 
-  const goalW = 138
-  const goalGapH = 8
+  const bands = []
   const totalGoalW = goalCols * goalW + (goalCols - 1) * goalGapH
-  const goalStartX = colDef.project.x + (colDef.project.w - totalGoalW) / 2
+  const goalStartX = colDef.identity.x + Math.max(0, (contentW - totalGoalW) / 2)
 
+  if (goalLane.length > 0) {
+    bands.push({ key: 'goals', x: colDef.identity.x, y: pad.y, w: contentW })
+  }
   goalLane.forEach((goal, i) => {
     nodes.push({
       id: `goal:${goal.id}`,
@@ -225,21 +233,22 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
     }))
   })
 
-  const decisionTop = bodyY + 12
-  const decisionColCount = Math.min(decisionLane.length, 3) || 1
-  const decW = 134
-  const decGapH = 8
-  const totalDecW = decisionColCount * decW + (decisionColCount - 1) * decGapH
-  const decStartX = colDef.project.x + (colDef.project.w - totalDecW) / 2
+  const decisionTop = bodyY + labelH + 16
+  const decisionColCount = Math.min(decisionLane.length, bandCols) || 1
+  const totalDecW = decisionColCount * goalW + (decisionColCount - 1) * goalGapH
+  const decStartX = colDef.identity.x + Math.max(0, (contentW - totalDecW) / 2)
 
+  if (decisionLane.length > 0) {
+    bands.push({ key: 'decisions', x: colDef.identity.x, y: decisionTop - labelH, w: contentW })
+  }
   decisionLane.forEach((decision, i) => {
     nodes.push({
       id: `decision:${decision.id}`,
       type: 'decision',
       name: decision.name,
-      x: decStartX + (i % decisionColCount) * (decW + decGapH),
+      x: decStartX + (i % decisionColCount) * (goalW + goalGapH),
       y: decisionTop + Math.floor(i / decisionColCount) * (decisionH + 6),
-      w: decW,
+      w: goalW,
       h: decisionH,
       color: decision.color,
       data: decision,
@@ -254,8 +263,10 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
     }
   })
 
-  const decAreaH = decisionLane.length > 0 ? Math.ceil(decisionLane.length / decisionColCount) * (decisionH + 6) + 24 : 0
-  const canvasH = Math.max(520, bodyY + decAreaH + pad.y + 40)
+  const decAreaH = decisionLane.length > 0
+    ? labelH + Math.ceil(decisionLane.length / decisionColCount) * (decisionH + 6) + 28
+    : 0
+  const canvasH = Math.max(520, bodyY + decAreaH + pad.y + 24)
 
   const nodeById = new Map(nodes.map(n => [n.id, n]))
   const validLinks = links.filter(l => nodeById.has(l.from) && nodeById.has(l.to))
@@ -267,7 +278,9 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
     width: canvasW,
     height: canvasH,
     columns: colDef,
+    bands,
     labelH,
+    labelY: bodyTop - labelH,
     padY: pad.y,
   }
 }
@@ -361,6 +374,46 @@ function mulberry32(seed) {
   }
 }
 
+// Re-place settled nodes one by one, spiralling outwards from each node's
+// simulated position to the nearest free spot. Deterministic, keeps the
+// cluster structure, and guarantees zero overlapping cards. Positions are
+// still center-based at this point.
+function separateRects(nodes, gap = 12) {
+  const placed = []
+  const collides = (x, y, node) => placed.some(p =>
+    Math.abs(x - p.x) < (node.w + p.w) / 2 + gap &&
+    Math.abs(y - p.y) < (node.h + p.h) / 2 + gap
+  )
+
+  const ordered = [...nodes].sort((a, b) =>
+    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || a.y - b.y || a.x - b.x
+  )
+  for (const node of ordered) {
+    if (node.pinned || !collides(node.x, node.y, node)) {
+      placed.push(node)
+      continue
+    }
+    let best = null
+    for (let radius = 26; radius <= 640 && !best; radius += 26) {
+      const steps = Math.max(8, Math.round((radius / 26) * 6))
+      for (let step = 0; step < steps; step++) {
+        const angle = (step / steps) * Math.PI * 2
+        const x = node.x + Math.cos(angle) * radius
+        const y = node.y + Math.sin(angle) * radius * 0.72
+        if (!collides(x, y, node)) {
+          best = { x, y }
+          break
+        }
+      }
+    }
+    if (best) {
+      node.x = best.x
+      node.y = best.y
+    }
+    placed.push(node)
+  }
+}
+
 const NETWORK_SIZE = {
   identity: { w: 140, h: 46 },
   project: { w: 180, h: 60 },
@@ -369,15 +422,17 @@ const NETWORK_SIZE = {
   decision: { w: 138, h: 44 },
 }
 
-// Deterministic force-directed layout. Runs a fixed number of settling
-// iterations so the same inputs always produce the same picture.
+// Deterministic identity-clustered layout: identities sit pinned on a ring,
+// their projects settle around them, and tasks/goals/decisions settle around
+// their project. Positions are clamped to a fixed canvas so fit-to-view never
+// shrinks the graph into an unreadable blur.
 export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
   const nodes = []
   const links = []
 
   const pushNode = (id, type, name, color, data) => {
     const size = NETWORK_SIZE[type] || { w: 150, h: 46 }
-    nodes.push({ id, type, name, color, data, w: size.w, h: size.h, x: 0, y: 0 })
+    nodes.push({ id, type, name, color, data, w: size.w, h: size.h, x: 0, y: 0, vx: 0, vy: 0 })
   }
 
   visibleIdentityNodes.forEach(identity =>
@@ -417,27 +472,65 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
   const nodeById = new Map(nodes.map(n => [n.id, n]))
   const validLinks = links.filter(l => nodeById.has(l.from) && nodeById.has(l.to))
 
-  const width = 1200
-  const height = 820
+  const width = 1460
+  const height = 940
   const cx = width / 2
   const cy = height / 2
-  const rng = mulberry32((nodes.length * 2654435761) >>> 0)
-  nodes.forEach((node, i) => {
-    const angle = (i / Math.max(nodes.length, 1)) * Math.PI * 2
-    const radius = Math.min(width, height) * 0.34
-    node.x = cx + Math.cos(angle) * radius + (rng() - 0.5) * 60
-    node.y = cy + Math.sin(angle) * radius + (rng() - 0.5) * 60
-    node.vx = 0
-    node.vy = 0
+  const clampPad = 100
+
+  // Pin identities evenly on an ellipse; everything else starts near its
+  // anchor with deterministic jitter and settles from there.
+  const identityAnchors = new Map()
+  const identityCount = Math.max(visibleIdentityNodes.length, 1)
+  visibleIdentityNodes.forEach((identity, i) => {
+    const angle = (i / identityCount) * Math.PI * 2 - Math.PI / 2
+    identityAnchors.set(identity.id, {
+      x: cx + Math.cos(angle) * width * 0.3,
+      y: cy + Math.sin(angle) * height * 0.3,
+    })
   })
 
+  const anchorFor = (node) => {
+    if (node.type === 'identity') return identityAnchors.get(node.data.id)
+    if (node.type === 'project') {
+      const ownerId = (node.data.identityIds || [])[0]
+      return identityAnchors.get(ownerId) || { x: cx, y: cy }
+    }
+    if (node.type === 'task') {
+      const project = nodeById.get(`project:${node.data.projectId}`)
+      return project ? { x: project.x, y: project.y } : { x: cx, y: cy }
+    }
+    const linked = node.data.projectIds?.[0] || node.data.projectId
+    const project = nodeById.get(`project:${linked}`)
+    return project ? { x: project.x, y: project.y } : { x: cx, y: cy }
+  }
+
+  const rng = mulberry32((nodes.length * 2654435761) >>> 0)
+  for (const node of nodes) {
+    if (node.type === 'identity') {
+      const anchor = identityAnchors.get(node.data.id)
+      node.x = anchor.x
+      node.y = anchor.y
+      node.pinned = true
+      continue
+    }
+    const anchor = anchorFor(node)
+    node.x = anchor.x + (rng() - 0.5) * 220
+    node.y = anchor.y + (rng() - 0.5) * 220
+  }
+
   const index = new Map(nodes.map((n, i) => [n.id, i]))
-  const springLen = 150
-  const springK = 0.025
-  const repulse = 9000
-  const gravity = 0.02
-  const damping = 0.86
-  for (let iter = 0; iter < 320; iter++) {
+  const SPRING = {
+    owns: { len: 165, k: 0.05 },
+    goal: { len: 190, k: 0.02 },
+    decision: { len: 150, k: 0.025 },
+    dependency: { len: 190, k: 0.015 },
+    task: { len: 110, k: 0.055 },
+  }
+  const repulse = 7600
+  const gravity = 0.012
+  const damping = 0.85
+  for (let iter = 0; iter < 280; iter++) {
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         let dx = nodes[i].x - nodes[j].x
@@ -456,10 +549,11 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
     for (const link of validLinks) {
       const a = nodes[index.get(link.from)]
       const b = nodes[index.get(link.to)]
+      const spring = SPRING[link.type] || SPRING.task
       const dx = b.x - a.x
       const dy = b.y - a.y
       const d = Math.hypot(dx, dy) || 0.01
-      const f = (d - springLen) * springK
+      const f = (d - spring.len) * spring.k
       const fx = (dx / d) * f
       const fy = (dy / d) * f
       a.vx += fx
@@ -468,16 +562,23 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
       b.vy -= fy
     }
     for (const node of nodes) {
+      if (node.pinned) {
+        node.vx = 0
+        node.vy = 0
+        continue
+      }
       node.vx += (cx - node.x) * gravity
       node.vy += (cy - node.y) * gravity
       node.vx *= damping
       node.vy *= damping
-      node.x += node.vx
-      node.y += node.vy
+      node.x = Math.max(clampPad, Math.min(width - clampPad, node.x + node.vx))
+      node.y = Math.max(clampPad, Math.min(height - clampPad, node.y + node.vy))
     }
   }
 
-  const pad = 90
+  separateRects(nodes)
+
+  const pad = 70
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -501,6 +602,7 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
     node.y += pad - minY
     delete node.vx
     delete node.vy
+    delete node.pinned
   })
 
   return {
