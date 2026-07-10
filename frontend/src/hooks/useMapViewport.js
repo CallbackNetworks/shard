@@ -7,21 +7,24 @@ const ZOOM_MAX = 2.4
 // ResizeObserver, computes a fit-to-frame scale, and exposes pointer/keyboard/
 // wheel handlers that pan and zoom around the cursor.
 export default function useMapViewport({ width, height }) {
-  const graphRef = useRef(null)
+  // Callback ref instead of a mount-time effect: the graph frame mounts and
+  // unmounts as the user switches layout styles, so measurement has to follow
+  // the element, not the hook's lifecycle.
+  const [frameEl, setFrameEl] = useState(null)
+  const graphRef = useCallback((el) => setFrameEl(el), [])
   const panRef = useRef(null)
   const [frame, setFrame] = useState({ width: 0, height: 0 })
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
 
   useEffect(() => {
-    const el = graphRef.current
-    if (!el) return undefined
-    const update = () => setFrame({ width: el.clientWidth, height: el.clientHeight })
+    if (!frameEl) return undefined
+    const update = () => setFrame({ width: frameEl.clientWidth, height: frameEl.clientHeight })
     update()
     if (typeof ResizeObserver === 'undefined') return undefined
     const observer = new ResizeObserver(update)
-    observer.observe(el)
+    observer.observe(frameEl)
     return () => observer.disconnect()
-  }, [])
+  }, [frameEl])
 
   const fit = useMemo(() => {
     const padding = 28

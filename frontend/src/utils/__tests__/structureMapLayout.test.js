@@ -57,8 +57,19 @@ describe('buildNetworkLayout', () => {
   })
 
   it('keeps the canvas bounded so fit-to-view stays readable', () => {
-    expect(layout.width).toBeLessThan(2200)
-    expect(layout.height).toBeLessThan(1700)
+    expect(layout.width).toBeLessThan(2400)
+    expect(layout.height).toBeLessThan(2000)
+  })
+
+  it('rings tasks outside projects outside identities', () => {
+    const center = layout.orbit
+    const dist = (n) => Math.hypot(n.x + n.w / 2 - center.cx, (n.y + n.h / 2 - center.cy) / center.squash)
+    const maxIdentity = Math.max(...layout.nodes.filter(n => n.type === 'identity').map(dist))
+    const minProject = Math.min(...layout.nodes.filter(n => n.type === 'project').map(dist))
+    const maxProject = Math.max(...layout.nodes.filter(n => n.type === 'project').map(dist))
+    const minTask = Math.min(...layout.nodes.filter(n => n.type === 'task').map(dist))
+    expect(maxIdentity).toBeLessThan(minProject)
+    expect(maxProject).toBeLessThan(minTask)
   })
 
   it('is deterministic for identical input', () => {

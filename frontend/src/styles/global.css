@@ -1916,6 +1916,12 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   pointer-events: none;
   overflow: visible;
 }
+.kt-map-orbit {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+  stroke-dasharray: 2 6;
+}
 .kt-map-links path {
   opacity: 0.72;
   stroke-dasharray: var(--kt-map-dash, none);

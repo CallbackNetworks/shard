@@ -49,6 +49,16 @@ export default function MapCanvas({
       }}
     >
       <svg className="kt-map-links" viewBox={`0 0 ${layout.width} ${layout.height}`} aria-hidden="true">
+        {layout.orbit && layout.orbit.rings.map(radius => (
+          <ellipse
+            key={radius}
+            className="kt-map-orbit"
+            cx={layout.orbit.cx}
+            cy={layout.orbit.cy}
+            rx={radius}
+            ry={radius * layout.orbit.squash}
+          />
+        ))}
         {layout.links.map((link, index) => {
           const from = layout.nodeById.get(link.from)
           const to = layout.nodeById.get(link.to)

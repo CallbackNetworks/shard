@@ -364,20 +364,9 @@ export function networkPath(from, to) {
   return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
 }
 
-function mulberry32(seed) {
-  let a = seed >>> 0
-  return function () {
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-// Re-place settled nodes one by one, spiralling outwards from each node's
-// simulated position to the nearest free spot. Deterministic, keeps the
-// cluster structure, and guarantees zero overlapping cards. Positions are
-// still center-based at this point.
+// Safety net after the deterministic radial placement: re-place any node that
+// still collides (rare diagonal cases) by spiralling outwards from its slot to
+// the nearest free spot. Deterministic; normally a no-op.
 function separateRects(nodes, gap = 12) {
   const placed = []
   const collides = (x, y, node) => placed.some(p =>
@@ -385,11 +374,9 @@ function separateRects(nodes, gap = 12) {
     Math.abs(y - p.y) < (node.h + p.h) / 2 + gap
   )
 
-  const ordered = [...nodes].sort((a, b) =>
-    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || a.y - b.y || a.x - b.x
-  )
+  const ordered = [...nodes].sort((a, b) => a.y - b.y || a.x - b.x)
   for (const node of ordered) {
-    if (node.pinned || !collides(node.x, node.y, node)) {
+    if (!collides(node.x, node.y, node)) {
       placed.push(node)
       continue
     }
@@ -422,17 +409,20 @@ const NETWORK_SIZE = {
   decision: { w: 138, h: 44 },
 }
 
-// Deterministic identity-clustered layout: identities sit pinned on a ring,
-// their projects settle around them, and tasks/goals/decisions settle around
-// their project. Positions are clamped to a fixed canvas so fit-to-view never
-// shrinks the graph into an unreadable blur.
+// Sector-orbit layout (radial tidy tree): every identity owns an angular
+// sector sized by how many tasks live under it, projects sit on an inner
+// orbit inside their identity's sector, tasks on an outer orbit inside their
+// project's slice, and goals/pending decisions float on the outermost ring at
+// the mean angle of what they link to. Angles are allocated by need, so the
+// picture is deterministic and collision-free by construction; rings are
+// staggered into two sub-orbits to halve the required radius.
 export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
   const nodes = []
   const links = []
 
   const pushNode = (id, type, name, color, data) => {
     const size = NETWORK_SIZE[type] || { w: 150, h: 46 }
-    nodes.push({ id, type, name, color, data, w: size.w, h: size.h, x: 0, y: 0, vx: 0, vy: 0 })
+    nodes.push({ id, type, name, color, data, w: size.w, h: size.h, x: 0, y: 0 })
   }
 
   visibleIdentityNodes.forEach(identity =>
@@ -472,113 +462,118 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
   const nodeById = new Map(nodes.map(n => [n.id, n]))
   const validLinks = links.filter(l => nodeById.has(l.from) && nodeById.has(l.to))
 
-  const width = 1460
-  const height = 940
-  const cx = width / 2
-  const cy = height / 2
-  const clampPad = 100
+  const TAU = Math.PI * 2
+  const SQUASH = 0.86
 
-  // Pin identities evenly on an ellipse; everything else starts near its
-  // anchor with deterministic jitter and settles from there.
-  const identityAnchors = new Map()
-  const identityCount = Math.max(visibleIdentityNodes.length, 1)
-  visibleIdentityNodes.forEach((identity, i) => {
-    const angle = (i / identityCount) * Math.PI * 2 - Math.PI / 2
-    identityAnchors.set(identity.id, {
-      x: cx + Math.cos(angle) * width * 0.3,
-      y: cy + Math.sin(angle) * height * 0.3,
-    })
+  // --- Cluster the forest: one sector per identity, plus one for unowned ---
+  const tasksByProject = new Map()
+  visibleTaskNodes.forEach(task => {
+    if (!tasksByProject.has(task.projectId)) tasksByProject.set(task.projectId, [])
+    tasksByProject.get(task.projectId).push(task)
   })
 
-  const anchorFor = (node) => {
-    if (node.type === 'identity') return identityAnchors.get(node.data.id)
-    if (node.type === 'project') {
-      const ownerId = (node.data.identityIds || [])[0]
-      return identityAnchors.get(ownerId) || { x: cx, y: cy }
-    }
-    if (node.type === 'task') {
-      const project = nodeById.get(`project:${node.data.projectId}`)
-      return project ? { x: project.x, y: project.y } : { x: cx, y: cy }
-    }
-    const linked = node.data.projectIds?.[0] || node.data.projectId
-    const project = nodeById.get(`project:${linked}`)
-    return project ? { x: project.x, y: project.y } : { x: cx, y: cy }
+  const identityIdSet = new Set(visibleIdentityNodes.map(identity => identity.id))
+  const clusters = visibleIdentityNodes.map(identity => ({ identityId: identity.id, projects: [] }))
+  const clusterByIdentity = new Map(clusters.map(cluster => [cluster.identityId, cluster]))
+  const unownedCluster = { identityId: null, projects: [] }
+  visibleProjects.forEach(project => {
+    const ownerId = (project.identityIds || []).find(id => identityIdSet.has(id))
+    const cluster = clusterByIdentity.get(ownerId)
+    if (cluster) cluster.projects.push(project)
+    else unownedCluster.projects.push(project)
+  })
+  if (unownedCluster.projects.length > 0) clusters.push(unownedCluster)
+
+  // Weight = angular need. A project needs one unit per task (min one unit);
+  // an empty identity still gets a sliver so its node has room.
+  const projectWeight = (project) => Math.max(tasksByProject.get(project.id)?.length || 0, 1)
+  clusters.forEach(cluster => {
+    cluster.weight = cluster.projects.reduce((sum, project) => sum + projectWeight(project), 0) || 0.5
+  })
+  const totalWeight = clusters.reduce((sum, cluster) => sum + cluster.weight, 0)
+
+  const gapAngle = clusters.length > 1 ? 0.05 : 0
+  const usable = TAU - clusters.length * gapAngle
+  const unitAngle = usable / Math.max(totalWeight, 1)
+
+  // --- Ring radii sized from angular need (two staggered sub-orbits) ---
+  const PROJECT_ARC = 208
+  const TASK_ARC = 166
+  const LANE_ARC = 172
+  const r2 = Math.max(280, PROJECT_ARC / Math.max(unitAngle, 0.0001) / 2)
+  const r2b = r2 + 96
+  const r3 = Math.max(r2b + 140, TASK_ARC / Math.max(unitAngle, 0.0001) / 2)
+  const r3b = r3 + 84
+  const laneCount = laneNodes.length
+  const r4 = Math.max(r3b + 150, (laneCount * LANE_ARC) / TAU)
+  const r1 = Math.max(130, r2 * 0.42)
+
+  const maxR = laneCount > 0 ? r4 : r3b
+  const edgePad = 130
+  const cx = maxR + edgePad
+  const cy = maxR * SQUASH + edgePad
+  const place = (node, angle, radius) => {
+    node.x = cx + Math.cos(angle) * radius
+    node.y = cy + Math.sin(angle) * radius * SQUASH
   }
 
-  const rng = mulberry32((nodes.length * 2654435761) >>> 0)
-  for (const node of nodes) {
-    if (node.type === 'identity') {
-      const anchor = identityAnchors.get(node.data.id)
-      node.x = anchor.x
-      node.y = anchor.y
-      node.pinned = true
-      continue
-    }
-    const anchor = anchorFor(node)
-    node.x = anchor.x + (rng() - 0.5) * 220
-    node.y = anchor.y + (rng() - 0.5) * 220
-  }
+  // --- Walk sectors: identity mid-sector, projects and tasks inside it ---
+  let cursor = -Math.PI / 2
+  let projectIndex = 0
+  const projectAngleById = new Map()
+  clusters.forEach(cluster => {
+    const span = cluster.weight * unitAngle
+    const identityNode = cluster.identityId ? nodeById.get(`identity:${cluster.identityId}`) : null
+    if (identityNode) place(identityNode, cursor + span / 2, r1)
 
-  const index = new Map(nodes.map((n, i) => [n.id, i]))
-  const SPRING = {
-    owns: { len: 165, k: 0.05 },
-    goal: { len: 190, k: 0.02 },
-    decision: { len: 150, k: 0.025 },
-    dependency: { len: 190, k: 0.015 },
-    task: { len: 110, k: 0.055 },
-  }
-  const repulse = 7600
-  const gravity = 0.012
-  const damping = 0.85
-  for (let iter = 0; iter < 280; iter++) {
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        let dx = nodes[i].x - nodes[j].x
-        let dy = nodes[i].y - nodes[j].y
-        const d2 = dx * dx + dy * dy + 0.01
-        const d = Math.sqrt(d2)
-        const f = repulse / d2
-        const fx = (dx / d) * f
-        const fy = (dy / d) * f
-        nodes[i].vx += fx
-        nodes[i].vy += fy
-        nodes[j].vx -= fx
-        nodes[j].vy -= fy
-      }
+    let projectCursor = cursor
+    cluster.projects.forEach(project => {
+      const projectSpan = projectWeight(project) * unitAngle
+      const projectAngle = projectCursor + projectSpan / 2
+      const projectNode = nodeById.get(`project:${project.id}`)
+      if (projectNode) place(projectNode, projectAngle, projectIndex % 2 === 0 ? r2 : r2b)
+      projectAngleById.set(project.id, projectAngle)
+      projectIndex += 1
+
+      const tasks = tasksByProject.get(project.id) || []
+      tasks.forEach((task, i) => {
+        const taskAngle = projectCursor + ((i + 0.5) / tasks.length) * projectSpan
+        const taskNode = nodeById.get(`task:${task.id}`)
+        if (taskNode) place(taskNode, taskAngle, i % 2 === 0 ? r3 : r3b)
+      })
+      projectCursor += projectSpan
+    })
+    cursor += span + gapAngle
+  })
+
+  // --- Outer ring: goals and decisions aim at the circular mean of their
+  // linked projects, then get nudged apart to a minimum angular distance ---
+  const laneEntries = laneNodes.map(node => {
+    const linkedIds = (node.projectIds || (node.projectId ? [node.projectId] : []))
+      .filter(id => projectAngleById.has(id))
+    let angle = -Math.PI / 2
+    if (linkedIds.length > 0) {
+      const sumX = linkedIds.reduce((sum, id) => sum + Math.cos(projectAngleById.get(id)), 0)
+      const sumY = linkedIds.reduce((sum, id) => sum + Math.sin(projectAngleById.get(id)), 0)
+      angle = Math.atan2(sumY, sumX)
     }
-    for (const link of validLinks) {
-      const a = nodes[index.get(link.from)]
-      const b = nodes[index.get(link.to)]
-      const spring = SPRING[link.type] || SPRING.task
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      const d = Math.hypot(dx, dy) || 0.01
-      const f = (d - spring.len) * spring.k
-      const fx = (dx / d) * f
-      const fy = (dy / d) * f
-      a.vx += fx
-      a.vy += fy
-      b.vx -= fx
-      b.vy -= fy
-    }
-    for (const node of nodes) {
-      if (node.pinned) {
-        node.vx = 0
-        node.vy = 0
-        continue
-      }
-      node.vx += (cx - node.x) * gravity
-      node.vy += (cy - node.y) * gravity
-      node.vx *= damping
-      node.vy *= damping
-      node.x = Math.max(clampPad, Math.min(width - clampPad, node.x + node.vx))
-      node.y = Math.max(clampPad, Math.min(height - clampPad, node.y + node.vy))
+    return { node, angle }
+  }).sort((a, b) => a.angle - b.angle)
+
+  const minLaneGap = LANE_ARC / Math.max(r4, 1)
+  for (let i = 1; i < laneEntries.length; i++) {
+    if (laneEntries[i].angle < laneEntries[i - 1].angle + minLaneGap) {
+      laneEntries[i].angle = laneEntries[i - 1].angle + minLaneGap
     }
   }
+  laneEntries.forEach(({ node, angle }) => {
+    const laneNode = nodeById.get(`${node.lane === 'goal' ? 'goal' : 'decision'}:${node.id}`)
+    if (laneNode) place(laneNode, angle, r4)
+  })
 
   separateRects(nodes)
 
-  const pad = 70
+  const pad = 60
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -594,15 +589,12 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
   if (!nodes.length) {
     minX = 0
     minY = 0
-    maxX = width
-    maxY = height
+    maxX = 900
+    maxY = 600
   }
   nodes.forEach(node => {
     node.x += pad - minX
     node.y += pad - minY
-    delete node.vx
-    delete node.vy
-    delete node.pinned
   })
 
   return {
@@ -612,5 +604,13 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
     width: maxX - minX + pad * 2,
     height: maxY - minY + pad * 2,
     columns: null,
+    orbit: nodes.length
+      ? {
+          cx: cx + pad - minX,
+          cy: cy + pad - minY,
+          squash: SQUASH,
+          rings: laneCount > 0 ? [r1, r2, r2b, r3, r3b, r4] : [r1, r2, r2b, r3, r3b],
+        }
+      : null,
   }
 }
