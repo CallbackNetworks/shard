@@ -22,6 +22,7 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
     share_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
+    allow_guest_notes: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     agent_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
@@ -201,6 +202,7 @@ class Identity(Base):
     share_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
     share_pin_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     share_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    allow_guest_notes: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     project_identities: Mapped[list["ProjectIdentity"]] = relationship(
@@ -258,11 +260,14 @@ class Comment(Base):
     __tablename__ = "comments"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    task_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    # Nullable: a comment with task_id=None is a project-level guest note
+    task_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True, index=True
     )
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     author: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Set only for notes submitted by share-link visitors; None for owner/synced comments
+    guest_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     # External issue-comment id (GitHub/Gitea/GitLab) for bidirectional sync & echo prevention
     external_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)

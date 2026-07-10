@@ -17,3 +17,4 @@
 | [0013](0013-full-data-backup-strategy.md) | Full-Data Backup Strategy | Accepted | 2026-07-06 |
 | [0014](0014-bidirectional-issue-sync.md) | Bidirectional Issue Sync for Comments, Labels, and State | Accepted | 2026-07-09 |
 | [0015](0015-outbound-field-sync-last-write-wins.md) | Outbound Field Sync with Last-Write-Wins Semantics | Accepted | 2026-07-09 |
+| [0016](0016-guest-notes-on-share-pages.md) | Guest Notes on Public Share Pages | Accepted | 2026-07-10 |

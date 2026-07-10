@@ -127,7 +127,15 @@ export default function ShareView({ scope = 'identity' }) {
             <EmptyState message="No active projects" />
           )}
           {projects.map((p, i) => (
-            <ShareProjectCard key={p.id} project={p} index={i} bp={bp} />
+            <ShareProjectCard
+              key={p.id}
+              project={p}
+              index={i}
+              bp={bp}
+              scope={scope}
+              token={token}
+              guestNotesEnabled={meta.guest_notes_enabled === true}
+            />
           ))}
         </div>
 

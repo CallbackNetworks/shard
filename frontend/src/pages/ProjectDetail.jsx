@@ -1,7 +1,7 @@
 import { useState, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2 } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2, MessageSquare } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -200,6 +200,11 @@ export default function ProjectDetail() {
     onSuccess: invalidate,
   })
 
+  const guestNotesMut = useMutation({
+    mutationFn: () => updateProject(id, { allow_guest_notes: !project.allow_guest_notes }),
+    onSuccess: invalidate,
+  })
+
   const saveAgentInstrMut = useMutation({
     mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null, repo_url: repoUrl || null }),
     onSuccess: () => { invalidate(); setAgentInstrDirty(false) },
@@ -389,6 +394,15 @@ export default function ProjectDetail() {
             >
               {copiedShare ? <Check size={12} /> : <Share2 size={12} />}
               {copiedShare ? 'Copied!' : 'Share'}
+            </button>
+            <button
+              onClick={() => guestNotesMut.mutate()}
+              className={s.archiveBtn}
+              style={project.allow_guest_notes ? { color: '#818cf8', borderColor: 'rgba(129,140,248,0.4)' } : undefined}
+              title={project.allow_guest_notes ? 'Guest notes enabled on share page — click to disable' : 'Allow share-page visitors to leave notes'}
+            >
+              <MessageSquare size={12} />
+              Notes
             </button>
             <LabelManager
               labels={labels}

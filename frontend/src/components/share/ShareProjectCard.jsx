@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Bar, Label, urgencyScore, urgencyColor } from '../OverviewViews'
 import { STATUS_COLOR } from '../../constants/theme'
 import useScrollReveal from './useScrollReveal'
+import GuestNotes from './GuestNotes'
 import { relativeTime, formatMinutes, formatDate } from './utils'
 
 const STATUS_COLOR_MAP = STATUS_COLOR
@@ -16,12 +17,12 @@ function hasDetails(task) {
     (task.blocking && task.blocking.length > 0)
 }
 
-function TaskRow({ task, index, bp }) {
+function TaskRow({ task, index, bp, share }) {
   const [open, setOpen] = useState(false)
   const sc = STATUS_COLOR_MAP[task.status] || 'rgba(255,255,255,0.28)'
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
   const isMobile = bp === 'mobile'
-  const expandable = hasDetails(task)
+  const expandable = hasDetails(task) || share.enabled
 
   return (
     <div>
@@ -148,13 +149,29 @@ function TaskRow({ task, index, bp }) {
               )}
             </div>
           )}
+
+          {/* Guest notes */}
+          {share.enabled && (
+            <div className="kt-share-task-notes">
+              <div className="kt-share-mini-label">
+                NOTES ({(task.comments || []).length})
+              </div>
+              <GuestNotes
+                scope={share.scope}
+                token={share.token}
+                projectId={share.projectId}
+                taskId={task.id}
+                notes={task.comments}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-export default function ShareProjectCard({ project, index: _index, bp }) {
+export default function ShareProjectCard({ project, index: _index, bp, scope, token, guestNotesEnabled }) {
   const [expanded, setExpanded] = useState(false)
   const [ref, visible] = useScrollReveal(0.1)
   const u = urgencyScore(project)
@@ -244,13 +261,28 @@ export default function ShareProjectCard({ project, index: _index, bp }) {
       </div>
 
       {visibleTasks.map((t, i) => (
-        <TaskRow key={t.id} task={t} index={i} bp={bp} />
+        <TaskRow
+          key={t.id}
+          task={t}
+          index={i}
+          bp={bp}
+          share={{ scope, token, projectId: project.id, enabled: !!guestNotesEnabled }}
+        />
       ))}
 
       {hasMore && (
         <button onClick={() => setExpanded(!expanded)} className="kt-share-show-more">
           {expanded ? 'SHOW LESS' : `SHOW ALL ${tasks.length} TASKS`}
         </button>
+      )}
+
+      {guestNotesEnabled && (
+        <div className="kt-share-project-notes">
+          <div className="kt-share-mini-label">
+            PROJECT NOTES ({(project.notes || []).length})
+          </div>
+          <GuestNotes scope={scope} token={token} projectId={project.id} notes={project.notes} />
+        </div>
       )}
     </div>
   )

@@ -270,6 +270,10 @@ export const getEstimationCalibration = (params = {}) => api.get('/analytics/est
 // Share (public, no auth — uses plain axios to avoid the auth interceptor)
 export const getShareData = (token, scope = 'identity') =>
   axios.get(`/share/${scope}/${token}`, { withCredentials: true }).then(r => r.data)
+export const postShareProjectNote = (scope, token, payload) =>
+  axios.post(`/share/${scope}/${token}/notes`, payload, { withCredentials: true }).then(r => r.data)
+export const postShareTaskNote = (scope, token, taskId, payload) =>
+  axios.post(`/share/${scope}/${token}/tasks/${taskId}/notes`, payload, { withCredentials: true }).then(r => r.data)
 export const rotateShareToken = (identityId) => api.post(`/identities/${identityId}/rotate-share-token`).then(r => r.data)
 
 // Share PIN & expiry management (authenticated)

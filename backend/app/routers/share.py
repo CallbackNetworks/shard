@@ -4,12 +4,13 @@ import os
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import (
     ActivityLog,
+    Comment,
     Cycle,
     CycleTask,
     Identity,
@@ -18,6 +19,7 @@ from app.models import (
     Task,
     TaskLabel,
 )
+from app.services.activity import log_activity
 from app.services.pin_utils import check_pin
 from app.services.rate_limiter import share_rate_limit
 
@@ -25,6 +27,7 @@ router = APIRouter(prefix="/share", tags=["share"])
 
 _PIN_SECRET = os.getenv("SECRET_KEY", "share-pin-default-secret")
 _PIN_TTL = 900  # 15 minutes
+_NOTE_DAILY_LIMIT = 20  # guest notes per visitor (ip hash) per UTC day
 
 
 def _sign_token(identity_id: str, ts: int) -> str:
@@ -122,7 +125,18 @@ def _load_project(db: Session, token: str) -> Project | None:
     return db.query(Project).filter(Project.share_token == token).options(*_project_eager_options()).first()
 
 
-def _serialize_project(p: Project):
+def _serialize_comment(c: Comment):
+    return {
+        "id": c.id,
+        "author": c.author,
+        "guest_name": c.guest_name,
+        "is_guest": c.guest_name is not None,
+        "body": c.body,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+    }
+
+
+def _serialize_project(p: Project, db: Session, include_notes: bool):
     tasks = p.tasks
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
@@ -182,10 +196,25 @@ def _serialize_project(p: Project):
                 "subtask_count": len(t.subtasks),
                 "subtasks": subtask_details,
                 "comment_count": len(t.comments),
+                "comments": (
+                    [_serialize_comment(c) for c in sorted(t.comments, key=lambda c: c.created_at)]
+                    if include_notes
+                    else []
+                ),
                 "blocked_by": blocked_by,
                 "blocking": blocking,
             }
         )
+
+    project_notes = []
+    if include_notes:
+        note_rows = (
+            db.query(Comment)
+            .filter(Comment.project_id == p.id, Comment.task_id.is_(None))
+            .order_by(Comment.created_at.asc())
+            .all()
+        )
+        project_notes = [_serialize_comment(c) for c in note_rows]
 
     return {
         "id": p.id,
@@ -199,11 +228,12 @@ def _serialize_project(p: Project):
         "labels": project_labels,
         "active_cycle": active_cycle,
         "comment_count": comment_count,
+        "notes": project_notes,
         "tasks": task_list,
     }
 
 
-def _build_payload(owner: dict, source_projects: list[Project], db: Session, scope: str):
+def _build_payload(owner: dict, source_projects: list[Project], db: Session, scope: str, include_notes: bool = False):
     projects = []
     project_ids = []
 
@@ -211,7 +241,7 @@ def _build_payload(owner: dict, source_projects: list[Project], db: Session, sco
         if not p or p.status != "active":
             continue
         project_ids.append(p.id)
-        projects.append(_serialize_project(p))
+        projects.append(_serialize_project(p, db, include_notes))
 
     recent_activity = []
     if project_ids:
@@ -264,6 +294,7 @@ def _build_payload(owner: dict, source_projects: list[Project], db: Session, sco
             "generated_at": datetime.now(UTC).isoformat(),
             "requires_pin": False,
             "scope": scope,
+            "guest_notes_enabled": include_notes,
         },
     }
 
@@ -277,7 +308,7 @@ def _build_response(identity: Identity, db: Session):
         "avatar": identity.avatar,
         "description": identity.description,
     }
-    return _build_payload(owner, projects, db, scope="identity")
+    return _build_payload(owner, projects, db, scope="identity", include_notes=identity.allow_guest_notes)
 
 
 def _build_project_response(project: Project, db: Session):
@@ -289,7 +320,7 @@ def _build_project_response(project: Project, db: Session):
         "avatar": project.name[:1].upper(),
         "description": project.description,
     }
-    return _build_payload(owner, [project], db, scope="project")
+    return _build_payload(owner, [project], db, scope="project", include_notes=project.allow_guest_notes)
 
 
 def _maybe_log_view(db: Session, identity: Identity, ip_hash: str):
@@ -386,3 +417,105 @@ def verify_share_pin(token: str, body: PinVerifyRequest, response: Response, db:
         samesite="lax",
     )
     return _build_response(identity, db)
+
+
+# ── Guest notes ──────────────────────────────────────────────────
+
+
+class GuestNoteIn(BaseModel):
+    guest_name: str = Field(..., min_length=1, max_length=80)
+    body: str = Field(..., min_length=1, max_length=2000)
+    project_id: str | None = None  # required for identity-scope project-level notes
+
+    @field_validator("guest_name", "body")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be blank")
+        return v
+
+
+def _resolve_note_target(scope: str, token: str, request: Request, db: Session) -> list[Project]:
+    """Validate a guest-note write against a share token; return the projects it may write to."""
+    if scope == "identity":
+        identity = db.query(Identity).filter(Identity.share_token == token).first()
+        if not identity:
+            raise HTTPException(status_code=404, detail="Share link not found")
+        if identity.share_expires_at and datetime.now(UTC) > _as_utc(identity.share_expires_at):
+            raise HTTPException(status_code=410, detail="Share link has expired")
+        if not identity.allow_guest_notes:
+            raise HTTPException(status_code=403, detail="Guest notes are disabled for this share link")
+        if identity.share_pin_hash:
+            session_token = request.cookies.get("share_session")
+            if not session_token or not _verify_token(session_token, identity.id):
+                raise HTTPException(status_code=403, detail="PIN verification required")
+        return [pi.project for pi in identity.project_identities if pi.project and pi.project.status == "active"]
+    if scope == "project":
+        project = db.query(Project).filter(Project.share_token == token).first()
+        if not project or project.status != "active":
+            raise HTTPException(status_code=404, detail="Share link not found")
+        if not project.allow_guest_notes:
+            raise HTTPException(status_code=403, detail="Guest notes are disabled for this share link")
+        return [project]
+    raise HTTPException(status_code=404, detail="Share link not found")
+
+
+def _enforce_note_quota(db: Session, ip_hash: str):
+    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    count = (
+        db.query(ActivityLog)
+        .filter(
+            ActivityLog.action == "share.note",
+            ActivityLog.actor == f"visitor:{ip_hash}",
+            ActivityLog.created_at >= day_start,
+        )
+        .count()
+    )
+    if count >= _NOTE_DAILY_LIMIT:
+        raise HTTPException(status_code=429, detail="Daily guest note limit reached")
+
+
+def _create_note(db: Session, project_id: str, task_id: str | None, body: GuestNoteIn, request: Request) -> dict:
+    client_ip = request.client.host if request.client else "unknown"
+    ip_hash = _hash_ip(client_ip)
+    _enforce_note_quota(db, ip_hash)
+    note = Comment(task_id=task_id, project_id=project_id, guest_name=body.guest_name, body=body.body)
+    db.add(note)
+    log_activity(
+        db,
+        "share.note",
+        project_id=project_id,
+        task_id=task_id,
+        actor=f"visitor:{ip_hash}",
+        detail=f"Guest note from {body.guest_name}",
+    )
+    db.commit()
+    db.refresh(note)
+    return _serialize_comment(note)
+
+
+@router.post("/{scope}/{token}/notes", status_code=201, dependencies=[Depends(share_rate_limit)])
+def create_guest_project_note(
+    scope: str, token: str, body: GuestNoteIn, request: Request, db: Session = Depends(get_db)
+):
+    projects = _resolve_note_target(scope, token, request, db)
+    if scope == "project":
+        project = projects[0]
+    else:
+        project = next((p for p in projects if p.id == body.project_id), None)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found in this share")
+    return _create_note(db, project.id, None, body, request)
+
+
+@router.post("/{scope}/{token}/tasks/{task_id}/notes", status_code=201, dependencies=[Depends(share_rate_limit)])
+def create_guest_task_note(
+    scope: str, token: str, task_id: str, body: GuestNoteIn, request: Request, db: Session = Depends(get_db)
+):
+    projects = _resolve_note_target(scope, token, request, db)
+    project_ids = [p.id for p in projects]
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id.in_(project_ids)).first() if project_ids else None
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found in this share")
+    return _create_note(db, task.project_id, task.id, body, request)

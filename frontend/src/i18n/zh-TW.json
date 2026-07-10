@@ -257,6 +257,8 @@
   "identities.pinRemoved": "PIN 已移除",
   "identities.linkExpiry": "連結到期",
   "identities.expires": "（到期：{{date}}）",
+  "identities.guestNotes": "訪客留言",
+  "identities.guestNotesHint": "允許分享連結的訪客在專案與任務留言",
   "identities.views": "查看次數",
   "identities.load": "載入",
   "identities.linkUnlinkProjects": "連結 / 取消連結專案",

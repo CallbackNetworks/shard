@@ -257,6 +257,8 @@
   "identities.pinRemoved": "PIN removed",
   "identities.linkExpiry": "Link Expiry",
   "identities.expires": "(Expires {{date}})",
+  "identities.guestNotes": "Guest Notes",
+  "identities.guestNotesHint": "Let share-link visitors leave notes on projects and tasks",
   "identities.views": "Views",
   "identities.load": "Load",
   "identities.linkUnlinkProjects": "Link / Unlink Projects",

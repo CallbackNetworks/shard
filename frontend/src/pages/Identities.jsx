@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit3, Trash2, Link2, Unlink, ExternalLink, Share2, RefreshCw, Check, Shield, Clock, Eye } from 'lucide-react'
+import { Plus, Edit3, Trash2, Link2, Unlink, ExternalLink, Share2, RefreshCw, Check, Shield, Clock, Eye, MessageSquare } from 'lucide-react'
 import {
   getIdentities, createIdentity, updateIdentity, deleteIdentity,
   getProjects, linkProjectIdentity, unlinkProjectIdentity, rotateShareToken,
@@ -188,6 +188,28 @@ function ShareSettings({ identity, onUpdate }) {
             }}>
             {expiryInput ? t('set') : t('clear')}
           </button>
+        </div>
+      </div>
+
+      {/* Guest notes */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <MessageSquare size={11} />
+          {t('identities.guestNotes')}
+          <input
+            type="checkbox"
+            checked={!!identity.allow_guest_notes}
+            onChange={async e => {
+              try {
+                await updateIdentity(identity.id, { allow_guest_notes: e.target.checked })
+                onUpdate()
+              } catch { /* ignore */ }
+            }}
+          />
+          {identity.allow_guest_notes && <span style={{ color: DARK.success, fontWeight: 600, fontSize: 11 }}>{t('identities.active')}</span>}
+        </label>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
+          {t('identities.guestNotesHint')}
         </div>
       </div>
 

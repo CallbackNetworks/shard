@@ -18,6 +18,7 @@ class IdentityUpdate(BaseModel):
     color: str | None = None
     description: str | None = None
     avatar: str | None = None
+    allow_guest_notes: bool | None = None
 
 
 class IdentityOut(BaseModel):
@@ -31,6 +32,7 @@ class IdentityOut(BaseModel):
     share_token: str | None = None
     share_pin_set: bool = False
     share_expires_at: datetime | None = None
+    allow_guest_notes: bool = False
     created_at: datetime
     project_count: int = 0
 
@@ -86,6 +88,7 @@ class ProjectUpdate(BaseModel):
     agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
     repo_url: str | None = Field(None, description="Repository URL linked to this project")
     wip_limits: dict | None = Field(None, description="WIP limits per status column")
+    allow_guest_notes: bool | None = Field(None, description="Allow share-link visitors to leave guest notes")
 
 
 class ProjectOut(BaseModel):
@@ -96,6 +99,7 @@ class ProjectOut(BaseModel):
     description: str | None
     status: str
     share_token: str | None = None
+    allow_guest_notes: bool = False
     repo_url: str | None = None
     wip_limits: dict | None = None
     created_at: datetime
@@ -338,9 +342,10 @@ class CommentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    task_id: str
+    task_id: str | None
     project_id: str | None
     author: str | None
+    guest_name: str | None = None
     body: str
     external_id: str | None = None
     created_at: datetime
