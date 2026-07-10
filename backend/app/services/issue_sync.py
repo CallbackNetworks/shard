@@ -307,6 +307,35 @@ async def reopen_gitlab_issue(
     return await set_gitlab_issue_state(project_path, issue_iid, "reopen", token, gitlab_url)
 
 
+async def update_github_issue_fields(
+    repo: str, issue_number: str, payload: dict, token: str, api_base: str = GITHUB_API_BASE
+) -> bool:
+    """Update issue fields (title, body, assignees) via the GitHub-compatible API."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/{issue_number}"
+    resp = await _github_request("PATCH", url, token, payload, f"update fields on {repo}#{issue_number}")
+    return resp is not None and resp.is_success
+
+
+async def update_gitlab_issue_fields(
+    project_path: str, issue_iid: str, payload: dict, token: str, gitlab_url: str = "https://gitlab.com"
+) -> bool:
+    """Update issue fields (title, description, assignee_ids) via the GitLab API."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues/{issue_iid}"
+    resp = await _gitlab_request("PUT", url, token, payload, f"update fields on GitLab {project_path}#{issue_iid}")
+    return resp is not None and resp.is_success
+
+
+async def lookup_gitlab_user_id(username: str, token: str, gitlab_url: str = "https://gitlab.com") -> int | None:
+    """Resolve a GitLab username to its numeric user id (needed for assignee_ids)."""
+    url = f"{gitlab_url}/api/v4/users?username={username}"
+    resp = await _gitlab_request("GET", url, token, None, f"lookup GitLab user {username}")
+    if resp is not None and resp.is_success:
+        users = resp.json()
+        if users:
+            return users[0].get("id")
+    return None
+
+
 async def create_github_issue_comment(
     repo: str, issue_number: str, body: str, token: str, api_base: str = GITHUB_API_BASE
 ) -> str | None:

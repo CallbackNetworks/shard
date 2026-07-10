@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ApiKey, Task, TaskDependency
 from app.routers.deps import get_project_or_404 as _get_project_or_404
-from app.routers.issue_sync import sync_task_closure_to_external, sync_task_reopen_to_external
+from app.routers.issue_sync import (
+    sync_task_closure_to_external,
+    sync_task_fields_to_external,
+    sync_task_reopen_to_external,
+)
 from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate, TaskWithSubtasksOut
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications
@@ -86,6 +90,8 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     old_priority = task.priority
     old_assignee = task.assignee
     old_agent_key_id = task.assigned_agent_key_id
+    old_title = task.title
+    old_description = task.description
 
     for field, value in changes.items():
         setattr(task, field, value)
@@ -145,6 +151,17 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
             await sync_task_reopen_to_external(task, db)
     if "assignee" in changes and changes["assignee"] != old_assignee:
         await fire_notifications(db, task, "task.assigned")
+
+    if task.external_provider:
+        changed_fields = set()
+        if "title" in changes and changes["title"] != old_title:
+            changed_fields.add("title")
+        if "description" in changes and changes["description"] != old_description:
+            changed_fields.add("description")
+        if "assignee" in changes and changes["assignee"] != old_assignee:
+            changed_fields.add("assignee")
+        if changed_fields:
+            await sync_task_fields_to_external(task, db, changed_fields)
 
     for trigger, ctx in triggered_rules:
         await run_rules(db, trigger, task, {"_rule_depth": 1, **ctx})

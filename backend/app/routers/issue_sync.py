@@ -24,12 +24,15 @@ from app.services.issue_sync import (
     detect_comment_webhook,
     detect_issue_webhook,
     detect_pr_webhook,
+    lookup_gitlab_user_id,
     reopen_github_issue,
     reopen_gitlab_issue,
     replace_github_issue_labels,
     replace_gitlab_issue_labels,
     resolve_github_api_base,
     update_github_issue_comment,
+    update_github_issue_fields,
+    update_gitlab_issue_fields,
     update_gitlab_issue_note,
 )
 from app.services.ws_manager import ws_manager
@@ -421,6 +424,47 @@ async def sync_task_reopen_to_external(task: Task, db: Session) -> bool:
     if task.external_provider == "github":
         return await reopen_github_issue(task.external_repo, task.external_id, token, base)
     return await reopen_gitlab_issue(task.external_repo, task.external_id, token, base)
+
+
+async def sync_task_fields_to_external(task: Task, db: Session, changed: set[str]) -> bool:
+    """
+    Push changed task fields (title, description, assignee) to the linked external issue.
+
+    Last-write-wins in both directions: inbound issue events overwrite the task,
+    outbound edits overwrite the issue.
+    """
+    target = _external_sync_target(task, db)
+    if not target:
+        return False
+    token, base = target
+
+    if task.external_provider == "github":
+        payload: dict = {}
+        if "title" in changed:
+            payload["title"] = task.title
+        if "description" in changed:
+            payload["body"] = task.description or ""
+        if "assignee" in changed:
+            payload["assignees"] = [task.assignee] if task.assignee else []
+        if not payload:
+            return False
+        return await update_github_issue_fields(task.external_repo, task.external_id, payload, token, base)
+
+    payload = {}
+    if "title" in changed:
+        payload["title"] = task.title
+    if "description" in changed:
+        payload["description"] = task.description or ""
+    if "assignee" in changed:
+        if task.assignee:
+            user_id = await lookup_gitlab_user_id(task.assignee, token, base)
+            if user_id is not None:
+                payload["assignee_ids"] = [user_id]
+        else:
+            payload["assignee_ids"] = []
+    if not payload:
+        return False
+    return await update_gitlab_issue_fields(task.external_repo, task.external_id, payload, token, base)
 
 
 async def sync_comment_to_external(comment: Comment, task: Task, db: Session) -> bool:

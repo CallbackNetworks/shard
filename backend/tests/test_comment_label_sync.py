@@ -295,6 +295,115 @@ class TestOutboundReopen:
         mock_reopen.assert_not_called()
 
 
+class TestOutboundFieldSync:
+    @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
+    def test_title_change_pushed(self, mock_update, client, sample_project, db):
+        _make_integration(db, sample_project.id)
+        task = _make_external_task(db, sample_project.id)
+
+        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"title": "New title"})
+        assert r.status_code == 200
+        mock_update.assert_called_once_with(
+            "owner/repo", "42", {"title": "New title"}, "ghp_testtoken", "https://api.github.com"
+        )
+
+    @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
+    def test_title_and_description_pushed_together(self, mock_update, client, sample_project, db):
+        _make_integration(db, sample_project.id)
+        task = _make_external_task(db, sample_project.id)
+
+        r = client.patch(
+            f"/projects/{sample_project.id}/tasks/{task.id}",
+            json={"title": "New title", "description": "New body"},
+        )
+        assert r.status_code == 200
+        mock_update.assert_called_once_with(
+            "owner/repo", "42", {"title": "New title", "body": "New body"}, "ghp_testtoken", "https://api.github.com"
+        )
+
+    @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
+    def test_assignee_change_pushed(self, mock_update, client, sample_project, db):
+        _make_integration(db, sample_project.id)
+        task = _make_external_task(db, sample_project.id)
+
+        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"assignee": "devuser"})
+        assert r.status_code == 200
+        mock_update.assert_called_once_with(
+            "owner/repo", "42", {"assignees": ["devuser"]}, "ghp_testtoken", "https://api.github.com"
+        )
+
+    @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
+    def test_status_only_change_not_field_pushed(self, mock_update, client, sample_project, db):
+        _make_integration(db, sample_project.id)
+        task = _make_external_task(db, sample_project.id, status="todo")
+
+        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"status": "in_progress"})
+        assert r.status_code == 200
+        mock_update.assert_not_called()
+
+    @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
+    def test_local_task_not_pushed(self, mock_update, client, sample_project, db):
+        _make_integration(db, sample_project.id)
+        task = Task(project_id=sample_project.id, title="Local task")
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+
+        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"title": "Renamed"})
+        assert r.status_code == 200
+        mock_update.assert_not_called()
+
+    @patch("app.routers.issue_sync.lookup_gitlab_user_id", new_callable=AsyncMock, return_value=99)
+    @patch("app.routers.issue_sync.update_gitlab_issue_fields", new_callable=AsyncMock, return_value=True)
+    def test_gitlab_fields_mapped(self, mock_update, mock_lookup, client, sample_project, db):
+        _make_integration(db, sample_project.id, name="gitlab-sync", url="https://gitlab.example.com")
+        task = _make_external_task(
+            db,
+            sample_project.id,
+            external_provider="gitlab",
+            external_id="7",
+            external_repo="group/proj",
+            external_url="https://gitlab.example.com/group/proj/-/issues/7",
+        )
+
+        r = client.patch(
+            f"/projects/{sample_project.id}/tasks/{task.id}",
+            json={"title": "GL title", "assignee": "gluser"},
+        )
+        assert r.status_code == 200
+        mock_lookup.assert_called_once_with("gluser", "ghp_testtoken", "https://gitlab.example.com")
+        mock_update.assert_called_once_with(
+            "group/proj",
+            "7",
+            {"title": "GL title", "assignee_ids": [99]},
+            "ghp_testtoken",
+            "https://gitlab.example.com",
+        )
+
+    @patch("app.routers.issue_sync.lookup_gitlab_user_id", new_callable=AsyncMock, return_value=None)
+    @patch("app.routers.issue_sync.update_gitlab_issue_fields", new_callable=AsyncMock, return_value=True)
+    def test_gitlab_unknown_assignee_skipped(self, mock_update, mock_lookup, client, sample_project, db):
+        _make_integration(db, sample_project.id, name="gitlab-sync", url="https://gitlab.example.com")
+        task = _make_external_task(
+            db,
+            sample_project.id,
+            external_provider="gitlab",
+            external_id="7",
+            external_repo="group/proj",
+            external_url="https://gitlab.example.com/group/proj/-/issues/7",
+        )
+
+        r = client.patch(
+            f"/projects/{sample_project.id}/tasks/{task.id}",
+            json={"title": "GL title", "assignee": "ghost"},
+        )
+        assert r.status_code == 200
+        # Unknown user: assignee omitted, title still pushed
+        mock_update.assert_called_once_with(
+            "group/proj", "7", {"title": "GL title"}, "ghp_testtoken", "https://gitlab.example.com"
+        )
+
+
 class TestOutboundComments:
     @patch("app.routers.issue_sync.create_github_issue_comment", new_callable=AsyncMock, return_value="9001")
     def test_comment_create_pushed(self, mock_create, client, sample_project, db):
