@@ -1,7 +1,9 @@
 """
 Inbound GitHub / GitLab issue webhook endpoint.
 
-Receives issue events and creates or updates Shard tasks accordingly.
+Receives issue, issue-comment, and pull-request events and mirrors them onto
+Shard tasks, comments, and labels. Also hosts the outbound sync helpers that
+push Shard-side changes (state, comments, labels) back to the external issue.
 """
 
 import logging
@@ -10,14 +12,25 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Integration, Project, Task
+from app.models import Comment, Integration, Label, Project, Task, TaskLabel
 from app.services.activity import log_activity
 from app.services.issue_sync import (
     close_github_issue,
     close_gitlab_issue,
+    create_github_issue_comment,
+    create_gitlab_issue_note,
+    delete_github_issue_comment,
+    delete_gitlab_issue_note,
+    detect_comment_webhook,
     detect_issue_webhook,
     detect_pr_webhook,
+    reopen_github_issue,
+    reopen_gitlab_issue,
+    replace_github_issue_labels,
+    replace_gitlab_issue_labels,
     resolve_github_api_base,
+    update_github_issue_comment,
+    update_gitlab_issue_note,
 )
 from app.services.ws_manager import ws_manager
 
@@ -30,6 +43,59 @@ STATUS_MAP = {
     "in_progress": "in_progress",
     "done": "done",
 }
+
+
+def _get_sync_integration(project_id: str, db: Session) -> Integration | None:
+    """Return the active issue_sync integration for a project, if any."""
+    return (
+        db.query(Integration)
+        .filter(
+            Integration.type == "issue_sync",
+            Integration.project_id == project_id,
+            Integration.active.is_(True),
+        )
+        .first()
+    )
+
+
+def _find_external_task(project_id: str, provider: str, external_id: str, repo: str, db: Session) -> Task | None:
+    return (
+        db.query(Task)
+        .filter(
+            Task.project_id == project_id,
+            Task.external_provider == provider,
+            Task.external_id == external_id,
+            Task.external_repo == repo,
+        )
+        .first()
+    )
+
+
+def _apply_external_labels(task: Task, label_names: list[str], db: Session) -> None:
+    """Mirror the external issue's label set onto the task.
+
+    Only plain labels (type == "label") are touched; decision labels and other
+    enhanced label types (ADR-0004) are never attached or detached here.
+    Missing labels are created project-scoped with source "issue_sync".
+    """
+    wanted = set(label_names)
+    current = {tl.label.name: tl for tl in task.task_labels if tl.label.type == "label"}
+
+    for name in wanted - set(current):
+        label = (
+            db.query(Label)
+            .filter(Label.project_id == task.project_id, Label.name == name, Label.type == "label")
+            .first()
+        )
+        if not label:
+            label = Label(project_id=task.project_id, name=name, source="issue_sync")
+            db.add(label)
+            db.flush()
+        db.add(TaskLabel(task_id=task.id, label_id=label.id))
+
+    for name, tl in current.items():
+        if name not in wanted:
+            db.delete(tl)
 
 
 @router.post("/{project_id}")
@@ -52,6 +118,9 @@ async def receive_issue_webhook(
     headers = dict(request.headers)
     normalized = detect_issue_webhook(headers, body)
     if not normalized:
+        comment_data = detect_comment_webhook(headers, body)
+        if comment_data:
+            return await _handle_comment_event(comment_data, project_id, db)
         pr_data = detect_pr_webhook(headers, body)
         if pr_data:
             return await _handle_pr_event(pr_data, project_id, db)
@@ -61,16 +130,7 @@ async def receive_issue_webhook(
     ext_id = normalized["external_id"]
     repo = normalized["repo"]
 
-    existing = (
-        db.query(Task)
-        .filter(
-            Task.project_id == project_id,
-            Task.external_provider == provider,
-            Task.external_id == ext_id,
-            Task.external_repo == repo,
-        )
-        .first()
-    )
+    existing = _find_external_task(project_id, provider, ext_id, repo, db)
 
     action = normalized.get("action", "")
 
@@ -99,6 +159,7 @@ async def receive_issue_webhook(
             existing.status = new_status
         if normalized.get("assignee"):
             existing.assignee = normalized["assignee"]
+        _apply_external_labels(existing, normalized.get("labels", []), db)
 
         log_activity(
             db,
@@ -127,6 +188,7 @@ async def receive_issue_webhook(
     )
     db.add(task)
     db.flush()
+    _apply_external_labels(task, normalized.get("labels", []), db)
 
     log_activity(
         db,
@@ -141,6 +203,70 @@ async def receive_issue_webhook(
     db.refresh(task)
     await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
     return {"ok": True, "action": "created", "task_id": task.id}
+
+
+async def _handle_comment_event(data: dict, project_id: str, db: Session) -> dict:
+    """Mirror an external issue-comment event (created/edited/deleted) onto Shard comments.
+
+    Comments that originated from Shard (matched by external_id) are not
+    re-created when their webhook echo arrives.
+    """
+    task = _find_external_task(project_id, data["provider"], data["issue_id"], data["repo"], db)
+    if not task:
+        return {"ok": True, "detail": "Ignored (no linked task)"}
+
+    action = data.get("action", "created")
+    ext_comment_id = data["comment_id"]
+    existing = db.query(Comment).filter(Comment.task_id == task.id, Comment.external_id == ext_comment_id).first()
+
+    if action == "deleted":
+        if not existing:
+            return {"ok": True, "action": "comment_ignored"}
+        db.delete(existing)
+        log_activity(
+            db,
+            "task.comment_deleted",
+            project_id=project_id,
+            task_id=task.id,
+            actor=f"issue-sync:{data['provider']}",
+            detail=f'Comment deleted on "{task.title}" via {data["provider"]} issue sync',
+        )
+        db.commit()
+        await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task.id})
+        return {"ok": True, "action": "comment_deleted"}
+
+    if existing:
+        if action == "created":
+            # Echo of a comment Shard itself pushed outbound
+            return {"ok": True, "action": "comment_echo_ignored"}
+        existing.body = data["body"]
+        if data.get("author"):
+            existing.author = data["author"]
+        db.commit()
+        await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task.id})
+        return {"ok": True, "action": "comment_updated", "comment_id": existing.id}
+
+    comment = Comment(
+        task_id=task.id,
+        project_id=project_id,
+        author=data.get("author"),
+        body=data["body"],
+        external_id=ext_comment_id,
+    )
+    db.add(comment)
+    db.flush()
+    log_activity(
+        db,
+        "task.commented",
+        project_id=project_id,
+        task_id=task.id,
+        actor=data.get("author") or f"issue-sync:{data['provider']}",
+        detail=f'Comment added to "{task.title}" from {data["provider"]} issue #{data["issue_id"]}',
+        meta={"external_url": data.get("url", "")},
+    )
+    db.commit()
+    await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task.id})
+    return {"ok": True, "action": "comment_created", "comment_id": comment.id}
 
 
 async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
@@ -255,33 +381,103 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
     return {"ok": True, "action": "pr_ignored", "affected_tasks": []}
 
 
+def _external_sync_target(task: Task, db: Session) -> tuple[str, str] | None:
+    """Return (token, api_base_or_gitlab_url) when the task is linked and sync is configured."""
+    if not task.external_provider or not task.external_id or not task.external_repo:
+        return None
+    integration = _get_sync_integration(task.project_id, db)
+    if not integration or not integration.secret:
+        return None
+    if task.external_provider == "github":
+        return integration.secret, resolve_github_api_base(task.external_url, integration.url)
+    if task.external_provider == "gitlab":
+        return integration.secret, integration.url or "https://gitlab.com"
+    return None
+
+
 async def sync_task_closure_to_external(task: Task, db: Session) -> bool:
     """
     When a Shard task is marked done, close the corresponding external issue.
     Returns True if an external issue was closed.
     """
-    if not task.external_provider or not task.external_id or not task.external_repo:
+    target = _external_sync_target(task, db)
+    if not target:
         return False
-
-    integration = (
-        db.query(Integration)
-        .filter(
-            Integration.type == "issue_sync",
-            Integration.project_id == task.project_id,
-            Integration.active.is_(True),
-        )
-        .first()
-    )
-    if not integration or not integration.secret:
-        return False
-
-    token = integration.secret
-
+    token, base = target
     if task.external_provider == "github":
-        api_base = resolve_github_api_base(task.external_url, integration.url)
-        return await close_github_issue(task.external_repo, task.external_id, token, api_base)
-    elif task.external_provider == "gitlab":
-        gitlab_url = integration.url or "https://gitlab.com"
-        return await close_gitlab_issue(task.external_repo, task.external_id, token, gitlab_url)
+        return await close_github_issue(task.external_repo, task.external_id, token, base)
+    return await close_gitlab_issue(task.external_repo, task.external_id, token, base)
 
-    return False
+
+async def sync_task_reopen_to_external(task: Task, db: Session) -> bool:
+    """
+    When a done Shard task is moved back to an open status, reopen the external issue.
+    Returns True if an external issue was reopened.
+    """
+    target = _external_sync_target(task, db)
+    if not target:
+        return False
+    token, base = target
+    if task.external_provider == "github":
+        return await reopen_github_issue(task.external_repo, task.external_id, token, base)
+    return await reopen_gitlab_issue(task.external_repo, task.external_id, token, base)
+
+
+async def sync_comment_to_external(comment: Comment, task: Task, db: Session) -> bool:
+    """
+    Push a Shard-created comment to the linked external issue and store the
+    returned external comment id (used to skip the webhook echo).
+    """
+    if comment.external_id:
+        return False  # originated externally, nothing to push
+    target = _external_sync_target(task, db)
+    if not target:
+        return False
+    token, base = target
+    if task.external_provider == "github":
+        ext_id = await create_github_issue_comment(task.external_repo, task.external_id, comment.body, token, base)
+    else:
+        ext_id = await create_gitlab_issue_note(task.external_repo, task.external_id, comment.body, token, base)
+    if not ext_id:
+        return False
+    comment.external_id = ext_id
+    db.commit()
+    return True
+
+
+async def sync_comment_update_to_external(comment: Comment, task: Task, db: Session) -> bool:
+    """Push an edited Shard comment body to the linked external comment."""
+    if not comment.external_id:
+        return False
+    target = _external_sync_target(task, db)
+    if not target:
+        return False
+    token, base = target
+    if task.external_provider == "github":
+        return await update_github_issue_comment(task.external_repo, comment.external_id, comment.body, token, base)
+    return await update_gitlab_issue_note(
+        task.external_repo, task.external_id, comment.external_id, comment.body, token, base
+    )
+
+
+async def sync_comment_delete_to_external(external_comment_id: str, task: Task, db: Session) -> bool:
+    """Delete the linked external comment after a Shard comment is deleted."""
+    target = _external_sync_target(task, db)
+    if not target:
+        return False
+    token, base = target
+    if task.external_provider == "github":
+        return await delete_github_issue_comment(task.external_repo, external_comment_id, token, base)
+    return await delete_gitlab_issue_note(task.external_repo, task.external_id, external_comment_id, token, base)
+
+
+async def sync_labels_to_external(task: Task, db: Session) -> bool:
+    """Replace the external issue's labels with the task's current plain-label set."""
+    target = _external_sync_target(task, db)
+    if not target:
+        return False
+    token, base = target
+    names = [tl.label.name for tl in task.task_labels if tl.label.type == "label"]
+    if task.external_provider == "github":
+        return await replace_github_issue_labels(task.external_repo, task.external_id, names, token, base)
+    return await replace_gitlab_issue_labels(task.external_repo, task.external_id, names, token, base)

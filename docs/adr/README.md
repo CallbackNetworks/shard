@@ -15,3 +15,4 @@
 | [0011](0011-runtime-adjustable-system-settings.md) | Runtime-Adjustable System Settings | Accepted | 2026-07-05 |
 | [0012](0012-frontend-styling-strategy.md) | Frontend Styling Strategy — CSS Modules over Inline Styles | Accepted | 2026-07-06 |
 | [0013](0013-full-data-backup-strategy.md) | Full-Data Backup Strategy | Accepted | 2026-07-06 |
+| [0014](0014-bidirectional-issue-sync.md) | Bidirectional Issue Sync for Comments, Labels, and State | Accepted | 2026-07-09 |

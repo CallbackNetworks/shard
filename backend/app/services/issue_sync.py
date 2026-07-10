@@ -1,8 +1,10 @@
 """
 GitHub / GitLab issue synchronization service.
 
-Inbound: Webhook payloads from GitHub/GitLab create or update Shard tasks.
-Outbound: When Shard tasks are completed, the corresponding external issue is closed.
+Inbound: Webhook payloads from GitHub/GitLab create or update Shard tasks,
+comments, and labels.
+Outbound: Task completion closes the external issue, reopening reopens it,
+comment create/edit/delete and label changes are pushed back.
 Also handles GitHub pull request events for PR-to-task linking.
 """
 
@@ -145,6 +147,59 @@ def detect_pr_webhook(headers: dict, payload: dict) -> dict | None:
     return None
 
 
+def normalize_github_comment(payload: dict) -> dict | None:
+    """Extract normalized comment data from a GitHub issue_comment webhook payload."""
+    comment = payload.get("comment")
+    issue = payload.get("issue")
+    if not comment or not issue:
+        return None
+
+    return {
+        "provider": "github",
+        "action": payload.get("action", "created"),  # created / edited / deleted
+        "comment_id": str(comment["id"]),
+        "body": comment.get("body") or "",
+        "author": (comment.get("user") or {}).get("login"),
+        "issue_id": str(issue["number"]),
+        "url": comment.get("html_url", ""),
+        "repo": payload.get("repository", {}).get("full_name", ""),
+    }
+
+
+def normalize_gitlab_note(payload: dict) -> dict | None:
+    """Extract normalized comment data from a GitLab Note Hook payload (issue notes only)."""
+    attrs = payload.get("object_attributes")
+    if not attrs or attrs.get("noteable_type") != "Issue":
+        return None
+
+    issue = payload.get("issue") or {}
+    action = {"create": "created", "update": "edited"}.get(attrs.get("action"), "created")
+
+    return {
+        "provider": "gitlab",
+        "action": action,
+        "comment_id": str(attrs.get("id", "")),
+        "body": attrs.get("note") or "",
+        "author": (payload.get("user") or {}).get("username"),
+        "issue_id": str(issue.get("iid", "")),
+        "url": attrs.get("url", ""),
+        "repo": payload.get("project", {}).get("path_with_namespace", ""),
+    }
+
+
+def detect_comment_webhook(headers: dict, payload: dict) -> dict | None:
+    """Auto-detect provider and normalize an issue-comment webhook payload."""
+    gh_event = headers.get("x-github-event", "")
+    if gh_event == "issue_comment":
+        return normalize_github_comment(payload)
+
+    gl_event = headers.get("x-gitlab-event", "")
+    if gl_event in ("Note Hook", "note"):
+        return normalize_gitlab_note(payload)
+
+    return None
+
+
 def detect_issue_webhook(headers: dict, payload: dict) -> dict | None:
     """Auto-detect provider and normalize issue webhook payload."""
     gh_event = headers.get("x-github-event", "")
@@ -158,43 +213,174 @@ def detect_issue_webhook(headers: dict, payload: dict) -> dict | None:
     return None
 
 
-async def close_github_issue(repo: str, issue_number: str, token: str, api_base: str = GITHUB_API_BASE) -> bool:
-    """Close an issue via the GitHub-compatible API (github.com, GHE, or Gitea)."""
-    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/{issue_number}"
-    headers = {
+def _github_headers(token: str) -> dict:
+    return {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json",
     }
+
+
+async def _github_request(
+    method: str, url: str, token: str, json_body: dict | None, what: str
+) -> httpx.Response | None:
+    """Fire a GitHub-compatible API request, returning the response or None on transport error."""
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.patch(url, json={"state": "closed"}, headers=headers)
-        if resp.is_success:
-            logger.info("Closed issue %s#%s via %s", repo, issue_number, api_base)
-            return True
-        logger.warning("Failed to close issue %s#%s via %s: %s", repo, issue_number, api_base, resp.status_code)
-        return False
+            resp = await client.request(method, url, json=json_body, headers=_github_headers(token))
+        if not resp.is_success:
+            logger.warning("Failed to %s via %s: %s", what, url, resp.status_code)
+        return resp
     except httpx.HTTPError as exc:
-        logger.warning("Error closing issue %s#%s via %s: %s", repo, issue_number, api_base, exc)
-        return False
+        logger.warning("Error on %s via %s: %s", what, url, exc)
+        return None
+
+
+def _gitlab_project_url(project_path: str, gitlab_url: str) -> str:
+    import urllib.parse
+
+    encoded_path = urllib.parse.quote(project_path, safe="")
+    return f"{gitlab_url}/api/v4/projects/{encoded_path}"
+
+
+async def _gitlab_request(
+    method: str, url: str, token: str, json_body: dict | None, what: str
+) -> httpx.Response | None:
+    """Fire a GitLab API request, returning the response or None on transport error."""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.request(method, url, json=json_body, headers={"PRIVATE-TOKEN": token})
+        if not resp.is_success:
+            logger.warning("Failed to %s via %s: %s", what, url, resp.status_code)
+        return resp
+    except httpx.HTTPError as exc:
+        logger.warning("Error on %s via %s: %s", what, url, exc)
+        return None
+
+
+async def set_github_issue_state(
+    repo: str, issue_number: str, state: str, token: str, api_base: str = GITHUB_API_BASE
+) -> bool:
+    """Set an issue's state ("open" or "closed") via the GitHub-compatible API (github.com, GHE, or Gitea)."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/{issue_number}"
+    resp = await _github_request("PATCH", url, token, {"state": state}, f"set issue {repo}#{issue_number} {state}")
+    if resp is not None and resp.is_success:
+        logger.info("Set issue %s#%s state=%s via %s", repo, issue_number, state, api_base)
+        return True
+    return False
+
+
+async def close_github_issue(repo: str, issue_number: str, token: str, api_base: str = GITHUB_API_BASE) -> bool:
+    """Close an issue via the GitHub-compatible API (github.com, GHE, or Gitea)."""
+    return await set_github_issue_state(repo, issue_number, "closed", token, api_base)
+
+
+async def reopen_github_issue(repo: str, issue_number: str, token: str, api_base: str = GITHUB_API_BASE) -> bool:
+    """Reopen an issue via the GitHub-compatible API (github.com, GHE, or Gitea)."""
+    return await set_github_issue_state(repo, issue_number, "open", token, api_base)
+
+
+async def set_gitlab_issue_state(
+    project_path: str, issue_iid: str, state_event: str, token: str, gitlab_url: str = "https://gitlab.com"
+) -> bool:
+    """Apply a state event ("close" or "reopen") to a GitLab issue via the API."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues/{issue_iid}"
+    resp = await _gitlab_request(
+        "PUT", url, token, {"state_event": state_event}, f"{state_event} GitLab issue {project_path}#{issue_iid}"
+    )
+    if resp is not None and resp.is_success:
+        logger.info("Applied %s to GitLab issue %s#%s", state_event, project_path, issue_iid)
+        return True
+    return False
 
 
 async def close_gitlab_issue(
     project_path: str, issue_iid: str, token: str, gitlab_url: str = "https://gitlab.com"
 ) -> bool:
     """Close a GitLab issue via the API."""
-    import urllib.parse
+    return await set_gitlab_issue_state(project_path, issue_iid, "close", token, gitlab_url)
 
-    encoded_path = urllib.parse.quote(project_path, safe="")
-    url = f"{gitlab_url}/api/v4/projects/{encoded_path}/issues/{issue_iid}"
-    headers = {"PRIVATE-TOKEN": token}
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.put(url, json={"state_event": "close"}, headers=headers)
-        if resp.is_success:
-            logger.info("Closed GitLab issue %s#%s", project_path, issue_iid)
-            return True
-        logger.warning("Failed to close GitLab issue %s#%s: %s", project_path, issue_iid, resp.status_code)
-        return False
-    except httpx.HTTPError as exc:
-        logger.warning("Error closing GitLab issue %s#%s: %s", project_path, issue_iid, exc)
-        return False
+
+async def reopen_gitlab_issue(
+    project_path: str, issue_iid: str, token: str, gitlab_url: str = "https://gitlab.com"
+) -> bool:
+    """Reopen a GitLab issue via the API."""
+    return await set_gitlab_issue_state(project_path, issue_iid, "reopen", token, gitlab_url)
+
+
+async def create_github_issue_comment(
+    repo: str, issue_number: str, body: str, token: str, api_base: str = GITHUB_API_BASE
+) -> str | None:
+    """Post a comment on a GitHub-compatible issue. Returns the external comment id on success."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/{issue_number}/comments"
+    resp = await _github_request("POST", url, token, {"body": body}, f"comment on {repo}#{issue_number}")
+    if resp is not None and resp.is_success:
+        return str(resp.json().get("id", "")) or None
+    return None
+
+
+async def update_github_issue_comment(
+    repo: str, comment_id: str, body: str, token: str, api_base: str = GITHUB_API_BASE
+) -> bool:
+    """Edit an existing comment via the GitHub-compatible API."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/comments/{comment_id}"
+    resp = await _github_request("PATCH", url, token, {"body": body}, f"edit comment {comment_id} on {repo}")
+    return resp is not None and resp.is_success
+
+
+async def delete_github_issue_comment(repo: str, comment_id: str, token: str, api_base: str = GITHUB_API_BASE) -> bool:
+    """Delete a comment via the GitHub-compatible API."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/comments/{comment_id}"
+    resp = await _github_request("DELETE", url, token, None, f"delete comment {comment_id} on {repo}")
+    return resp is not None and resp.is_success
+
+
+async def create_gitlab_issue_note(
+    project_path: str, issue_iid: str, body: str, token: str, gitlab_url: str = "https://gitlab.com"
+) -> str | None:
+    """Post a note on a GitLab issue. Returns the external note id on success."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues/{issue_iid}/notes"
+    resp = await _gitlab_request("POST", url, token, {"body": body}, f"note on GitLab {project_path}#{issue_iid}")
+    if resp is not None and resp.is_success:
+        return str(resp.json().get("id", "")) or None
+    return None
+
+
+async def update_gitlab_issue_note(
+    project_path: str, issue_iid: str, note_id: str, body: str, token: str, gitlab_url: str = "https://gitlab.com"
+) -> bool:
+    """Edit an existing note on a GitLab issue."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues/{issue_iid}/notes/{note_id}"
+    resp = await _gitlab_request("PUT", url, token, {"body": body}, f"edit note {note_id} on {project_path}")
+    return resp is not None and resp.is_success
+
+
+async def delete_gitlab_issue_note(
+    project_path: str, issue_iid: str, note_id: str, token: str, gitlab_url: str = "https://gitlab.com"
+) -> bool:
+    """Delete a note from a GitLab issue."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues/{issue_iid}/notes/{note_id}"
+    resp = await _gitlab_request("DELETE", url, token, None, f"delete note {note_id} on {project_path}")
+    return resp is not None and resp.is_success
+
+
+async def replace_github_issue_labels(
+    repo: str, issue_number: str, labels: list[str], token: str, api_base: str = GITHUB_API_BASE
+) -> bool:
+    """Replace the label set of a GitHub-compatible issue with the given names.
+
+    github.com accepts label names directly; Gitea accepts names since 1.20.
+    """
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/{issue_number}/labels"
+    resp = await _github_request("PUT", url, token, {"labels": labels}, f"set labels on {repo}#{issue_number}")
+    return resp is not None and resp.is_success
+
+
+async def replace_gitlab_issue_labels(
+    project_path: str, issue_iid: str, labels: list[str], token: str, gitlab_url: str = "https://gitlab.com"
+) -> bool:
+    """Replace the label set of a GitLab issue with the given names."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues/{issue_iid}"
+    resp = await _gitlab_request(
+        "PUT", url, token, {"labels": ",".join(labels)}, f"set labels on GitLab {project_path}#{issue_iid}"
+    )
+    return resp is not None and resp.is_success

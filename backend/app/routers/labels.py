@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import Label, TaskLabel
 from app.routers.deps import get_label_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
+from app.routers.issue_sync import sync_labels_to_external
 from app.schemas import LabelCreate, LabelOut, LabelUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/labels", tags=["labels"])
@@ -53,23 +54,28 @@ task_label_router = APIRouter(
 
 
 @task_label_router.post("/{label_id}", response_model=LabelOut, status_code=status.HTTP_201_CREATED)
-def add_label_to_task(project_id: str, task_id: str, label_id: str, db: Session = Depends(get_db)):
+async def add_label_to_task(project_id: str, task_id: str, label_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    get_task_or_404(task_id, db, project_id=project_id)
+    task = get_task_or_404(task_id, db, project_id=project_id)
     label = get_label_or_404(label_id, db, project_id=project_id)
     existing = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
     if not existing:
         tl = TaskLabel(task_id=task_id, label_id=label_id)
         db.add(tl)
         db.commit()
+        if task.external_provider:
+            await sync_labels_to_external(task, db)
     return label
 
 
 @task_label_router.delete("/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_label_from_task(project_id: str, task_id: str, label_id: str, db: Session = Depends(get_db)):
+async def remove_label_from_task(project_id: str, task_id: str, label_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
     tl = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
     if not tl:
         raise HTTPException(status_code=404, detail="Label not assigned to task")
+    task = get_task_or_404(task_id, db, project_id=project_id)
     db.delete(tl)
     db.commit()
+    if task.external_provider:
+        await sync_labels_to_external(task, db)

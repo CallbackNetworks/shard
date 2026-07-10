@@ -264,6 +264,8 @@ class Comment(Base):
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     author: Mapped[str | None] = mapped_column(String(255), nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    # External issue-comment id (GitHub/Gitea/GitLab) for bidirectional sync & echo prevention
+    external_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 

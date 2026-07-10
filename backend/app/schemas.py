@@ -342,6 +342,7 @@ class CommentOut(BaseModel):
     project_id: str | None
     author: str | None
     body: str
+    external_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

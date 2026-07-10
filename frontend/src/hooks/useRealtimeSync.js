@@ -19,6 +19,8 @@ export default function useRealtimeSync() {
             qc.invalidateQueries({ queryKey: ['projects'] })
             if (data.project_id) {
               qc.invalidateQueries({ queryKey: ['project', data.project_id] })
+              // Comments can change server-side (issue-comment sync) without a local mutation
+              qc.invalidateQueries({ queryKey: ['comments', data.project_id] })
             }
           }
           if (event === 'notification.new') {
