@@ -2625,7 +2625,7 @@ h1 {
 }
 .kt-page {
   max-width: 1120px;
-  margin: 0;
+  margin: 0 auto;
   padding: 36px 28px 28px;
   color: var(--kt-ink);
 }
