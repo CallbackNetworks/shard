@@ -18,3 +18,4 @@
 | [0014](0014-bidirectional-issue-sync.md) | Bidirectional Issue Sync for Comments, Labels, and State | Accepted | 2026-07-09 |
 | [0015](0015-outbound-field-sync-last-write-wins.md) | Outbound Field Sync with Last-Write-Wins Semantics | Accepted | 2026-07-09 |
 | [0016](0016-guest-notes-on-share-pages.md) | Guest Notes on Public Share Pages | Accepted | 2026-07-10 |
+| [0017](0017-pr-signal-sync-content-stays-external.md) | PR Signal Sync — Signals In, Content Stays External | Accepted | 2026-07-10 |

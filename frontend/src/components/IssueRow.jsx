@@ -4,7 +4,7 @@ import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, File
 import { useTranslation } from 'react-i18next'
 import { regenerateToken } from '../api/client'
 import { PRIORITY, DARK } from '../constants/theme'
-import { PriorityIcon, StatusIcon, LabelChip } from './TaskIcons'
+import { PriorityIcon, StatusIcon, LabelChip, PrBadge } from './TaskIcons'
 import TaskEditForm from './TaskEditForm'
 import CommentsPanel from './CommentsPanel'
 import DependenciesPanel from './DependenciesPanel'
@@ -126,6 +126,13 @@ export default memo(function IssueRow({
         {labels.length > 0 && (
           <div style={{ display: 'flex', gap: 3, flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden', maxWidth: 160 }}>
             {labels.slice(0, 3).map(lb => <LabelChip key={lb.id} label={lb} />)}
+          </div>
+        )}
+
+        {/* Pull request badges (click jumps to the external PR page) */}
+        {(task.pull_requests || []).length > 0 && (
+          <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+            {task.pull_requests.slice(0, 2).map(pr => <PrBadge key={pr.id} pr={pr} />)}
           </div>
         )}
 

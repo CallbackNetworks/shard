@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -103,6 +103,38 @@ class Task(Base):
         foreign_keys="TaskDependency.depends_on_id",
     )
     assigned_agent: Mapped["ApiKey | None"] = relationship("ApiKey", foreign_keys=[assigned_agent_key_id])
+    pull_requests: Mapped[list["TaskPullRequest"]] = relationship(
+        "TaskPullRequest", back_populates="task", cascade="all, delete-orphan"
+    )
+
+
+class TaskPullRequest(Base):
+    """Structured link between a task and an external pull request.
+
+    Only lifecycle/review signals are stored — PR content (diff, review
+    threads) stays external and is reached via pr_url (see ADR-0017).
+    """
+
+    __tablename__ = "task_pull_requests"
+    __table_args__ = (UniqueConstraint("task_id", "repo", "pr_number", name="uq_task_pr"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    task_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(20), nullable=False, default="github")
+    repo: Mapped[str] = mapped_column(String(500), nullable=False)
+    pr_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    pr_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    pr_title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="open")  # open / merged / closed
+    # review_requested / approved / changes_requested / commented
+    review_state: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    task: Mapped["Task"] = relationship("Task", back_populates="pull_requests")
 
 
 class Label(Base):

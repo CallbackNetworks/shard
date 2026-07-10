@@ -1,5 +1,5 @@
 from app.models import RecurrenceRule
-from app.schemas import CycleOut, IdentityOut, LabelOut, ProjectOut, RecurrenceRuleOut, TaskOut
+from app.schemas import CycleOut, IdentityOut, LabelOut, ProjectOut, RecurrenceRuleOut, TaskOut, TaskPullRequestOut
 
 
 def enrich_task(task, db=None) -> TaskOut:
@@ -9,6 +9,7 @@ def enrich_task(task, db=None) -> TaskOut:
     out.comment_count = len(task.comments)
     out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
     out.blocking = [d.task_id for d in task.blocking_deps]
+    out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
     if task.assigned_agent is not None:
         out.assigned_agent_name = task.assigned_agent.name
     if db is not None:
@@ -24,6 +25,7 @@ def enrich_task_as_dict(task) -> dict:
     out.comment_count = len(task.comments)
     out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
     out.blocking = [d.task_id for d in task.blocking_deps]
+    out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
     if task.assigned_agent is not None:
         out.assigned_agent_name = task.assigned_agent.name
     return out.model_dump()

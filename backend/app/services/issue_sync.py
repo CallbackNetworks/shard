@@ -147,6 +147,34 @@ def detect_pr_webhook(headers: dict, payload: dict) -> dict | None:
     return None
 
 
+def normalize_github_pr_review(payload: dict) -> dict | None:
+    """Extract normalized review data from a GitHub pull_request_review webhook payload."""
+    review = payload.get("review")
+    pr = payload.get("pull_request")
+    if not review or not pr:
+        return None
+
+    return {
+        "type": "pull_request_review",
+        "action": payload.get("action", ""),  # submitted / edited / dismissed
+        "review_state": (review.get("state") or "").lower(),  # approved / changes_requested / commented
+        "reviewer": (review.get("user") or {}).get("login"),
+        "pr_number": pr.get("number"),
+        "pr_url": pr.get("html_url", ""),
+        "pr_title": pr.get("title", ""),
+        "repo": payload.get("repository", {}).get("full_name", ""),
+        "issue_refs": parse_issue_refs(pr.get("body") or ""),
+    }
+
+
+def detect_pr_review_webhook(headers: dict, payload: dict) -> dict | None:
+    """Detect a GitHub pull_request_review webhook event and normalize it."""
+    gh_event = headers.get("x-github-event", "")
+    if gh_event == "pull_request_review":
+        return normalize_github_pr_review(payload)
+    return None
+
+
 def normalize_github_comment(payload: dict) -> dict | None:
     """Extract normalized comment data from a GitHub issue_comment webhook payload."""
     comment = payload.get("comment")

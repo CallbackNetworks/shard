@@ -1,7 +1,13 @@
 """Tests for GitHub PR linking (normalization, detection, webhook handling)."""
 
-from app.models import Task
-from app.services.issue_sync import detect_pr_webhook, normalize_github_pr, parse_issue_refs
+from app.models import Notification, Task, TaskPullRequest
+from app.services.issue_sync import (
+    detect_pr_review_webhook,
+    detect_pr_webhook,
+    normalize_github_pr,
+    normalize_github_pr_review,
+    parse_issue_refs,
+)
 
 
 class TestParseIssueRefs:
@@ -220,7 +226,7 @@ class TestPrWebhookEndpoint:
         assert task2.status == "done"
 
     def test_pr_opened_links_to_task(self, client, sample_project, db):
-        """When a PR is opened with 'Fixes #N', the PR URL is appended to the task description."""
+        """When a PR is opened with 'Fixes #N', a structured PR link is created and the task starts."""
         task = Task(
             project_id=sample_project.id,
             title="Link target",
@@ -245,15 +251,22 @@ class TestPrWebhookEndpoint:
         assert task.id in data["affected_tasks"]
 
         db.refresh(task)
-        assert "https://github.com/test/repo/pull/77" in task.description
+        # Description is no longer mutated — the link is a structured row
+        assert task.description == "Original description"
+        assert task.status == "in_progress"
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link is not None
+        assert link.pr_number == "77"
+        assert link.pr_url == "https://github.com/test/repo/pull/77"
+        assert link.state == "open"
+        assert link.branch == "feature"
 
-    def test_pr_opened_no_duplicate_link(self, client, sample_project, db):
-        """If the PR URL is already in the description, do not duplicate it."""
-        pr_url = "https://github.com/test/repo/pull/77"
+    def test_pr_edited_upserts_link_once(self, client, sample_project, db):
+        """Repeated PR events upsert the same structured link instead of duplicating."""
         task = Task(
             project_id=sample_project.id,
             title="Already linked",
-            description=f"Has link: {pr_url}",
+            status="in_progress",
             external_provider="github",
             external_id="42",
             external_repo="test/repo",
@@ -262,19 +275,21 @@ class TestPrWebhookEndpoint:
         db.commit()
         db.refresh(task)
 
-        payload = self._pr_payload(action="edited", body="Fixes #42", number=77)
-        r = client.post(
-            f"/webhook/issues/{sample_project.id}",
-            json=payload,
-            headers={"x-github-event": "pull_request"},
-        )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["action"] == "pr_linked"
-        assert data["affected_tasks"] == []
+        for _ in range(2):
+            payload = self._pr_payload(action="edited", body="Fixes #42", number=77)
+            r = client.post(
+                f"/webhook/issues/{sample_project.id}",
+                json=payload,
+                headers={"x-github-event": "pull_request"},
+            )
+            assert r.status_code == 200
+            assert r.json()["action"] == "pr_linked"
 
+        links = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).all()
+        assert len(links) == 1
         db.refresh(task)
-        assert task.description.count(pr_url) == 1
+        # edited does not touch status
+        assert task.status == "in_progress"
 
     def test_pr_without_issue_refs_no_effect(self, client, sample_project, db):
         """A PR without issue references is acknowledged but does not affect tasks."""
@@ -290,7 +305,7 @@ class TestPrWebhookEndpoint:
         assert data["affected_tasks"] == []
 
     def test_pr_closed_not_merged(self, client, sample_project, db):
-        """A closed-but-not-merged PR does not mark tasks as done."""
+        """A closed-but-not-merged PR keeps the task open, flags the link, and raises a notification."""
         task = Task(
             project_id=sample_project.id,
             title="Should stay open",
@@ -310,10 +325,16 @@ class TestPrWebhookEndpoint:
         )
         assert r.status_code == 200
         data = r.json()
-        assert data["action"] == "pr_ignored"
+        assert data["action"] == "pr_closed"
 
         db.refresh(task)
         assert task.status == "in_progress"
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link.state == "closed"
+        notif = db.query(Notification).filter(Notification.type == "pr.closed").first()
+        assert notif is not None
+        assert notif.task_id == task.id
+        assert notif.link == "https://github.com/test/repo/pull/50"
 
     def test_pr_merge_closes_task_by_description_url(self, client, sample_project, db):
         """A merged PR also closes tasks whose description contains the PR URL."""
@@ -377,8 +398,11 @@ class TestPrWebhookEndpoint:
         assert r.status_code == 200
         data = r.json()
         assert data["action"] == "pr_merged"
-        # The task was already done, so it should not appear in affected_tasks
-        assert data["affected_tasks"] == []
+        # The task stays done; only its PR link is updated to merged
+        db.refresh(task)
+        assert task.status == "done"
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link.state == "merged"
 
     def test_pr_wrong_repo_no_match(self, client, sample_project, db):
         """Tasks from a different repo are not affected."""
@@ -403,6 +427,33 @@ class TestPrWebhookEndpoint:
         data = r.json()
         assert data["affected_tasks"] == []
 
+    def test_review_requested_flags_link_and_notifies(self, client, sample_project, db):
+        task = Task(
+            project_id=sample_project.id,
+            title="Awaiting review",
+            status="in_progress",
+            external_provider="github",
+            external_id="42",
+            external_repo="test/repo",
+        )
+        db.add(task)
+        db.commit()
+
+        payload = self._pr_payload(action="review_requested", body="Fixes #42")
+        r = client.post(
+            f"/webhook/issues/{sample_project.id}",
+            json=payload,
+            headers={"x-github-event": "pull_request"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "pr_review_requested"
+
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link.review_state == "review_requested"
+        notif = db.query(Notification).filter(Notification.type == "pr.review_requested").first()
+        assert notif is not None
+        assert notif.link == "https://github.com/test/repo/pull/50"
+
     def test_project_not_found(self, client):
         """PR webhook to a nonexistent project returns 404."""
         payload = {
@@ -423,3 +474,140 @@ class TestPrWebhookEndpoint:
             headers={"x-github-event": "pull_request"},
         )
         assert r.status_code == 404
+
+
+class TestPrReviewSignals:
+    """Tests for pull_request_review webhook handling (signals only, content stays external)."""
+
+    def _review_payload(self, state="approved", action="submitted", body="Fixes #42", number=50):
+        return {
+            "action": action,
+            "review": {
+                "state": state,
+                "user": {"login": "reviewer1"},
+            },
+            "pull_request": {
+                "number": number,
+                "html_url": f"https://github.com/test/repo/pull/{number}",
+                "title": f"PR #{number}",
+                "body": body,
+            },
+            "repository": {"full_name": "test/repo"},
+        }
+
+    def test_normalize_github_pr_review(self):
+        result = normalize_github_pr_review(self._review_payload(state="APPROVED"))
+        assert result is not None
+        assert result["type"] == "pull_request_review"
+        assert result["action"] == "submitted"
+        assert result["review_state"] == "approved"
+        assert result["reviewer"] == "reviewer1"
+        assert result["pr_number"] == 50
+        assert result["issue_refs"] == ["42"]
+
+    def test_normalize_missing_review(self):
+        assert normalize_github_pr_review({"action": "submitted"}) is None
+
+    def test_detect_pr_review_webhook(self):
+        headers = {"x-github-event": "pull_request_review"}
+        assert detect_pr_review_webhook(headers, self._review_payload()) is not None
+        assert detect_pr_review_webhook({"x-github-event": "pull_request"}, {}) is None
+
+    def _make_task(self, db, project_id, **overrides):
+        defaults = dict(
+            project_id=project_id,
+            title="Reviewed task",
+            status="in_progress",
+            external_provider="github",
+            external_id="42",
+            external_repo="test/repo",
+        )
+        defaults.update(overrides)
+        task = Task(**defaults)
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        return task
+
+    def test_approved_review_updates_link_and_notifies(self, client, sample_project, db):
+        task = self._make_task(db, sample_project.id)
+
+        r = client.post(
+            f"/webhook/issues/{sample_project.id}",
+            json=self._review_payload(state="approved"),
+            headers={"x-github-event": "pull_request_review"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "pr_review_approved"
+
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link.review_state == "approved"
+        notif = db.query(Notification).filter(Notification.type == "pr.approved").first()
+        assert notif is not None
+        assert notif.task_id == task.id
+
+    def test_changes_requested_notifies(self, client, sample_project, db):
+        task = self._make_task(db, sample_project.id)
+
+        r = client.post(
+            f"/webhook/issues/{sample_project.id}",
+            json=self._review_payload(state="changes_requested"),
+            headers={"x-github-event": "pull_request_review"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "pr_review_changes_requested"
+
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link.review_state == "changes_requested"
+        assert db.query(Notification).filter(Notification.type == "pr.changes_requested").count() == 1
+
+    def test_commented_review_no_notification(self, client, sample_project, db):
+        task = self._make_task(db, sample_project.id)
+
+        r = client.post(
+            f"/webhook/issues/{sample_project.id}",
+            json=self._review_payload(state="commented"),
+            headers={"x-github-event": "pull_request_review"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "pr_review_commented"
+
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link.review_state == "commented"
+        assert db.query(Notification).count() == 0
+
+    def test_review_matches_task_via_existing_link(self, client, sample_project, db):
+        """A review on a PR without issue refs still matches tasks through the stored PR link."""
+        task = self._make_task(db, sample_project.id, external_id="999")
+        db.add(
+            TaskPullRequest(
+                task_id=task.id,
+                repo="test/repo",
+                pr_number="50",
+                pr_url="https://github.com/test/repo/pull/50",
+                pr_title="PR #50",
+            )
+        )
+        db.commit()
+
+        r = client.post(
+            f"/webhook/issues/{sample_project.id}",
+            json=self._review_payload(state="approved", body="no refs"),
+            headers={"x-github-event": "pull_request_review"},
+        )
+        assert r.status_code == 200
+        assert task.id in r.json()["affected_tasks"]
+
+        link = db.query(TaskPullRequest).filter(TaskPullRequest.task_id == task.id).first()
+        assert link.review_state == "approved"
+
+    def test_dismissed_review_ignored(self, client, sample_project, db):
+        self._make_task(db, sample_project.id)
+
+        r = client.post(
+            f"/webhook/issues/{sample_project.id}",
+            json=self._review_payload(state="approved", action="dismissed"),
+            headers={"x-github-event": "pull_request_review"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "pr_review_ignored"

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Comment, Integration, Label, Project, Task, TaskLabel
+from app.models import Comment, Integration, Label, Notification, Project, Task, TaskLabel, TaskPullRequest
 from app.services.activity import log_activity
 from app.services.issue_sync import (
     close_github_issue,
@@ -23,6 +23,7 @@ from app.services.issue_sync import (
     delete_gitlab_issue_note,
     detect_comment_webhook,
     detect_issue_webhook,
+    detect_pr_review_webhook,
     detect_pr_webhook,
     lookup_gitlab_user_id,
     reopen_github_issue,
@@ -127,6 +128,9 @@ async def receive_issue_webhook(
         pr_data = detect_pr_webhook(headers, body)
         if pr_data:
             return await _handle_pr_event(pr_data, project_id, db)
+        review_data = detect_pr_review_webhook(headers, body)
+        if review_data:
+            return await _handle_pr_review_event(review_data, project_id, db)
         return {"ok": True, "detail": "Ignored (not an issue event)"}
 
     provider = normalized["provider"]
@@ -272,67 +276,152 @@ async def _handle_comment_event(data: dict, project_id: str, db: Session) -> dic
     return {"ok": True, "action": "comment_created", "comment_id": comment.id}
 
 
-async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
-    """Handle a GitHub pull_request webhook event.
+def _find_pr_tasks(pr_data: dict, project_id: str, db: Session) -> list[Task]:
+    """Tasks referenced via 'Fixes #N' in the PR body, plus tasks already linked to this PR."""
+    repo = pr_data["repo"]
+    pr_number = str(pr_data["pr_number"])
+    tasks: dict[str, Task] = {}
 
-    - On opened/edited: link the PR URL to tasks referenced via 'Fixes #N' etc.
-    - On merged (action=closed, merged=true): mark referenced tasks as done.
+    for ref_num in pr_data.get("issue_refs", []):
+        task = _find_external_task(project_id, "github", ref_num, repo, db)
+        if task:
+            tasks[task.id] = task
+
+    links = (
+        db.query(TaskPullRequest)
+        .join(Task, Task.id == TaskPullRequest.task_id)
+        .filter(
+            Task.project_id == project_id,
+            TaskPullRequest.repo == repo,
+            TaskPullRequest.pr_number == pr_number,
+        )
+        .all()
+    )
+    for link in links:
+        if link.task is not None:
+            tasks[link.task_id] = link.task
+
+    return list(tasks.values())
+
+
+def _upsert_pr_link(db: Session, task: Task, pr_data: dict, state: str | None) -> TaskPullRequest:
+    """Create or refresh the structured PR link on a task. state=None keeps the current state."""
+    pr_number = str(pr_data["pr_number"])
+    link = (
+        db.query(TaskPullRequest)
+        .filter(
+            TaskPullRequest.task_id == task.id,
+            TaskPullRequest.repo == pr_data["repo"],
+            TaskPullRequest.pr_number == pr_number,
+        )
+        .first()
+    )
+    if not link:
+        link = TaskPullRequest(
+            task_id=task.id,
+            provider="github",
+            repo=pr_data["repo"],
+            pr_number=pr_number,
+            pr_url=pr_data.get("pr_url", ""),
+            pr_title=pr_data.get("pr_title", ""),
+            branch=pr_data.get("branch"),
+            state=state or "open",
+        )
+        db.add(link)
+        db.flush()
+        return link
+
+    if pr_data.get("pr_url"):
+        link.pr_url = pr_data["pr_url"]
+    if pr_data.get("pr_title"):
+        link.pr_title = pr_data["pr_title"]
+    if pr_data.get("branch"):
+        link.branch = pr_data["branch"]
+    if state is not None:
+        link.state = state
+    return link
+
+
+async def _notify_pr(db: Session, ntype: str, message: str, url: str, project_id: str, task_id: str) -> None:
+    """Create an in-app notification whose link jumps straight to the external PR page."""
+    notif = Notification(type=ntype, message=message, link=url, project_id=project_id, task_id=task_id)
+    db.add(notif)
+    db.commit()
+    await ws_manager.broadcast("notification.new", {"id": notif.id})
+
+
+async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
+    """Handle a GitHub pull_request webhook event — lifecycle signals only.
+
+    PR content (diff, review threads) is never mirrored; the stored pr_url is
+    the jump-off point (ADR-0017).
+
+    - opened/reopened: upsert the PR link, move todo tasks to in_progress
+    - review_requested: flag the PR link and raise an in-app notification
+    - closed merged: mark the link merged and complete referenced tasks
+    - closed unmerged: mark the link closed and raise an in-app notification
     """
     action = pr_data.get("action", "")
-    repo = pr_data["repo"]
     pr_url = pr_data["pr_url"]
-    pr_title = pr_data["pr_title"]
-    issue_refs = pr_data.get("issue_refs", [])
+    pr_number = pr_data["pr_number"]
     merged = pr_data.get("merged", False)
 
+    tasks = _find_pr_tasks(pr_data, project_id, db)
     affected_task_ids: list[str] = []
 
-    # Find tasks matching the issue references
-    referenced_tasks = []
-    for ref_num in issue_refs:
-        task = (
-            db.query(Task)
-            .filter(
-                Task.project_id == project_id,
-                Task.external_provider == "github",
-                Task.external_id == ref_num,
-                Task.external_repo == repo,
-            )
-            .first()
-        )
-        if task:
-            referenced_tasks.append(task)
-
-    if action in ("opened", "edited", "synchronize", "reopened"):
-        # Link PR URL to task descriptions
-        for task in referenced_tasks:
-            pr_link = f"\n\nLinked PR: [{pr_title}]({pr_url})"
-            if pr_url not in (task.description or ""):
-                task.description = (task.description or "") + pr_link
+    if action in ("opened", "edited", "synchronize", "reopened", "ready_for_review"):
+        for task in tasks:
+            _upsert_pr_link(db, task, pr_data, "open")
+            if action in ("opened", "reopened") and task.status == "todo":
+                task.status = "in_progress"
                 log_activity(
                     db,
-                    "task.updated",
+                    "task.status_changed",
                     project_id=project_id,
                     task_id=task.id,
                     actor="pr-sync:github",
-                    detail=f'PR #{pr_data["pr_number"]} linked to task "{task.title}"',
+                    detail=f'Task "{task.title}" moved to in_progress by PR #{pr_number}',
+                    meta={"pr_url": pr_url, "old_status": "todo", "new_status": "in_progress"},
+                )
+            else:
+                log_activity(
+                    db,
+                    "task.pr_linked",
+                    project_id=project_id,
+                    task_id=task.id,
+                    actor="pr-sync:github",
+                    detail=f'PR #{pr_number} linked to task "{task.title}"',
                     meta={"pr_url": pr_url},
                 )
-                affected_task_ids.append(task.id)
+            affected_task_ids.append(task.id)
 
         db.commit()
         for tid in affected_task_ids:
             await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": tid})
+        return {"ok": True, "action": "pr_linked", "affected_tasks": affected_task_ids}
 
-        return {
-            "ok": True,
-            "action": "pr_linked",
-            "affected_tasks": affected_task_ids,
-        }
+    if action == "review_requested":
+        for task in tasks:
+            link = _upsert_pr_link(db, task, pr_data, "open")
+            link.review_state = "review_requested"
+            affected_task_ids.append(task.id)
+        db.commit()
+        if tasks:
+            await _notify_pr(
+                db,
+                "pr.review_requested",
+                f'PR #{pr_number} "{pr_data["pr_title"]}" is awaiting review',
+                pr_url,
+                project_id,
+                tasks[0].id,
+            )
+        for tid in affected_task_ids:
+            await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": tid})
+        return {"ok": True, "action": "pr_review_requested", "affected_tasks": affected_task_ids}
 
     if action == "closed" and merged:
-        # Merged PR: mark referenced tasks as done
-        for task in referenced_tasks:
+        for task in tasks:
+            _upsert_pr_link(db, task, pr_data, "merged")
             if task.status != "done":
                 task.status = "done"
                 log_activity(
@@ -341,12 +430,13 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
                     project_id=project_id,
                     task_id=task.id,
                     actor="pr-sync:github",
-                    detail=f'Task "{task.title}" completed by merged PR #{pr_data["pr_number"]}',
+                    detail=f'Task "{task.title}" completed by merged PR #{pr_number}',
                     meta={"pr_url": pr_url},
                 )
-                affected_task_ids.append(task.id)
+            affected_task_ids.append(task.id)
 
-        # Also check for tasks whose description already contains this PR URL
+        # Legacy fallback: tasks whose description contains this PR URL
+        # (from the pre-ADR-0016 description-append linking)
         tasks_with_pr_url = (
             db.query(Task)
             .filter(
@@ -365,7 +455,7 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
                     project_id=project_id,
                     task_id=task.id,
                     actor="pr-sync:github",
-                    detail=f'Task "{task.title}" completed by merged PR #{pr_data["pr_number"]}',
+                    detail=f'Task "{task.title}" completed by merged PR #{pr_number}',
                     meta={"pr_url": pr_url},
                 )
                 affected_task_ids.append(task.id)
@@ -373,15 +463,75 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         db.commit()
         for tid in affected_task_ids:
             await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": tid})
+        return {"ok": True, "action": "pr_merged", "affected_tasks": affected_task_ids}
 
-        return {
-            "ok": True,
-            "action": "pr_merged",
-            "affected_tasks": affected_task_ids,
-        }
+    if action == "closed" and not merged:
+        for task in tasks:
+            _upsert_pr_link(db, task, pr_data, "closed")
+            log_activity(
+                db,
+                "task.pr_closed",
+                project_id=project_id,
+                task_id=task.id,
+                actor="pr-sync:github",
+                detail=f'PR #{pr_number} on task "{task.title}" was closed without merging',
+                meta={"pr_url": pr_url},
+            )
+            affected_task_ids.append(task.id)
+        db.commit()
+        if tasks:
+            await _notify_pr(
+                db,
+                "pr.closed",
+                f'PR #{pr_number} "{pr_data["pr_title"]}" was closed without merging',
+                pr_url,
+                project_id,
+                tasks[0].id,
+            )
+        for tid in affected_task_ids:
+            await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": tid})
+        return {"ok": True, "action": "pr_closed", "affected_tasks": affected_task_ids}
 
-    # Closed without merge or other actions: acknowledge but take no action
     return {"ok": True, "action": "pr_ignored", "affected_tasks": []}
+
+
+async def _handle_pr_review_event(data: dict, project_id: str, db: Session) -> dict:
+    """Handle a GitHub pull_request_review webhook event (review signals only)."""
+    if data.get("action") != "submitted":
+        return {"ok": True, "action": "pr_review_ignored", "affected_tasks": []}
+
+    review_state = data.get("review_state") or "commented"
+    tasks = _find_pr_tasks(data, project_id, db)
+    affected_task_ids: list[str] = []
+
+    for task in tasks:
+        link = _upsert_pr_link(db, task, data, None)
+        link.review_state = review_state
+        log_activity(
+            db,
+            "task.pr_reviewed",
+            project_id=project_id,
+            task_id=task.id,
+            actor=data.get("reviewer") or "pr-sync:github",
+            detail=f'PR #{data["pr_number"]} on task "{task.title}" reviewed: {review_state}',
+            meta={"pr_url": data.get("pr_url", ""), "review_state": review_state},
+        )
+        affected_task_ids.append(task.id)
+
+    db.commit()
+    if tasks and review_state in ("approved", "changes_requested"):
+        verb = "approved" if review_state == "approved" else "needs changes"
+        await _notify_pr(
+            db,
+            f"pr.{review_state}",
+            f'PR #{data["pr_number"]} "{data.get("pr_title", "")}" {verb}',
+            data.get("pr_url", ""),
+            project_id,
+            tasks[0].id,
+        )
+    for tid in affected_task_ids:
+        await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": tid})
+    return {"ok": True, "action": f"pr_review_{review_state}", "affected_tasks": affected_task_ids}
 
 
 def _external_sync_target(task: Task, db: Session) -> tuple[str, str] | None:

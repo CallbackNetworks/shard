@@ -158,6 +158,21 @@ class TaskUpdate(_TaskTitleMixin, BaseModel):
     is_pinned: bool | None = None
 
 
+class TaskPullRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    provider: str
+    repo: str
+    pr_number: str
+    pr_url: str
+    pr_title: str
+    branch: str | None = None
+    state: str
+    review_state: str | None = None
+    updated_at: datetime
+
+
 class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -192,6 +207,7 @@ class TaskOut(BaseModel):
     comment_count: int = 0
     blocked_by: list[str] = []  # task IDs this task depends on (must complete first)
     blocking: list[str] = []  # task IDs that depend on this task
+    pull_requests: list[TaskPullRequestOut] = []
     recurrence: "RecurrenceRuleOut | None" = None
 
 
