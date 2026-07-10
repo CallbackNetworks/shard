@@ -108,7 +108,7 @@ def prune_backups(keep: int, dest_dir: Path | None = None) -> int:
         return 0
     files = sorted(dest.glob(f"{BACKUP_PREFIX}*.zip"), key=lambda p: p.name, reverse=True)
     removed = 0
-    for path in files[max(keep, 1):]:
+    for path in files[max(keep, 1) :]:
         path.unlink(missing_ok=True)
         removed += 1
     if removed:
