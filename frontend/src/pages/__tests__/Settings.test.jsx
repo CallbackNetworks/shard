@@ -34,6 +34,10 @@ vi.mock('../../api/client', () => ({
   runBackup: vi.fn(() => Promise.resolve({})),
   exportBackup: vi.fn(() => Promise.resolve({ data: new Blob(), headers: {} })),
   downloadBackupFile: vi.fn(() => Promise.resolve({ data: new Blob(), headers: {} })),
+  restoreBackupFile: vi.fn(() => Promise.resolve({})),
+  restoreServerBackup: vi.fn(() => Promise.resolve({})),
+  getIcalToken: vi.fn(() => Promise.resolve({ token: null, url: null })),
+  rotateGlobalIcalToken: vi.fn(() => Promise.resolve({})),
 }))
 
 // Mock ThemeContext

@@ -100,7 +100,7 @@ jobs:
         run: docker compose -f docker-compose.ci.yml -p ci-frontend build frontend
 
       - name: Lint
-        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npm run lint -- --max-warnings 300
+        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npm run lint -- --max-warnings 10
 
       - name: Run tests
         run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npx vitest run

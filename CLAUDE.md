@@ -148,13 +148,13 @@ docker compose exec backend sh -c "cd /app && alembic revision --autogenerate -m
 docker compose exec backend sh -c "cd /app && alembic upgrade head"
 ```
 
-Alembic uses `render_as_batch=True` for SQLite compatibility. Legacy `ALTER TABLE` blocks remain in `main.py` lifespan for backward compat — new schema changes should use Alembic.
+Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh database the lifespan runs `Base.metadata.create_all()` and stamps the Alembic chain to `head` (see `_stamp_alembic_head` in `main.py` and ADR-0018); on an existing database, run `alembic upgrade head` for schema changes. All new schema changes go through Alembic.
 
 ## Backend architecture (`backend/app/`)
 
 **Entry point: `main.py`**
 - Registers all routers
-- `lifespan` context: runs `Base.metadata.create_all()` + legacy `ALTER TABLE` migrations, then starts the background scheduler as an `asyncio.Task`
+- `lifespan` context: runs `Base.metadata.create_all()` and stamps a fresh database to the Alembic head, then starts the background scheduler as an `asyncio.Task`
 - Auth middleware reads `AUTH_PASSWORD`; bypasses `/auth/`, `/health`, `/webhook/`, `/share/`, `/docs`, `/openapi.json`, `/redoc`, `/api/v1/`
 
 **Data layer**
