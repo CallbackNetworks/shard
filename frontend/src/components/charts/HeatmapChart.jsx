@@ -54,7 +54,7 @@ export default function HeatmapChart({ data = [], color = '#facc15', cellSize = 
       <svg width={totalW} height={totalH + 16} style={{ display: 'block' }}>
         {monthLabels.map((m, i) => (
           <text key={i} x={m.weekIndex * (cellSize + gap)} y={10}
-            fontSize={9} fill="rgba(255,255,255,0.3)" fontFamily="system-ui">
+            fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.3)" fontFamily="system-ui">
             {m.label}
           </text>
         ))}
@@ -62,7 +62,7 @@ export default function HeatmapChart({ data = [], color = '#facc15', cellSize = 
           week.map((cell, di) => {
             const intensity = cell.count === 0 ? 0 : 0.15 + (cell.count / maxCount) * 0.85
             const fill = cell.count === 0
-              ? 'rgba(255,255,255,0.05)'
+              ? 'rgba(var(--kt-ink-rgb), 0.05)'
               : `rgba(${r},${g},${b},${intensity})`
             const isHovered = hover && hover.date === cell.date
             return (
@@ -72,7 +72,7 @@ export default function HeatmapChart({ data = [], color = '#facc15', cellSize = 
                 y={labelH + di * (cellSize + gap)}
                 width={cellSize} height={cellSize} rx={2}
                 fill={fill}
-                stroke={isHovered ? '#fff' : 'none'}
+                stroke={isHovered ? 'var(--kt-ink)' : 'none'}
                 strokeWidth={isHovered ? 1 : 0}
                 style={{ cursor: cell.count > 0 ? 'pointer' : 'default' }}
                 onMouseEnter={() => setHover(cell)}
@@ -92,13 +92,13 @@ export default function HeatmapChart({ data = [], color = '#facc15', cellSize = 
           return (
             <g>
               <rect x={adjustedX} y={ty - 4} width={boxW} height={20} rx={4}
-                fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.15)" strokeWidth={0.5} />
+                fill="rgba(0,0,0,0.85)" stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeWidth={0.5} />
               <text x={adjustedX + 8} y={ty + 10} fontSize={10} fill="#fff" fontFamily="system-ui">{text}</text>
             </g>
           )
         })()}
       </svg>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>
         Less
         {[0.05, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
           <span key={i} style={{

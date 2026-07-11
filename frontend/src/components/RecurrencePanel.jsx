@@ -23,16 +23,16 @@ export default function RecurrencePanel({ projectId, task, depth }) {
   }
 
   const padLeft = 16 + depth * 20 + 36
-  const inputStyle = { padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(255,255,255,0.05)', color: DARK.text, outline: 'none' }
+  const inputStyle = { padding: '4px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(var(--kt-ink-rgb), 0.05)', color: DARK.text, outline: 'none' }
 
   return (
     <div style={{
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
-      borderBottom: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(255,255,255,0.02)',
+      borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+      background: 'rgba(var(--kt-ink-rgb), 0.02)',
     }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {t('recurrence.title')}
       </div>
       {task.recurrence ? (
@@ -47,7 +47,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
               {task.recurrence.active ? t('recurrence.active') : t('recurrence.paused')}
             </span>
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontSize: 11 }}>
+          <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.35)', marginBottom: 8, fontSize: 11 }}>
             {t('recurrence.nextRun')} {new Date(task.recurrence.next_run_at).toLocaleString()}
             {task.recurrence.last_run_at && (
               <> {'\u00B7'} {t('recurrence.lastRan')} {new Date(task.recurrence.last_run_at).toLocaleString()}</>
@@ -59,7 +59,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
                 await updateRecurrence(projectId, task.id, { active: !task.recurrence.active })
                 qc.invalidateQueries({ queryKey: ['project', projectId] })
               }}
-              style={{ padding: '4px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.success, textTransform: 'uppercase', letterSpacing: '1px' }}
+              style={{ padding: '4px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.success, textTransform: 'uppercase', letterSpacing: '1px' }}
             >
               {task.recurrence.active ? t('pause') : t('resume')}
             </button>

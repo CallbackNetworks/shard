@@ -26,7 +26,7 @@ export default function RadarChart({ axes = [], datasets = [], size = 240 }) {
         }).join(' ')
         return (
           <polygon key={level} points={points} fill="none"
-            stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />
+            stroke="rgba(var(--kt-ink-rgb), 0.06)" strokeWidth={0.5} />
         )
       })}
 
@@ -34,7 +34,7 @@ export default function RadarChart({ axes = [], datasets = [], size = 240 }) {
         const p = getPoint(i, 100)
         return (
           <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y}
-            stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />
+            stroke="rgba(var(--kt-ink-rgb), 0.06)" strokeWidth={0.5} />
         )
       })}
 
@@ -74,7 +74,7 @@ export default function RadarChart({ axes = [], datasets = [], size = 240 }) {
         return (
           <text key={i} x={p.x} y={p.y}
             textAnchor="middle" dominantBaseline="middle"
-            fontSize={9} fill="rgba(255,255,255,0.45)" fontFamily="system-ui">
+            fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.45)" fontFamily="system-ui">
             {axis.label}
           </text>
         )
@@ -83,7 +83,7 @@ export default function RadarChart({ axes = [], datasets = [], size = 240 }) {
       {hover !== null && datasets[hover] && (
         <g>
           <rect x={cx - 50} y={size - 22} width={100} height={18} rx={4}
-            fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.15)" strokeWidth={0.5} />
+            fill="rgba(0,0,0,0.85)" stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeWidth={0.5} />
           <text x={cx} y={size - 10} textAnchor="middle" fontSize={10}
             fill={datasets[hover].color} fontFamily="system-ui" fontWeight={700}>
             {datasets[hover].name}

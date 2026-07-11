@@ -116,8 +116,8 @@ function ShareSettings({ identity, onUpdate }) {
 
   return (
     <div style={{
-      marginTop: 12, padding: '14px 16px', background: 'rgba(255,255,255,0.03)',
-      borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)',
+      marginTop: 12, padding: '14px 16px', background: 'rgba(var(--kt-ink-rgb), 0.03)',
+      borderRadius: 8, border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
     }}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: DARK.text, display: 'flex', alignItems: 'center', gap: 6 }}>
         <Shield size={13} /> {t('identities.shareSettings')}
@@ -125,7 +125,7 @@ function ShareSettings({ identity, onUpdate }) {
 
       {/* PIN */}
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
           <Shield size={11} />
           {t('identities.pinProtection')}
           {identity.share_pin_set && <span style={{ color: DARK.success, fontWeight: 600, fontSize: 11 }}>{t('identities.active')}</span>}
@@ -141,8 +141,8 @@ function ShareSettings({ identity, onUpdate }) {
           />
           <button onClick={handleSetPin} disabled={pinInput.length < 4}
             style={{
-              background: pinInput.length >= 4 ? BRAND : 'rgba(255,255,255,0.06)',
-              color: pinInput.length >= 4 ? '#000' : 'rgba(255,255,255,0.3)',
+              background: pinInput.length >= 4 ? BRAND : 'rgba(var(--kt-ink-rgb), 0.06)',
+              color: pinInput.length >= 4 ? '#000' : 'rgba(var(--kt-ink-rgb), 0.3)',
               border: 'none', borderRadius: 0, padding: '6px 14px',
               cursor: pinInput.length >= 4 ? 'pointer' : 'default',
               fontSize: 12, fontWeight: 700,
@@ -165,7 +165,7 @@ function ShareSettings({ identity, onUpdate }) {
 
       {/* Expiry */}
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.5)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
           <Clock size={11} />
           {t('identities.linkExpiry')}
           {identity.share_expires_at && <span style={{ color: DARK.warning, fontWeight: 600, fontSize: 11 }}>
@@ -181,8 +181,8 @@ function ShareSettings({ identity, onUpdate }) {
           />
           <button onClick={handleSetExpiry}
             style={{
-              background: 'rgba(255,255,255,0.06)',
-              color: DARK.text, border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(var(--kt-ink-rgb), 0.06)',
+              color: DARK.text, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)',
               borderRadius: 0, padding: '5px 14px', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
             }}>
@@ -193,7 +193,7 @@ function ShareSettings({ identity, onUpdate }) {
 
       {/* Guest notes */}
       <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+        <label style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.5)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
           <MessageSquare size={11} />
           {t('identities.guestNotes')}
           <input
@@ -208,21 +208,21 @@ function ShareSettings({ identity, onUpdate }) {
           />
           {identity.allow_guest_notes && <span style={{ color: DARK.success, fontWeight: 600, fontSize: 11 }}>{t('identities.active')}</span>}
         </label>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
+        <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', marginTop: 4 }}>
           {t('identities.guestNotesHint')}
         </div>
       </div>
 
       {/* View count */}
       <div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.5)', display: 'flex', alignItems: 'center', gap: 4 }}>
           <Eye size={11} />
           {t('identities.views')}
           {viewCount !== null && <span style={{ fontWeight: 600, color: DARK.text }}>{viewCount}</span>}
           <button onClick={loadViews}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: 'rgba(255,255,255,0.3)', fontSize: 11, textDecoration: 'underline',
+              color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 11, textDecoration: 'underline',
               padding: 0, marginLeft: 4,
             }}>
             {viewCount === null ? t('identities.load') : t('refresh')}
@@ -342,10 +342,10 @@ export default function Identities() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 16, color: DARK.text }}>{identity.name}</div>
                     {identity.description && (
-                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{identity.description}</div>
+                      <div style={{ fontSize: 13, color: 'rgba(var(--kt-ink-rgb), 0.35)', marginTop: 2 }}>{identity.description}</div>
                     )}
                   </div>
-                  <span className="kt-badge" style={{ color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)' }}>
+                  <span className="kt-badge" style={{ color: 'rgba(var(--kt-ink-rgb), 0.35)', background: 'rgba(var(--kt-ink-rgb), 0.06)' }}>
                     {identity.project_count} project{identity.project_count !== 1 ? 's' : ''}
                   </span>
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -360,8 +360,8 @@ export default function Identities() {
                           onClick={() => copyShareLink(identity)}
                           title={t('identities.share')} aria-label={t('identities.share')}
                           style={{
-                            background: copiedId === identity.id ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)',
-                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
+                            background: copiedId === identity.id ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                            border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                             color: copiedId === identity.id ? DARK.success : DARK.text,
                           }}>
                           {copiedId === identity.id ? <Check size={13} /> : <Share2 size={13} />}
@@ -369,7 +369,7 @@ export default function Identities() {
                         <button
                           onClick={() => { if (confirm('Revoke current share link and generate a new one?')) rotateMut.mutate(identity.id) }}
                           title="Revoke share link" aria-label="Revoke share link"
-                          className="kt-btn" style={{ padding: '6px 8px', color: 'rgba(255,255,255,0.4)' }}>
+                          className="kt-btn" style={{ padding: '6px 8px', color: 'rgba(var(--kt-ink-rgb), 0.4)' }}>
                           <RefreshCw size={13} />
                         </button>
                       </>
@@ -377,8 +377,8 @@ export default function Identities() {
                     <button onClick={() => setSettingsId(settingsId === identity.id ? null : identity.id)}
                       title={t('identities.settings')} aria-label={t('identities.settings')}
                       style={{
-                        background: settingsId === identity.id ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
+                        background: settingsId === identity.id ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                        border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                         color: settingsId === identity.id ? BRAND : DARK.text,
                       }}>
                       <Shield size={13} />
@@ -386,8 +386,8 @@ export default function Identities() {
                     <button onClick={() => setLinkingId(isLinking ? null : identity.id)}
                       title={t('identities.projects')} aria-label={t('identities.projects')}
                       style={{
-                        background: isLinking ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
+                        background: isLinking ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                        border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                         color: isLinking ? BRAND : DARK.text,
                       }}>
                       <Link2 size={13} />
@@ -441,9 +441,9 @@ export default function Identities() {
                             style={{
                               display: 'flex', alignItems: 'center', gap: 4,
                               fontSize: 12, padding: '4px 10px', borderRadius: 0, cursor: 'pointer',
-                              background: isLinked ? identity.color + '18' : 'rgba(255,255,255,0.05)',
-                              color: isLinked ? identity.color : 'rgba(255,255,255,0.4)',
-                              border: isLinked ? `1px solid ${identity.color}55` : '1px solid rgba(255,255,255,0.1)',
+                              background: isLinked ? identity.color + '18' : 'rgba(var(--kt-ink-rgb), 0.05)',
+                              color: isLinked ? identity.color : 'rgba(var(--kt-ink-rgb), 0.4)',
+                              border: isLinked ? `1px solid ${identity.color}55` : '1px solid rgba(var(--kt-ink-rgb), 0.1)',
                               fontWeight: isLinked ? 600 : 400,
                             }}
                           >

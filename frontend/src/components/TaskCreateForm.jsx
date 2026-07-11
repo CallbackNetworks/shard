@@ -30,7 +30,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
   if (!showForm) return null
 
   return (
-    <div style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${DARK.border}` }}>
+    <div style={{ padding: '12px 24px', background: 'rgba(var(--kt-ink-rgb), 0.02)', borderBottom: `1px solid ${DARK.border}` }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {templates.length > 0 && (
           <select
@@ -78,7 +78,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
         <input type="date" value={newTask.due_date} onChange={e => setNewTask(p => ({ ...p, due_date: e.target.value }))}
           style={{ ...input }} />
         <button onClick={onCancel}
-          style={{ padding: '7px 16px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', color: DARK.text, fontSize: 12, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          style={{ padding: '7px 16px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', color: DARK.text, fontSize: 12, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px' }}>
           {t('cancel')}
         </button>
         <button
@@ -86,7 +86,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
           onClick={() => createMut.mutate(newTask)}
           style={{
             padding: '7px 18px', border: 'none', borderRadius: 9999,
-            background: BRAND, color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            background: BRAND, color: 'var(--kt-bg)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
             opacity: !newTask.title ? 0.5 : 1, textTransform: 'uppercase', letterSpacing: '1.4px',
           }}
         >
@@ -120,7 +120,7 @@ export default function TaskCreateForm({ showForm, newTask, setNewTask, createMu
                     fontSize: 11, padding: '2px 8px', borderRadius: 9999, fontWeight: 600, cursor: 'pointer',
                     background: selected ? lb.color + '22' : 'transparent',
                     color: selected ? lb.color : DARK.textMid,
-                    border: selected ? `1px solid ${lb.color}44` : '1px solid rgba(255,255,255,0.1)',
+                    border: selected ? `1px solid ${lb.color}44` : '1px solid rgba(var(--kt-ink-rgb), 0.1)',
                   }}
                 >
                   {lb.name}

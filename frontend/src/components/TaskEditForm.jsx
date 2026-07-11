@@ -40,7 +40,7 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
   }
 
   return (
-    <div style={{ paddingLeft: depth * 24, background: 'rgba(255,255,255,0.03)', borderBottom: `1px solid ${DARK.border}` }}>
+    <div style={{ paddingLeft: depth * 24, background: 'rgba(var(--kt-ink-rgb), 0.03)', borderBottom: `1px solid ${DARK.border}` }}>
       <div style={{ padding: '10px 16px' }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input
@@ -65,14 +65,14 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
           </select>
           <input type="date" value={editData.start_date} onChange={e => setEditData(p => ({ ...p, start_date: e.target.value }))}
             style={{ ...darkInput }} />
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>{'\u2192'}</span>
+          <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 12 }}>{'\u2192'}</span>
           <input type="date" value={editData.due_date} onChange={e => setEditData(p => ({ ...p, due_date: e.target.value }))}
             style={{ ...darkInput }} />
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{t('taskEdit.estimated')}</span>
+          <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 11 }}>{t('taskEdit.estimated')}</span>
           <input type="number" min="0" placeholder="min" value={editData.time_estimate}
             onChange={e => setEditData(p => ({ ...p, time_estimate: e.target.value }))}
             style={{ ...darkInput, width: 70 }} />
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{t('taskEdit.spent')}</span>
+          <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 11 }}>{t('taskEdit.spent')}</span>
           <input type="number" min="0" placeholder="min" value={editData.time_spent}
             onChange={e => setEditData(p => ({ ...p, time_spent: e.target.value }))}
             style={{ ...darkInput, width: 70 }} />
@@ -96,7 +96,7 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
           />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button onClick={onCancel} style={{ padding: '5px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
+          <button onClick={onCancel} style={{ padding: '5px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
           <button onClick={handleSave} style={{ padding: '5px 16px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('save')}</button>
         </div>
       </div>

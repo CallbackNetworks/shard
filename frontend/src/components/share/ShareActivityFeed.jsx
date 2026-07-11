@@ -9,11 +9,11 @@ const ACTION_COLORS = {
   'task.deleted': STATUS_COLOR.failed,
   'task.failed': STATUS_COLOR.failed,
   'project.created': '#3b82f6',
-  'project.archived': 'rgba(255,255,255,0.28)',
+  'project.archived': 'rgba(var(--kt-ink-rgb), 0.28)',
 }
 
 function ActivityEntry({ entry, index }) {
-  const color = ACTION_COLORS[entry.action] || 'rgba(255,255,255,0.28)'
+  const color = ACTION_COLORS[entry.action] || 'rgba(var(--kt-ink-rgb), 0.28)'
   return (
     <div className="kt-share-activity-entry" style={{ '--share-accent': color, animationDelay: `${0.05 * index}s` }}>
       <div className="kt-share-activity-mark">

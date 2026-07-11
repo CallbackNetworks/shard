@@ -1,7 +1,7 @@
 /* ── GlowBar ─────────────────────────────────────────────────────── */
 .glowBarEmpty {
   height: 3px;
-  background: rgba(255,255,255,0.04);
+  background: rgba(var(--kt-ink-rgb), 0.04);
   border-radius: 0;
 }
 
@@ -9,7 +9,7 @@
   height: 3px;
   border-radius: 0;
   overflow: hidden;
-  background: rgba(255,255,255,0.04);
+  background: rgba(var(--kt-ink-rgb), 0.04);
   position: relative;
 }
 
@@ -29,7 +29,7 @@
 .glowBarShimmer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(var(--kt-ink-rgb), 0.15), transparent);
   animation: shimmerSlide 2.4s ease infinite;
 }
 
@@ -59,7 +59,7 @@
 }
 
 .projectCard:hover {
-  border-color: #ffffff;
+  border-color: var(--kt-ink);
   transform: translateX(2px);
 }
 
@@ -70,7 +70,7 @@
   bottom: 0;
   width: 3px;
   height: auto;
-  background: rgba(255,255,255,0.2);
+  background: rgba(var(--kt-ink-rgb), 0.2);
 }
 
 .cardHeader {
@@ -104,7 +104,7 @@
   font-size: 16px;
   line-height: 1.15;
   font-weight: 400;
-  color: #ffffff;
+  color: var(--kt-ink);
   margin-bottom: 3px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -117,7 +117,7 @@
 
 .cardDescription {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--kt-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -140,8 +140,8 @@
 }
 
 .statusBadgeArchived {
-  background: rgba(255,255,255,0.03);
-  color: #9ca3af;
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  color: var(--kt-muted);
   border: 1px solid var(--kt-line);
 }
 
@@ -166,7 +166,7 @@
 
 .statsRemaining {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .statsPercent {
@@ -216,7 +216,7 @@
 
 .activityDetail {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--kt-muted);
   line-height: 1.5;
 }
 
@@ -246,7 +246,7 @@
 }
 
 .taskRowHover {
-  background: rgba(255,255,255,0.03);
+  background: rgba(var(--kt-ink-rgb), 0.03);
 }
 
 .taskStatusDot {
@@ -367,7 +367,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .dueSoonToggle:disabled {
@@ -377,7 +377,7 @@
 .dueSoonTitle {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--kt-ink);
   flex: 1;
   text-align: left;
 }
@@ -489,7 +489,7 @@
   font-size: 34px;
   line-height: 1;
   font-weight: 400;
-  color: #f3f4f6;
+  color: var(--kt-ink);
   margin-bottom: 6px;
   font-family: var(--kt-display);
   font-synthesis-weight: none;
@@ -499,7 +499,7 @@
 
 .gettingStartedSubtitle {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .stepsGrid {
@@ -546,7 +546,7 @@
   font-size: 16px;
   line-height: 1.15;
   font-weight: 400;
-  color: #f3f4f6;
+  color: var(--kt-ink);
   margin-bottom: 6px;
   font-family: var(--kt-display);
   font-synthesis-weight: none;
@@ -555,7 +555,7 @@
 
 .stepDesc {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--kt-muted);
   line-height: 1.5;
 }
 
@@ -576,18 +576,18 @@
 
 /* ── Input style ─────────────────────────────────────────────────── */
 .inputField {
-  background: #1a1a1a;
+  background: var(--kt-elev);
   border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 10px 14px;
   font-size: 14px;
-  color: #ffffff;
+  color: var(--kt-ink);
   outline: none;
   transition: border-color 0.15s;
 }
 
 .inputField:focus {
-  border-color: #ffffff;
+  border-color: var(--kt-ink);
   box-shadow: none;
 }
 
@@ -597,10 +597,10 @@
   flex-direction: column;
   height: 100%;
   background: var(--kt-bg);
-  color: #ffffff;
+  color: var(--kt-ink);
   background-image:
-    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    linear-gradient(rgba(var(--kt-ink-rgb), 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--kt-ink-rgb), 0.025) 1px, transparent 1px);
   background-size: 36px 36px;
 }
 
@@ -610,7 +610,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  background: rgba(20,20,20,0.94);
+  background: rgba(var(--kt-bg-rgb), 0.94);
   position: relative;
   overflow: hidden;
 }
@@ -635,7 +635,7 @@
   font-size: clamp(28px, 3.4vw, 46px);
   line-height: 1;
   font-weight: 400;
-  color: #f3f4f6;
+  color: var(--kt-ink);
   letter-spacing: 0;
   text-transform: uppercase;
   font-family: var(--kt-display);
@@ -655,7 +655,7 @@
 }
 
 .headerStatsArchived {
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .newProjectBtn {
@@ -685,7 +685,7 @@
 /* ── Create form ─────────────────────────────────────────────────── */
 .createForm {
   padding: 12px 24px;
-  background: rgba(255,255,255,0.02);
+  background: rgba(var(--kt-ink-rgb), 0.02);
   border-bottom: 1px solid var(--kt-line);
   animation: fadeUpIn 0.2s ease forwards;
 }
@@ -707,13 +707,13 @@
 
 .cancelBtn {
   padding: 8px 20px;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--kt-ink);
   border-radius: 0;
   background: transparent;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  color: #ffffff;
+  color: var(--kt-ink);
   text-transform: uppercase;
   letter-spacing: 0;
 }
@@ -761,7 +761,7 @@
 
 .tabBtnActive {
   font-weight: 400;
-  color: #f3f4f6;
+  color: var(--kt-ink);
   border-bottom: 2px solid var(--kt-hit);
   background: rgba(250,204,21,0.12);
 }
@@ -792,7 +792,7 @@
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .loadingSpinner {
@@ -833,7 +833,7 @@
   font-size: 19px;
   line-height: 1.12;
   font-weight: 400;
-  color: #f3f4f6;
+  color: var(--kt-ink);
   font-family: var(--kt-display);
   font-synthesis-weight: none;
   text-transform: uppercase;
@@ -910,7 +910,7 @@
 
 .commandHeadline span {
   font-size: clamp(76px, 12vw, 148px);
-  color: #f3f4f6;
+  color: var(--kt-ink);
 }
 
 .commandHeadline em {
@@ -922,7 +922,7 @@
 
 .commandSubline {
   margin-top: 12px;
-  color: #9ca3af;
+  color: var(--kt-muted);
   font-size: 13px;
   text-transform: uppercase;
 }
@@ -949,7 +949,7 @@
 
 .commandMetric span {
   display: block;
-  color: #f3f4f6;
+  color: var(--kt-ink);
   font-family: var(--kt-display);
   font-size: 38px;
   line-height: 0.9;
@@ -971,7 +971,7 @@
 .commandMetricWide strong {
   display: block;
   margin-top: 6px;
-  color: #d1d5db;
+  color: var(--kt-muted);
   font-size: 12px;
   line-height: 1.35;
   max-height: 34px;
@@ -1014,7 +1014,7 @@
 }
 
 .priorityLaneWaiting {
-  border-color: rgba(255,255,255,0.12);
+  border-color: rgba(var(--kt-ink-rgb), 0.12);
 }
 
 .priorityLaneHeader {
@@ -1023,7 +1023,7 @@
   gap: 7px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--kt-line);
-  color: #f3f4f6;
+  color: var(--kt-ink);
   font-family: var(--kt-display);
   font-size: 22px;
   line-height: 1;
@@ -1059,8 +1059,8 @@
 .priorityTask {
   width: 100%;
   text-align: left;
-  border: 1px solid rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.06);
+  background: rgba(var(--kt-ink-rgb), 0.025);
   padding: 8px 9px;
   cursor: pointer;
   animation: slideInLeft 0.26s ease both;
@@ -1073,7 +1073,7 @@
 
 .priorityTaskTitle {
   display: block;
-  color: #d1d5db;
+  color: var(--kt-muted);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -1122,7 +1122,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.05);
   padding-bottom: 7px;
 }
 
@@ -1132,14 +1132,14 @@
 }
 
 .pressureRows span {
-  color: #f3f4f6;
+  color: var(--kt-ink);
   font-family: var(--kt-display);
   font-size: 36px;
   line-height: 0.9;
 }
 
 .pressureRows em {
-  color: #6b7280;
+  color: var(--kt-faint);
   font-size: 11px;
   font-style: normal;
   text-transform: uppercase;
@@ -1153,7 +1153,7 @@
 
 .briefingGrid section {
   min-width: 0;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
   padding-top: 10px;
 }
 
@@ -1164,7 +1164,7 @@
 
 .briefingGrid b {
   display: block;
-  color: #9ca3af;
+  color: var(--kt-muted);
   font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
@@ -1183,14 +1183,14 @@
   align-items: center;
   min-height: 28px;
   padding: 6px 8px;
-  border: 1px solid rgba(255,255,255,0.055);
-  background: rgba(255,255,255,0.018);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.055);
+  background: rgba(var(--kt-ink-rgb), 0.018);
 }
 
 .briefingItem span {
   min-width: 0;
   overflow: hidden;
-  color: #d1d5db;
+  color: var(--kt-muted);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1245,16 +1245,16 @@
 
 .filterBtnActive {
   font-weight: 700;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid #ffffff;
-  color: #ffffff;
+  background: rgba(var(--kt-ink-rgb), 0.08);
+  border: 1px solid var(--kt-ink);
+  color: var(--kt-ink);
 }
 
 .filterBtnInactive {
   font-weight: 400;
   background: transparent;
   border: 1px solid var(--kt-line);
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .filterCount {
@@ -1280,7 +1280,7 @@
 .emptyTitle {
   font-size: 16px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--kt-ink);
 }
 
 .emptySubtitle {

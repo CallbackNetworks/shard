@@ -34,7 +34,7 @@ export default function StackedBarChart({ bars = [], segments = [], height = 220
             >
               <text x={PAD.l - 8} y={y + barH / 2 + 1}
                 textAnchor="end" dominantBaseline="middle"
-                fontSize={11} fill={isHov ? '#fff' : 'rgba(255,255,255,0.5)'} fontFamily="system-ui">
+                fontSize={11} fill={isHov ? 'var(--kt-ink)' : 'rgba(var(--kt-ink-rgb), 0.5)'} fontFamily="system-ui">
                 {bar.label.length > 14 ? bar.label.slice(0, 12) + '...' : bar.label}
               </text>
               {segments.map(seg => {
@@ -51,7 +51,7 @@ export default function StackedBarChart({ bars = [], segments = [], height = 220
               })}
               <text x={xOffset + 6} y={y + barH / 2 + 1}
                 dominantBaseline="middle"
-                fontSize={10} fill="rgba(255,255,255,0.3)" fontFamily="system-ui">
+                fontSize={10} fill="rgba(var(--kt-ink-rgb), 0.3)" fontFamily="system-ui">
                 {segments.reduce((s, seg) => s + (bar.values[seg.key] || 0), 0)}
               </text>
             </g>
@@ -70,7 +70,7 @@ export default function StackedBarChart({ bars = [], segments = [], height = 220
           return (
             <g>
               <rect x={boxX} y={y} width={boxW} height={boxH} rx={4}
-                fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.15)" strokeWidth={0.5} />
+                fill="rgba(0,0,0,0.85)" stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeWidth={0.5} />
               {textLines.map((line, li) => (
                 <text key={li} x={boxX + 8} y={y + 14 + li * 14}
                   fontSize={10} fill="#fff" fontFamily="system-ui">{line}</text>
@@ -92,9 +92,9 @@ export default function StackedBarChart({ bars = [], segments = [], height = 220
         return (
           <g key={f}>
             <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv}
-              stroke="rgba(255,255,255,0.05)" strokeWidth={0.5} />
+              stroke="rgba(var(--kt-ink-rgb), 0.05)" strokeWidth={0.5} />
             <text x={PAD.l - 4} y={yv + 3} textAnchor="end"
-              fontSize={9} fill="rgba(255,255,255,0.2)" fontFamily="system-ui">
+              fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)" fontFamily="system-ui">
               {Math.round(maxVal * f)}
             </text>
           </g>
@@ -123,7 +123,7 @@ export default function StackedBarChart({ bars = [], segments = [], height = 220
               )
             })}
             <text x={x + barW / 2} y={H - 6} textAnchor="middle"
-              fontSize={9} fill={isHov ? '#fff' : 'rgba(255,255,255,0.3)'} fontFamily="system-ui">
+              fontSize={9} fill={isHov ? 'var(--kt-ink)' : 'rgba(var(--kt-ink-rgb), 0.3)'} fontFamily="system-ui">
               {bar.label.length > 8 ? bar.label.slice(0, 6) + '..' : bar.label}
             </text>
           </g>

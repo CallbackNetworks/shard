@@ -532,7 +532,7 @@ export default function ProjectDetail() {
                       setFilterDue(fl.due || 'all')
                       setShowFilters(true)
                     }}
-                    style={{ fontSize: 11, background: DARK.elevated, color: DARK.textMid, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
+                    style={{ fontSize: 11, background: DARK.elevated, color: DARK.textMid, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
                     value=""
                   >
                     <option value="">Saved views</option>
@@ -560,7 +560,7 @@ export default function ProjectDetail() {
                       })
                     }}
                     title="Save current filter"
-                    style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}
+                    style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}
                   >
                     <Bookmark size={11} /> Save
                   </button>
@@ -570,7 +570,7 @@ export default function ProjectDetail() {
                   onClick={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
                   style={{
                     background: bulkMode ? 'rgba(250,204,21,0.12)' : 'none',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
+                    border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
                     color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
                   }}
                 >
@@ -586,7 +586,7 @@ export default function ProjectDetail() {
                     URL.revokeObjectURL(url)
                   }}
                   title="Export tasks"
-                  style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center' }}
+                  style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center' }}
                 >
                   <Download size={11} />
                 </button>
@@ -594,7 +594,7 @@ export default function ProjectDetail() {
                 <button
                   onClick={() => setShowImport(v => !v)}
                   title="Import tasks"
-                  style={{ background: showImport ? 'rgba(250,204,21,0.12)' : 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
+                  style={{ background: showImport ? 'rgba(250,204,21,0.12)' : 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
                 >
                   <Upload size={11} />
                 </button>
@@ -676,7 +676,7 @@ export default function ProjectDetail() {
                 <span style={{ fontSize: 12, color: DARK.info, fontWeight: 600 }}>{selectedTasks.size} selected</span>
                 <select
                   onChange={e => { if (e.target.value) { bulkUpdateMut.mutate({ task_ids: [...selectedTasks], status: e.target.value }); e.target.value = '' } }}
-                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '3px 6px' }}
+                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 4, padding: '3px 6px' }}
                   defaultValue=""
                 >
                   <option value="" disabled>Set status...</option>
@@ -687,7 +687,7 @@ export default function ProjectDetail() {
                 </select>
                 <select
                   onChange={e => { if (e.target.value) { bulkUpdateMut.mutate({ task_ids: [...selectedTasks], priority: e.target.value }); e.target.value = '' } }}
-                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '3px 6px' }}
+                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 4, padding: '3px 6px' }}
                   defaultValue=""
                 >
                   <option value="" disabled>Set priority...</option>
@@ -708,13 +708,13 @@ export default function ProjectDetail() {
 
             {/* Import modal */}
             {showImport && (
-              <div style={{ padding: 16, background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ padding: 16, background: 'rgba(var(--kt-ink-rgb), 0.02)', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)' }}>
                 <div style={{ fontSize: 12, color: DARK.text, fontWeight: 600, marginBottom: 8 }}>Import Tasks (JSON)</div>
                 <textarea
                   value={importJson}
                   onChange={e => setImportJson(e.target.value)}
                   placeholder={'[\n  { "title": "Task 1", "priority": "high" },\n  { "title": "Task 2", "subtasks": [{ "title": "Sub 1" }] }\n]'}
-                  style={{ width: '100%', minHeight: 100, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: 10, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
+                  style={{ width: '100%', minHeight: 100, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 6, padding: 10, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
                 />
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
@@ -729,7 +729,7 @@ export default function ProjectDetail() {
                   >
                     {importMut.isPending ? 'Importing...' : 'Import'}
                   </button>
-                  <button onClick={() => setShowImport(false)} style={{ padding: '5px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.text }}>Cancel</button>
+                  <button onClick={() => setShowImport(false)} style={{ padding: '5px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.text }}>Cancel</button>
                 </div>
               </div>
             )}

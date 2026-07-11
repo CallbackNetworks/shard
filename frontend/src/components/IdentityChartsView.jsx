@@ -16,7 +16,7 @@ const HorizontalBarChart = lazy(() => import('./charts/HorizontalBarChart'))
 const AreaChart = lazy(() => import('./charts/AreaChart'))
 
 const ChartFallback = () => (
-  <div style={{ padding: '24px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>Loading...</div>
+  <div style={{ padding: '24px 0', textAlign: 'center', color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 12 }}>Loading...</div>
 )
 
 const STATUS_COLORS = {
@@ -29,15 +29,15 @@ const STATUS_COLORS = {
 function StatCard({ label, value, color, delay = 0 }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: 'rgba(var(--kt-ink-rgb), 0.03)',
+      border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
       borderRadius: 8,
       padding: '14px 16px',
       animation: 'fadeUpIn 0.35s ease forwards',
       animationDelay: `${delay}s`,
       opacity: 0,
     }}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
     </div>
   )
@@ -47,7 +47,7 @@ function Section({ title, children, style }) {
   return (
     <div style={{ marginBottom: 28, ...style }}>
       <div style={{
-        fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.3)',
+        fontSize: 11, fontWeight: 800, color: 'rgba(var(--kt-ink-rgb), 0.3)',
         letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 14,
       }}>
         {title}
@@ -66,7 +66,7 @@ function IdentityTab({ identity, active, onClick }) {
       cursor: 'pointer',
       padding: '8px 14px',
       fontSize: 11, fontWeight: active ? 700 : 400,
-      color: active ? identity.color : 'rgba(255,255,255,0.4)',
+      color: active ? identity.color : 'rgba(var(--kt-ink-rgb), 0.4)',
       display: 'flex', alignItems: 'center', gap: 6,
       transition: 'all 0.15s',
       outline: 'none',
@@ -93,8 +93,8 @@ function IdentityCard({ identity, onNavigate }) {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: 'rgba(var(--kt-ink-rgb), 0.03)',
+      border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
       borderTop: `2px solid ${identity.color}`,
       borderRadius: 10,
       padding: 20,
@@ -111,8 +111,8 @@ function IdentityCard({ identity, onNavigate }) {
           {identity.avatar || identity.name.charAt(0)}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{identity.name}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--kt-ink)' }}>{identity.name}</div>
+          <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)' }}>
             {identity.projects.length} {t('hub.projects')} · {identity.total_tasks} {t('hub.tasks')}
           </div>
         </div>
@@ -135,8 +135,8 @@ function IdentityCard({ identity, onNavigate }) {
           ].map(s => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', flex: 1 }}>{s.label}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: s.value > 0 ? '#fff' : 'rgba(255,255,255,0.2)' }}>
+              <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.5)', flex: 1 }}>{s.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: s.value > 0 ? 'var(--kt-ink)' : 'rgba(var(--kt-ink-rgb), 0.2)' }}>
                 {s.value}
               </span>
             </div>
@@ -145,7 +145,7 @@ function IdentityCard({ identity, onNavigate }) {
       </div>
 
       {identity.projects.length > 0 && (
-        <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+        <div style={{ marginTop: 16, borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.06)', paddingTop: 12 }}>
           {identity.projects.map(p => {
             const pPct = p.total_tasks > 0 ? Math.round((p.done / p.total_tasks) * 100) : 0
             return (
@@ -158,20 +158,20 @@ function IdentityCard({ identity, onNavigate }) {
                 onClick={() => onNavigate?.(p.id)}
               >
                 <span style={{
-                  fontSize: 11, color: 'rgba(255,255,255,0.6)', flex: 1,
+                  fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.6)', flex: 1,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
                 }}>
                   {p.name}
                 </span>
                 <div style={{
-                  width: 60, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', flexShrink: 0,
+                  width: 60, height: 4, borderRadius: 2, background: 'rgba(var(--kt-ink-rgb), 0.06)', flexShrink: 0,
                 }}>
                   <div style={{
                     width: `${pPct}%`, height: '100%', borderRadius: 2,
                     background: identity.color, transition: 'width 0.3s',
                   }} />
                 </div>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', width: 30, textAlign: 'right', flexShrink: 0 }}>
+                <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.3)', width: 30, textAlign: 'right', flexShrink: 0 }}>
                   {pPct}%
                 </span>
               </div>
@@ -194,11 +194,11 @@ function PerspectiveSwitcher({ value, onChange }) {
     <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
       {options.map(o => (
         <button key={o.key} onClick={() => onChange(o.key)} style={{
-          background: value === o.key ? 'rgba(255,255,255,0.08)' : 'transparent',
-          border: `1px solid ${value === o.key ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)'}`,
+          background: value === o.key ? 'rgba(var(--kt-ink-rgb), 0.08)' : 'transparent',
+          border: `1px solid ${value === o.key ? 'rgba(var(--kt-ink-rgb), 0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)'}`,
           borderRadius: 6, padding: '5px 12px', cursor: 'pointer',
           fontSize: 11, fontWeight: value === o.key ? 700 : 400,
-          color: value === o.key ? '#fff' : 'rgba(255,255,255,0.4)',
+          color: value === o.key ? 'var(--kt-ink)' : 'rgba(var(--kt-ink-rgb), 0.4)',
           transition: 'all 0.15s', outline: 'none',
         }}>
           {o.label}
@@ -383,7 +383,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
     <div>
       {/* Identity filter tabs */}
       <div style={{
-        display: 'flex', gap: 2, borderBottom: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', gap: 2, borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.06)',
         marginBottom: 4, flexWrap: 'wrap',
       }}>
         <button onClick={() => onSelectIdentity?.(null)} style={{
@@ -392,7 +392,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
           borderBottom: `2px solid ${!selectedIdentityId ? '#facc15' : 'transparent'}`,
           cursor: 'pointer', padding: '8px 16px',
           fontSize: 11, fontWeight: !selectedIdentityId ? 700 : 400,
-          color: !selectedIdentityId ? '#fff' : 'rgba(255,255,255,0.4)',
+          color: !selectedIdentityId ? 'var(--kt-ink)' : 'rgba(var(--kt-ink-rgb), 0.4)',
           transition: 'all 0.15s', outline: 'none',
         }}>
           {t('hub.all')}
@@ -421,7 +421,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             <StatCard label={t('hub.totalTasks')} value={selectedIdent ? selectedIdent.total_tasks : totals.total_tasks} color="#fff" delay={0} />
             <StatCard label={t('hub.completed')} value={selectedIdent ? selectedIdent.done : totals.done} color={STATUS_COLOR.done} delay={0.06} />
             <StatCard label={t('hub.inProgress')} value={selectedIdent ? selectedIdent.in_progress : totals.in_progress} color={STATUS_COLOR.in_progress} delay={0.12} />
-            <StatCard label={t('hub.overdueCount')} value={selectedIdent ? selectedIdent.overdue : totals.overdue} color={(selectedIdent ? selectedIdent.overdue : totals.overdue) > 0 ? STATUS_COLOR.failed : '#fff'} delay={0.18} />
+            <StatCard label={t('hub.overdueCount')} value={selectedIdent ? selectedIdent.overdue : totals.overdue} color={(selectedIdent ? selectedIdent.overdue : totals.overdue) > 0 ? STATUS_COLOR.failed : 'var(--kt-ink)'} delay={0.18} />
           </div>
 
           <div style={{
@@ -524,8 +524,8 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             {displayedIdentities.map(ident => {
               return (
                 <div key={ident.id} style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: 'rgba(var(--kt-ink-rgb), 0.03)',
+                  border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
                   borderRadius: 10, padding: 16,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
                 }}>
@@ -550,8 +550,8 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             }}>
               {displayedIdentities.map(ident => (
                 <div key={ident.id} style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: 'rgba(var(--kt-ink-rgb), 0.03)',
+                  border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
                   borderRadius: 10, padding: 16,
                 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: ident.color, marginBottom: 10 }}>

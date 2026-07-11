@@ -76,7 +76,7 @@ export default memo(function IssueRow({
         style={{
           display: 'flex', alignItems: 'center',
           padding: `0 16px 0 ${16 + depth * 20}px`, height: 36, gap: 8,
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
           background: hovered ? DARK.hover : 'transparent',
           transition: 'background 0.12s',
         }}
@@ -96,7 +96,7 @@ export default memo(function IssueRow({
         <PriorityIcon priority={task.priority} />
         <StatusIcon status={task.status} />
 
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontFamily: 'monospace', minWidth: 64, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.22)', fontFamily: 'monospace', minWidth: 64, flexShrink: 0 }}>
           {issueId}
         </span>
 
@@ -107,7 +107,7 @@ export default memo(function IssueRow({
 
         <span style={{
           flex: 1, fontSize: 13,
-          color: task.status === 'done' ? 'rgba(255,255,255,0.25)' : DARK.text,
+          color: task.status === 'done' ? 'rgba(var(--kt-ink-rgb), 0.25)' : DARK.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           textDecoration: task.status === 'done' ? 'line-through' : 'none',
         }}>
@@ -139,7 +139,7 @@ export default memo(function IssueRow({
         {/* Subtask count badge */}
         {subtaskCount > 0 && (
           <span style={{
-            fontSize: 10, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)',
+            fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.35)', background: 'rgba(var(--kt-ink-rgb), 0.06)',
             padding: '1px 6px', borderRadius: 10, flexShrink: 0, whiteSpace: 'nowrap',
           }}>
             {subtaskCount} {t('issue.subtask')}
@@ -153,7 +153,7 @@ export default memo(function IssueRow({
             title={t('recurrence.repeats', { frequency: task.recurrence.frequency })}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 10, color: showRecurrence ? DARK.success : 'rgba(255,255,255,0.3)',
+              fontSize: 10, color: showRecurrence ? DARK.success : 'rgba(var(--kt-ink-rgb), 0.3)',
               cursor: 'pointer', flexShrink: 0,
             }}
           >
@@ -178,7 +178,7 @@ export default memo(function IssueRow({
             onClick={(e) => { e.stopPropagation(); setShowComments(v => !v) }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 10, color: 'rgba(255,255,255,0.35)', cursor: 'pointer',
+              fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.35)', cursor: 'pointer',
               flexShrink: 0, whiteSpace: 'nowrap',
             }}
           >
@@ -204,11 +204,11 @@ export default memo(function IssueRow({
             title={`Progress: ${task.progress_pct}%${task.agent_notes ? '\n' + task.agent_notes : ''}`}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 10, color: 'rgba(255,255,255,0.45)', flexShrink: 0, whiteSpace: 'nowrap',
+              fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.45)', flexShrink: 0, whiteSpace: 'nowrap',
             }}
           >
             <span style={{
-              width: 36, height: 4, background: 'rgba(255,255,255,0.1)',
+              width: 36, height: 4, background: 'rgba(var(--kt-ink-rgb), 0.1)',
               borderRadius: 2, overflow: 'hidden', display: 'inline-block',
             }}>
               <span style={{
@@ -223,7 +223,7 @@ export default memo(function IssueRow({
         )}
 
         {showProject && projectName && (
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', background: 'rgba(var(--kt-ink-rgb), 0.06)', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
             {projectName}
           </span>
         )}
@@ -232,7 +232,7 @@ export default memo(function IssueRow({
         <TimeTracker task={task} onUpdate={onUpdate} />
 
         {task.due_date && (
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
           </span>
         )}
@@ -317,8 +317,8 @@ export default memo(function IssueRow({
           paddingRight: 16,
           paddingTop: 8,
           paddingBottom: 10,
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          background: 'rgba(255,255,255,0.02)',
+          borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+          background: 'rgba(var(--kt-ink-rgb), 0.02)',
           fontSize: 13,
           lineHeight: 1.6,
           color: DARK.textMid,
@@ -352,8 +352,8 @@ export default memo(function IssueRow({
         <div style={{
           paddingLeft: 16 + depth * 20 + 36, paddingRight: 16,
           paddingTop: 8, paddingBottom: 10,
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          background: 'rgba(255,255,255,0.02)',
+          borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+          background: 'rgba(var(--kt-ink-rgb), 0.02)',
         }}>
           <BuildHistoryPanel taskId={task.id} />
         </div>
@@ -364,7 +364,7 @@ export default memo(function IssueRow({
         <div style={{
           display: 'flex', gap: 6, alignItems: 'center',
           padding: `6px 16px 6px ${16 + (depth + 1) * 20 + 12}px`,
-          background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.07)',
+          background: 'rgba(var(--kt-ink-rgb), 0.02)', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
         }}>
           <input
             autoFocus
@@ -372,10 +372,10 @@ export default memo(function IssueRow({
             onChange={e => setSubtaskTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleCreateSubtask(); if (e.key === 'Escape') setShowSubtaskForm(false) }}
             placeholder={t('issue.subtaskTitlePlaceholder')}
-            style={{ flex: 1, padding: '4px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: DARK.hover, color: DARK.text }}
+            style={{ flex: 1, padding: '4px 10px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: DARK.hover, color: DARK.text }}
           />
           <button onClick={handleCreateSubtask} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('add')}</button>
-          <button onClick={() => setShowSubtaskForm(false)} style={{ padding: '4px 12px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
+          <button onClick={() => setShowSubtaskForm(false)} style={{ padding: '4px 12px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
         </div>
       )}
 

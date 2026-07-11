@@ -25,12 +25,12 @@
   gap: 5px;
   padding: 6px 14px;
   border-radius: 0;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   background: transparent;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  color: #ffffff;
+  color: var(--kt-ink);
   text-transform: uppercase;
   letter-spacing: 0;
 }
@@ -52,13 +52,13 @@
 .labelManagerTitle {
   font-size: 12px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--kt-ink);
   margin-bottom: 10px;
 }
 
 .labelManagerEmpty {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(var(--kt-ink-rgb), 0.25);
   margin-bottom: 10px;
 }
 
@@ -91,7 +91,7 @@
 .labelManagerNewLabel {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(var(--kt-ink-rgb), 0.35);
   margin-bottom: 6px;
 }
 
@@ -108,8 +108,8 @@
   border: 1px solid var(--kt-line);
   border-radius: 0;
   font-size: 12px;
-  background: rgba(255,255,255,0.03);
-  color: #ffffff;
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  color: var(--kt-ink);
 }
 
 .labelManagerPalette {
@@ -134,7 +134,7 @@
   border: none;
   border-radius: 0;
   background: var(--kt-hit);
-  color: #000;
+  color: var(--kt-bg);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -149,13 +149,13 @@
   height: 100%;
   position: relative;
   background: var(--kt-bg);
-  color: #ffffff;
+  color: var(--kt-ink);
 }
 
 /* ── Header ── */
 .header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
+  background: rgba(var(--kt-ink-rgb), 0.015);
 }
 
 .headerDesktop {
@@ -173,7 +173,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(var(--kt-ink-rgb), 0.3);
   font-size: 12px;
   padding: 0;
   margin-bottom: 14px;
@@ -218,7 +218,7 @@
   margin: 0;
   font-size: 24px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--kt-ink);
 }
 
 .statusBadge {
@@ -237,15 +237,15 @@
 }
 
 .statusArchived {
-  background: rgba(255, 255, 255, 0.06);
-  color: #9ca3af;
+  background: rgba(var(--kt-ink-rgb), 0.06);
+  color: var(--kt-muted);
   border: 1px solid var(--kt-line);
 }
 
 .projectDescription {
   margin: 0;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(var(--kt-ink-rgb), 0.38);
 }
 
 .projectLabels {
@@ -270,7 +270,7 @@
 
 .progressText {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(var(--kt-ink-rgb), 0.3);
 }
 
 .progressBarTrack {
@@ -295,17 +295,17 @@
   gap: 5px;
   padding: 6px 14px;
   border-radius: 0;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  color: #ffffff;
+  color: var(--kt-ink);
   text-transform: uppercase;
   letter-spacing: 0;
 }
 
 .agentBtnActive {
-  background: rgba(255,255,255,0.1);
+  background: rgba(var(--kt-ink-rgb), 0.1);
 }
 
 .agentBtnInactive {
@@ -315,12 +315,12 @@
 .archiveBtn {
   padding: 7px 16px;
   border-radius: 0;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   background: transparent;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  color: #ffffff;
+  color: var(--kt-ink);
   text-transform: uppercase;
   letter-spacing: 0;
 }
@@ -333,7 +333,7 @@
   border-radius: 0;
   border: none;
   background: var(--kt-hit);
-  color: #000;
+  color: var(--kt-bg);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -362,14 +362,14 @@
 
 .agentInstrDesc {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(var(--kt-ink-rgb), 0.4);
   margin-bottom: 8px;
 }
 
 .agentInstrTextarea {
   width: 100%;
   background: rgba(0, 0, 0, 0.3);
-  color: #ffffff;
+  color: var(--kt-ink);
   border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 8px 10px;
@@ -391,7 +391,7 @@
   border-radius: 0;
   border: none;
   background: var(--kt-hit);
-  color: #000;
+  color: var(--kt-bg);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -400,7 +400,7 @@
 .agentInstrCancelBtn {
   padding: 5px 14px;
   border-radius: 0;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   background: transparent;
   color: #fff;
   font-size: 12px;
@@ -421,12 +421,12 @@
   margin-bottom: -1px;
   transition: color 0.15s;
   border-bottom: 2px solid transparent;
-  color: #9ca3af;
+  color: var(--kt-muted);
   font-weight: 400;
 }
 
 .tabActive {
-  color: #ffffff;
+  color: var(--kt-ink);
   font-weight: 700;
   border-bottom-color: var(--kt-hit);
 }
@@ -439,7 +439,7 @@
 
 .cycleActiveBadge {
   background: var(--kt-hit);
-  color: #000;
+  color: var(--kt-bg);
   border-radius: 0;
   font-size: 9px;
   padding: 1px 6px;
@@ -457,10 +457,10 @@
   display: flex;
   gap: 4px;
   padding: 8px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
   flex-wrap: wrap;
   align-items: center;
-  background: rgba(255, 255, 255, 0.01);
+  background: rgba(var(--kt-ink-rgb), 0.01);
 }
 
 .filterBtn {
@@ -474,15 +474,15 @@
 .filterBtnActive {
   font-weight: 700;
   border: none;
-  background: #262626;
-  color: #ffffff;
+  background: var(--kt-elev);
+  color: var(--kt-ink);
 }
 
 .filterBtnInactive {
   font-weight: 400;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   background: transparent;
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .filterCount {
@@ -509,20 +509,20 @@
 }
 
 .advancedFilterActive {
-  border: 1px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.15);
+  background: rgba(var(--kt-ink-rgb), 0.05);
   color: var(--kt-hit);
 }
 
 .advancedFilterInactive {
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   background: transparent;
-  color: #9ca3af;
+  color: var(--kt-muted);
 }
 
 .activeFilterBadge {
   background: var(--kt-hit);
-  color: #000;
+  color: var(--kt-bg);
   border-radius: 0;
   font-size: 9px;
   padding: 1px 5px;
@@ -535,8 +535,8 @@
   font-size: 13px;
   border: none;
   outline: none;
-  background: #262626;
-  color: #ffffff;
+  background: var(--kt-elev);
+  color: var(--kt-ink);
   width: 160px;
   box-shadow: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
 }
@@ -545,7 +545,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(var(--kt-ink-rgb), 0.3);
   padding: 0;
   display: flex;
 }
@@ -557,13 +557,13 @@
   padding: 8px 16px;
   flex-wrap: wrap;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
+  background: rgba(var(--kt-ink-rgb), 0.02);
 }
 
 .advancedFilterLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(var(--kt-ink-rgb), 0.3);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0;
@@ -574,16 +574,16 @@
   border-radius: 0;
   font-size: 11px;
   border: 1px solid var(--kt-line);
-  color: #ffffff;
+  color: var(--kt-ink);
   outline: none;
 }
 
 .filterSelectDefault {
-  background: rgba(255,255,255,0.03);
+  background: rgba(var(--kt-ink-rgb), 0.03);
 }
 
 .filterSelectActive {
-  background: rgba(255,255,255,0.05);
+  background: rgba(var(--kt-ink-rgb), 0.05);
 }
 
 .filterSelectAgent {
@@ -592,8 +592,8 @@
 }
 
 .filterSelectAgentDefault {
-  background: rgba(255,255,255,0.03);
-  color: #ffffff;
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  color: var(--kt-ink);
 }
 
 .clearAllFiltersBtn {
@@ -614,8 +614,8 @@
   padding: 0 16px;
   height: 28px;
   gap: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
+  background: rgba(var(--kt-ink-rgb), 0.02);
 }
 
 .colSpacer12 {
@@ -632,7 +632,7 @@
 
 .colHeader {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(var(--kt-ink-rgb), 0.2);
 }
 
 .colHeaderId {
@@ -659,21 +659,21 @@
 .emptyState {
   padding: 48px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(var(--kt-ink-rgb), 0.2);
   font-size: 13px;
 }
 
 /* ── Timeline hint ── */
 .timelineHint {
   padding: 10px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.01);
+  color: rgba(var(--kt-ink-rgb), 0.3);
+  background: rgba(var(--kt-ink-rgb), 0.01);
 }
 
 .timelineHintStrong {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(var(--kt-ink-rgb), 0.5);
 }
 
 /* ── Loading state ── */
@@ -682,7 +682,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #9ca3af;
+  color: var(--kt-muted);
   background: var(--kt-bg);
 }
 
@@ -712,7 +712,7 @@
   height: 48px;
   border-radius: 0;
   background: var(--kt-hit);
-  color: #000;
+  color: var(--kt-bg);
   border: none;
   cursor: pointer;
   display: flex;

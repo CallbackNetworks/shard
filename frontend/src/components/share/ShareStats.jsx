@@ -31,7 +31,7 @@ function ProgressRing({ pct, color, size = 48, stroke = 4 }) {
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
+        stroke="rgba(var(--kt-ink-rgb), 0.06)" strokeWidth={stroke} />
       <circle cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color} strokeWidth={stroke}
         strokeDasharray={circ} strokeDashoffset={offset}
@@ -49,7 +49,7 @@ export default function ShareStats({ summary, color, bp }) {
         sub={`${summary.done_tasks} completed`} color={STATUS_COLOR.done} delay={0.2} />
       <StatCard label="PROGRESS" value={Math.round(summary.overall_progress)} color={color} delay={0.25} />
       <StatCard label="OVERDUE" value={summary.overdue_tasks}
-        color={summary.overdue_tasks > 0 ? STATUS_COLOR.failed : 'rgba(255,255,255,0.28)'} delay={0.3} />
+        color={summary.overdue_tasks > 0 ? STATUS_COLOR.failed : 'rgba(var(--kt-ink-rgb), 0.28)'} delay={0.3} />
     </div>
   )
 }

@@ -11,8 +11,8 @@ const PRIORITY_COLORS = {
   low: '#facc15',
 }
 
-const GRID_BORDER = 'rgba(255,255,255,0.06)'
-const DIMMED_TEXT = 'rgba(255,255,255,0.15)'
+const GRID_BORDER = 'rgba(var(--kt-ink-rgb), 0.06)'
+const DIMMED_TEXT = 'rgba(var(--kt-ink-rgb), 0.15)'
 
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate()

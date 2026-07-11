@@ -11,16 +11,18 @@ const STORAGE_KEY = 'ui_prefs'
 export const PROJECT_VIEWS = ['issues', 'board', 'timeline', 'calendar', 'table']
 export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent']
 
-// Accent color presets: `main` maps to CSS var --accent (was BRAND #facc15),
-// `deep` maps to --accent-2 (was BRAND_2 #eab308).
+// Accent color presets: `main`/`deep` are used in dark mode, `mainLight`/
+// `deepLight` in light mode (darker shades that stay readable on white).
+// applyUiPrefs publishes all four as CSS vars; global.css resolves --accent
+// and --accent-2 per theme.
 export const ACCENT_PRESETS = [
-  { key: 'amber', main: '#facc15', deep: '#eab308' },
-  { key: 'indigo', main: '#818cf8', deep: '#6366f1' },
-  { key: 'emerald', main: '#34d399', deep: '#10b981' },
-  { key: 'sky', main: '#38bdf8', deep: '#0ea5e9' },
-  { key: 'rose', main: '#fb7185', deep: '#f43f5e' },
-  { key: 'violet', main: '#a78bfa', deep: '#8b5cf6' },
-  { key: 'orange', main: '#fb923c', deep: '#f97316' },
+  { key: 'amber', main: '#facc15', deep: '#eab308', mainLight: '#a16207', deepLight: '#854d0e' },
+  { key: 'indigo', main: '#818cf8', deep: '#6366f1', mainLight: '#4f46e5', deepLight: '#4338ca' },
+  { key: 'emerald', main: '#34d399', deep: '#10b981', mainLight: '#059669', deepLight: '#047857' },
+  { key: 'sky', main: '#38bdf8', deep: '#0ea5e9', mainLight: '#0284c7', deepLight: '#0369a1' },
+  { key: 'rose', main: '#fb7185', deep: '#f43f5e', mainLight: '#e11d48', deepLight: '#be123c' },
+  { key: 'violet', main: '#a78bfa', deep: '#8b5cf6', mainLight: '#7c3aed', deepLight: '#6d28d9' },
+  { key: 'orange', main: '#fb923c', deep: '#f97316', mainLight: '#ea580c', deepLight: '#c2410c' },
 ]
 
 // UI scale factors applied via document zoom.
@@ -114,8 +116,14 @@ export function applyUiPrefs(prefs = current) {
     const root = document.documentElement
     root.setAttribute('data-motion', prefs.reduceMotion ? 'reduced' : 'full')
     const accent = resolveAccent(prefs)
-    root.style.setProperty('--accent', accent.main)
-    root.style.setProperty('--accent-2', accent.deep)
+    root.style.setProperty('--accent-dark', accent.main)
+    root.style.setProperty('--accent-2-dark', accent.deep)
+    root.style.setProperty('--accent-light', accent.mainLight || accent.main)
+    root.style.setProperty('--accent-2-light', accent.deepLight || accent.deep)
+    // Clear legacy direct vars so the theme-resolved values in global.css
+    // win; setting --accent inline would defeat the light-mode override.
+    root.style.removeProperty('--accent')
+    root.style.removeProperty('--accent-2')
     root.style.zoom = prefs.uiScale && prefs.uiScale !== 1 ? String(prefs.uiScale) : ''
   } catch {
     /* document unavailable (SSR/tests) */

@@ -7,7 +7,7 @@ import { relativeTime, formatMinutes, formatDate } from './utils'
 
 const STATUS_COLOR_MAP = STATUS_COLOR
 const STATUS_LABEL = { done: 'DONE', in_progress: 'ACTIVE', failed: 'FAILED', todo: 'TODO' }
-const PRI_COLOR = { high: '#facc15', medium: '#f0b429', low: 'rgba(255,255,255,0.35)' }
+const PRI_COLOR = { high: '#facc15', medium: '#f0b429', low: 'rgba(var(--kt-ink-rgb), 0.35)' }
 
 function hasDetails(task) {
   return task.description || task.progress_pct != null || task.start_date ||
@@ -19,7 +19,7 @@ function hasDetails(task) {
 
 function TaskRow({ task, index, bp, share }) {
   const [open, setOpen] = useState(false)
-  const sc = STATUS_COLOR_MAP[task.status] || 'rgba(255,255,255,0.28)'
+  const sc = STATUS_COLOR_MAP[task.status] || 'rgba(var(--kt-ink-rgb), 0.28)'
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
   const isMobile = bp === 'mobile'
   const expandable = hasDetails(task) || share.enabled
@@ -64,7 +64,7 @@ function TaskRow({ task, index, bp, share }) {
               {task.comment_count} cmt
             </span>
           )}
-          <span style={{ color: PRI_COLOR[task.priority] || 'rgba(255,255,255,0.28)' }}>
+          <span style={{ color: PRI_COLOR[task.priority] || 'rgba(var(--kt-ink-rgb), 0.28)' }}>
             {(task.priority || '').toUpperCase()}
           </span>
           {task.due_date && (
@@ -98,7 +98,7 @@ function TaskRow({ task, index, bp, share }) {
             {task.progress_pct != null && (
               <span className="kt-share-task-progress">
                 <span>
-                  <Bar pct={task.progress_pct} color={sc} height={3} bg="rgba(255,255,255,0.06)" />
+                  <Bar pct={task.progress_pct} color={sc} height={3} bg="rgba(var(--kt-ink-rgb), 0.06)" />
                 </span>
                 <b>{task.progress_pct}%</b>
               </span>
@@ -118,7 +118,7 @@ function TaskRow({ task, index, bp, share }) {
                 SUBTASKS ({task.subtasks.length})
               </div>
               {task.subtasks.map(s => {
-                const sColor = STATUS_COLOR_MAP[s.status] || 'rgba(255,255,255,0.28)'
+                const sColor = STATUS_COLOR_MAP[s.status] || 'rgba(var(--kt-ink-rgb), 0.28)'
                 return (
                   <div key={s.id} className="kt-share-subtask" style={{ '--task-color': sColor }}>
                     <span />
@@ -231,7 +231,7 @@ export default function ShareProjectCard({ project, index: _index, bp, scope, to
 
         <div className="kt-share-project-counts">
           {[[STATUS_COLOR.done, done, 'done'], [STATUS_COLOR.in_progress, active, 'active'], [STATUS_COLOR.failed, failed, 'failed']].map(([c, n, l]) => (
-            <span key={l} style={{ color: n > 0 ? c : 'rgba(255,255,255,0.18)' }}>
+            <span key={l} style={{ color: n > 0 ? c : 'rgba(var(--kt-ink-rgb), 0.18)' }}>
               {n} <b>{l}</b>
             </span>
           ))}

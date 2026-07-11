@@ -50,7 +50,7 @@ export default function TimeTracker({ task, onUpdate }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 11, color: running ? DARK.warning : 'rgba(255,255,255,0.35)',
+      fontSize: 11, color: running ? DARK.warning : 'rgba(var(--kt-ink-rgb), 0.35)',
       flexShrink: 0, whiteSpace: 'nowrap',
     }}>
       {running ? (
@@ -76,18 +76,18 @@ export default function TimeTracker({ task, onUpdate }) {
             onClick={(e) => { e.stopPropagation(); start() }}
             title="Start timer"
             style={{
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+              background: 'transparent', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)',
               borderRadius: 4, padding: '1px 3px', cursor: 'pointer', display: 'inline-flex',
-              alignItems: 'center', color: 'rgba(255,255,255,0.3)',
+              alignItems: 'center', color: 'rgba(var(--kt-ink-rgb), 0.3)',
             }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.4)'; e.currentTarget.style.color = DARK.success }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(var(--kt-ink-rgb), 0.1)'; e.currentTarget.style.color = 'rgba(var(--kt-ink-rgb), 0.3)' }}
           >
             <Play size={9} fill="currentColor" />
           </button>
           <Clock size={10} />
           <span>{spent}</span>
-          {est && <span style={{ color: 'rgba(255,255,255,0.15)' }}>/ {est}</span>}
+          {est && <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.15)' }}>/ {est}</span>}
         </>
       )}
     </span>

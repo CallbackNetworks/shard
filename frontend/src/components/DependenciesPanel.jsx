@@ -29,14 +29,14 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
     <div style={{
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
-      borderBottom: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(255,255,255,0.02)',
+      borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+      background: 'rgba(var(--kt-ink-rgb), 0.02)',
     }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {t('deps.blockedBy')}
       </div>
       {blockedBy.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginBottom: 8 }}>{t('deps.noBlockers')}</div>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.2)', marginBottom: 8 }}>{t('deps.noBlockers')}</div>
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
           {blockedBy.map(depId => {
@@ -56,7 +56,7 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
         <select
           value={depInput}
           onChange={e => setDepInput(e.target.value)}
-          style={{ flex: 1, padding: '4px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none' }}
+          style={{ flex: 1, padding: '4px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(var(--kt-ink-rgb), 0.05)', color: 'var(--kt-ink)', outline: 'none' }}
         >
           <option value="">{t('deps.pickBlocker')}</option>
           {allTasks.filter(t => t.id !== task.id && !blockedBy.includes(t.id)).map(t => (

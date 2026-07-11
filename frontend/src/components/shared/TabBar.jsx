@@ -3,7 +3,7 @@ export default function TabBar({ tabs, active, onChange, style }) {
     <div style={{
       display: 'flex',
       gap: 2,
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.06)',
       marginBottom: 16,
       flexWrap: 'wrap',
       ...style,
@@ -13,14 +13,14 @@ export default function TabBar({ tabs, active, onChange, style }) {
           key={tab.key}
           onClick={() => onChange(tab.key)}
           style={{
-            background: active === tab.key ? 'rgba(255,255,255,0.06)' : 'transparent',
+            background: active === tab.key ? 'rgba(var(--kt-ink-rgb), 0.06)' : 'transparent',
             border: 'none',
             borderBottom: `2px solid ${active === tab.key ? '#facc15' : 'transparent'}`,
             cursor: 'pointer',
             padding: '8px 14px',
             fontSize: 11,
             fontWeight: active === tab.key ? 700 : 400,
-            color: active === tab.key ? '#fff' : 'rgba(255,255,255,0.4)',
+            color: active === tab.key ? '#fff' : 'rgba(var(--kt-ink-rgb), 0.4)',
             transition: 'all 0.15s',
             outline: 'none',
             letterSpacing: '0.08em',

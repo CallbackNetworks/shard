@@ -121,29 +121,29 @@ export default function ApiKeys() {
 
       {showCreate && (
         <div className="kt-panel" style={{ padding: 20, marginBottom: 20 }}>
-          <h3 style={{ fontWeight: 600, marginBottom: 16, color: '#ffffff' }}>{t('create')} {t('apiKeys.title')}</h3>
+          <h3 style={{ fontWeight: 600, marginBottom: 16, color: 'var(--kt-ink)' }}>{t('create')} {t('apiKeys.title')}</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('name')} *
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('name')} *
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder={t('apiKeys.namePlaceholder')}
                 className="kt-input" style={{ marginTop: 4 }} />
             </label>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('apiKeys.projectScope')}
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('apiKeys.projectScope')}
               <select value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
                 className="kt-input" style={{ marginTop: 4, cursor: 'pointer' }}>
                 <option value="">{t('apiKeys.allProjects')}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </label>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{t('apiKeys.scopes')}
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('apiKeys.scopes')}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {SCOPES.map(scope => (
                   <label key={scope} style={{
                     display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-                    background: form.scopes.includes(scope) ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.05)',
-                    color: form.scopes.includes(scope) ? BRAND : 'rgba(255,255,255,0.4)',
+                    background: form.scopes.includes(scope) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.05)',
+                    color: form.scopes.includes(scope) ? BRAND : 'rgba(var(--kt-ink-rgb), 0.4)',
                     padding: '4px 12px', fontSize: 13,
-                    border: form.scopes.includes(scope) ? `1px solid rgba(250,204,21,0.3)` : '1px solid rgba(255,255,255,0.08)',
+                    border: form.scopes.includes(scope) ? `1px solid rgba(250,204,21,0.3)` : '1px solid rgba(var(--kt-ink-rgb), 0.08)',
                   }}>
                     <input type="checkbox" checked={form.scopes.includes(scope)} onChange={() => toggleScope(scope)} style={{ cursor: 'pointer' }} />
                     {scope}
@@ -184,16 +184,16 @@ export default function ApiKeys() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, color: '#ffffff' }}>{ak.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, color: 'var(--kt-ink)' }}>{ak.name}</span>
                     <span style={{
-                      background: ak.active ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: ak.active ? '#facc15' : 'rgba(255,255,255,0.35)',
+                      background: ak.active ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                      color: ak.active ? '#facc15' : 'rgba(var(--kt-ink-rgb), 0.35)',
                       padding: '2px 8px', fontSize: 12, fontWeight: 600,
                     }}>{ak.active ? 'active' : 'inactive'}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <code style={{
-                      background: 'rgba(255,255,255,0.06)', padding: '4px 10px', fontSize: 13,
+                      background: 'rgba(var(--kt-ink-rgb), 0.06)', padding: '4px 10px', fontSize: 13,
                       fontFamily: 'monospace', color: BRAND,
                     }}>
                       {ak.key_preview}
@@ -204,7 +204,7 @@ export default function ApiKeys() {
                       <span key={s} className="kt-chip" style={{ fontSize: 12, fontWeight: 600 }}>{s}</span>
                     ))}
                   </div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>
+                  <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>
                     {ak.project_id
                       ? `Project: ${projects.find(p => p.id === ak.project_id)?.name || ak.project_id}`
                       : 'All projects'}
@@ -229,9 +229,9 @@ export default function ApiKeys() {
       )}
 
       <div className="kt-panel" style={{ marginTop: 32, padding: 20 }}>
-        <h3 style={{ fontWeight: 600, marginBottom: 12, color: '#ffffff' }}>{t('apiKeys.usage')}</h3>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginBottom: 12 }}>
-          Use the <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', color: BRAND }}>X-API-Key</code> header to authenticate requests to <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', color: BRAND }}>/api/v1/</code> endpoints.
+        <h3 style={{ fontWeight: 600, marginBottom: 12, color: 'var(--kt-ink)' }}>{t('apiKeys.usage')}</h3>
+        <p style={{ color: 'rgba(var(--kt-ink-rgb), 0.35)', fontSize: 13, marginBottom: 12 }}>
+          Use the <code style={{ background: 'rgba(var(--kt-ink-rgb), 0.08)', padding: '1px 5px', color: BRAND }}>X-API-Key</code> header to authenticate requests to <code style={{ background: 'rgba(var(--kt-ink-rgb), 0.08)', padding: '1px 5px', color: BRAND }}>/api/v1/</code> endpoints.
         </p>
         <div className="kt-panel" style={{ padding: 16, overflow: 'auto' }}>
           <pre style={{ margin: 0, color: '#cdd6f4', fontSize: 13, lineHeight: 1.6 }}>{`# List projects
@@ -261,15 +261,15 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
   http://localhost:8000/api/v1/email/send`}</pre>
         </div>
 
-        <h4 style={{ fontWeight: 600, marginTop: 20, marginBottom: 8, color: '#ffffff' }}>{t('apiKeys.availableEndpoints')}</h4>
+        <h4 style={{ fontWeight: 600, marginTop: 20, marginBottom: 8, color: 'var(--kt-ink)' }}>{t('apiKeys.availableEndpoints')}</h4>
         <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', textAlign: 'left' }}>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('method')}</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('endpoint')}</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('scope')}</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('description')}</th>
+            <tr style={{ borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)', textAlign: 'left' }}>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)' }}>{t('method')}</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)' }}>{t('endpoint')}</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)' }}>{t('scope')}</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)' }}>{t('description')}</th>
             </tr>
           </thead>
           <tbody>
@@ -290,19 +290,19 @@ curl -X POST -H "X-API-Key: tdp_your_key_here" \\
               ['GET', '/api/v1/email/status', 'read', 'SMTP config status'],
               ['POST', '/api/v1/email/send', 'write', 'Send email directly'],
             ].map(([method, path, scope, desc], i) => (
-              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <tr key={i} style={{ borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.04)' }}>
                 <td style={{ padding: '6px 12px' }}>
                   <span style={{
-                    background: METHOD_STYLE[method]?.bg || 'rgba(255,255,255,0.06)',
-                    color: METHOD_STYLE[method]?.color || '#ffffff',
+                    background: METHOD_STYLE[method]?.bg || 'rgba(var(--kt-ink-rgb), 0.06)',
+                    color: METHOD_STYLE[method]?.color || 'var(--kt-ink)',
                     padding: '1px 6px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace',
                   }}>{method}</span>
                 </td>
-                <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12, color: '#ffffff' }}>{path}</td>
+                <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12, color: 'var(--kt-ink)' }}>{path}</td>
                 <td style={{ padding: '6px 12px' }}>
                   <span className="kt-chip">{scope}</span>
                 </td>
-                <td style={{ padding: '6px 12px', color: 'rgba(255,255,255,0.35)' }}>{desc}</td>
+                <td style={{ padding: '6px 12px', color: 'rgba(var(--kt-ink-rgb), 0.35)' }}>{desc}</td>
               </tr>
             ))}
           </tbody>

@@ -27,10 +27,10 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
 
   return (
     <>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 4, fontFamily: 'monospace' }}>{issueId}</div>
+      <div style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)', marginBottom: 4, fontFamily: 'monospace' }}>{issueId}</div>
       <div style={{ fontSize: 13, color: DARK.text, lineHeight: 1.4, marginBottom: 6, fontWeight: 400 }}>{task.title}</div>
       {task.description && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4, marginBottom: 6 }}>
+        <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)', lineHeight: 1.4, marginBottom: 6 }}>
           {task.description.length > 80 ? task.description.slice(0, 80) + '\u2026' : task.description}
         </div>
       )}
@@ -58,8 +58,8 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
         </div>
       )}
       {!task.assigned_agent_name && task.assignee && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+        <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(var(--kt-ink-rgb), 0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'rgba(var(--kt-ink-rgb), 0.5)' }}>
             {task.assignee.charAt(0).toUpperCase()}
           </span>
           {task.assignee}
@@ -73,7 +73,7 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
           <div style={{ display: 'flex', gap: 2 }}>
             <button
               onClick={() => navigator.clipboard.writeText(`${window.location.origin}/webhook/callback/${task.callback_token}`)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', padding: '2px 4px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.25)', padding: '2px 4px' }}
             >
               <Link2 size={11} />
             </button>
@@ -81,7 +81,7 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
               value={task.status}
               onChange={e => onUpdate(task.id, { status: e.target.value })}
               onClick={e => e.stopPropagation()}
-              style={{ fontSize: 11, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '2px 4px', background: DARK.elevated, color: DARK.text }}
+              style={{ fontSize: 11, border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 4, padding: '2px 4px', background: DARK.elevated, color: DARK.text }}
             >
               <option value="todo">{t('todo')}</option>
               <option value="in_progress">{t('inProgress')}</option>
@@ -90,14 +90,14 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
             </select>
             <button
               onClick={() => { if (confirm(`Delete "${task.title}"?`)) onDelete(task.id) }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', padding: '2px 4px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.25)', padding: '2px 4px' }}
             >
               <Trash2 size={11} />
             </button>
           </div>
         ) : (
           task.due_date && (
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
+            <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>
               {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
             </span>
           )
@@ -160,8 +160,8 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
         <span style={{ fontSize: 12, fontWeight: 600, color: overWip ? '#facc15' : DARK.text }}>{translatedLabel}</span>
         <span style={{
           marginLeft: 'auto', fontSize: 11, padding: '1px 6px', borderRadius: 10,
-          background: overWip ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.06)',
-          color: overWip ? '#facc15' : 'rgba(255,255,255,0.35)',
+          background: overWip ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+          color: overWip ? '#facc15' : 'rgba(var(--kt-ink-rgb), 0.35)',
           fontWeight: overWip ? 700 : 400,
         }}>
           {tasks.length}{wipLimit ? ` / ${wipLimit}` : ''}
@@ -175,8 +175,8 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
             minHeight: 48,
             borderRadius: 8,
             padding: isOver ? 4 : 0,
-            background: isOver ? 'rgba(255,255,255,0.04)' : 'transparent',
-            border: isOver ? '2px dashed rgba(255,255,255,0.15)' : '2px dashed transparent',
+            background: isOver ? 'rgba(var(--kt-ink-rgb), 0.04)' : 'transparent',
+            border: isOver ? '2px dashed rgba(var(--kt-ink-rgb), 0.15)' : '2px dashed transparent',
             transition: 'background 0.15s, border-color 0.15s, padding 0.15s',
           }}
         >
@@ -192,7 +192,7 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
           {tasks.length === 0 && !isOver && (
             <div style={{
               padding: '10px 12px', borderRadius: 8,
-              border: '1px dashed rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.15)', fontSize: 12, textAlign: 'center',
+              border: '1px dashed rgba(var(--kt-ink-rgb), 0.08)', color: 'rgba(var(--kt-ink-rgb), 0.15)', fontSize: 12, textAlign: 'center',
             }}>
               {t('board.noIssues')}
             </div>
@@ -297,7 +297,7 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onRe
           <div style={{
             background: DARK.surface, borderRadius: 8,
             padding: '10px 12px', width: 258,
-            boxShadow: '0 12px 28px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1)',
+            boxShadow: '0 12px 28px rgba(0,0,0,0.6), 0 0 0 1px rgba(var(--kt-ink-rgb), 0.1)',
             transform: 'translateY(-2px)',
           }}>
             <CardContent

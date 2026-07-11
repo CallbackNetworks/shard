@@ -102,7 +102,7 @@ export default function NotificationCenter() {
         onClick={() => setOpen(v => !v)}
         style={{
           position: 'relative',
-          background: open ? 'rgba(255,255,255,0.1)' : DARK.hover,
+          background: open ? 'rgba(var(--kt-ink-rgb), 0.1)' : DARK.hover,
           border: `1px solid ${DARK.border}`,
           borderRadius: 0,
           width: 34, height: 34,
@@ -117,7 +117,7 @@ export default function NotificationCenter() {
         {unread > 0 && (
           <span style={{
             position: 'absolute', top: -4, right: -4,
-            background: BRAND, color: '#000',
+            background: BRAND, color: 'var(--kt-bg)',
             borderRadius: 0, fontSize: 9, fontWeight: 700,
             width: 16, height: 16,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -139,7 +139,7 @@ export default function NotificationCenter() {
           overflow: 'hidden',
         }}>
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.06)' }}>
             <span style={{ fontWeight: 700, fontSize: 13 }}>{t('notifications.title')}</span>
             <div style={{ display: 'flex', gap: 6 }}>
               {unread > 0 && (
@@ -168,12 +168,12 @@ export default function NotificationCenter() {
                   onClick={() => handleClickNotif(n)}
                   style={{
                     display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
-                    borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.04)',
                     cursor: n.link ? 'pointer' : 'default',
                     background: n.read ? 'transparent' : 'rgba(250,204,21,0.05)',
                     transition: 'background 0.1s',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--kt-ink-rgb), 0.04)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(250,204,21,0.05)' }}
                 >
                   <div style={{ marginTop: 2, flexShrink: 0 }}>

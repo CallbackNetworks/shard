@@ -33,7 +33,7 @@ function SectionLabel({ label }) {
     <div style={{
       padding: '8px 14px 4px',
       fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-      textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)',
+      textTransform: 'uppercase', color: 'rgba(var(--kt-ink-rgb), 0.25)',
     }}>{label}</div>
   )
 }
@@ -57,7 +57,7 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
         transition: 'background 0.1s',
       }}
     >
-      <span style={{ color: isActive ? ACCENT : 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+      <span style={{ color: isActive ? ACCENT : 'rgba(var(--kt-ink-rgb), 0.35)', flexShrink: 0 }}>
         {item.icon}
       </span>
       <span style={{
@@ -68,12 +68,12 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
         {item.label}
       </span>
       {item.meta && (
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.2)', flexShrink: 0 }}>
           {item.meta}
         </span>
       )}
       {isActive && (
-        <span style={{ color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>
+        <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', flexShrink: 0 }}>
           <ArrowRight size={12} />
         </span>
       )}
@@ -247,7 +247,7 @@ export default function CommandPalette({ open, onClose }) {
           padding: '12px 16px',
           borderBottom: `1px solid ${BORDER}`,
         }}>
-          <Search size={15} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+          <Search size={15} style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', flexShrink: 0 }} />
           <input
             ref={inputRef}
             value={query}
@@ -256,20 +256,20 @@ export default function CommandPalette({ open, onClose }) {
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
               color: DARK.text, fontSize: 15, fontWeight: 400,
-              '::placeholder': { color: 'rgba(255,255,255,0.2)' },
+              '::placeholder': { color: 'rgba(var(--kt-ink-rgb), 0.2)' },
             }}
           />
           <kbd style={{
             padding: '2px 6px', borderRadius: 0,
-            background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`,
-            color: 'rgba(255,255,255,0.25)', fontSize: 11,
+            background: 'rgba(var(--kt-ink-rgb), 0.05)', border: `1px solid ${BORDER}`,
+            color: 'rgba(var(--kt-ink-rgb), 0.25)', fontSize: 11,
           }}>esc</kbd>
         </div>
 
         {/* Results */}
         <div style={{ maxHeight: 400, overflowY: 'auto', padding: '6px 0' }}>
           {grouped.length === 0 && (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 13 }}>
               {t('palette.noResults')}
             </div>
           )}
@@ -291,13 +291,13 @@ export default function CommandPalette({ open, onClose }) {
           borderTop: `1px solid ${BORDER}`,
           padding: '8px 14px',
           display: 'flex', gap: 16,
-          color: 'rgba(255,255,255,0.2)', fontSize: 11,
+          color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 11,
         }}>
           {[['↑↓', t('palette.navigate')], ['↵', t('palette.select')], ['esc', t('palette.close')]].map(([key, label]) => (
             <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <kbd style={{
                 padding: '1px 5px', borderRadius: 0,
-                background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}`,
+                background: 'rgba(var(--kt-ink-rgb), 0.06)', border: `1px solid ${BORDER}`,
                 fontSize: 10,
               }}>{key}</kbd>
               {label}

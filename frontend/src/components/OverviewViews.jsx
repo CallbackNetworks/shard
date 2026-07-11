@@ -7,10 +7,10 @@ import { formatTimestamp } from '../utils/datetime'
 
 export const FONT = '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif'
 export const BG   = '#121212'
-export const LINE = 'rgba(255,255,255,0.06)'
-export const DIM  = 'rgba(255,255,255,0.22)'
-export const MID  = 'rgba(255,255,255,0.55)'
-export const HI   = '#e2e4f0'
+export const LINE = 'rgba(var(--kt-ink-rgb), 0.06)'
+export const DIM  = 'rgba(var(--kt-ink-rgb), 0.22)'
+export const MID  = 'rgba(var(--kt-ink-rgb), 0.55)'
+export const HI   = 'var(--kt-ink)'
 
 /* ── Geometry helpers ──────────────────────────────────────────────── */
 // Right-lean parallelogram: top-right straight, bottom-right cut
@@ -53,7 +53,7 @@ function QuickAddTask({ projectId }) {
   if (!open) {
     return (
       <button onClick={(e) => { e.stopPropagation(); setOpen(true) }} style={{
-        background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+        background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4,
         color: DIM, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '2px 8px',
         letterSpacing: '0.08em', fontFamily: FONT,
       }}>+ TASK</button>
@@ -69,7 +69,7 @@ function QuickAddTask({ projectId }) {
         placeholder="Task title..."
         autoFocus
         style={{
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)',
+          background: 'rgba(var(--kt-ink-rgb), 0.05)', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)',
           borderRadius: 4, padding: '3px 8px', fontSize: 11, color: HI, outline: 'none',
           width: 160, fontFamily: FONT,
         }}
@@ -139,7 +139,7 @@ export function useCountUp(target, ms = 700) {
 }
 
 /* ── Bar — flat parallelogram progress bar ─────────────────────────── */
-export function Bar({ pct, color, height = 5, bg = 'rgba(255,255,255,0.05)' }) {
+export function Bar({ pct, color, height = 5, bg = 'rgba(var(--kt-ink-rgb), 0.05)' }) {
   const anim = useCountUp(pct)
   return (
     <div style={{
@@ -166,7 +166,7 @@ export function StackedBar({ done, active, failed, total, height = 14 }) {
   const f = useCountUp(Math.round(pFailed))
   const offset = height * 1.2
   return (
-    <div style={{ width: '100%', height, display: 'flex', background: 'rgba(255,255,255,0.04)', clipPath: PARA_R(offset) }}>
+    <div style={{ width: '100%', height, display: 'flex', background: 'rgba(var(--kt-ink-rgb), 0.04)', clipPath: PARA_R(offset) }}>
       <div style={{ width: `${d}%`, height: '100%', background: STATUS_COLOR.done, transition: 'width 0.04s' }} />
       <div style={{ width: `${a}%`, height: '100%', background: STATUS_COLOR.in_progress, transition: 'width 0.04s' }} />
       <div style={{ width: `${f}%`, height: '100%', background: STATUS_COLOR.failed, transition: 'width 0.04s' }} />
@@ -217,9 +217,9 @@ function GlassRow({ children, accentColor, style = {} }) {
   return (
     <div style={{
       position: 'relative',
-      background: 'rgba(255,255,255,0.018)',
-      borderTop: '1px solid rgba(255,255,255,0.07)',
-      borderBottom: '1px solid rgba(255,255,255,0.03)',
+      background: 'rgba(var(--kt-ink-rgb), 0.018)',
+      borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+      borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.03)',
       margin: '6px 0',
       padding: '16px 20px 16px 24px',
       clipPath: PARA_R(18),
@@ -263,7 +263,7 @@ export function ViewProgress({ projects, pinned, onTogglePin }) {
                 {overdue > 0 && <Label color={STATUS_COLOR.failed}>! {overdue} overdue</Label>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.15)', fontVariantNumeric: 'tabular-nums' }}>
                   {relativeTime(p.updated_at)}
                 </span>
                 <span style={{ fontSize: 24, fontWeight: 900, color, letterSpacing: '-0.04em', lineHeight: 1 }}>
@@ -274,7 +274,7 @@ export function ViewProgress({ projects, pinned, onTogglePin }) {
             </div>
             {p.description && (
               <div style={{
-                fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8,
+                fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', marginBottom: 8,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500,
               }}>
                 {p.description}
@@ -321,14 +321,14 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', fontVariantNumeric: 'tabular-nums' }}>{relativeTime(p.updated_at)}</span>
+                <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.15)', fontVariantNumeric: 'tabular-nums' }}>{relativeTime(p.updated_at)}</span>
                 <span style={{ fontSize: 11, color: DIM }}>{total} tasks</span>
                 <Label color={color}>{uLabel}</Label>
               </div>
             </div>
             {p.description && (
               <div style={{
-                fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8,
+                fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', marginBottom: 8,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500,
               }}>
                 {p.description}
@@ -337,7 +337,7 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
             <StackedBar done={done} active={active} failed={failed} total={total} height={12} />
             <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
               {[[STATUS_COLOR.done, done, 'done'], [STATUS_COLOR.in_progress, active, 'active'], [STATUS_COLOR.failed, failed, 'failed']].map(([c, n, l]) => (
-                <span key={l} style={{ fontSize: 11, color: n > 0 ? c : 'rgba(255,255,255,0.15)', fontWeight: 700, letterSpacing: '0.04em' }}>
+                <span key={l} style={{ fontSize: 11, color: n > 0 ? c : 'rgba(var(--kt-ink-rgb), 0.15)', fontWeight: 700, letterSpacing: '0.04em' }}>
                   {n} <span style={{ fontWeight: 400, opacity: 0.6 }}>{l}</span>
                 </span>
               ))}
@@ -373,8 +373,8 @@ export function ViewTasks({ projects }) {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '12px 20px 12px 24px',
-                background: 'rgba(255,255,255,0.025)',
-                borderTop: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(var(--kt-ink-rgb), 0.025)',
+                borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.08)',
                 clipPath: PARA_R(14),
                 cursor: 'pointer', userSelect: 'none',
                 position: 'relative',
@@ -388,7 +388,7 @@ export function ViewTasks({ projects }) {
                 </div>
                 {p.description && (
                   <div style={{
-                    fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2, marginLeft: 20,
+                    fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', marginTop: 2, marginLeft: 20,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500,
                   }}>
                     {p.description}
@@ -413,7 +413,7 @@ export function ViewTasks({ projects }) {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '8px 20px 8px 32px',
-                      background: i % 2 === 0 ? 'rgba(255,255,255,0.008)' : 'transparent',
+                      background: i % 2 === 0 ? 'rgba(var(--kt-ink-rgb), 0.008)' : 'transparent',
                       borderLeft: `2px solid ${sc}22`,
                       cursor: hasDetail ? 'pointer' : 'default',
                       transition: 'background 0.15s',
@@ -431,7 +431,7 @@ export function ViewTasks({ projects }) {
                     }} />
                     <span style={{
                       flex: 1, fontSize: 12,
-                      color: t.status === 'done' ? 'rgba(255,255,255,0.2)' : MID,
+                      color: t.status === 'done' ? 'rgba(var(--kt-ink-rgb), 0.2)' : MID,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       textDecoration: t.status === 'done' ? 'line-through' : 'none',
                     }}>
@@ -455,13 +455,13 @@ export function ViewTasks({ projects }) {
                   {isExpanded && (
                     <div style={{
                       padding: '10px 20px 12px 52px',
-                      background: 'rgba(255,255,255,0.015)',
+                      background: 'rgba(var(--kt-ink-rgb), 0.015)',
                       borderLeft: `2px solid ${sc}33`,
-                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.04)',
                     }}>
                       {t.description && (
                         <div style={{
-                          fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, marginBottom: 8,
+                          fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.4)', lineHeight: 1.5, marginBottom: 8,
                         }}>
                           {t.description.length > 200 ? t.description.slice(0, 200) + '...' : t.description}
                         </div>
@@ -478,7 +478,7 @@ export function ViewTasks({ projects }) {
                         {t.progress_pct != null && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span style={{ width: 60 }}>
-                              <Bar pct={t.progress_pct} color={sc} height={3} bg="rgba(255,255,255,0.06)" />
+                              <Bar pct={t.progress_pct} color={sc} height={3} bg="rgba(var(--kt-ink-rgb), 0.06)" />
                             </span>
                             <span style={{ color: MID, fontSize: 11 }}>{t.progress_pct}%</span>
                           </span>
@@ -512,7 +512,7 @@ export function ViewTasks({ projects }) {
                                   background: sColor, clipPath: PARA(2),
                                 }} />
                                 <span style={{
-                                  flex: 1, color: s.status === 'done' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.45)',
+                                  flex: 1, color: s.status === 'done' ? 'rgba(var(--kt-ink-rgb), 0.2)' : 'rgba(var(--kt-ink-rgb), 0.45)',
                                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                   textDecoration: s.status === 'done' ? 'line-through' : 'none',
                                 }}>
@@ -572,7 +572,7 @@ export function ViewCompare({ projects }) {
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr repeat(6, 52px)',
         padding: '8px 20px 8px 24px',
-        background: 'rgba(255,255,255,0.03)',
+        background: 'rgba(var(--kt-ink-rgb), 0.03)',
         clipPath: PARA_R(14),
         marginBottom: 4,
       }}>

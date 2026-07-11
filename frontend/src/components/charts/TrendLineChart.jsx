@@ -10,7 +10,7 @@ export default function TrendLineChart({ series = [], height = 200, showArea = f
 
   if (series.length === 0 || series.every(s => s.data.length === 0)) {
     return (
-      <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, padding: '24px 0', textAlign: 'center' }}>
+      <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 12, padding: '24px 0', textAlign: 'center' }}>
         No activity data
       </div>
     )
@@ -41,9 +41,9 @@ export default function TrendLineChart({ series = [], height = 200, showArea = f
           return (
             <g key={f}>
               <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv}
-                stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
+                stroke="rgba(var(--kt-ink-rgb), 0.05)" strokeWidth={1} />
               <text x={PAD.l - 4} y={yv + 4} textAnchor="end"
-                fontSize={9} fill="rgba(255,255,255,0.2)" fontFamily="system-ui">
+                fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)" fontFamily="system-ui">
                 {Math.round(maxVal * f)}
               </text>
             </g>
@@ -72,7 +72,7 @@ export default function TrendLineChart({ series = [], height = 200, showArea = f
         {hoverDate && (
           <g>
             <line x1={x(hoverDate)} y1={PAD.t} x2={x(hoverDate)} y2={PAD.t + innerH}
-              stroke="rgba(255,255,255,0.2)" strokeWidth={1} strokeDasharray="3 2" />
+              stroke="rgba(var(--kt-ink-rgb), 0.2)" strokeWidth={1} strokeDasharray="3 2" />
             {series.map((s, si) => {
               const point = s.data.find(d => d.date === hoverDate)
               if (!point) return null
@@ -102,7 +102,7 @@ export default function TrendLineChart({ series = [], height = 200, showArea = f
 
         {allDates.filter((_, i) => i % Math.max(1, Math.ceil(dateCount / 8)) === 0 || i === dateCount - 1).map(d => (
           <text key={d} x={x(d)} y={H - 4} textAnchor="middle"
-            fontSize={9} fill="rgba(255,255,255,0.2)" fontFamily="system-ui">
+            fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)" fontFamily="system-ui">
             {d.slice(5)}
           </text>
         ))}
@@ -113,7 +113,7 @@ export default function TrendLineChart({ series = [], height = 200, showArea = f
           {series.map((s, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
               <span style={{ width: 12, height: 3, background: s.color, borderRadius: 2 }} />
-              <span style={{ color: 'rgba(255,255,255,0.5)' }}>{s.name}</span>
+              <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.5)' }}>{s.name}</span>
             </div>
           ))}
         </div>

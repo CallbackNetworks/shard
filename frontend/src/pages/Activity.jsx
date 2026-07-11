@@ -42,9 +42,9 @@ const chip = (active) => ({
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 700,
-  background: active ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.04)',
+  background: active ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.04)',
   color: active ? BRAND : DARK.textMid,
-  border: `1px solid ${active ? 'rgba(250,204,21,0.32)' : 'rgba(255,255,255,0.08)'}`,
+  border: `1px solid ${active ? 'rgba(250,204,21,0.32)' : 'rgba(var(--kt-ink-rgb), 0.08)'}`,
   transition: 'all 0.15s',
 })
 

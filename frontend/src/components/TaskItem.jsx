@@ -67,7 +67,7 @@ export default function TaskItem({ task, projectId: _projectId, onUpdate, onDele
           onClick={e => e.stopPropagation()}
           style={{
             fontSize: 13, fontWeight: 600, borderRadius: 0,
-            border: '1px solid rgba(255,255,255,0.15)', padding: '4px 12px',
+            border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', padding: '4px 12px',
             cursor: 'pointer', background: DARK.elevated, color: DARK.text,
           }}
         >
@@ -81,7 +81,7 @@ export default function TaskItem({ task, projectId: _projectId, onUpdate, onDele
           onClick={copyToken}
           style={{
             fontSize: 12, fontWeight: 700,
-            background: DARK.elevated, border: '1px solid rgba(255,255,255,0.15)',
+            background: DARK.elevated, border: '1px solid rgba(var(--kt-ink-rgb), 0.15)',
             borderRadius: 9999, padding: '4px 14px', cursor: 'pointer', color: DARK.text,
             textTransform: 'uppercase', letterSpacing: '1px',
           }}

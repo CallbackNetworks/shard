@@ -143,8 +143,8 @@ export default function Dashboard() {
             onClick={() => setShowWidgetConfig(v => !v)}
             title="Configure widgets"
             style={{
-              background: showWidgetConfig ? 'rgba(255,255,255,0.1)' : 'transparent',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
+              background: showWidgetConfig ? 'rgba(var(--kt-ink-rgb), 0.1)' : 'transparent',
+              border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 8,
               padding: '7px 10px', cursor: 'pointer', color: DARK.textMid,
               display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
             }}
@@ -182,8 +182,8 @@ export default function Dashboard() {
               key={item.id}
               onClick={() => toggleWidget(item.id)}
               style={{
-                background: w(item.id) ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${w(item.id) ? 'rgba(250,204,21,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                background: w(item.id) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.04)',
+                border: `1px solid ${w(item.id) ? 'rgba(250,204,21,0.3)' : 'rgba(var(--kt-ink-rgb), 0.1)'}`,
                 borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
                 fontSize: 11, color: w(item.id) ? BRAND : DARK.textDim,
                 display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',

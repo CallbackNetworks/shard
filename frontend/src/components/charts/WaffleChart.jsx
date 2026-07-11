@@ -14,7 +14,7 @@ export default function WaffleChart({ segments = [], total, cols = 10, cellSize 
     }
   }
   while (cells.length < actualTotal) {
-    cells.push({ color: 'rgba(255,255,255,0.06)', label: 'Empty', segIdx: -1 })
+    cells.push({ color: 'rgba(var(--kt-ink-rgb), 0.06)', label: 'Empty', segIdx: -1 })
   }
 
   const rows = Math.ceil(cells.length / cols)
@@ -35,7 +35,7 @@ export default function WaffleChart({ segments = [], total, cols = 10, cellSize 
               y={row * (cellSize + gap)}
               width={cellSize} height={cellSize} rx={2}
               fill={isHov ? cell.color : cell.color + (cell.segIdx >= 0 ? 'cc' : '')}
-              stroke={isHov ? '#fff' : 'none'} strokeWidth={isHov ? 0.5 : 0}
+              stroke={isHov ? 'var(--kt-ink)' : 'none'} strokeWidth={isHov ? 0.5 : 0}
               onMouseEnter={() => setHover(cell.segIdx)}
               onMouseLeave={() => setHover(null)}
               style={{ cursor: cell.segIdx >= 0 ? 'pointer' : 'default', transition: 'fill 0.12s' }}
@@ -54,8 +54,8 @@ export default function WaffleChart({ segments = [], total, cols = 10, cellSize 
             onMouseLeave={() => setHover(null)}
           >
             <span style={{ width: 8, height: 8, borderRadius: 2, background: seg.color }} />
-            <span style={{ color: 'rgba(255,255,255,0.5)' }}>{seg.label}</span>
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>{seg.value}</span>
+            <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.5)' }}>{seg.label}</span>
+            <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontWeight: 700 }}>{seg.value}</span>
           </div>
         ))}
       </div>

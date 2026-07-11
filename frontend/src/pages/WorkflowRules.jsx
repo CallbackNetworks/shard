@@ -81,17 +81,17 @@ function RuleModal({ initial, onSave, onClose }) {
         <h2 style={{ fontWeight: 700, marginBottom: 20, color: DARK.text, fontSize: 16 }}>{initial ? 'Edit' : 'New'} Workflow Rule</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</div>
+            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</div>
             <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Auto-escalate urgent tasks" className="kt-input" />
           </div>
           <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trigger</div>
+            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trigger</div>
             <select value={form.trigger} onChange={e => set('trigger', e.target.value)} className="kt-input">
               {TRIGGERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               Conditions (all must match)
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -102,7 +102,7 @@ function RuleModal({ initial, onSave, onClose }) {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               Actions
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -113,7 +113,7 @@ function RuleModal({ initial, onSave, onClose }) {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Project ID (optional, leave blank for global)</div>
+            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Project ID (optional, leave blank for global)</div>
             <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder="(all projects)" className="kt-input" />
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
@@ -181,7 +181,7 @@ export default function WorkflowRules() {
       </div>
 
       {isLoading ? (
-        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Loading…</div>
+        <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 13 }}>Loading…</div>
       ) : rules.length === 0 ? (
         <div className="kt-empty">
           <GitMerge size={36} className="kt-empty-icon" />
@@ -210,11 +210,11 @@ export default function WorkflowRules() {
                     <span style={{ fontWeight: 600, fontSize: 14, color: DARK.text }}>{rule.name}</span>
                     <span style={{
                       fontSize: 10, padding: '1px 8px', fontWeight: 600,
-                      background: rule.active ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.07)',
+                      background: rule.active ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.07)',
                       color: rule.active ? DARK.success : '#6b7280',
                     }}>{rule.active ? 'active' : 'paused'}</span>
                     {rule.run_count > 0 && (
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>ran {rule.run_count}×</span>
+                      <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>ran {rule.run_count}×</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
@@ -249,8 +249,8 @@ export default function WorkflowRules() {
               </div>
 
               {/* Test section */}
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>Dry-run:</span>
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.05)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>Dry-run:</span>
                 <input
                   value={testTaskId}
                   onChange={e => setTestTaskId(e.target.value)}
@@ -269,8 +269,8 @@ export default function WorkflowRules() {
                 {testResults[rule.id] && (
                   <span style={{
                     fontSize: 11, padding: '2px 8px',
-                    background: testResults[rule.id].would_fire ? 'rgba(250,204,21,0.1)' : 'rgba(255,255,255,0.05)',
-                    color: testResults[rule.id].would_fire ? DARK.success : 'rgba(255,255,255,0.3)',
+                    background: testResults[rule.id].would_fire ? 'rgba(250,204,21,0.1)' : 'rgba(var(--kt-ink-rgb), 0.05)',
+                    color: testResults[rule.id].would_fire ? DARK.success : 'rgba(var(--kt-ink-rgb), 0.3)',
                   }}>
                     {testResults[rule.id].would_fire
                       ? `Would fire ${testResults[rule.id].actions?.length} action(s)`

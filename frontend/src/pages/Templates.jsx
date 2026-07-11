@@ -100,7 +100,7 @@ function TemplateForm({ initial, onSave, onClose }) {
             {form.subtasks.map((s, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px',
-                background: 'rgba(255,255,255,0.03)', marginBottom: 4,
+                background: 'rgba(var(--kt-ink-rgb), 0.03)', marginBottom: 4,
               }}>
                 <span style={{ flex: 1, fontSize: 12 }}>{s.title}</span>
                 <button onClick={() => removeSubtask(i)} className="kt-icon-btn" style={{ color: DARK.danger, padding: 0 }}>
@@ -190,7 +190,7 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
             )}
           </div>
           {expanded && tpl.subtasks.length > 0 && (
-            <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: '2px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: '2px solid rgba(var(--kt-ink-rgb), 0.06)' }}>
               {tpl.subtasks.map((s, i) => (
                 <div key={i} style={{ fontSize: 11, color: '#9ca3af', padding: '2px 0' }}>• {s.title}</div>
               ))}

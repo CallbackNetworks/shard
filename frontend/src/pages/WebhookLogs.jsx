@@ -30,7 +30,7 @@ function DeliveryRow({ delivery, integrationMap, isMobile }) {
     <>
       <tr
         onClick={() => setExpanded(v => !v)}
-        style={{ cursor: 'pointer', background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent' }}
+        style={{ cursor: 'pointer', background: expanded ? 'rgba(var(--kt-ink-rgb), 0.02)' : 'transparent' }}
       >
         <td style={tdStyle}>
           <span style={{
@@ -64,7 +64,7 @@ function DeliveryRow({ delivery, integrationMap, isMobile }) {
         </td>
       </tr>
       {expanded && (
-        <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <tr style={{ background: 'rgba(var(--kt-ink-rgb), 0.02)' }}>
           <td colSpan={7} style={{ padding: '8px 16px 16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
               <div>
@@ -103,12 +103,12 @@ function DeliveryRow({ delivery, integrationMap, isMobile }) {
 
 const tdStyle = {
   padding: '8px 12px', fontSize: 12, color: DARK.text,
-  borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'middle',
+  borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.05)', verticalAlign: 'middle',
 }
 
 const thStyle = {
-  padding: '8px 12px', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)',
-  background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)',
+  padding: '8px 12px', fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.35)',
+  background: 'rgba(var(--kt-ink-rgb), 0.03)', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
   textAlign: 'left', whiteSpace: 'nowrap',
 }
 

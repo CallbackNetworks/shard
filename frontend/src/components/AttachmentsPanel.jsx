@@ -51,11 +51,11 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
     <div style={{
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
-      borderBottom: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(255,255,255,0.02)',
+      borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+      background: 'rgba(var(--kt-ink-rgb), 0.02)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {t('attachments.title')}
         </span>
         <input ref={fileRef} type="file" onChange={handleUpload} style={{ display: 'none' }} />
@@ -64,7 +64,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
           disabled={uploading}
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.15)',
+            padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.15)',
             background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.textMid, fontWeight: 600,
           }}
         >
@@ -72,22 +72,22 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
         </button>
       </div>
       {loading ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>Loading{'\u2026'}</div>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>Loading{'\u2026'}</div>
       ) : files.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>{t('attachments.noAttachments')}</div>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>{t('attachments.noAttachments')}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {files.map(f => (
             <div key={f.id} style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '5px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              padding: '5px 8px', borderRadius: 6, background: 'rgba(var(--kt-ink-rgb), 0.04)',
+              border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
             }}>
-              <Paperclip size={11} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+              <Paperclip size={11} style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', flexShrink: 0 }} />
               <span style={{ flex: 1, fontSize: 12, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {f.filename}
               </span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)', flexShrink: 0 }}>
                 {formatSize(f.size)}
               </span>
               <a

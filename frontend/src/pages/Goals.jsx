@@ -218,7 +218,7 @@ function GoalCard({ goal, onEdit, onDelete }) {
               </span>
             </div>
             <div className="kt-progress-track" style={{
-              height: 4, borderRadius: 0, background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+              height: 4, borderRadius: 0, background: 'rgba(var(--kt-ink-rgb), 0.08)', overflow: 'hidden',
             }}>
               <div className="kt-progress-fill" style={{
                 height: '100%', borderRadius: 0,
@@ -308,7 +308,7 @@ function StatusTabs({ active, onChange, counts }) {
             {Icon && <Icon size={11} />}
             <span>{tab.label}</span>
             <span className="kt-badge" style={{
-              background: isActive ? 'rgba(250,204,21,0.16)' : 'rgba(255,255,255,0.04)',
+              background: isActive ? 'rgba(250,204,21,0.16)' : 'rgba(var(--kt-ink-rgb), 0.04)',
               color: isActive ? BRAND : '#4b5563',
             }}>
               {count}

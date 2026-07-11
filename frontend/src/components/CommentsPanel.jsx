@@ -65,25 +65,25 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
     <div style={{
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
-      borderBottom: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(255,255,255,0.02)',
+      borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+      background: 'rgba(var(--kt-ink-rgb), 0.02)',
     }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {t('comments.title')}
       </div>
       {loading ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>Loading{'\u2026'}</div>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>Loading{'\u2026'}</div>
       ) : (
         <>
           {comments.length === 0 && (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginBottom: 8 }}>{t('comments.noComments')}</div>
+            <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.2)', marginBottom: 8 }}>{t('comments.noComments')}</div>
           )}
           {comments.map(c => (
-            <div key={c.id} style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div key={c.id} style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(var(--kt-ink-rgb), 0.04)', border: '1px solid rgba(var(--kt-ink-rgb), 0.07)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: DARK.success }}>{c.author || t('comments.anonymous')}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
+                  <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>
                     {new Date(c.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <button onClick={() => handleDelete(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(250,204,21,0.5)', padding: 0, display: 'flex' }}>
@@ -100,7 +100,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                 value={author}
                 onChange={e => setAuthor(e.target.value)}
                 placeholder={t('comments.yourName')}
-                style={{ width: 140, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 11, outline: 'none', background: 'rgba(255,255,255,0.05)', color: DARK.text }}
+                style={{ width: 140, padding: '5px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 11, outline: 'none', background: 'rgba(var(--kt-ink-rgb), 0.05)', color: DARK.text }}
               />
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -119,12 +119,12 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                   onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleAdd() }}
                   placeholder={t('comments.addComment')}
                   rows={2}
-                  style={{ width: '100%', padding: '5px 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: 'rgba(255,255,255,0.05)', color: DARK.text, resize: 'vertical', minHeight: 40 }}
+                  style={{ width: '100%', padding: '5px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: 'rgba(var(--kt-ink-rgb), 0.05)', color: DARK.text, resize: 'vertical', minHeight: 40 }}
                 />
                 {showMentions && identities.length > 0 && (
                   <div style={{
                     position: 'absolute', bottom: '100%', left: 0, background: DARK.elevated,
-                    border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: 4,
+                    border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 6, padding: 4,
                     zIndex: 10, minWidth: 140, boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
                   }}>
                     {identities.map(ident => (
@@ -147,7 +147,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                           color: DARK.text, fontSize: 11, cursor: 'pointer', borderRadius: 4,
                           textAlign: 'left',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(var(--kt-ink-rgb), 0.06)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
                         <span style={{

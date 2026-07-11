@@ -75,7 +75,7 @@ export default function Login() {
             width: 38, height: 38, marginBottom: 18,
             background: BRAND,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, fontWeight: 400, color: '#171717',
+            fontSize: 16, fontWeight: 400, color: 'var(--kt-bg)',
             fontFamily: FONT.display,
             fontSynthesisWeight: 'none',
           }}>S</div>

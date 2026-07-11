@@ -467,22 +467,22 @@ function IntegrationModal({ initial, onSave, onClose }) {
             {/* Quick presets */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, marginTop: 4 }}>
               <button type="button" onClick={() => set('events', [...ALL_EVENTS])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.allEvents')}
               </button>
               <button type="button" onClick={() => set('events', [...CRITICAL_EVENTS])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.12)', background: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.04)', color: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? '#facc15' : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? '#facc15' : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.criticalOnly')}
               </button>
               <button type="button" onClick={() => set('events', [])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: DARK.textDim, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.08)', background: 'rgba(var(--kt-ink-rgb), 0.04)', color: DARK.textDim, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.clearAll')}
               </button>
             </div>
             {/* Grouped events */}
             {Object.entries(EVENT_GROUPS).map(([group, events]) => (
               <div key={group} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(var(--kt-ink-rgb), 0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   {t(`integrations.eventGroup.${group}`)}
                 </div>
                 <div className={s.eventsGrid}>

@@ -109,7 +109,7 @@ export default function MindMapCanvas({ trees = [], onNodeClick }) {
         ref={svgRef}
         width="100%"
         height="100%"
-        style={{ cursor: dragging ? 'grabbing' : 'grab', background: 'rgba(255,255,255,0.015)' }}
+        style={{ cursor: dragging ? 'grabbing' : 'grab', background: 'rgba(var(--kt-ink-rgb), 0.015)' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -127,7 +127,7 @@ export default function MindMapCanvas({ trees = [], onNodeClick }) {
                 key={i}
                 d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
                 fill="none"
-                stroke="rgba(255,255,255,0.12)"
+                stroke="rgba(var(--kt-ink-rgb), 0.12)"
                 strokeWidth={1.5}
               />
             )
@@ -135,7 +135,7 @@ export default function MindMapCanvas({ trees = [], onNodeClick }) {
 
           {nodes.map((node) => {
             const isHover = hoverNode === node.id
-            const fillColor = node.color || 'rgba(255,255,255,0.08)'
+            const fillColor = node.color || '#9ca3af'
             const bgOpacity = node.depth === 0 ? 0.2 : node.depth === 1 ? 0.12 : 0.08
             return (
               <g
@@ -151,7 +151,7 @@ export default function MindMapCanvas({ trees = [], onNodeClick }) {
                   width={NODE_W} height={NODE_H}
                   rx={8}
                   fill={isHover ? fillColor + '33' : fillColor + Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}
-                  stroke={isHover ? fillColor : 'rgba(255,255,255,0.08)'}
+                  stroke={isHover ? fillColor : 'rgba(var(--kt-ink-rgb), 0.08)'}
                   strokeWidth={isHover ? 1.5 : 0.5}
                 />
                 {node.depth === 0 && (
@@ -168,7 +168,7 @@ export default function MindMapCanvas({ trees = [], onNodeClick }) {
                   dominantBaseline="middle"
                   fontSize={node.depth === 0 ? 12 : 11}
                   fontWeight={node.depth === 0 ? 700 : 400}
-                  fill={node.depth === 0 ? '#fff' : 'rgba(255,255,255,0.7)'}
+                  fill={node.depth === 0 ? 'var(--kt-ink)' : 'rgba(var(--kt-ink-rgb), 0.7)'}
                   fontFamily="system-ui"
                 >
                   {node.label.length > LABEL_TRUNC ? node.label.slice(0, LABEL_TRUNC - 1) + '…' : node.label}
@@ -218,9 +218,9 @@ export default function MindMapCanvas({ trees = [], onNodeClick }) {
 }
 
 const zoomBtnStyle = {
-  background: 'rgba(255,255,255,0.08)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  color: 'rgba(255,255,255,0.6)',
+  background: 'rgba(var(--kt-ink-rgb), 0.08)',
+  border: '1px solid rgba(var(--kt-ink-rgb), 0.12)',
+  color: 'rgba(var(--kt-ink-rgb), 0.6)',
   borderRadius: 6,
   padding: '4px 10px',
   fontSize: 11,

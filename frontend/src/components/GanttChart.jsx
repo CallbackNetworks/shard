@@ -94,15 +94,15 @@ export default function GanttChart({ tasks, onUpdateTask }) {
   return (
     <div style={{ overflow: 'auto', minHeight: 200 }}>
       {/* Zoom controls */}
-      <div style={{ display: 'flex', gap: 4, padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginRight: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('gantt.zoom')}</span>
+      <div style={{ display: 'flex', gap: 4, padding: '8px 16px', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', marginRight: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('gantt.zoom')}</span>
         {ZOOM_LEVELS.map((z, i) => (
           <button
             key={z.labelKey}
             onClick={() => setZoom(i)}
             style={{
               padding: '3px 10px', borderRadius: 9999, fontSize: 11, cursor: 'pointer',
-              border: zoom === i ? 'none' : '1px solid rgba(255,255,255,0.15)',
+              border: zoom === i ? 'none' : '1px solid rgba(var(--kt-ink-rgb), 0.15)',
               background: zoom === i ? 'rgba(250,204,21,0.12)' : 'transparent',
               color: zoom === i ? DARK.success : DARK.textMid,
               fontWeight: zoom === i ? 700 : 400,
@@ -115,13 +115,13 @@ export default function GanttChart({ tasks, onUpdateTask }) {
 
       {/* Header */}
       <div style={{
-        display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)',
+        display: 'flex', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
         position: 'sticky', top: 0, background: DARK.bgAlt, zIndex: 2,
       }}>
         <div style={{
           width: TASK_NAME_W, minWidth: TASK_NAME_W, flexShrink: 0,
-          padding: '8px 16px', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)',
-          borderRight: '1px solid rgba(255,255,255,0.05)',
+          padding: '8px 16px', fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.35)',
+          borderRight: '1px solid rgba(var(--kt-ink-rgb), 0.05)',
         }}>
           {t('gantt.issue')}
         </div>
@@ -131,10 +131,10 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             const nextLeft = i + 1 < weeks.length ? getLeft(weeks[i + 1]) : 100
             return (
               <div key={i}>
-                <div style={{ position: 'absolute', left: `${left}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.05)' }} />
+                <div style={{ position: 'absolute', left: `${left}%`, top: 0, bottom: 0, width: 1, background: 'rgba(var(--kt-ink-rgb), 0.05)' }} />
                 <div style={{
                   position: 'absolute', left: `${left}%`, width: `${nextLeft - left}%`,
-                  padding: '8px 4px', fontSize: 11, color: 'rgba(255,255,255,0.25)',
+                  padding: '8px 4px', fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.25)',
                   overflow: 'hidden', whiteSpace: 'nowrap',
                 }}>
                   {fmtDate(week)}
@@ -152,7 +152,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
 
       {/* Rows */}
       {visibleTasks.length === 0 ? (
-        <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
+        <div style={{ padding: 48, textAlign: 'center', color: 'rgba(var(--kt-ink-rgb), 0.25)', fontSize: 13 }}>
           {t('gantt.noIssues')}
         </div>
       ) : (
@@ -194,11 +194,11 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             const hasDates = task.start_date && task.due_date
             const barWidth = hasDates ? getWidth(task.start_date, task.due_date) : 0
             return (
-              <div key={task.id} style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', height: ROW_H }}>
+              <div key={task.id} style={{ display: 'flex', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.05)', height: ROW_H }}>
                 <div style={{
                   width: TASK_NAME_W, minWidth: TASK_NAME_W, flexShrink: 0,
                   padding: '0 16px', display: 'flex', alignItems: 'center',
-                  borderRight: '1px solid rgba(255,255,255,0.05)',
+                  borderRight: '1px solid rgba(var(--kt-ink-rgb), 0.05)',
                 }}>
                   <span style={{ fontSize: 13, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {task.title}
@@ -229,7 +229,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
                   }}
                 >
                   {weeks.map((week, i) => (
-                    <div key={i} style={{ position: 'absolute', left: `${getLeft(week)}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.03)' }} />
+                    <div key={i} style={{ position: 'absolute', left: `${getLeft(week)}%`, top: 0, bottom: 0, width: 1, background: 'rgba(var(--kt-ink-rgb), 0.03)' }} />
                   ))}
                   <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 0, bottom: 0, width: 1.5, background: 'rgba(250,204,21,0.5)', zIndex: 1 }} />
                   {hasDates ? (
@@ -265,7 +265,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
                     <div style={{
                       position: 'absolute', left: `${todayLeft}%`, top: '50%',
                       transform: 'translate(-50%, -50%)',
-                      width: 8, height: 8, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', zIndex: 2,
+                      width: 8, height: 8, background: 'rgba(var(--kt-ink-rgb), 0.2)', borderRadius: '50%', zIndex: 2,
                     }} title="No dates set" />
                   )}
                 </div>
@@ -276,21 +276,21 @@ export default function GanttChart({ tasks, onUpdateTask }) {
       )}
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 16, padding: '10px 16px', borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.05)', flexWrap: 'wrap' }}>
         {Object.entries(STATUS_COLOR).map(([s, c]) => {
           const STATUS_LEGEND_KEYS = { todo: 'todo', in_progress: 'inProgress', done: 'done', failed: 'failed' }
           return (
-            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)' }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />
               {STATUS_LEGEND_KEYS[s] ? t(STATUS_LEGEND_KEYS[s]) : s.charAt(0).toUpperCase() + s.slice(1)}
             </span>
           )
         })}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
-          <span style={{ width: 10, height: 10, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'inline-block' }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)' }}>
+          <span style={{ width: 10, height: 10, background: 'rgba(var(--kt-ink-rgb), 0.2)', borderRadius: '50%', display: 'inline-block' }} />
           {t('gantt.noDates')}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)' }}>
           <svg width="16" height="10"><line x1="0" y1="5" x2="16" y2="5" stroke="#ffa42b" strokeWidth="1.5" strokeDasharray="4 2" opacity="0.5" /></svg>
           Dependency
         </span>

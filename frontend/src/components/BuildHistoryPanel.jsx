@@ -60,7 +60,7 @@ export default function BuildHistoryPanel({ taskId }) {
   if (!expanded) {
     return (
       <button onClick={() => setExpanded(true)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: 12, padding: '4px 0' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.35)', fontSize: 12, padding: '4px 0' }}>
         <ChevronRight size={12} />
         {t('integrations.buildHistory')}
       </button>
@@ -70,13 +70,13 @@ export default function BuildHistoryPanel({ taskId }) {
   return (
     <div style={{ marginTop: 8 }}>
       <button onClick={() => setExpanded(false)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: 12, padding: '4px 0', fontWeight: 600 }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.5)', fontSize: 12, padding: '4px 0', fontWeight: 600 }}>
         <ChevronDown size={12} />
         {t('integrations.buildHistory')} ({events.length})
       </button>
 
       {events.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', padding: '8px 0' }}>
+        <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.2)', padding: '8px 0' }}>
           {t('integrations.noBuildHistory')}
         </div>
       ) : (
@@ -84,7 +84,7 @@ export default function BuildHistoryPanel({ taskId }) {
           {events.map(ev => (
             <div key={ev.id} onClick={() => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
               style={{
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(var(--kt-ink-rgb), 0.03)', border: '1px solid rgba(var(--kt-ink-rgb), 0.06)',
                 borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
                 borderLeft: `3px solid ${STATUS_COLORS[ev.status] || '#6b7280'}`,
               }}>
@@ -96,7 +96,7 @@ export default function BuildHistoryPanel({ taskId }) {
                 <span style={{ fontSize: 10, color: STATUS_COLORS[ev.status], fontWeight: 600, textTransform: 'uppercase' }}>
                   {ev.status}
                 </span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
+                <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>
                   {timeAgo(ev.created_at)}
                 </span>
               </div>
@@ -104,22 +104,22 @@ export default function BuildHistoryPanel({ taskId }) {
               {/* Compact meta row */}
               <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
                 {ev.branch && (
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.3)', display: 'flex', alignItems: 'center', gap: 3 }}>
                     <GitBranch size={10} /> {ev.branch}
                   </span>
                 )}
                 {ev.commit_sha && (
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.3)', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 3 }}>
                     <GitCommit size={10} /> {ev.commit_sha.substring(0, 7)}
                   </span>
                 )}
                 {ev.build_duration_ms && (
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.3)', display: 'flex', alignItems: 'center', gap: 3 }}>
                     <Clock size={10} /> {formatDuration(ev.build_duration_ms)}
                   </span>
                 )}
                 {ev.triggered_by && (
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.3)', display: 'flex', alignItems: 'center', gap: 3 }}>
                     <User size={10} /> {ev.triggered_by}
                   </span>
                 )}
@@ -134,37 +134,37 @@ export default function BuildHistoryPanel({ taskId }) {
 
               {/* Expanded detail */}
               {selectedEvent?.id === ev.id && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.06)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 80 }}>Provider</span>
+                      <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Provider</span>
                       <span style={{ color: DARK.textMid }}>{ev.provider}</span>
                     </div>
                     {ev.event_type && (
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 80 }}>Event Type</span>
+                        <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Event Type</span>
                         <span style={{ color: DARK.textMid }}>{ev.event_type}</span>
                       </div>
                     )}
                     {ev.build_number && (
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 80 }}>Build #</span>
+                        <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Build #</span>
                         <span style={{ color: DARK.textMid }}>{ev.build_number}</span>
                       </div>
                     )}
                     {ev.commit_sha && (
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 80 }}>Commit</span>
+                        <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Commit</span>
                         <span style={{ color: DARK.textMid, fontFamily: 'monospace' }}>{ev.commit_sha}</span>
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 80 }}>Time</span>
+                      <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Time</span>
                       <span style={{ color: DARK.textMid }}>{new Date(ev.created_at).toLocaleString()}</span>
                     </div>
                     {ev.test_summary && (
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 80 }}>Tests</span>
+                        <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Tests</span>
                         <span style={{ color: DARK.textMid }}>
                           {ev.test_summary.passed && <span style={{ color: STATUS_COLOR.done }}>{ev.test_summary.passed} passed</span>}
                           {ev.test_summary.failed > 0 && <span style={{ color: STATUS_COLOR.failed, marginLeft: 8 }}>{ev.test_summary.failed} failed</span>}

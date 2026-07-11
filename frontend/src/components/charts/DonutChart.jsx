@@ -19,10 +19,10 @@ export default function DonutChart({ segments = [], size = 120, strokeWidth = 10
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(var(--kt-ink-rgb), 0.06)" strokeWidth={strokeWidth} />
 
       {total === 0 && (
-        <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={strokeWidth} />
+        <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(var(--kt-ink-rgb), 0.1)" strokeWidth={strokeWidth} />
       )}
 
       {arcs.map((arc, i) => (
@@ -43,13 +43,13 @@ export default function DonutChart({ segments = [], size = 120, strokeWidth = 10
 
       {centerText && (
         <text x={cx} y={centerSub ? cy - 4 : cy + 1} textAnchor="middle" dominantBaseline="middle"
-          fontSize={size * 0.18} fontWeight="800" fill="#fff" fontFamily="system-ui">
+          fontSize={size * 0.18} fontWeight="800" fill="var(--kt-ink)" fontFamily="system-ui">
           {centerText}
         </text>
       )}
       {centerSub && (
         <text x={cx} y={cy + size * 0.12} textAnchor="middle" dominantBaseline="middle"
-          fontSize={size * 0.09} fill="rgba(255,255,255,0.4)" fontFamily="system-ui">
+          fontSize={size * 0.09} fill="rgba(var(--kt-ink-rgb), 0.4)" fontFamily="system-ui">
           {centerSub}
         </text>
       )}
@@ -59,7 +59,7 @@ export default function DonutChart({ segments = [], size = 120, strokeWidth = 10
           <rect
             x={cx - 40} y={cy + radius + 6}
             width={80} height={22} rx={4}
-            fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.15)" strokeWidth={0.5}
+            fill="rgba(0,0,0,0.85)" stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeWidth={0.5}
           />
           <text x={cx} y={cy + radius + 20} textAnchor="middle" fontSize={10} fill="#fff" fontFamily="system-ui">
             {arcs[hover].label}: {arcs[hover].value} ({Math.round(arcs[hover].pct * 100)}%)

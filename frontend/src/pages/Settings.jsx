@@ -34,7 +34,7 @@ function StatusBadge({ ok, label }) {
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '3px 10px', fontSize: 11, fontWeight: 700,
-      background: ok ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.04)',
+      background: ok ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.04)',
       color: ok ? DARK.success : DARK.textDim,
       border: `1px solid ${ok ? 'rgba(250,204,21,0.25)' : DARK.border}`,
     }}>
@@ -549,7 +549,7 @@ export default function Settings() {
             </InfoRow>
             {settings.llm_model && (
               <InfoRow label={t('settings.model')}>
-                <code style={{ fontSize: 12, background: 'rgba(255,255,255,0.06)', padding: '2px 6px' }}>
+                <code style={{ fontSize: 12, background: 'rgba(var(--kt-ink-rgb), 0.06)', padding: '2px 6px' }}>
                   {settings.llm_model}
                 </code>
               </InfoRow>

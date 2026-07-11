@@ -20,7 +20,7 @@ export default function GaugeChart({ value = 0, max = 100, size = 120, color = '
 
       <path
         d={`M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`}
-        fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={8} strokeLinecap="round"
+        fill="none" stroke="rgba(var(--kt-ink-rgb), 0.06)" strokeWidth={8} strokeLinecap="round"
       />
 
       {pct > 0 && (
@@ -32,13 +32,13 @@ export default function GaugeChart({ value = 0, max = 100, size = 120, color = '
       )}
 
       <text x={cx} y={cy - 8} textAnchor="middle" dominantBaseline="middle"
-        fontSize={size * 0.2} fontWeight={800} fill="#fff" fontFamily="system-ui">
+        fontSize={size * 0.2} fontWeight={800} fill="var(--kt-ink)" fontFamily="system-ui">
         {displayPct}%
       </text>
 
       {label && (
         <text x={cx} y={cy + 8} textAnchor="middle" dominantBaseline="middle"
-          fontSize={9} fill="rgba(255,255,255,0.35)" fontFamily="system-ui">
+          fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.35)" fontFamily="system-ui">
           {label}
         </text>
       )}

@@ -23,8 +23,8 @@ function KeyBadge({ children }) {
         minWidth: 24,
         height: 24,
         padding: '0 6px',
-        background: 'rgba(255,255,255,0.1)',
-        border: '1px solid rgba(255,255,255,0.2)',
+        background: 'rgba(var(--kt-ink-rgb), 0.1)',
+        border: '1px solid rgba(var(--kt-ink-rgb), 0.2)',
         borderRadius: RADIUS.sm,
         fontFamily: FONT.mono,
         fontSize: FONT.sm,
@@ -132,7 +132,7 @@ export default function KeyboardShortcutsHelp({ open, onClose }) {
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255,255,255,0.1)',
+              background: 'rgba(var(--kt-ink-rgb), 0.1)',
               border: `1px solid ${DARK.borderMid}`,
               borderRadius: RADIUS.md,
               color: DARK.textMid,

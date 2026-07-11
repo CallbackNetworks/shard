@@ -14,7 +14,7 @@ const toolbarBtnStyle = (active) => ({
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',
-  color: active ? '#facc15' : 'rgba(255,255,255,0.4)',
+  color: active ? '#facc15' : 'rgba(var(--kt-ink-rgb), 0.4)',
   padding: '3px 5px',
   display: 'flex',
   alignItems: 'center',
@@ -29,7 +29,7 @@ const modeBtnStyle = (active) => ({
   borderRadius: 4,
   cursor: 'pointer',
   background: active ? '#facc15' : 'transparent',
-  color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+  color: active ? '#fff' : 'rgba(var(--kt-ink-rgb), 0.4)',
 })
 
 function Toolbar({ editor }) {
@@ -68,7 +68,7 @@ function Toolbar({ editor }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
       {items.map((item, i) =>
         item === null
-          ? <div key={i} style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 3px' }} />
+          ? <div key={i} style={{ width: 1, height: 16, background: 'rgba(var(--kt-ink-rgb), 0.1)', margin: '0 3px' }} />
           : <button key={i} type="button" onMouseDown={e => e.preventDefault()} onClick={item.action} style={toolbarBtnStyle(item.active)}>{item.icon}</button>
       )}
     </div>
@@ -142,12 +142,12 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
 
   return (
     <div style={{
-      border: '1px solid rgba(255,255,255,0.1)',
+      border: '1px solid rgba(var(--kt-ink-rgb), 0.1)',
       borderRadius: 6,
       overflow: 'hidden',
-      background: 'rgba(255,255,255,0.03)',
+      background: 'rgba(var(--kt-ink-rgb), 0.03)',
       fontSize: 13,
-      color: '#ffffff',
+      color: 'var(--kt-ink)',
     }}>
       {/* Toolbar + mode toggle */}
       <div style={{
@@ -155,12 +155,12 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '4px 8px',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-        background: 'rgba(255,255,255,0.02)',
+        borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+        background: 'rgba(var(--kt-ink-rgb), 0.02)',
         gap: 8,
         flexWrap: 'wrap',
       }}>
-        {mode === 'wysiwyg' ? <Toolbar editor={editor} /> : <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>Markdown source</div>}
+        {mode === 'wysiwyg' ? <Toolbar editor={editor} /> : <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>Markdown source</div>}
         <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
           <button type="button" onClick={switchToWysiwyg} style={modeBtnStyle(mode === 'wysiwyg')}>
             Edit
@@ -186,15 +186,15 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
             .tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
             .tiptap ul, .tiptap ol { padding-left: 1.4em; margin: 0.3em 0; }
             .tiptap li { margin: 0.1em 0; }
-            .tiptap code { background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: #facc15; }
+            .tiptap code { background: rgba(var(--kt-ink-rgb), 0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: #facc15; }
             .tiptap pre { background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
             .tiptap pre code { background: none; padding: 0; color: inherit; }
-            .tiptap blockquote { border-left: 3px solid rgba(255,255,255,0.15); padding-left: 12px; margin: 0.4em 0; color: rgba(255,255,255,0.4); }
+            .tiptap blockquote { border-left: 3px solid rgba(var(--kt-ink-rgb), 0.15); padding-left: 12px; margin: 0.4em 0; color: rgba(var(--kt-ink-rgb), 0.4); }
             .tiptap a { color: #facc15; text-decoration: underline; }
             .tiptap p.is-editor-empty:first-child::before {
               content: attr(data-placeholder);
               float: left;
-              color: rgba(255,255,255,0.2);
+              color: rgba(var(--kt-ink-rgb), 0.2);
               pointer-events: none;
               height: 0;
             }
@@ -215,8 +215,8 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
             fontFamily: 'monospace',
             fontSize: 12,
             lineHeight: 1.6,
-            background: 'rgba(255,255,255,0.02)',
-            color: '#ffffff',
+            background: 'rgba(var(--kt-ink-rgb), 0.02)',
+            color: 'var(--kt-ink)',
             boxSizing: 'border-box',
           }}
         />

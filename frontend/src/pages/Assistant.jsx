@@ -41,7 +41,7 @@ function ToolBlock({ name, result }) {
         <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
       {open && result && (
-        <pre style={{ margin: 0, padding: '0 10px 8px', fontSize: 10, color: 'rgba(255,255,255,0.4)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflow: 'auto' }}>
+        <pre style={{ margin: 0, padding: '0 10px 8px', fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.4)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflow: 'auto' }}>
           {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
         </pre>
       )}

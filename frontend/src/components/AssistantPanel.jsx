@@ -48,7 +48,7 @@ function ToolBlock({ name, result }) {
         <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
       {open && result && (
-        <pre style={{ margin: 0, padding: '0 10px 8px', fontSize: 10, color: 'rgba(255,255,255,0.4)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflow: 'auto' }}>
+        <pre style={{ margin: 0, padding: '0 10px 8px', fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.4)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflow: 'auto' }}>
           {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
         </pre>
       )}
@@ -96,7 +96,7 @@ function StreamingMessage({ events }) {
       {text && (
         <div style={{
           maxWidth: '85%', padding: '8px 12px', borderRadius: 0, fontSize: 13, lineHeight: 1.6,
-          background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}`, color: DARK.text,
+          background: 'rgba(var(--kt-ink-rgb), 0.06)', border: `1px solid ${BORDER}`, color: DARK.text,
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
           {text}
@@ -261,13 +261,13 @@ export default function AssistantPanel() {
         <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {currentConv?.title || t('assistant.title')}
         </span>
-        <button onClick={() => setShowConvList(v => !v)} title={t('assistant.conversations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
+        <button onClick={() => setShowConvList(v => !v)} title={t('assistant.conversations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.3)', padding: '2px 4px', display: 'flex' }}>
           <ChevronDown size={14} />
         </button>
-        <button onClick={() => createMut.mutate()} title={t('assistant.newChat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
+        <button onClick={() => createMut.mutate()} title={t('assistant.newChat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.3)', padding: '2px 4px', display: 'flex' }}>
           <Plus size={14} />
         </button>
-        <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '2px 4px', display: 'flex' }}>
+        <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.3)', padding: '2px 4px', display: 'flex' }}>
           <X size={14} />
         </button>
       </div>
@@ -284,7 +284,7 @@ export default function AssistantPanel() {
             />
           </div>
           {conversations.length === 0 ? (
-            <div style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>{convSearch ? t('assistant.noMatches') : t('assistant.noConversations')}</div>
+            <div style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>{convSearch ? t('assistant.noMatches') : t('assistant.noConversations')}</div>
           ) : conversations.map(c => (
             <div
               key={c.id}
@@ -306,7 +306,7 @@ export default function AssistantPanel() {
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 8px' }}>
         {!convId ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.2)' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>
             <MessageCircle size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
             <p style={{ fontSize: 13 }}>{t('assistant.noConversations')}</p>
             <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: ACCENT, border: 'none', borderRadius: 0, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
@@ -318,7 +318,7 @@ export default function AssistantPanel() {
             {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
             {showStreaming && <StreamingMessage events={streamEvents} />}
             {streaming && streamEvents.length === 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(var(--kt-ink-rgb), 0.25)', fontSize: 12 }}>
                 <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> {t('assistant.thinking')}
               </div>
             )}
@@ -336,8 +336,8 @@ export default function AssistantPanel() {
               onClick={() => { setInput(tmpl.prompt) }}
               style={{
                 padding: '4px 10px', borderRadius: 0,
-                border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
-                fontSize: 10, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontWeight: 500,
+                border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', background: 'rgba(var(--kt-ink-rgb), 0.04)',
+                fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.5)', cursor: 'pointer', fontWeight: 500,
                 whiteSpace: 'nowrap',
               }}
             >

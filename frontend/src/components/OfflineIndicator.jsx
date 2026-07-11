@@ -13,7 +13,7 @@ export default function OfflineIndicator() {
       display: 'flex', alignItems: 'center', gap: 8,
       padding: '8px 16px', borderRadius: 0,
       background: isOnline ? DARK.elevated : 'rgba(250,204,21,0.15)',
-      border: `1px solid ${isOnline ? 'rgba(255,255,255,0.1)' : 'rgba(250,204,21,0.32)'}`,
+      border: `1px solid ${isOnline ? 'rgba(var(--kt-ink-rgb), 0.1)' : 'rgba(250,204,21,0.32)'}`,
       color: isOnline ? DARK.text : DARK.success,
       fontSize: 12, fontWeight: 600,
       boxShadow: '6px 6px 0 rgba(0,0,0,0.35)',

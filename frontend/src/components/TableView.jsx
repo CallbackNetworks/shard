@@ -33,7 +33,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
 
   return (
     <tr ref={setNodeRef} style={style}>
-      <td style={{ ...tdStyle, width: 24, cursor: 'grab', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}
+      <td style={{ ...tdStyle, width: 24, cursor: 'grab', color: 'rgba(var(--kt-ink-rgb), 0.2)', textAlign: 'center' }}
           {...listeners} {...attributes}>
         ⠿
       </td>
@@ -42,7 +42,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           value={task.status}
           onChange={e => onUpdate(task.id, { status: e.target.value })}
           style={{
-            fontSize: 11, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+            fontSize: 11, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4,
             padding: '2px 6px', background: DARK.surface, color: STATUS_MAP[task.status]?.color || DARK.text,
           }}
         >
@@ -57,7 +57,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           value={task.priority}
           onChange={e => onUpdate(task.id, { priority: e.target.value })}
           style={{
-            fontSize: 11, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+            fontSize: 11, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4,
             padding: '2px 6px', background: DARK.surface,
             color: PRIORITY[task.priority]?.color || DARK.text,
           }}
@@ -70,7 +70,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
       <td style={{ ...tdStyle, maxWidth: 320 }}>
         <span style={{
           textDecoration: task.status === 'done' ? 'line-through' : 'none',
-          color: task.status === 'done' ? 'rgba(255,255,255,0.25)' : DARK.text,
+          color: task.status === 'done' ? 'rgba(var(--kt-ink-rgb), 0.25)' : DARK.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
         }}>
           {task.title}
@@ -84,9 +84,9 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           style={{
             width: 80, fontSize: 11, border: '1px solid transparent', borderRadius: 4,
             padding: '2px 6px', background: 'transparent', outline: 'none',
-            color: task.assignee ? DARK.text : 'rgba(255,255,255,0.15)',
+            color: task.assignee ? DARK.text : 'rgba(var(--kt-ink-rgb), 0.15)',
           }}
-          onFocus={e => { e.target.style.borderColor = 'rgba(255,255,255,0.15)'; e.target.style.background = 'rgba(255,255,255,0.05)' }}
+          onFocus={e => { e.target.style.borderColor = 'rgba(var(--kt-ink-rgb), 0.15)'; e.target.style.background = 'rgba(var(--kt-ink-rgb), 0.05)' }}
           onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent' }}
         />
       </td>
@@ -111,7 +111,7 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
             <Bot size={9} />
             {task.assigned_agent_name}
           </span>
-        ) : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>}
+        ) : <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.15)' }}>—</span>}
       </td>
       <td style={tdStyle}>
         {cycle ? (
@@ -121,23 +121,23 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           }}>
             {cycle.name}
           </span>
-        ) : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>}
+        ) : <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.15)' }}>—</span>}
       </td>
       <td style={tdStyle}>
         {task.due_date
           ? <span style={{ whiteSpace: 'nowrap', color: DARK.text }}>
               {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
             </span>
-          : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
+          : <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.15)' }}>—</span>
         }
       </td>
       <td style={tdStyle}>
         {(task.time_spent || task.time_estimate) ? (
-          <span style={{ fontSize: 11, whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.5)' }}>
+          <span style={{ fontSize: 11, whiteSpace: 'nowrap', color: 'rgba(var(--kt-ink-rgb), 0.5)' }}>
             {task.time_spent ? formatMinutes(task.time_spent) : '\u2014'}
             {task.time_estimate ? ` / ${formatMinutes(task.time_estimate)}` : ''}
           </span>
-        ) : <span style={{ color: 'rgba(255,255,255,0.15)' }}>{'\u2014'}</span>}
+        ) : <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.15)' }}>{'\u2014'}</span>}
       </td>
     </tr>
   )
@@ -175,19 +175,19 @@ export default function TableView({ tasks, projectId: _projectId, labels: _label
   }
 
   const SortIcon = ({ k }) => {
-    if (sortKey !== k) return <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>↕</span>
+    if (sortKey !== k) return <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.15)', fontSize: 10 }}>↕</span>
     return <span style={{ color: BRAND, fontSize: 10 }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
   const thStyle = () => ({
-    padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)',
-    background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)',
+    padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.35)',
+    background: 'rgba(var(--kt-ink-rgb), 0.03)', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
     cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'left',
   })
 
   const tdStyle = {
     padding: '5px 10px', fontSize: 12, color: DARK.text,
-    borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'middle',
+    borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.05)', verticalAlign: 'middle',
   }
 
   const handleDragEnd = (event) => {
@@ -248,7 +248,7 @@ export default function TableView({ tasks, projectId: _projectId, labels: _label
               ))}
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={10} style={{ ...tdStyle, textAlign: 'center', color: 'rgba(255,255,255,0.25)', padding: 40 }}>
+                  <td colSpan={10} style={{ ...tdStyle, textAlign: 'center', color: 'rgba(var(--kt-ink-rgb), 0.25)', padding: 40 }}>
                     {t('table.noIssues')}
                   </td>
                 </tr>

@@ -24,7 +24,7 @@ function SvgTooltip({ x, y, text, svgWidth }) {
   return (
     <g>
       <rect x={adjustedX} y={adjustedY} width={boxW} height={boxH} rx={4}
-        fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.15)" strokeWidth={0.5} />
+        fill="rgba(0,0,0,0.85)" stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeWidth={0.5} />
       {lines.map((line, i) => (
         <text key={i} x={adjustedX + padX} y={adjustedY + padY + (i + 1) * lineH - 3}
           fontSize={11} fill="#fff" fontFamily="system-ui">{line}</text>
@@ -39,7 +39,7 @@ function Heatmap({ data }) {
   const [hover, setHover] = useState(null)
 
   if (!data || data.length === 0) {
-    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.noActivityYet')}</div>
+    return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.noActivityYet')}</div>
   }
 
   const countByDate = {}
@@ -88,7 +88,7 @@ function Heatmap({ data }) {
         {/* Month labels */}
         {monthLabels.map((m, i) => (
           <text key={i} x={m.weekIndex * (cellSize + gap)} y={10}
-            fontSize={9} fill="rgba(255,255,255,0.3)" fontFamily="system-ui">
+            fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.3)" fontFamily="system-ui">
             {m.label}
           </text>
         ))}
@@ -97,7 +97,7 @@ function Heatmap({ data }) {
           week.map((cell, di) => {
             const intensity = cell.count === 0 ? 0 : 0.15 + (cell.count / maxCount) * 0.85
             const fill = cell.count === 0
-              ? 'rgba(255,255,255,0.05)'
+              ? 'rgba(var(--kt-ink-rgb), 0.05)'
               : `rgba(250,204,21,${intensity})`
             const isHovered = hover && hover.date === cell.date
             return (
@@ -132,7 +132,7 @@ function Heatmap({ data }) {
           )
         })()}
       </svg>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>
         {t('analytics.less')}
         {[0.05, 0.2, 0.4, 0.65, 0.9].map((op, i) => (
           <span key={i} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: `rgba(250,204,21,${op})` }} />
@@ -149,7 +149,7 @@ function BurndownChart({ data }) {
   const [hover, setHover] = useState(null)
 
   if (!data || data.length === 0) {
-    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.noDataForCycle')}</div>
+    return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.noDataForCycle')}</div>
   }
   const W = 500, H = 200, PAD = { t: 10, r: 20, b: 30, l: 40 }
   const innerW = W - PAD.l - PAD.r
@@ -173,14 +173,14 @@ function BurndownChart({ data }) {
         const yv = PAD.t + innerH - f * innerH
         return (
           <g key={f}>
-            <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
-            <text x={PAD.l - 4} y={yv + 4} textAnchor="end" fontSize={9} fill="rgba(255,255,255,0.2)">
+            <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="rgba(var(--kt-ink-rgb), 0.05)" strokeWidth={1} />
+            <text x={PAD.l - 4} y={yv + 4} textAnchor="end" fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)">
               {Math.round(maxVal * f)}
             </text>
           </g>
         )
       })}
-      <polyline points={idealPoints} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="4 3" />
+      <polyline points={idealPoints} fill="none" stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeWidth={1} strokeDasharray="4 3" />
       <polyline points={actualPoints} fill="none" stroke={BRAND} strokeWidth={2} strokeLinejoin="round" />
       {/* Interactive hover circles */}
       {data.map((d, i) => (
@@ -202,15 +202,15 @@ function BurndownChart({ data }) {
       {data.filter((_, i) => i % Math.ceil(data.length / 6) === 0 || i === data.length - 1).map((d) => {
         const i = data.indexOf(d)
         return (
-          <text key={i} x={x(i)} y={H - 4} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,0.2)">
+          <text key={i} x={x(i)} y={H - 4} textAnchor="middle" fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)">
             {d.date.slice(5)}
           </text>
         )
       })}
-      <line x1={PAD.l} y1={H - 18} x2={PAD.l + 16} y2={H - 18} stroke="rgba(255,255,255,0.15)" strokeDasharray="4 3" strokeWidth={1} />
-      <text x={PAD.l + 20} y={H - 14} fontSize={9} fill="rgba(255,255,255,0.2)">{t('analytics.ideal')}</text>
+      <line x1={PAD.l} y1={H - 18} x2={PAD.l + 16} y2={H - 18} stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeDasharray="4 3" strokeWidth={1} />
+      <text x={PAD.l + 20} y={H - 14} fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)">{t('analytics.ideal')}</text>
       <line x1={PAD.l + 55} y1={H - 18} x2={PAD.l + 71} y2={H - 18} stroke={BRAND} strokeWidth={2} />
-      <text x={PAD.l + 75} y={H - 14} fontSize={9} fill="rgba(255,255,255,0.2)">{t('analytics.actual')}</text>
+      <text x={PAD.l + 75} y={H - 14} fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)">{t('analytics.actual')}</text>
     </svg>
   )
 }
@@ -221,7 +221,7 @@ function VelocityChart({ data }) {
   const [hover, setHover] = useState(null)
 
   if (!data || data.length === 0) {
-    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.completeOneCycle')}</div>
+    return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.completeOneCycle')}</div>
   }
   const barH = 28, gap = 8, padding = { l: 130, r: 40, t: 10, b: 10 }
   const maxVal = Math.max(...data.map(d => d.total_tasks), 1)
@@ -242,16 +242,16 @@ function VelocityChart({ data }) {
             onMouseLeave={() => setHover(null)}
             style={{ cursor: 'pointer' }}
           >
-            <text x={padding.l - 8} y={y + barH / 2 + 4} textAnchor="end" fontSize={11} fill="rgba(255,255,255,0.5)">
+            <text x={padding.l - 8} y={y + barH / 2 + 4} textAnchor="end" fontSize={11} fill="rgba(var(--kt-ink-rgb), 0.5)">
               {d.name.length > 18 ? d.name.slice(0, 16) + '\u2026' : d.name}
             </text>
             <rect x={padding.l} y={y} width={totalW} height={barH} rx={4}
-              fill={isHovered ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}
+              fill={isHovered ? 'rgba(var(--kt-ink-rgb), 0.1)' : 'rgba(var(--kt-ink-rgb), 0.06)'}
             />
             <rect x={padding.l} y={y} width={doneW} height={barH} rx={4}
               fill={isHovered ? 'rgba(250,204,21,0.7)' : 'rgba(250,204,21,0.5)'}
             />
-            <text x={padding.l + totalW + 6} y={y + barH / 2 + 4} fontSize={10} fill="rgba(255,255,255,0.3)">
+            <text x={padding.l + totalW + 6} y={y + barH / 2 + 4} fontSize={10} fill="rgba(var(--kt-ink-rgb), 0.3)">
               {d.completed_tasks}/{d.total_tasks}
             </text>
           </g>
@@ -299,8 +299,8 @@ function StatusTrendChart({ data }) {
         const yv = PAD.t + innerH - f * innerH
         return (
           <g key={f}>
-            <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
-            <text x={PAD.l - 4} y={yv + 4} textAnchor="end" fontSize={9} fill="rgba(255,255,255,0.2)">{Math.round(maxTotal * f)}</text>
+            <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="rgba(var(--kt-ink-rgb), 0.05)" strokeWidth={1} />
+            <text x={PAD.l - 4} y={yv + 4} textAnchor="end" fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)">{Math.round(maxTotal * f)}</text>
           </g>
         )
       })}
@@ -310,7 +310,7 @@ function StatusTrendChart({ data }) {
       {/* Hover vertical line and circles */}
       {hover !== null && (
         <line x1={xAt(hover)} y1={PAD.t} x2={xAt(hover)} y2={PAD.t + innerH}
-          stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3 2" />
+          stroke="rgba(var(--kt-ink-rgb), 0.15)" strokeWidth={1} strokeDasharray="3 2" />
       )}
       {hover !== null && statuses.map(s => {
         const yv = PAD.t + innerH - (data[hover][s] / maxTotal) * innerH
@@ -332,7 +332,7 @@ function StatusTrendChart({ data }) {
       {data.filter((_, i) => i % Math.ceil(data.length / 5) === 0).map((d) => {
         const i = data.indexOf(d)
         return (
-          <text key={i} x={xAt(i)} y={H - 4} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,0.2)">
+          <text key={i} x={xAt(i)} y={H - 4} textAnchor="middle" fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.2)">
             {d.date.slice(5)}
           </text>
         )
@@ -340,7 +340,7 @@ function StatusTrendChart({ data }) {
       {statuses.map((s, i) => (
         <g key={s}>
           <rect x={PAD.l + i * 80} y={H - 22} width={10} height={4} rx={2} fill={STATUS_COLORS[s]} />
-          <text x={PAD.l + i * 80 + 14} y={H - 16} fontSize={9} fill="rgba(255,255,255,0.3)">{s}</text>
+          <text x={PAD.l + i * 80 + 14} y={H - 16} fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.3)">{s}</text>
         </g>
       ))}
     </svg>
@@ -355,11 +355,11 @@ function StatCard({ icon, label, value, sub, color, delay }) {
       animationDelay: delay != null ? `${delay}s` : '0s',
       opacity: 0,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(var(--kt-ink-rgb), 0.4)', fontSize: 12 }}>
         {icon}{label}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 700, color: color || '#ffffff' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{sub}</div>}
+      <div style={{ fontSize: 28, fontWeight: 700, color: color || 'var(--kt-ink)' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)' }}>{sub}</div>}
     </div>
   )
 }
@@ -373,14 +373,14 @@ function Section({ title, icon, children, delay, summary, actions }) {
       opacity: 0,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(var(--kt-ink-rgb), 0.6)', fontSize: 13, fontWeight: 600 }}>
           {icon}{title}
         </div>
         {actions && <div style={{ display: 'flex', gap: 6 }}>{actions}</div>}
       </div>
       {children}
       {summary && (
-        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.3)', fontStyle: 'italic' }}>
           {summary}
         </div>
       )}
@@ -390,7 +390,7 @@ function Section({ title, icon, children, delay, summary, actions }) {
 
 // ——— Estimation calibration ———
 function ratioColor(ratio) {
-  if (ratio == null) return 'rgba(255,255,255,0.15)'
+  if (ratio == null) return 'rgba(var(--kt-ink-rgb), 0.15)'
   if (ratio > 1.2) return STATUS_COLOR.failed
   if (ratio < 0.8) return STATUS_COLOR.in_progress
   return STATUS_COLOR.done
@@ -400,7 +400,7 @@ function CalibrationChart({ data }) {
   const { t } = useTranslation()
 
   if (!data || data.sample_size === 0) {
-    return <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.calibrationEmpty')}</div>
+    return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.calibrationEmpty')}</div>
   }
 
   const buckets = data.buckets.filter(b => b.count > 0)
@@ -418,26 +418,26 @@ function CalibrationChart({ data }) {
     <div>
       <svg width="100%" height={buckets.length * rowH + 26} viewBox={`0 0 ${W} ${buckets.length * rowH + 26}`} style={{ maxWidth: W }}>
         {/* reference line at ratio 1.0 (perfect estimate) */}
-        <line x1={refX} y1={0} x2={refX} y2={buckets.length * rowH} stroke="rgba(255,255,255,0.25)" strokeDasharray="3 3" />
-        <text x={refX} y={buckets.length * rowH + 14} fontSize={10} fill="rgba(255,255,255,0.3)" textAnchor="middle">1.0×</text>
-        <text x={W} y={buckets.length * rowH + 14} fontSize={10} fill="rgba(255,255,255,0.2)" textAnchor="end">{t('analytics.calibrationAxis')}</text>
+        <line x1={refX} y1={0} x2={refX} y2={buckets.length * rowH} stroke="rgba(var(--kt-ink-rgb), 0.25)" strokeDasharray="3 3" />
+        <text x={refX} y={buckets.length * rowH + 14} fontSize={10} fill="rgba(var(--kt-ink-rgb), 0.3)" textAnchor="middle">1.0×</text>
+        <text x={W} y={buckets.length * rowH + 14} fontSize={10} fill="rgba(var(--kt-ink-rgb), 0.2)" textAnchor="end">{t('analytics.calibrationAxis')}</text>
 
         {buckets.map((b, i) => {
           const y = i * rowH
           const color = ratioColor(b.avg_ratio)
           return (
             <g key={b.label}>
-              <text x={labelW - 8} y={y + rowH / 2 + 4} fontSize={11} fill="rgba(255,255,255,0.5)" textAnchor="end">{b.label}</text>
+              <text x={labelW - 8} y={y + rowH / 2 + 4} fontSize={11} fill="rgba(var(--kt-ink-rgb), 0.5)" textAnchor="end">{b.label}</text>
               <rect x={labelW} y={y + 6} width={scale(b.avg_ratio)} height={rowH - 12} rx={3} fill={color} opacity={0.75} />
               <text x={labelW + scale(b.avg_ratio) + 6} y={y + rowH / 2 + 4} fontSize={11} fill={color} fontWeight={700}>
                 {b.avg_ratio}×
               </text>
-              <text x={W} y={y + rowH / 2 + 4} fontSize={10} fill="rgba(255,255,255,0.25)" textAnchor="end">n={b.count}</text>
+              <text x={W} y={y + rowH / 2 + 4} fontSize={10} fill="rgba(var(--kt-ink-rgb), 0.25)" textAnchor="end">n={b.count}</text>
             </g>
           )
         })}
       </svg>
-      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)' }}>
         <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: STATUS_COLOR.failed, marginRight: 5 }} />{data.underestimated} {t('analytics.calibrationUnder')}</span>
         <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: STATUS_COLOR.done, marginRight: 5 }} />{data.sample_size - data.underestimated - data.overestimated} {t('analytics.calibrationOnTarget')}</span>
         <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: STATUS_COLOR.in_progress, marginRight: 5 }} />{data.overestimated} {t('analytics.calibrationOver')}</span>
@@ -554,7 +554,7 @@ export default function Analytics() {
               label={t('analytics.mostActive')}
               value={overview.most_active_project.name}
               sub={t('analytics.eventsThisWeek', { count: overview.most_active_project.activity_count })}
-              color="#facc15"
+              color="var(--kt-hit)"
               delay={0.32}
             />
           )}
@@ -596,7 +596,7 @@ export default function Analytics() {
               actions={selectedCycleId && burndown.length > 0 && <ExportButton onClick={exportBurndown} label="CSV" />}
             >
               {!selectedCycleId ? (
-                <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>{t('analytics.selectCycleForBurndown')}</div>
+                <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 13 }}>{t('analytics.selectCycleForBurndown')}</div>
               ) : (
                 <BurndownChart data={burndown} />
               )}
