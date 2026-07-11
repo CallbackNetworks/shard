@@ -266,13 +266,26 @@ async def import_tasks(
 # ---------------------------------------------------------------------------
 
 
+@router.post("/projects/{project_id}/ical-token/rotate", tags=["ical"])
+def rotate_ical_token(project_id: str, db: Session = Depends(get_db)):
+    """Issue a new iCal token, invalidating every existing subscription URL.
+
+    Independent of share_token so the calendar feed and public share page can be
+    revoked separately (see ADR-0022)."""
+    project = get_project_or_404(project_id, db)
+    project.ical_token = str(uuid.uuid4())
+    db.commit()
+    db.refresh(project)
+    return {"ical_token": project.ical_token}
+
+
 @router.get(
-    "/ical/{share_token}.ics",
+    "/ical/{ical_token}.ics",
     tags=["ical"],
     response_class=PlainTextResponse,
 )
 def ical_feed(
-    share_token: str,
+    ical_token: str,
     alarm: int = Query(
         30,
         ge=0,
@@ -281,9 +294,10 @@ def ical_feed(
     ),
     db: Session = Depends(get_db),
 ):
-    # The per-project share_token is the sole credential for this feed: the URL is
-    # unguessable and gates read-only access, so it is never derived from project_id.
-    project = db.query(Project).filter(Project.share_token == share_token).first()
+    # The per-project ical_token is the sole credential for this feed: the URL is
+    # unguessable and gates read-only access, and is independent of share_token so
+    # the two can be revoked separately.
+    project = db.query(Project).filter(Project.ical_token == ical_token).first()
     if project is None:
         raise HTTPException(status_code=404, detail="Calendar not found")
 

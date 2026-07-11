@@ -22,4 +22,5 @@
 | [0018](0018-postgres-parity-and-fresh-db-bootstrap.md) | PostgreSQL Behavior Parity and Fresh-Database Alembic Bootstrap | Accepted | 2026-07-10 |
 | [0019](0019-scheduler-long-run-resilience.md) | Scheduler Long-Run Resilience — Check Isolation, Persistent Dedup, Heartbeat, Fake-Clock Tests | Accepted | 2026-07-10 |
 | [0020](0020-databases-as-coequal-test-targets.md) | SQLite and PostgreSQL as Co-Equal Test Targets | Accepted | 2026-07-11 |
-| [0021](0021-token-protected-ical-feed.md) | Token-Protected iCal Feed via Reused Project Share Token | Accepted | 2026-07-11 |
+| [0021](0021-token-protected-ical-feed.md) | Token-Protected iCal Feed via Reused Project Share Token | Superseded by ADR-0022 | 2026-07-11 |
+| [0022](0022-independent-ical-token.md) | Independent iCal Token Separate from Share Token | Accepted | 2026-07-11 |

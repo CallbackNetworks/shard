@@ -1,7 +1,7 @@
 # ADR-0021: Token-Protected iCal Feed via Reused Project Share Token
 
 ## Status
-Accepted
+Superseded by ADR-0022
 
 ## Date
 2026-07-11
