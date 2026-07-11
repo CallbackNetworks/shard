@@ -8,11 +8,13 @@ import io
 import json
 import logging
 import os
+import shutil
 import zipfile
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy import DateTime
 from sqlalchemy.orm import Session
 
 from app.database import Base
@@ -22,6 +24,10 @@ logger = logging.getLogger(__name__)
 BACKUP_FORMAT_VERSION = 1
 BACKUP_PREFIX = "shard-backup-"
 UPLOAD_DIR = Path("/app/uploads")
+
+
+class RestoreError(Exception):
+    """Raised when an archive is malformed or incompatible with the schema."""
 
 
 def get_backup_dir() -> Path:
@@ -114,3 +120,145 @@ def prune_backups(keep: int, dest_dir: Path | None = None) -> int:
     if removed:
         logger.info("Pruned %d old backup(s), keeping %d", removed, keep)
     return removed
+
+
+def _coerce_value(column, value):
+    """Turn a JSON-decoded value back into the Python type the column expects.
+
+    Only DateTime needs help: build_archive serializes datetimes to ISO strings,
+    and psycopg will not accept a string into a timestamp column. Booleans and
+    JSON survive the JSON round-trip as native types already.
+    """
+    if value is None:
+        return None
+    if isinstance(column.type, DateTime):
+        return datetime.fromisoformat(value)
+    return value
+
+
+def _self_ref_columns(table):
+    """Columns on `table` whose foreign key points back into the same table."""
+    return [c for c in table.columns if any(fk.column.table is table for fk in c.foreign_keys)]
+
+
+def _order_rows_for_insert(table, rows: list[dict]) -> list[dict]:
+    """Order rows so a self-referential parent is always inserted before its child.
+
+    Under enforced foreign keys (PostgreSQL, and MySQL) a child row whose parent
+    lives in the same table — e.g. a subtask referencing tasks.parent_id — fails
+    if inserted first. SQLite in this project does not enforce FKs, but ordering
+    unconditionally keeps one code path across backends.
+    """
+    ref_cols = _self_ref_columns(table)
+    if not ref_cols:
+        return rows
+
+    pk_cols = [c.name for c in table.primary_key.columns]
+    if len(pk_cols) != 1:
+        return rows
+    pk = pk_cols[0]
+
+    remaining = list(rows)
+    emitted_ids: set = set()
+    ordered: list[dict] = []
+    # Iteratively emit rows whose self-referential parents are already placed.
+    while remaining:
+        progressed = False
+        deferred = []
+        for row in remaining:
+            parents = [row.get(c.name) for c in ref_cols]
+            if all(p is None or p in emitted_ids for p in parents):
+                ordered.append(row)
+                emitted_ids.add(row.get(pk))
+                progressed = True
+            else:
+                deferred.append(row)
+        if not progressed:
+            # Dangling or cyclic references: emit the rest as-is rather than loop.
+            ordered.extend(deferred)
+            break
+        remaining = deferred
+    return ordered
+
+
+def restore_db(db: Session, tables: dict) -> dict:
+    """Replace all table contents with `tables` (destructive), FK-safe.
+
+    Deletes every table in reverse dependency order, then re-inserts in forward
+    order with self-referential rows sorted parent-first. Runs in one
+    transaction so a failure leaves the existing data untouched.
+    """
+    known = {t.name: t for t in Base.metadata.sorted_tables}
+    unknown = set(tables) - set(known)
+    if unknown:
+        raise RestoreError(f"Archive contains unknown tables: {sorted(unknown)}")
+
+    counts: dict[str, int] = {}
+    # Delete children before parents. ondelete=CASCADE covers self-referential
+    # rows, so a single delete per table is enough.
+    for table in reversed(Base.metadata.sorted_tables):
+        db.execute(table.delete())
+
+    for table in Base.metadata.sorted_tables:
+        rows = tables.get(table.name, [])
+        if not rows:
+            counts[table.name] = 0
+            continue
+        cols = {c.name: c for c in table.columns}
+        prepared = [
+            {k: _coerce_value(cols[k], v) for k, v in row.items() if k in cols}
+            for row in _order_rows_for_insert(table, rows)
+        ]
+        db.execute(table.insert(), prepared)
+        counts[table.name] = len(prepared)
+
+    db.commit()
+    db.expire_all()
+    logger.info("Restore complete: %d tables, %d rows", len(counts), sum(counts.values()))
+    return counts
+
+
+def restore_uploads(zf: zipfile.ZipFile, upload_dir: Path | None = None) -> int:
+    """Replace the uploads directory with the archive's `uploads/` entries."""
+    dest = upload_dir or UPLOAD_DIR
+    members = [n for n in zf.namelist() if n.startswith("uploads/") and not n.endswith("/")]
+    if not dest.parent.exists():
+        # No uploads mount in this environment (e.g. tests): skip silently.
+        return 0
+    if dest.is_dir():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    for name in members:
+        rel = name[len("uploads/") :]
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(zf.read(name))
+    return len(members)
+
+
+def restore_archive(db: Session, data: bytes, restore_files: bool = True) -> dict:
+    """Validate and apply a backup archive built by build_archive."""
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile as exc:
+        raise RestoreError("Not a valid zip archive") from exc
+
+    with zf:
+        names = zf.namelist()
+        if "data.json" not in names:
+            raise RestoreError("Archive is missing data.json")
+        meta = {}
+        if "meta.json" in names:
+            meta = json.loads(zf.read("meta.json"))
+            version = meta.get("format_version")
+            if version != BACKUP_FORMAT_VERSION:
+                raise RestoreError(f"Unsupported backup format_version {version!r}; expected {BACKUP_FORMAT_VERSION}")
+        tables = json.loads(zf.read("data.json"))
+        table_counts = restore_db(db, tables)
+        file_count = restore_uploads(zf) if restore_files else 0
+
+    return {
+        "table_counts": table_counts,
+        "files_restored": file_count,
+        "source_meta": meta,
+    }

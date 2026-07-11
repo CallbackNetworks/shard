@@ -1,7 +1,7 @@
 import re
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
@@ -59,3 +59,42 @@ def download_backup(filename: str):
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Backup not found")
     return FileResponse(path, media_type="application/zip", filename=filename)
+
+
+@router.post("/restore")
+async def restore_backup(
+    file: UploadFile = File(...),
+    confirm: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Replace ALL data with the contents of an uploaded backup archive.
+
+    Destructive: requires confirm="replace" to guard against accidents. The
+    whole restore runs in one transaction, so a malformed archive leaves the
+    live data untouched.
+    """
+    if confirm != "replace":
+        raise HTTPException(status_code=400, detail='Restore requires confirm="replace"')
+    data = await file.read()
+    try:
+        result = backup_service.restore_archive(db, data)
+    except backup_service.RestoreError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return result
+
+
+@router.post("/restore/{filename}")
+def restore_from_server(filename: str, confirm: str = Form(""), db: Session = Depends(get_db)):
+    """Restore from an existing server-side archive by filename."""
+    if confirm != "replace":
+        raise HTTPException(status_code=400, detail='Restore requires confirm="replace"')
+    if not _FILENAME_RE.match(filename):
+        raise HTTPException(status_code=400, detail="Invalid backup filename")
+    path = backup_service.get_backup_dir() / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Backup not found")
+    try:
+        result = backup_service.restore_archive(db, path.read_bytes())
+    except backup_service.RestoreError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return result

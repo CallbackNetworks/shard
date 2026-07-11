@@ -2,7 +2,9 @@ import io
 import json
 import zipfile
 
-from app.models import Task
+import pytest
+
+from app.models import Comment, Task
 from app.services import backup as backup_service
 
 
@@ -90,3 +92,86 @@ def test_prune_backups_never_deletes_below_one(tmp_path):
     removed = backup_service.prune_backups(0, dest_dir=tmp_path)
     assert removed == 0
     assert (tmp_path / "shard-backup-20260101-000000.zip").is_file()
+
+
+def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
+    parent = Task(project_id=sample_project.id, title="Parent task", status="todo")
+    db.add(parent)
+    db.flush()
+    child = Task(
+        project_id=sample_project.id,
+        parent_id=parent.id,
+        title="Child task",
+        status="in_progress",
+    )
+    db.add(child)
+    db.flush()
+    db.add(Comment(task_id=parent.id, body="a note"))
+    db.commit()
+    parent_id = parent.id
+
+    archive = client.get("/backup/export").content
+
+    # Simulate operator error: wipe everything.
+    db.query(Comment).delete()
+    db.query(Task).delete()
+    db.commit()
+    assert db.query(Task).count() == 0
+
+    resp = client.post(
+        "/backup/restore",
+        files={"file": ("backup.zip", archive, "application/zip")},
+        data={"confirm": "replace"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["table_counts"]["tasks"] == 2
+    assert body["table_counts"]["comments"] == 1
+
+    db.expire_all()
+    titles = {t.title for t in db.query(Task).all()}
+    assert titles == {"Parent task", "Child task"}
+    # Self-referential parent link survives the restore.
+    restored_child = db.query(Task).filter_by(title="Child task").one()
+    assert restored_child.parent_id == parent_id
+    assert db.query(Comment).count() == 1
+
+
+def test_restore_requires_confirm(client, sample_project):
+    archive = client.get("/backup/export").content
+    resp = client.post(
+        "/backup/restore",
+        files={"file": ("backup.zip", archive, "application/zip")},
+    )
+    assert resp.status_code == 400
+
+
+def test_restore_rejects_non_zip(client):
+    resp = client.post(
+        "/backup/restore",
+        files={"file": ("backup.zip", b"not a zip", "application/zip")},
+        data={"confirm": "replace"},
+    )
+    assert resp.status_code == 422
+
+
+def test_restore_rejects_bad_format_version(client):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("meta.json", json.dumps({"format_version": 999}))
+        zf.writestr("data.json", json.dumps({}))
+    resp = client.post(
+        "/backup/restore",
+        files={"file": ("backup.zip", buf.getvalue(), "application/zip")},
+        data={"confirm": "replace"},
+    )
+    assert resp.status_code == 422
+
+
+def test_restore_rejects_unknown_table(client, db):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("meta.json", json.dumps({"format_version": 1}))
+        zf.writestr("data.json", json.dumps({"not_a_real_table": []}))
+    with pytest.raises(backup_service.RestoreError):
+        backup_service.restore_archive(db, buf.getvalue())

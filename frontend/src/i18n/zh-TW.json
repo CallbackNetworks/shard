@@ -789,5 +789,10 @@
   "settings.backupNow": "立即備份",
   "settings.backupDownload": "下載",
   "settings.backupExisting": "已儲存的備份",
-  "settings.backupNone": "尚無伺服器端備份"
+  "settings.backupNone": "尚無伺服器端備份",
+  "settings.backupRestore": "還原",
+  "settings.backupRestoreUpload": "從檔案還原…",
+  "settings.backupRestoreConfirm": "這會用備份內容取代目前所有資料，且無法復原。確定要繼續嗎？",
+  "settings.backupRestoreDone": "還原完成",
+  "settings.backupRestoreFailed": "還原失敗"
 }

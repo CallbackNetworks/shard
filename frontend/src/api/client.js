@@ -260,6 +260,17 @@ export const getBackupStatus = () => api.get('/backup/status').then(r => r.data)
 export const runBackup = () => api.post('/backup/run').then(r => r.data)
 export const exportBackup = () => api.get('/backup/export', { responseType: 'blob' })
 export const downloadBackupFile = (filename) => api.get(`/backup/download/${filename}`, { responseType: 'blob' })
+export const restoreBackupFile = (file) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('confirm', 'replace')
+  return api.post('/backup/restore', form).then(r => r.data)
+}
+export const restoreServerBackup = (filename) => {
+  const form = new FormData()
+  form.append('confirm', 'replace')
+  return api.post(`/backup/restore/${filename}`, form).then(r => r.data)
+}
 
 // Analytics
 export const getAnalyticsOverview = () => api.get('/analytics/overview').then(r => r.data)

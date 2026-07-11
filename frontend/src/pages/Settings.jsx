@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, DatabaseBackup, Download, CalendarClock, RefreshCw } from 'lucide-react'
-import { getSettings, changePassword, setPreference, updateSystemSettings, getBackupStatus, runBackup, exportBackup, downloadBackupFile, getIcalToken, rotateGlobalIcalToken } from '../api/client'
+import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, DatabaseBackup, Download, CalendarClock, RefreshCw, Upload, RotateCcw } from 'lucide-react'
+import { getSettings, changePassword, setPreference, updateSystemSettings, getBackupStatus, runBackup, exportBackup, downloadBackupFile, restoreBackupFile, restoreServerBackup, getIcalToken, rotateGlobalIcalToken } from '../api/client'
 import { DARK } from '../constants/theme'
 import { useTheme } from '../context/ThemeContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
@@ -189,6 +189,20 @@ export default function Settings() {
     } finally {
       setExporting(false)
     }
+  }
+
+  const restoreMut = useMutation({
+    mutationFn: ({ file, filename }) => (file ? restoreBackupFile(file) : restoreServerBackup(filename)),
+    onSuccess: () => {
+      qc.invalidateQueries()
+      window.alert(t('settings.backupRestoreDone'))
+    },
+    onError: (e) => window.alert(`${t('settings.backupRestoreFailed')}: ${e?.response?.data?.detail || e.message}`),
+  })
+  const uploadRestoreRef = useRef(null)
+  const handleRestore = (opts) => {
+    if (!window.confirm(t('settings.backupRestoreConfirm'))) return
+    restoreMut.mutate(opts)
   }
 
   const pwMut = useMutation({
@@ -565,6 +579,24 @@ export default function Settings() {
               <button onClick={handleExport} disabled={exporting} className="kt-btn">
                 <Download size={12} /> {exporting ? t('loading') : t('settings.backupDownload')}
               </button>
+              <button
+                onClick={() => uploadRestoreRef.current?.click()}
+                disabled={restoreMut.isPending}
+                className="kt-btn"
+              >
+                <Upload size={12} /> {restoreMut.isPending ? t('loading') : t('settings.backupRestoreUpload')}
+              </button>
+              <input
+                ref={uploadRestoreRef}
+                type="file"
+                accept=".zip,application/zip"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) handleRestore({ file })
+                }}
+              />
             </div>
             {backupStatus?.backups?.length > 0 ? (
               <div>
@@ -585,6 +617,15 @@ export default function Settings() {
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 4 }}
                     >
                       <Download size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleRestore({ filename: b.filename })}
+                      disabled={restoreMut.isPending}
+                      aria-label={t('settings.backupRestore')}
+                      title={t('settings.backupRestore')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 4 }}
+                    >
+                      <RotateCcw size={13} />
                     </button>
                   </div>
                 ))}

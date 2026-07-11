@@ -789,5 +789,10 @@
   "settings.backupNow": "Back up now",
   "settings.backupDownload": "Download",
   "settings.backupExisting": "Stored archives",
-  "settings.backupNone": "No server-side backups yet"
+  "settings.backupNone": "No server-side backups yet",
+  "settings.backupRestore": "Restore",
+  "settings.backupRestoreUpload": "Restore from file…",
+  "settings.backupRestoreConfirm": "This replaces ALL current data with the backup. This cannot be undone. Continue?",
+  "settings.backupRestoreDone": "Restore complete",
+  "settings.backupRestoreFailed": "Restore failed"
 }
