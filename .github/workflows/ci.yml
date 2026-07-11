@@ -32,6 +32,39 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.ci.yml -p ci-backend down -v
 
+  backend-postgres:
+    name: Backend tests (PostgreSQL)
+    runs-on: ci-builder
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest build backend
+
+      - name: Start PostgreSQL
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest up -d postgres
+
+      - name: Wait for PostgreSQL health
+        run: |
+          for i in $(seq 1 30); do
+            docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest exec -T postgres \
+              pg_isready -U todo -d shard_test 2>/dev/null && exit 0
+            sleep 2
+          done
+          echo "PostgreSQL failed to become healthy"
+          docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest logs postgres
+          exit 1
+
+      - name: Run tests against PostgreSQL
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest run --rm --no-deps \
+            -e TEST_DATABASE_URL=postgresql+psycopg://todo:todo_dev@postgres:5432/shard_test \
+            backend pytest tests/ -v --tb=short
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest down -v
+
   frontend:
     name: Frontend tests
     runs-on: ci-builder
@@ -59,7 +92,7 @@ jobs:
 
   integration:
     name: Integration smoke test (prod)
-    needs: [backend, frontend]
+    needs: [backend, backend-postgres, frontend]
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4

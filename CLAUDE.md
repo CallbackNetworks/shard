@@ -125,12 +125,13 @@ Config in `frontend/eslint.config.js` (flat config). CI allows up to 300 warning
 
 ## CI/CD pipeline (`.github/workflows/ci.yml`)
 
-Runs on push/PR to `main`. Five jobs:
-1. **Backend**: ruff lint + format check, pytest with coverage (>=70%), pip-audit
-2. **Frontend**: ESLint, vitest, npm audit, vite build
-3. **Integration**: production compose up, backend health check, frontend smoke test
-4. **Publish**: build and push Docker images to registry (main branch only)
-5. **Deploy**: pull images on `cd-deployer`, generate compose file at `$DEPLOY_DIR` (configurable via `vars.DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`), bring services up with health checks (main branch only). Requires `.env` pre-configured in the deploy directory.
+Runs on push/PR to `main`. Six jobs:
+1. **Backend**: ruff lint + format check, pytest with coverage (>=70%), pip-audit (SQLite)
+2. **Backend (PostgreSQL)**: same pytest suite against a `postgres:16-alpine` service via the `pgtest` profile in `docker-compose.ci.yml`, with `TEST_DATABASE_URL` pointing at it — guards SQLite/PostgreSQL behavior parity (see ADR-0018)
+3. **Frontend**: ESLint, vitest, npm audit, vite build
+4. **Integration**: production compose up, backend health check, frontend smoke test (needs backend + backend-postgres + frontend)
+5. **Publish**: build and push Docker images to registry (main branch only)
+6. **Deploy**: pull images on `cd-deployer`, generate compose file at `$DEPLOY_DIR` (configurable via `vars.DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`), bring services up with health checks (main branch only). Requires `.env` pre-configured in the deploy directory.
 
 ## Schema migrations (Alembic)
 

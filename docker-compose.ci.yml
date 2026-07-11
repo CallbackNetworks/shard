@@ -16,6 +16,23 @@ services:
     networks:
       - ci-network
 
+  # ---------- PostgreSQL parity tests ----------
+  postgres:
+    profiles: [pgtest]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shard_test}
+      POSTGRES_USER: ${POSTGRES_USER:-todo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo_dev}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo} -d ${POSTGRES_DB:-shard_test}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks:
+      - ci-network
+
   # ---------- integration smoke test (prod images) ----------
   backend-prod:
     profiles: [integration]
