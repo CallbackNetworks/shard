@@ -1,6 +1,6 @@
 """Tests for the background scheduler service."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -10,6 +10,7 @@ from app.services.scheduler import (
     _check_and_fire,
     _check_recurring,
     _compute_next_run,
+    _ensure_aware,
     _retry_failed_webhooks,
     _send_daily_summary,
 )
@@ -23,8 +24,8 @@ def _settings(**overrides):
 
 
 def _now():
-    """Return naive UTC datetime matching what SQLite stores."""
-    return datetime.utcnow()
+    """Return aware UTC datetime matching the app-wide convention."""
+    return datetime.now(UTC)
 
 
 # ── _compute_next_run ────────────────────────────────────────────────────
@@ -89,7 +90,9 @@ class TestComputeNextRun:
         assert result.day == 15
 
     def test_unknown_frequency_defaults_daily(self, db):
-        rule = self._make_rule(db, "unknown")
+        # Built in memory (not flushed): databases with native enums reject
+        # invalid values at INSERT time, but the fallback branch is pure Python.
+        rule = RecurrenceRule(template_task_id="t", frequency="unknown", interval_value=1, active=True)
         base = datetime(2026, 3, 15, 10, 0)
         assert _compute_next_run(rule, base) == base + timedelta(days=1)
 
@@ -232,7 +235,7 @@ class TestCheckRecurring:
 
         db.refresh(rule)
         assert rule.last_run_at is not None
-        assert rule.next_run_at > _now()
+        assert _ensure_aware(rule.next_run_at) > _now()
 
     @pytest.mark.asyncio
     async def test_skips_future_next_run(self, db):

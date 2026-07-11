@@ -79,6 +79,9 @@ class SQLiteSearchBackend(SearchBackend):
             rows = db.execute(fts_query, {"q": query, "lim": limit, "off": offset}).fetchall()
             return [r[0] for r in rows], True
         except Exception:
+            # Roll back so the session is usable for the ILIKE fallback
+            # (PostgreSQL aborts the transaction after any failed statement).
+            db.rollback()
             logger.debug("FTS5 query failed, falling back to ILIKE")
             return [], False
 
@@ -116,6 +119,9 @@ class PostgresSearchBackend(SearchBackend):
             rows = db.execute(fts_query, {"q": query, "lim": limit, "off": offset}).fetchall()
             return [r[0] for r in rows], True
         except Exception:
+            # Roll back so the session is usable for the ILIKE fallback
+            # (PostgreSQL aborts the transaction after any failed statement).
+            db.rollback()
             logger.debug("PostgreSQL tsquery failed, falling back to ILIKE")
             return [], False
 
@@ -132,9 +138,9 @@ class FallbackSearchBackend(SearchBackend):
         return [], False
 
 
-def get_search_backend() -> SearchBackend:
-    """Return the appropriate search backend for the current database dialect."""
-    dialect = get_dialect()
+def get_search_backend(dialect: str | None = None) -> SearchBackend:
+    """Return the appropriate search backend for the given dialect (defaults to the configured DATABASE_URL)."""
+    dialect = dialect or get_dialect()
     if dialect == "sqlite":
         return SQLiteSearchBackend()
     if dialect == "postgresql":

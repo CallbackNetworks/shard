@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Project, Task
 from app.services.enrichment import enrich_task_as_dict
+from app.services.search_backend import get_search_backend
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,9 @@ def search(
     db: Session = Depends(get_db),
 ):
     """Full-text search across tasks and projects. Uses FTS when available, falls back to LIKE."""
-    search_backend = request.app.state.search_backend
+    # Resolve the backend from the session's actual dialect, not the global
+    # DATABASE_URL, so an overridden session (e.g. in tests) picks the right FTS.
+    search_backend = get_search_backend(db.get_bind().dialect.name)
     task_ids, used_fts = search_backend.search_tasks(db, q, project_id, limit, offset)
     pattern = f"%{q}%"
 

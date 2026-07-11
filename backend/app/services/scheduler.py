@@ -7,12 +7,12 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, WebhookDelivery
+from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, WebhookDelivery, now_utc
 from app.services import backup as backup_service
 from app.services import email_sender
 from app.services.activity import log_activity
@@ -24,9 +24,18 @@ logger = logging.getLogger(__name__)
 CHECK_INTERVAL_SECONDS = 3600  # every hour
 
 
+def _ensure_aware(dt: datetime) -> datetime:
+    """Normalize a DB-loaded datetime to aware UTC.
+
+    SQLite returns naive datetimes while PostgreSQL returns aware ones for
+    the same timezone-aware column, so Python-side comparisons must normalize.
+    """
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
 async def _check_and_fire(db: Session) -> None:
     settings = get_system_settings(db)
-    now = datetime.utcnow()
+    now = now_utc()
     due_soon_cutoff = now + timedelta(hours=settings["due_soon_window_hours"])
     cooldown_cutoff = now - timedelta(hours=settings["reminder_cooldown_hours"])
 
@@ -42,7 +51,7 @@ async def _check_and_fire(db: Session) -> None:
     )
 
     for task in tasks:
-        event = "task.overdue" if task.due_date < now else "task.due_soon"
+        event = "task.overdue" if _ensure_aware(task.due_date) < now else "task.due_soon"
         try:
             await fire_notifications(db, task, event)
             task.reminder_sent_at = now
@@ -75,7 +84,7 @@ def _compute_next_run(rule: RecurrenceRule, from_time: datetime) -> datetime:
 
 
 async def _check_recurring(db: Session) -> None:
-    now = datetime.utcnow()
+    now = now_utc()
     rules = (
         db.query(RecurrenceRule)
         .filter(
@@ -87,7 +96,7 @@ async def _check_recurring(db: Session) -> None:
 
     for rule in rules:
         # Skip if past end_date
-        if rule.end_date and now > rule.end_date:
+        if rule.end_date and now > _ensure_aware(rule.end_date):
             logger.debug("Skipping expired recurrence rule %s", rule.id)
             continue
 
@@ -131,7 +140,7 @@ async def _check_recurring(db: Session) -> None:
 
 
 async def _retry_failed_webhooks(db: Session) -> None:
-    now = datetime.utcnow()
+    now = now_utc()
     deliveries = (
         db.query(WebhookDelivery)
         .filter(
@@ -156,7 +165,7 @@ _last_weekly_digest_date: str | None = None
 async def _run_daily_backup(db: Session) -> None:
     """Write a full backup archive once per day at/after the configured hour."""
     global _last_backup_date
-    now = datetime.utcnow()
+    now = now_utc()
     today_str = now.strftime("%Y-%m-%d")
     settings = get_system_settings(db)
     if not settings["backup_enabled"] or _last_backup_date == today_str or now.hour < settings["backup_hour"]:
@@ -172,7 +181,7 @@ async def _run_daily_backup(db: Session) -> None:
 async def _send_daily_summary(db: Session) -> None:
     """Generate and send a daily summary email to all email-type integrations."""
     global _last_summary_date
-    now = datetime.utcnow()
+    now = now_utc()
     today_str = now.strftime("%Y-%m-%d")
     summary_hour = get_system_settings(db)["summary_hour"]
 
@@ -275,7 +284,7 @@ async def _send_daily_summary(db: Session) -> None:
 async def _send_weekly_digest(db: Session) -> None:
     """Generate and send a weekly digest email to all email-type integrations."""
     global _last_weekly_digest_date
-    now = datetime.utcnow()
+    now = now_utc()
     summary_hour = get_system_settings(db)["summary_hour"]
 
     # Only send on the configured day of the week, at or after the summary hour
@@ -419,7 +428,7 @@ async def _check_sla_aging(db: Session) -> None:
     - > 7 days: fire a 'task.overdue' notification
     - Skip tasks already escalated within the last 7 days.
     """
-    now = datetime.utcnow()
+    now = now_utc()
     escalation_cutoff = now - timedelta(days=SLA_ESCALATION_DAYS)
 
     # Find tasks stuck in_progress
@@ -433,7 +442,7 @@ async def _check_sla_aging(db: Session) -> None:
     )
 
     for task in stuck_tasks:
-        days_stuck = (now - task.updated_at).days
+        days_stuck = (now - _ensure_aware(task.updated_at)).days
 
         # Check if already escalated within the last 7 days
         recent_escalation = (

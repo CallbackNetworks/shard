@@ -386,6 +386,8 @@ class TestRetryDelivery:
 
     @pytest.mark.asyncio
     async def test_retry_missing_integration_marks_dead(self, db):
+        if db.get_bind().dialect.name != "sqlite":
+            pytest.skip("orphan rows cannot be created under enforced foreign keys")
         delivery = WebhookDelivery(
             integration_id="nonexistent-id",
             event="task.done",
