@@ -264,3 +264,49 @@ def test_guest_note_daily_limit(client, db, sample_project):
         json={"guest_name": "Visitor", "body": "one too many"},
     )
     assert resp.status_code == 429
+
+
+def test_project_share_expired_returns_410(client, db, sample_project):
+    sample_project.share_expires_at = datetime.now(UTC) - timedelta(hours=1)
+    db.commit()
+    resp = client.get(f"/share/project/{sample_project.share_token}")
+    assert resp.status_code == 410
+
+
+def test_project_share_future_expiry_still_works(client, db, sample_project):
+    sample_project.share_expires_at = datetime.now(UTC) + timedelta(days=1)
+    db.commit()
+    resp = client.get(f"/share/project/{sample_project.share_token}")
+    assert resp.status_code == 200
+
+
+def test_project_guest_note_blocked_after_expiry(client, db, sample_project):
+    sample_project.allow_guest_notes = True
+    sample_project.share_expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    db.commit()
+    resp = client.post(
+        f"/share/project/{sample_project.share_token}/notes",
+        json={"guest_name": "Visitor", "body": "late note"},
+    )
+    assert resp.status_code == 410
+
+
+def test_set_project_expiry_endpoint(client, db, sample_project):
+    when = (datetime.now(UTC) + timedelta(days=3)).isoformat()
+    resp = client.post(f"/projects/{sample_project.id}/set-expiry", json={"expires_at": when})
+    assert resp.status_code == 200
+    db.refresh(sample_project)
+    assert sample_project.share_expires_at is not None
+
+    # Clearing sets it back to null.
+    resp = client.post(f"/projects/{sample_project.id}/set-expiry", json={"expires_at": None})
+    assert resp.status_code == 200
+    db.refresh(sample_project)
+    assert sample_project.share_expires_at is None
+
+
+def test_project_share_view_count(client, db, sample_project):
+    assert client.get(f"/projects/{sample_project.id}/share-views").json()["view_count"] == 0
+    # A public view is logged and counted.
+    client.get(f"/share/project/{sample_project.share_token}")
+    assert client.get(f"/projects/{sample_project.id}/share-views").json()["view_count"] == 1

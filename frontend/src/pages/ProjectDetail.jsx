@@ -1,7 +1,7 @@
 import { useState, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2, MessageSquare, CalendarClock, Eye } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -9,6 +9,7 @@ import {
   reorderTasks,
   bulkUpdateTasks, exportTasks, importTasks,
   getSavedFilters, createSavedFilter,
+  setProjectShareExpiry, getProjectShareViewCount,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
 import GanttChart from '../components/GanttChart'
@@ -141,6 +142,9 @@ export default function ProjectDetail() {
   const [importJson, setImportJson] = useState('')
   const [copiedIcal, setCopiedIcal] = useState(false)
   const [copiedShare, setCopiedShare] = useState(false)
+  const [shareSettingsOpen, setShareSettingsOpen] = useState(false)
+  const [expiryInput, setExpiryInput] = useState('')
+  const [shareViews, setShareViews] = useState(null)
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -204,6 +208,23 @@ export default function ProjectDetail() {
     mutationFn: () => updateProject(id, { allow_guest_notes: !project.allow_guest_notes }),
     onSuccess: invalidate,
   })
+
+  const setExpiryMut = useMutation({
+    mutationFn: (expiresAt) => setProjectShareExpiry(id, expiresAt),
+    onSuccess: invalidate,
+  })
+
+  const openShareSettings = async () => {
+    const next = !shareSettingsOpen
+    setShareSettingsOpen(next)
+    if (next) {
+      setExpiryInput(project.share_expires_at ? new Date(project.share_expires_at).toISOString().slice(0, 16) : '')
+      try {
+        const data = await getProjectShareViewCount(id)
+        setShareViews(data.view_count)
+      } catch { setShareViews(null) }
+    }
+  }
 
   const saveAgentInstrMut = useMutation({
     mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null, repo_url: repoUrl || null }),
@@ -406,6 +427,15 @@ export default function ProjectDetail() {
               <MessageSquare size={12} />
               Notes
             </button>
+            <button
+              onClick={openShareSettings}
+              className={s.archiveBtn}
+              style={project.share_expires_at ? { color: '#facc15', borderColor: 'rgba(250,204,21,0.4)' } : undefined}
+              title={project.share_expires_at ? `Share link expires ${new Date(project.share_expires_at).toLocaleString()}` : 'Set share-link expiry and view access count'}
+            >
+              <CalendarClock size={12} />
+              Link
+            </button>
             <LabelManager
               labels={labels}
               onCreateLabel={data => createLabelMut.mutate(data)}
@@ -431,6 +461,44 @@ export default function ProjectDetail() {
             </button>
           </div>
         </div>
+
+        {shareSettingsOpen && (
+          <div className={s.agentInstrPanel}>
+            <div className={s.agentInstrTitle}>
+              Share Link Settings
+            </div>
+            <div className={s.agentInstrDesc}>
+              Time-box the public share link and see how many times it has been viewed.
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                <CalendarClock size={13} /> Expires
+                <input
+                  type="datetime-local"
+                  value={expiryInput}
+                  onChange={e => setExpiryInput(e.target.value)}
+                  className="kt-input"
+                  style={{ width: 'auto' }}
+                />
+              </label>
+              <button
+                onClick={() => setExpiryMut.mutate(expiryInput ? new Date(expiryInput).toISOString() : null)}
+                disabled={setExpiryMut.isPending}
+                className={s.archiveBtn}
+              >
+                {expiryInput ? 'Set' : 'Clear'}
+              </button>
+              {project.share_expires_at && (
+                <span style={{ fontSize: 12, color: '#facc15' }}>
+                  Expires {new Date(project.share_expires_at).toLocaleString()}
+                </span>
+              )}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginLeft: 'auto' }}>
+                <Eye size={13} /> {shareViews === null ? '—' : shareViews} views
+              </span>
+            </div>
+          </div>
+        )}
 
         {showAgentInstr && (
           <div className={s.agentInstrPanel}>

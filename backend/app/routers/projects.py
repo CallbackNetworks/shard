@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import Project
+from app.models import ActivityLog, Project
 from app.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 from app.services.activity import log_activity
 from app.services.enrichment import enrich_project
@@ -95,3 +98,39 @@ async def delete_project(project_id: str, db: Session = Depends(get_db)):
     db.delete(project)
     db.commit()
     await ws_manager.broadcast("project.deleted", {"project_id": project_id})
+
+
+# ── Share link expiry and access audit ───────────────────────────
+# Mirrors the identity share-link controls so a public project link can be
+# time-boxed and its views counted. Audit reuses activity_logs (share.viewed).
+
+
+class SetExpiryBody(BaseModel):
+    expires_at: datetime | None
+
+
+@router.post("/{project_id}/set-expiry")
+def set_project_share_expiry(project_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project.share_expires_at = body.expires_at
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/{project_id}/share-views")
+def get_project_share_view_count(project_id: str, db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    count = (
+        db.query(ActivityLog)
+        .filter(
+            ActivityLog.action == "share.viewed",
+            ActivityLog.meta.isnot(None),
+            ActivityLog.meta["project_id"].as_string() == project_id,
+        )
+        .count()
+    )
+    return {"view_count": count}

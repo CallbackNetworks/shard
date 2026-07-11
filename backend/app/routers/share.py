@@ -352,6 +352,35 @@ def _maybe_log_view(db: Session, identity: Identity, ip_hash: str):
         db.rollback()
 
 
+def _maybe_log_project_view(db: Session, project: Project, ip_hash: str):
+    """Log at most one project-share view per IP-hash per hour (mirrors identity)."""
+    try:
+        hour_start = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+        existing = (
+            db.query(ActivityLog.id)
+            .filter(
+                ActivityLog.action == "share.viewed",
+                ActivityLog.actor == f"visitor:{ip_hash}",
+                ActivityLog.meta.isnot(None),
+                ActivityLog.meta["project_id"].as_string() == project.id,
+                ActivityLog.created_at >= hour_start,
+            )
+            .first()
+        )
+        if not existing:
+            db.add(
+                ActivityLog(
+                    action="share.viewed",
+                    actor=f"visitor:{ip_hash}",
+                    detail=f"Project share page viewed for {project.name}",
+                    meta={"project_id": project.id},
+                )
+            )
+            db.commit()
+    except Exception:
+        db.rollback()
+
+
 @router.get("/identity/{token}", dependencies=[Depends(share_rate_limit)])
 def get_share_identity(token: str, request: Request, db: Session = Depends(get_db)):
     identity = _load_identity(db, token)
@@ -384,9 +413,12 @@ def get_share_project(token: str, request: Request, db: Session = Depends(get_db
     if not project or project.status != "active":
         raise HTTPException(status_code=404, detail="Share link not found")
 
+    if project.share_expires_at and datetime.now(UTC) > _as_utc(project.share_expires_at):
+        raise HTTPException(status_code=410, detail="Share link has expired")
+
     client_ip = request.client.host if request.client else "unknown"
     ip_hash = _hash_ip(client_ip)
-    _maybe_log_view(db, project.project_identities[0].identity, ip_hash) if project.project_identities else None
+    _maybe_log_project_view(db, project, ip_hash)
 
     return _build_project_response(project, db)
 
@@ -455,6 +487,8 @@ def _resolve_note_target(scope: str, token: str, request: Request, db: Session) 
         project = db.query(Project).filter(Project.share_token == token).first()
         if not project or project.status != "active":
             raise HTTPException(status_code=404, detail="Share link not found")
+        if project.share_expires_at and datetime.now(UTC) > _as_utc(project.share_expires_at):
+            raise HTTPException(status_code=410, detail="Share link has expired")
         if not project.allow_guest_notes:
             raise HTTPException(status_code=403, detail="Guest notes are disabled for this share link")
         return [project]

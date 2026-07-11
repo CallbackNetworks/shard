@@ -294,3 +294,5 @@ export const setSharePin = (identityId, pin) => api.post(`/identities/${identity
 export const clearSharePin = (identityId) => api.delete(`/identities/${identityId}/pin`).then(r => r.data)
 export const setShareExpiry = (identityId, expiresAt) => api.post(`/identities/${identityId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
 export const getShareViewCount = (identityId) => api.get(`/identities/${identityId}/share-views`).then(r => r.data)
+export const setProjectShareExpiry = (projectId, expiresAt) => api.post(`/projects/${projectId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
+export const getProjectShareViewCount = (projectId) => api.get(`/projects/${projectId}/share-views`).then(r => r.data)
