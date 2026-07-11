@@ -250,3 +250,68 @@ def test_estimation_calibration_project_filter(client, db, sample_project):
     data = resp.json()
     assert data["sample_size"] == 1
     assert data["recent_tasks"][0]["title"] == "Mine"
+
+
+def _completed(project_id, estimate, spent):
+    return Task(
+        project_id=project_id,
+        title="done task",
+        status="done",
+        time_estimate=estimate,
+        time_spent=spent,
+    )
+
+
+def test_estimate_suggestion_not_enough_history(client, db, sample_project):
+    db.add(_completed(sample_project.id, 60, 90))
+    db.commit()
+    resp = client.get("/analytics/estimate-suggestion", params={"raw_estimate": 60})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["suggested_estimate"] is None
+    assert body["reason"] == "not_enough_history"
+
+
+def test_estimate_suggestion_uses_overall_median(client, db, sample_project):
+    # 5 tasks that each ran 2x their estimate, spread so no single bucket has 3.
+    for est in (20, 45, 90, 200, 300):
+        db.add(_completed(sample_project.id, est, est * 2))
+    db.commit()
+    resp = client.get("/analytics/estimate-suggestion", params={"raw_estimate": 100})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["basis"] == "overall_median"
+    assert body["ratio"] == 2.0
+    assert body["suggested_estimate"] == 200
+
+
+def test_estimate_suggestion_prefers_bucket(client, db, sample_project):
+    # 3 tasks in the 1-2h bucket (61-120m) that ran 1.5x; others elsewhere.
+    for est in (70, 90, 110):
+        db.add(_completed(sample_project.id, est, int(est * 1.5)))
+    for est in (20, 300):
+        db.add(_completed(sample_project.id, est, est * 5))
+    db.commit()
+    resp = client.get("/analytics/estimate-suggestion", params={"raw_estimate": 100})
+    body = resp.json()
+    assert body["basis"] == "bucket"
+    assert body["bucket"] == "1-2h"
+    assert body["ratio"] == 1.5
+    assert body["suggested_estimate"] == 150
+
+
+def test_estimate_suggestion_falls_back_to_global(client, db, sample_project):
+    other = Project(name="Other")
+    db.add(other)
+    db.flush()
+    # Global history lives in another project; the target project has too few.
+    for est in (30, 60, 90, 120, 240):
+        db.add(_completed(other.id, est, est * 3))
+    db.commit()
+    resp = client.get(
+        "/analytics/estimate-suggestion",
+        params={"raw_estimate": 60, "project_id": sample_project.id},
+    )
+    body = resp.json()
+    assert body["basis_scope"] == "global"
+    assert body["suggested_estimate"] is not None

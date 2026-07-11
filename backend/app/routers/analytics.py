@@ -297,6 +297,91 @@ def get_estimation_calibration(
     }
 
 
+# Minimum completed samples before a calibration suggestion is offered at all,
+# and the minimum in a specific size bucket before we trust that bucket's ratio
+# over the overall median.
+_MIN_CALIBRATION_SAMPLE = 5
+_MIN_BUCKET_SAMPLE = 3
+
+
+@router.get("/estimate-suggestion")
+def get_estimate_suggestion(
+    raw_estimate: int = Query(..., ge=1, description="The user's raw estimate in minutes"),
+    project_id: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Suggest a calibrated estimate from the user's own history (closes the loop).
+
+    Given a raw estimate, apply the historical spent/estimate ratio for tasks of
+    a similar size (or the overall median when that size bucket is sparse). Falls
+    back to global history when a project has too few completed, estimated tasks.
+    Returns suggested=None with a reason when there is not enough signal.
+    """
+
+    def _completed(scoped_project: str | None):
+        q = db.query(Task).filter(
+            Task.status == "done",
+            Task.time_estimate.isnot(None),
+            Task.time_estimate > 0,
+            Task.time_spent.isnot(None),
+            Task.time_spent > 0,
+        )
+        if scoped_project:
+            q = q.filter(Task.project_id == scoped_project)
+        return q.order_by(Task.updated_at.desc()).limit(2000).all()
+
+    tasks = _completed(project_id)
+    basis_scope = "project"
+    if project_id and len(tasks) < _MIN_CALIBRATION_SAMPLE:
+        tasks = _completed(None)
+        basis_scope = "global"
+
+    if len(tasks) < _MIN_CALIBRATION_SAMPLE:
+        return {
+            "raw_estimate": raw_estimate,
+            "suggested_estimate": None,
+            "reason": "not_enough_history",
+            "sample_size": len(tasks),
+        }
+
+    # Prefer the ratio of the size bucket the raw estimate falls into.
+    bucket_label = next(
+        (
+            label
+            for label, low, high in ESTIMATE_BUCKETS
+            if raw_estimate >= low and (high is None or raw_estimate <= high)
+        ),
+        None,
+    )
+    bucket_tasks = []
+    for label, low, high in ESTIMATE_BUCKETS:
+        if label == bucket_label:
+            bucket_tasks = [t for t in tasks if t.time_estimate >= low and (high is None or t.time_estimate <= high)]
+            break
+
+    if len(bucket_tasks) >= _MIN_BUCKET_SAMPLE:
+        ratio = sum(t.time_spent for t in bucket_tasks) / sum(t.time_estimate for t in bucket_tasks)
+        basis = "bucket"
+        sample = len(bucket_tasks)
+    else:
+        ratios = sorted(t.time_spent / t.time_estimate for t in tasks)
+        n = len(ratios)
+        ratio = ratios[n // 2] if n % 2 == 1 else (ratios[n // 2 - 1] + ratios[n // 2]) / 2
+        basis = "overall_median"
+        sample = n
+
+    suggested = max(1, round(raw_estimate * ratio))
+    return {
+        "raw_estimate": raw_estimate,
+        "suggested_estimate": suggested,
+        "ratio": round(ratio, 2),
+        "basis": basis,
+        "basis_scope": basis_scope,
+        "bucket": bucket_label,
+        "sample_size": sample,
+    }
+
+
 @router.get("/status-trend")
 def get_status_trend(
     project_id: str | None = None,

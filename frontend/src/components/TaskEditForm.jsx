@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { Sparkles } from 'lucide-react'
 import { DARK, FORM_INPUT } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
-import { getApiKeys } from '../api/client'
+import { getApiKeys, getEstimateSuggestion } from '../api/client'
 
 const darkInput = FORM_INPUT
 
@@ -23,6 +24,11 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
     time_spent: task.time_spent || '',
     assigned_agent_key_id: task.assigned_agent_key_id || '',
   })
+
+  const suggestMut = useMutation({
+    mutationFn: () => getEstimateSuggestion(parseInt(editData.time_estimate), task.project_id),
+  })
+  const suggestion = suggestMut.data
 
   const handleSave = () => {
     const data = { ...editData }
@@ -70,8 +76,33 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
             style={{ ...darkInput }} />
           <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 11 }}>{t('taskEdit.estimated')}</span>
           <input type="number" min="0" placeholder="min" value={editData.time_estimate}
-            onChange={e => setEditData(p => ({ ...p, time_estimate: e.target.value }))}
+            onChange={e => { setEditData(p => ({ ...p, time_estimate: e.target.value })); suggestMut.reset() }}
             style={{ ...darkInput, width: 70 }} />
+          {parseInt(editData.time_estimate) > 0 && (
+            <button
+              type="button"
+              onClick={() => suggestMut.mutate()}
+              disabled={suggestMut.isPending}
+              title={t('taskEdit.suggestEstimate')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.info, padding: 2, display: 'inline-flex' }}
+            >
+              <Sparkles size={13} />
+            </button>
+          )}
+          {suggestion && (
+            suggestion.suggested_estimate ? (
+              <button
+                type="button"
+                onClick={() => setEditData(p => ({ ...p, time_estimate: String(suggestion.suggested_estimate) }))}
+                title={t('taskEdit.applySuggestion')}
+                style={{ background: 'rgba(129,140,248,0.12)', border: `1px solid ${DARK.info}`, borderRadius: 6, cursor: 'pointer', color: DARK.info, fontSize: 11, padding: '2px 7px' }}
+              >
+                {t('taskEdit.suggestHint', { minutes: suggestion.suggested_estimate, ratio: suggestion.ratio, n: suggestion.sample_size })}
+              </button>
+            ) : (
+              <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.35)', fontSize: 11 }}>{t('taskEdit.noSuggestion')}</span>
+            )
+          )}
           <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 11 }}>{t('taskEdit.spent')}</span>
           <input type="number" min="0" placeholder="min" value={editData.time_spent}
             onChange={e => setEditData(p => ({ ...p, time_spent: e.target.value }))}
