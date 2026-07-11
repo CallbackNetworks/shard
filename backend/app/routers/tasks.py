@@ -94,6 +94,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     old_agent_key_id = task.assigned_agent_key_id
     old_title = task.title
     old_description = task.description
+    old_due_date = task.due_date
 
     for field, value in changes.items():
         setattr(task, field, value)
@@ -162,6 +163,8 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
             changed_fields.add("description")
         if "assignee" in changes and changes["assignee"] != old_assignee:
             changed_fields.add("assignee")
+        if "due_date" in changes and changes["due_date"] != old_due_date:
+            changed_fields.add("due_date")
         if changed_fields:
             await sync_task_fields_to_external(task, db, changed_fields)
 

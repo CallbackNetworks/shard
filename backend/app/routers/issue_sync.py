@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models import Comment, Integration, Label, Notification, Project, Task, TaskLabel, TaskPullRequest
 from app.services.activity import log_activity
 from app.services.issue_sync import (
+    GITHUB_API_BASE,
     close_github_issue,
     close_gitlab_issue,
     create_github_issue,
@@ -27,6 +28,8 @@ from app.services.issue_sync import (
     detect_issue_webhook,
     detect_pr_review_webhook,
     detect_pr_webhook,
+    format_due_date_gitea,
+    format_due_date_gitlab,
     lookup_gitlab_user_id,
     parse_repo_url,
     reopen_github_issue,
@@ -169,6 +172,8 @@ async def receive_issue_webhook(
             existing.status = new_status
         if normalized.get("assignee"):
             existing.assignee = normalized["assignee"]
+        if "due_date" in normalized:
+            existing.due_date = normalized["due_date"]
         _apply_external_labels(existing, normalized.get("labels", []), db)
 
         log_activity(
@@ -191,6 +196,7 @@ async def receive_issue_webhook(
         description=normalized["description"],
         status=STATUS_MAP.get(normalized["status"], "todo"),
         assignee=normalized.get("assignee"),
+        due_date=normalized.get("due_date"),
         external_provider=provider,
         external_id=ext_id,
         external_url=normalized["external_url"],
@@ -581,10 +587,11 @@ async def sync_task_reopen_to_external(task: Task, db: Session) -> bool:
 
 async def sync_task_fields_to_external(task: Task, db: Session, changed: set[str]) -> bool:
     """
-    Push changed task fields (title, description, assignee) to the linked external issue.
+    Push changed task fields (title, description, assignee, due_date) to the linked issue.
 
     Last-write-wins in both directions: inbound issue events overwrite the task,
-    outbound edits overwrite the issue.
+    outbound edits overwrite the issue. Due dates only apply to Gitea and GitLab —
+    github.com / GitHub Enterprise issues have no due date, so it is never sent there.
     """
     target = _external_sync_target(task, db)
     if not target:
@@ -599,9 +606,16 @@ async def sync_task_fields_to_external(task: Task, db: Session, changed: set[str
             payload["body"] = task.description or ""
         if "assignee" in changed:
             payload["assignees"] = [task.assignee] if task.assignee else []
-        if not payload:
-            return False
-        return await update_github_issue_fields(task.external_repo, task.external_id, payload, token, base)
+        ok = True
+        if payload:
+            ok = await update_github_issue_fields(task.external_repo, task.external_id, payload, token, base)
+        # Gitea (any github-compatible host other than github.com/GHE's api.github.com)
+        # supports due_date. Send it as its own request so a non-Gitea host that
+        # rejects the field cannot fail the title/description update.
+        if "due_date" in changed and base.rstrip("/") != GITHUB_API_BASE:
+            due = format_due_date_gitea(task.due_date)
+            await update_github_issue_fields(task.external_repo, task.external_id, {"due_date": due}, token, base)
+        return ok
 
     payload = {}
     if "title" in changed:
@@ -615,6 +629,8 @@ async def sync_task_fields_to_external(task: Task, db: Session, changed: set[str
                 payload["assignee_ids"] = [user_id]
         else:
             payload["assignee_ids"] = []
+    if "due_date" in changed:
+        payload["due_date"] = format_due_date_gitlab(task.due_date)
     if not payload:
         return False
     return await update_gitlab_issue_fields(task.external_repo, task.external_id, payload, token, base)

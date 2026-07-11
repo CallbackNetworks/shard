@@ -595,3 +595,122 @@ class TestCreateExternalIssue:
         db.commit()
         resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
         assert resp.status_code == 502
+
+
+class TestDueDateParsing:
+    def test_rfc3339_gitea(self):
+        from app.services.issue_sync import parse_due_date
+
+        dt = parse_due_date("2026-07-20T00:00:00Z")
+        assert dt is not None and dt.year == 2026 and dt.month == 7 and dt.day == 20
+        assert dt.tzinfo is not None
+
+    def test_plain_date_gitlab(self):
+        from app.services.issue_sync import parse_due_date
+
+        dt = parse_due_date("2026-07-20")
+        assert dt is not None and dt.day == 20 and dt.tzinfo is not None
+
+    def test_blank_and_none(self):
+        from app.services.issue_sync import parse_due_date
+
+        assert parse_due_date(None) is None
+        assert parse_due_date("") is None
+        assert parse_due_date("not-a-date") is None
+
+
+class TestDueDateNormalization:
+    def test_github_com_issue_has_no_due_date(self):
+        from app.services.issue_sync import normalize_github_issue
+
+        payload = {"action": "opened", "issue": {"number": 1, "title": "x"}, "repository": {"full_name": "o/r"}}
+        assert normalize_github_issue(payload)["due_date"] is None
+
+    def test_gitea_issue_due_date(self):
+        from app.services.issue_sync import normalize_github_issue
+
+        payload = {
+            "action": "edited",
+            "issue": {"number": 2, "title": "x", "due_date": "2026-08-01T00:00:00Z"},
+            "repository": {"full_name": "o/r"},
+        }
+        assert normalize_github_issue(payload)["due_date"].month == 8
+
+    def test_gitlab_issue_due_date(self):
+        from app.services.issue_sync import normalize_gitlab_issue
+
+        payload = {"object_attributes": {"iid": 3, "title": "x", "due_date": "2026-09-15"}, "project": {}}
+        assert normalize_gitlab_issue(payload)["due_date"].day == 15
+
+
+class TestDueDateOutbound:
+    def _integration(self, db, project_id, url, secret):
+        db.add(Integration(name="s", type="issue_sync", url=url, project_id=project_id, secret=secret, active=True))
+        db.commit()
+
+    def _task(self, db, project_id, provider, repo, url, due):
+        from datetime import UTC, datetime
+
+        t = Task(
+            project_id=project_id,
+            title="t",
+            external_provider=provider,
+            external_id="10",
+            external_repo=repo,
+            external_url=url,
+            due_date=datetime(2026, 7, 20, tzinfo=UTC) if due else None,
+        )
+        db.add(t)
+        db.commit()
+        db.refresh(t)
+        return t
+
+    @pytest.mark.asyncio
+    @patch("app.routers.issue_sync.update_gitlab_issue_fields", new_callable=AsyncMock, return_value=True)
+    async def test_gitlab_sends_plain_date(self, mock_update, client, db, sample_project):
+        from app.routers.issue_sync import sync_task_fields_to_external
+
+        self._integration(db, sample_project.id, "https://gitlab.com", "glpat")
+        task = self._task(
+            db, sample_project.id, "gitlab", "group/app", "https://gitlab.com/group/app/-/issues/10", True
+        )
+        await sync_task_fields_to_external(task, db, {"due_date"})
+        args = mock_update.call_args[0]
+        assert args[2]["due_date"] == "2026-07-20"
+
+    @pytest.mark.asyncio
+    @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
+    async def test_gitea_sends_rfc3339_separately(self, mock_update, client, db, sample_project):
+        from app.routers.issue_sync import sync_task_fields_to_external
+
+        self._integration(db, sample_project.id, "https://gitea.example.com", "tok")
+        task = self._task(db, sample_project.id, "github", "o/r", "https://gitea.example.com/o/r/issues/10", True)
+        await sync_task_fields_to_external(task, db, {"due_date"})
+        # Called once with only the due_date field, targeting the Gitea API base.
+        mock_update.assert_called_once()
+        payload = mock_update.call_args[0][2]
+        assert "due_date" in payload and payload["due_date"].startswith("2026-07-20")
+
+    @pytest.mark.asyncio
+    @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
+    async def test_github_com_never_sends_due_date(self, mock_update, client, db, sample_project):
+        from app.routers.issue_sync import sync_task_fields_to_external
+
+        self._integration(db, sample_project.id, "https://github.com", "ghp")
+        task = self._task(db, sample_project.id, "github", "o/r", "https://github.com/o/r/issues/10", True)
+        await sync_task_fields_to_external(task, db, {"due_date"})
+        mock_update.assert_not_called()
+
+
+class TestDueDateInbound:
+    def test_gitea_webhook_sets_task_due_date(self, client, sample_project, db):
+        headers = {"X-GitHub-Event": "issues"}
+        body = {
+            "action": "opened",
+            "issue": {"number": 55, "title": "Due task", "due_date": "2026-10-05T00:00:00Z"},
+            "repository": {"full_name": "o/r"},
+        }
+        resp = client.post(f"/webhook/issues/{sample_project.id}", json=body, headers=headers)
+        assert resp.status_code == 200
+        task = db.query(Task).filter(Task.external_id == "55").first()
+        assert task is not None and task.due_date is not None and task.due_date.month == 10

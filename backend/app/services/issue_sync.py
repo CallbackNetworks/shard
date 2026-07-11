@@ -10,6 +10,7 @@ Also handles GitHub pull request events for PR-to-task linking.
 
 import logging
 import re
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import httpx
@@ -17,6 +18,37 @@ import httpx
 logger = logging.getLogger(__name__)
 
 GITHUB_API_BASE = "https://api.github.com"
+
+
+def parse_due_date(value) -> datetime | None:
+    """Parse a provider due date ("YYYY-MM-DD" or RFC3339) into an aware datetime.
+
+    Gitea sends RFC3339 ("2026-07-20T00:00:00Z"), GitLab sends a plain date
+    ("2026-07-20"). Returns None for missing/blank/unparseable values.
+    """
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            dt = datetime.strptime(text, "%Y-%m-%d")
+        except ValueError:
+            return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+def format_due_date_gitlab(due: datetime | None) -> str:
+    """GitLab wants a plain date; empty string clears the field."""
+    return due.date().isoformat() if due else ""
+
+
+def format_due_date_gitea(due: datetime | None) -> str | None:
+    """Gitea/RFC3339 due date; None clears the field."""
+    return due.astimezone(UTC).isoformat().replace("+00:00", "Z") if due else None
 
 
 def resolve_github_api_base(external_url: str | None = None, integration_url: str | None = None) -> str:
@@ -73,6 +105,8 @@ def normalize_github_issue(payload: dict) -> dict | None:
         "labels": [lb["name"] for lb in issue.get("labels", [])],
         "assignee": issue.get("assignee", {}).get("login") if issue.get("assignee") else None,
         "repo": payload.get("repository", {}).get("full_name", ""),
+        # github.com issues have no due date; Gitea includes "due_date" here.
+        "due_date": parse_due_date(issue.get("due_date")),
     }
 
 
@@ -100,6 +134,7 @@ def normalize_gitlab_issue(payload: dict) -> dict | None:
         "labels": [lb["title"] for lb in payload.get("labels", [])],
         "assignee": (payload.get("assignees") or [{}])[0].get("username") if payload.get("assignees") else None,
         "repo": payload.get("project", {}).get("path_with_namespace", ""),
+        "due_date": parse_due_date(attrs.get("due_date")),
     }
 
 
