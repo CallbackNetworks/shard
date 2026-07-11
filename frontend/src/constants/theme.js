@@ -23,21 +23,25 @@ export const SHADOW_SM = '0 1px 2px rgba(0,0,0,0.3)'
 export const SHADOW_LG = '0 4px 12px rgba(0,0,0,0.4)'
 export const INSET_SHADOW = 'inset 0 1px 2px rgba(0,0,0,0.2)'
 
+// Despite the name, DARK now resolves through the theme-aware --kt-* CSS
+// variables so every inline usage follows light/dark mode automatically.
+// The raw dark values live in global.css :root; light values in the
+// [data-theme="light"] block.
 export const DARK = {
-  bg:        '#171717',
-  bgAlt:     '#141414',
-  surface:   '#1f1f1f',
-  elevated:  '#262626',
-  overlay:   '#303030',
-  text:      '#ffffff',
-  textMid:   '#9ca3af',
-  textDim:   '#6b7280',
-  textFaint: 'rgba(255,255,255,0.15)',
-  border:    '#3a3a3a',
-  borderMid: '#525252',
-  borderStrong: '#737373',
-  hover:     'rgba(255,255,255,0.05)',
-  active:    'rgba(255,255,255,0.08)',
+  bg:        'var(--kt-bg, #171717)',
+  bgAlt:     'var(--kt-bg, #141414)',
+  surface:   'var(--kt-surface, #1f1f1f)',
+  elevated:  'var(--kt-elev, #262626)',
+  overlay:   'var(--kt-elev, #303030)',
+  text:      'var(--kt-ink, #ffffff)',
+  textMid:   'var(--kt-muted, #9ca3af)',
+  textDim:   'var(--kt-faint, #6b7280)',
+  textFaint: 'rgba(var(--kt-ink-rgb, 255, 255, 255), 0.15)',
+  border:    'var(--kt-line, #3a3a3a)',
+  borderMid: 'var(--kt-line, #525252)',
+  borderStrong: 'var(--kt-faint, #737373)',
+  hover:     'var(--kt-hover, rgba(255,255,255,0.05))',
+  active:    'rgba(var(--kt-ink-rgb, 255, 255, 255), 0.08)',
   danger:    STATUS_COLOR.failed,
   dangerBg:  STATUS_BG.failed,
   warning:   '#f59e0b',
@@ -118,13 +122,13 @@ export const LIGHT = {
 }
 
 export const FORM_INPUT = {
-  background: '#262626',
-  border: '1px solid #3a3a3a',
+  background: 'var(--kt-elev, #262626)',
+  border: '1px solid var(--kt-line, #3a3a3a)',
   borderRadius: 0,
   padding: '7px 10px',
   fontSize: 13,
   outline: 'none',
-  color: '#ffffff',
+  color: 'var(--kt-ink, #ffffff)',
   fontFamily: FONT.family,
 }
 

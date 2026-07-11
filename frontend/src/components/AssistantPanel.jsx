@@ -230,7 +230,7 @@ export default function AssistantPanel() {
           position: 'fixed', bottom: 20, right: 20, zIndex: 290,
           width: 48, height: 48, borderRadius: 0,
           background: ACCENT,
-          border: 'none', cursor: 'pointer', color: '#000',
+          border: 'none', cursor: 'pointer', color: 'var(--kt-bg)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '6px 6px 0 rgba(0,0,0,0.45)',
           transition: 'transform 0.2s, box-shadow 0.2s',
@@ -256,7 +256,7 @@ export default function AssistantPanel() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: `1px solid ${BORDER}` }}>
         <div style={{ width: 28, height: 28, borderRadius: 0, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <MessageCircle size={14} color="#000" />
+          <MessageCircle size={14} color="var(--kt-bg)" />
         </div>
         <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {currentConv?.title || t('assistant.title')}
@@ -309,7 +309,7 @@ export default function AssistantPanel() {
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>
             <MessageCircle size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
             <p style={{ fontSize: 13 }}>{t('assistant.noConversations')}</p>
-            <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: ACCENT, border: 'none', borderRadius: 0, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
+            <button onClick={() => createMut.mutate()} style={{ marginTop: 10, padding: '8px 20px', background: ACCENT, border: 'none', borderRadius: 0, color: 'var(--kt-bg)', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.4px' }}>
               {t('assistant.newChat')}
             </button>
           </div>
@@ -366,7 +366,7 @@ export default function AssistantPanel() {
             style={{
               padding: '8px 12px', border: 'none', borderRadius: 0,
               background: ACCENT,
-              color: '#000', cursor: 'pointer', display: 'flex', alignItems: 'center',
+              color: 'var(--kt-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center',
               opacity: (!input.trim() || streaming || !convId) ? 0.4 : 1,
               flexShrink: 0,
             }}
