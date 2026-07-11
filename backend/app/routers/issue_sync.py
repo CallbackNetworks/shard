@@ -12,7 +12,18 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Comment, Integration, Label, Notification, Project, Task, TaskLabel, TaskPullRequest
+from app.models import (
+    Comment,
+    Cycle,
+    CycleTask,
+    Integration,
+    Label,
+    Notification,
+    Project,
+    Task,
+    TaskLabel,
+    TaskPullRequest,
+)
 from app.services.activity import log_activity
 from app.services.issue_sync import (
     GITHUB_API_BASE,
@@ -28,6 +39,8 @@ from app.services.issue_sync import (
     detect_issue_webhook,
     detect_pr_review_webhook,
     detect_pr_webhook,
+    find_or_create_github_milestone,
+    find_or_create_gitlab_milestone,
     format_due_date_gitea,
     format_due_date_gitlab,
     lookup_gitlab_user_id,
@@ -37,6 +50,8 @@ from app.services.issue_sync import (
     replace_github_issue_labels,
     replace_gitlab_issue_labels,
     resolve_github_api_base,
+    set_github_issue_milestone,
+    set_gitlab_issue_milestone,
     update_github_issue_comment,
     update_github_issue_fields,
     update_gitlab_issue_fields,
@@ -175,6 +190,7 @@ async def receive_issue_webhook(
         if "due_date" in normalized:
             existing.due_date = normalized["due_date"]
         _apply_external_labels(existing, normalized.get("labels", []), db)
+        apply_inbound_milestone_cycle(existing, normalized.get("milestone"), db)
 
         log_activity(
             db,
@@ -205,6 +221,7 @@ async def receive_issue_webhook(
     db.add(task)
     db.flush()
     _apply_external_labels(task, normalized.get("labels", []), db)
+    apply_inbound_milestone_cycle(task, normalized.get("milestone"), db)
 
     log_activity(
         db,
@@ -694,6 +711,73 @@ async def sync_labels_to_external(task: Task, db: Session) -> bool:
     if task.external_provider == "github":
         return await replace_github_issue_labels(task.external_repo, task.external_id, names, token, base)
     return await replace_gitlab_issue_labels(task.external_repo, task.external_id, names, token, base)
+
+
+def _task_primary_cycle(task: Task, db: Session) -> Cycle | None:
+    """The cycle whose milestone an issue should mirror.
+
+    An external issue has a single milestone slot but a Shard task may sit in
+    several cycles; the earliest-created cycle wins, deterministically.
+    """
+    return (
+        db.query(Cycle)
+        .join(CycleTask, CycleTask.cycle_id == Cycle.id)
+        .filter(CycleTask.task_id == task.id)
+        .order_by(Cycle.created_at.asc())
+        .first()
+    )
+
+
+async def sync_task_milestone_to_external(task: Task, db: Session) -> bool:
+    """Mirror the task's cycle membership onto the linked issue's milestone.
+
+    Cycle name maps to milestone title, and the cycle's end_date to the milestone
+    due date (ADR-0029). When the task is in no cycle, the milestone is cleared.
+    Recomputes from current DB state, so add/remove both call this after commit.
+    """
+    target = _external_sync_target(task, db)
+    if not target:
+        return False
+    token, base = target
+    cycle = _task_primary_cycle(task, db)
+
+    if task.external_provider == "github":
+        if cycle is None:
+            return await set_github_issue_milestone(task.external_repo, task.external_id, None, token, base)
+        number = await find_or_create_github_milestone(
+            task.external_repo, cycle.name, format_due_date_gitea(cycle.end_date), token, base
+        )
+        if number is None:
+            return False
+        return await set_github_issue_milestone(task.external_repo, task.external_id, number, token, base)
+
+    if cycle is None:
+        return await set_gitlab_issue_milestone(task.external_repo, task.external_id, 0, token, base)
+    milestone_id = await find_or_create_gitlab_milestone(
+        task.external_repo, cycle.name, format_due_date_gitlab(cycle.end_date), token, base
+    )
+    if milestone_id is None:
+        return False
+    return await set_gitlab_issue_milestone(task.external_repo, task.external_id, milestone_id, token, base)
+
+
+def apply_inbound_milestone_cycle(task: Task, milestone_title: str | None, db: Session) -> None:
+    """Add the task to the same-named cycle when an issue carries a milestone.
+
+    Maps to an existing cycle only (never auto-creates one, ADR-0029) and is
+    additive: a cleared milestone does not remove the task from any cycle, so
+    inbound events cannot clobber manual Shard-side cycle assignment.
+    """
+    if not milestone_title:
+        return
+    cycle = db.query(Cycle).filter(Cycle.project_id == task.project_id, Cycle.name == milestone_title).first()
+    if not cycle:
+        return
+    exists = (
+        db.query(CycleTask).filter(CycleTask.cycle_id == cycle.id, CycleTask.task_id == task.id).first()
+    )
+    if not exists:
+        db.add(CycleTask(cycle_id=cycle.id, task_id=task.id))
 
 
 async def create_external_issue_from_task(task: Task, project: Project, db: Session, provider: str | None = None):

@@ -30,3 +30,4 @@
 | [0026](0026-create-external-issue-from-task.md) | Create External Issue from a Shard Task | Accepted | 2026-07-11 |
 | [0027](0027-due-date-sync-gitea-gitlab.md) | Due-Date Sync for Gitea and GitLab | Accepted | 2026-07-11 |
 | [0028](0028-estimate-calibration-suggestion.md) | Estimate Calibration Suggestion | Accepted | 2026-07-11 |
+| [0029](0029-milestone-cycle-sync.md) | Milestone ↔ Cycle Sync | Accepted | 2026-07-11 |

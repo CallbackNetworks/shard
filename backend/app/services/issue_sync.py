@@ -107,6 +107,8 @@ def normalize_github_issue(payload: dict) -> dict | None:
         "repo": payload.get("repository", {}).get("full_name", ""),
         # github.com issues have no due date; Gitea includes "due_date" here.
         "due_date": parse_due_date(issue.get("due_date")),
+        # github.com and Gitea both nest the milestone object with its title.
+        "milestone": (issue.get("milestone") or {}).get("title"),
     }
 
 
@@ -552,3 +554,78 @@ async def create_gitlab_issue(
         data = resp.json()
         return {"number": str(data.get("iid", "")), "url": data.get("web_url", "")}
     return None
+
+
+async def find_or_create_github_milestone(
+    repo: str, title: str, due_on: str | None, token: str, api_base: str = GITHUB_API_BASE
+) -> int | None:
+    """Find a milestone by title (any state) or create it. Returns its number.
+
+    github.com and Gitea share the same milestones REST shape; `due_on` is RFC3339.
+    """
+    base = api_base.rstrip("/")
+    resp = await _github_request(
+        "GET", f"{base}/repos/{repo}/milestones?state=all&per_page=100", token, None, f"list milestones in {repo}"
+    )
+    if resp is not None and resp.is_success:
+        for m in resp.json():
+            if m.get("title") == title:
+                return m.get("number")
+    payload: dict = {"title": title}
+    if due_on:
+        payload["due_on"] = due_on
+    resp = await _github_request(
+        "POST", f"{base}/repos/{repo}/milestones", token, payload, f"create milestone {title!r} in {repo}"
+    )
+    if resp is not None and resp.is_success:
+        return resp.json().get("number")
+    return None
+
+
+async def set_github_issue_milestone(
+    repo: str, issue_number: str, milestone_number: int | None, token: str, api_base: str = GITHUB_API_BASE
+) -> bool:
+    """Set (or clear, with None) an issue's milestone via the GitHub-compatible API."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues/{issue_number}"
+    resp = await _github_request(
+        "PATCH", url, token, {"milestone": milestone_number}, f"set milestone on {repo}#{issue_number}"
+    )
+    return resp is not None and resp.is_success
+
+
+async def find_or_create_gitlab_milestone(
+    project_path: str, title: str, due_date: str | None, token: str, gitlab_url: str = "https://gitlab.com"
+) -> int | None:
+    """Find a project milestone by title or create it. Returns its id. `due_date` is YYYY-MM-DD."""
+    import urllib.parse
+
+    base = _gitlab_project_url(project_path, gitlab_url)
+    resp = await _gitlab_request(
+        "GET",
+        f"{base}/milestones?title={urllib.parse.quote(title)}",
+        token,
+        None,
+        f"list milestones in {project_path}",
+    )
+    if resp is not None and resp.is_success:
+        for m in resp.json():
+            if m.get("title") == title:
+                return m.get("id")
+    payload: dict = {"title": title}
+    if due_date:
+        payload["due_date"] = due_date
+    resp = await _gitlab_request("POST", f"{base}/milestones", token, payload, f"create milestone {title!r}")
+    if resp is not None and resp.is_success:
+        return resp.json().get("id")
+    return None
+
+
+async def set_gitlab_issue_milestone(
+    project_path: str, issue_iid: str, milestone_id: int, token: str, gitlab_url: str = "https://gitlab.com"
+) -> bool:
+    """Set an issue's milestone via the GitLab API. Pass milestone_id=0 to unassign."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues/{issue_iid}"
+    resp = await _gitlab_request(
+        "PUT", url, token, {"milestone_id": milestone_id}, f"set milestone on GitLab {project_path}#{issue_iid}"
+    )
+    return resp is not None and resp.is_success

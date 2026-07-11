@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models import Cycle, CycleTask, Task
 from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
+from app.routers.issue_sync import sync_task_milestone_to_external
 from app.schemas import CycleCreate, CycleOut, CycleUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/cycles", tags=["cycles"])
@@ -68,26 +69,31 @@ def delete_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{cycle_id}/tasks/{task_id}", status_code=status.HTTP_201_CREATED)
-def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
+async def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
     get_cycle_or_404(cycle_id, db, project_id=project_id)
-    get_task_or_404(task_id, db, project_id=project_id)
+    task = get_task_or_404(task_id, db, project_id=project_id)
     existing = db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id).first()
     if not existing:
         ct = CycleTask(cycle_id=cycle_id, task_id=task_id)
         db.add(ct)
         db.commit()
+        if task.external_provider:
+            await sync_task_milestone_to_external(task, db)
     return {"cycle_id": cycle_id, "task_id": task_id}
 
 
 @router.delete("/{cycle_id}/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
+async def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
     ct = db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id).first()
     if not ct:
         raise HTTPException(status_code=404, detail="Task not in cycle")
     db.delete(ct)
     db.commit()
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task and task.external_provider:
+        await sync_task_milestone_to_external(task, db)
 
 
 @router.post("/{cycle_id}/duplicate", response_model=CycleOut, status_code=status.HTTP_201_CREATED)

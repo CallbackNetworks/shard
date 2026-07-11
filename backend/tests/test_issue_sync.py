@@ -714,3 +714,107 @@ class TestDueDateInbound:
         assert resp.status_code == 200
         task = db.query(Task).filter(Task.external_id == "55").first()
         assert task is not None and task.due_date is not None and task.due_date.month == 10
+
+
+class TestMilestoneCycle:
+    """milestone <-> cycle mapping (ADR-0029)."""
+
+    def _integration(self, db, project_id, url="https://github.com", secret="ghp"):
+        db.add(Integration(name="s", type="issue_sync", url=url, project_id=project_id, secret=secret, active=True))
+        db.commit()
+
+    def test_normalize_github_milestone_title(self):
+        from app.services.issue_sync import normalize_github_issue
+
+        payload = {
+            "action": "edited",
+            "issue": {"number": 1, "title": "x", "milestone": {"title": "Sprint 12"}},
+            "repository": {"full_name": "o/r"},
+        }
+        assert normalize_github_issue(payload)["milestone"] == "Sprint 12"
+
+    def test_normalize_github_no_milestone(self):
+        from app.services.issue_sync import normalize_github_issue
+
+        payload = {"action": "opened", "issue": {"number": 1, "title": "x"}, "repository": {"full_name": "o/r"}}
+        assert normalize_github_issue(payload)["milestone"] is None
+
+    @pytest.mark.asyncio
+    @patch("app.routers.issue_sync.set_github_issue_milestone", new_callable=AsyncMock, return_value=True)
+    @patch("app.routers.issue_sync.find_or_create_github_milestone", new_callable=AsyncMock, return_value=7)
+    async def test_outbound_add_to_cycle_sets_milestone(self, mock_find, mock_set, client, db, sample_project):
+        from datetime import UTC, datetime
+
+        from app.models import Cycle
+
+        self._integration(db, sample_project.id)
+        cycle = Cycle(project_id=sample_project.id, name="Sprint 12", end_date=datetime(2026, 8, 1, tzinfo=UTC))
+        db.add(cycle)
+        task = Task(
+            project_id=sample_project.id, title="t", external_provider="github",
+            external_id="10", external_repo="o/r", external_url="https://github.com/o/r/issues/10",
+        )
+        db.add(task)
+        db.commit()
+
+        resp = client.post(f"/projects/{sample_project.id}/cycles/{cycle.id}/tasks/{task.id}")
+        assert resp.status_code == 201, resp.text
+        mock_find.assert_called_once()
+        # find_or_create called with the cycle name and its end_date as RFC3339 due_on
+        assert mock_find.call_args[0][1] == "Sprint 12"
+        assert mock_find.call_args[0][2].startswith("2026-08-01")
+        mock_set.assert_called_once_with("o/r", "10", 7, "ghp", "https://api.github.com")
+
+    @pytest.mark.asyncio
+    @patch("app.routers.issue_sync.set_github_issue_milestone", new_callable=AsyncMock, return_value=True)
+    async def test_outbound_remove_from_cycle_clears_milestone(self, mock_set, client, db, sample_project):
+        from app.models import Cycle, CycleTask
+
+        self._integration(db, sample_project.id)
+        cycle = Cycle(project_id=sample_project.id, name="Sprint 12")
+        db.add(cycle)
+        task = Task(
+            project_id=sample_project.id, title="t", external_provider="github",
+            external_id="10", external_repo="o/r", external_url="https://github.com/o/r/issues/10",
+        )
+        db.add(task)
+        db.flush()
+        db.add(CycleTask(cycle_id=cycle.id, task_id=task.id))
+        db.commit()
+
+        resp = client.delete(f"/projects/{sample_project.id}/cycles/{cycle.id}/tasks/{task.id}")
+        assert resp.status_code == 204
+        # No cycle left -> milestone cleared with None
+        mock_set.assert_called_once_with("o/r", "10", None, "ghp", "https://api.github.com")
+
+    def test_inbound_milestone_maps_to_existing_cycle(self, client, db, sample_project):
+        from app.models import Cycle, CycleTask
+
+        cycle = Cycle(project_id=sample_project.id, name="Sprint 9")
+        db.add(cycle)
+        db.commit()
+        body = {
+            "action": "opened",
+            "issue": {"number": 20, "title": "Task", "milestone": {"title": "Sprint 9"}},
+            "repository": {"full_name": "o/r"},
+        }
+        resp = client.post(f"/webhook/issues/{sample_project.id}", json=body, headers={"X-GitHub-Event": "issues"})
+        assert resp.status_code == 200
+        task = db.query(Task).filter(Task.external_id == "20").first()
+        assert task is not None
+        link = db.query(CycleTask).filter(CycleTask.cycle_id == cycle.id, CycleTask.task_id == task.id).first()
+        assert link is not None
+
+    def test_inbound_milestone_no_matching_cycle_is_ignored(self, client, db, sample_project):
+        from app.models import CycleTask
+
+        body = {
+            "action": "opened",
+            "issue": {"number": 21, "title": "Task", "milestone": {"title": "Nonexistent"}},
+            "repository": {"full_name": "o/r"},
+        }
+        resp = client.post(f"/webhook/issues/{sample_project.id}", json=body, headers={"X-GitHub-Event": "issues"})
+        assert resp.status_code == 200
+        task = db.query(Task).filter(Task.external_id == "21").first()
+        # No cycle created, no membership added.
+        assert db.query(CycleTask).filter(CycleTask.task_id == task.id).count() == 0
