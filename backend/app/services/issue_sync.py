@@ -441,3 +441,79 @@ async def replace_gitlab_issue_labels(
         "PUT", url, token, {"labels": ",".join(labels)}, f"set labels on GitLab {project_path}#{issue_iid}"
     )
     return resp is not None and resp.is_success
+
+
+def parse_repo_url(repo_url: str, provider: str | None = None) -> dict | None:
+    """Parse a project repo URL into the pieces needed to create an issue.
+
+    Returns ``{provider, repo, host, base}`` where ``repo`` is ``owner/name`` for
+    GitHub-compatible hosts (github.com, GHE, Gitea) or the full namespace path
+    for GitLab, and ``base`` is the API base / GitLab root URL. Provider defaults
+    to gitlab when the host looks like GitLab, otherwise GitHub-compatible; pass
+    ``provider`` explicitly to override (e.g. self-hosted GitLab on a plain host).
+    """
+    if not repo_url:
+        return None
+    parsed = urlparse(repo_url if "://" in repo_url else f"https://{repo_url}")
+    host = parsed.netloc
+    path = parsed.path.strip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    if not host or not path:
+        return None
+
+    if provider is None:
+        provider = "gitlab" if "gitlab" in host.lower() else "github"
+
+    scheme = parsed.scheme or "https"
+    if provider == "gitlab":
+        return {"provider": "gitlab", "repo": path, "host": host, "base": f"{scheme}://{host}"}
+
+    segments = path.split("/")
+    if len(segments) < 2:
+        return None
+    repo = "/".join(segments[:2])
+    return {"provider": "github", "repo": repo, "host": host, "base": resolve_github_api_base(repo_url)}
+
+
+async def create_github_issue(
+    repo: str,
+    title: str,
+    body: str,
+    labels: list[str],
+    assignee: str | None,
+    token: str,
+    api_base: str = GITHUB_API_BASE,
+) -> dict | None:
+    """Create a new issue via the GitHub-compatible API. Returns {number, url} on success."""
+    url = f"{api_base.rstrip('/')}/repos/{repo}/issues"
+    payload: dict = {"title": title, "body": body or ""}
+    if labels:
+        payload["labels"] = labels
+    if assignee:
+        payload["assignees"] = [assignee]
+    resp = await _github_request("POST", url, token, payload, f"create issue in {repo}")
+    if resp is not None and resp.is_success:
+        data = resp.json()
+        return {"number": str(data.get("number", "")), "url": data.get("html_url", "")}
+    return None
+
+
+async def create_gitlab_issue(
+    project_path: str,
+    title: str,
+    description: str,
+    labels: list[str],
+    token: str,
+    gitlab_url: str = "https://gitlab.com",
+) -> dict | None:
+    """Create a new issue via the GitLab API. Returns {number, url} on success."""
+    url = f"{_gitlab_project_url(project_path, gitlab_url)}/issues"
+    payload: dict = {"title": title, "description": description or ""}
+    if labels:
+        payload["labels"] = ",".join(labels)
+    resp = await _gitlab_request("POST", url, token, payload, f"create issue in {project_path}")
+    if resp is not None and resp.is_success:
+        data = resp.json()
+        return {"number": str(data.get("iid", "")), "url": data.get("web_url", "")}
+    return None

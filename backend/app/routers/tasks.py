@@ -1,12 +1,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey, Task, TaskDependency
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import (
+    create_external_issue_from_task,
     sync_task_closure_to_external,
     sync_task_fields_to_external,
     sync_task_reopen_to_external,
@@ -191,6 +193,33 @@ async def delete_task(project_id: str, task_id: str, db: Session = Depends(get_d
     db.delete(task)
     db.commit()
     await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": task_id})
+
+
+class CreateExternalIssueBody(BaseModel):
+    provider: str | None = None  # "github" | "gitlab"; auto-detected from repo URL when omitted
+
+
+@router.post("/{task_id}/create-external-issue", response_model=TaskOut)
+async def create_external_issue(
+    project_id: str,
+    task_id: str,
+    body: CreateExternalIssueBody | None = None,
+    db: Session = Depends(get_db),
+):
+    """Create a new external issue from this task and link it (explicit action).
+
+    The task becomes the source of truth for the new issue; afterwards the usual
+    two-way sync applies. Requires an active issue_sync integration and the
+    project's repo URL.
+    """
+    project = _get_project_or_404(project_id, db)
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    provider = body.provider if body else None
+    if provider and provider not in ("github", "gitlab"):
+        raise HTTPException(status_code=400, detail="provider must be 'github' or 'gitlab'")
+    return await create_external_issue_from_task(task, project, db, provider)
 
 
 @router.post("/{task_id}/dependencies/{depends_on_id}", status_code=status.HTTP_201_CREATED)

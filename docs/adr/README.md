@@ -27,3 +27,4 @@
 | [0023](0023-scoped-ical-feeds-global-identity-project.md) | Scoped iCal Feeds — Global (Personal), Identity, and Project | Accepted | 2026-07-11 |
 | [0024](0024-backup-restore-endpoint.md) | Backup Restore Endpoint | Accepted | 2026-07-11 |
 | [0025](0025-project-share-expiry-and-audit.md) | Project Share-Link Expiry and Access Audit | Accepted | 2026-07-11 |
+| [0026](0026-create-external-issue-from-task.md) | Create External Issue from a Shard Task | Accepted | 2026-07-11 |

@@ -17,7 +17,9 @@ from app.services.activity import log_activity
 from app.services.issue_sync import (
     close_github_issue,
     close_gitlab_issue,
+    create_github_issue,
     create_github_issue_comment,
+    create_gitlab_issue,
     create_gitlab_issue_note,
     delete_github_issue_comment,
     delete_gitlab_issue_note,
@@ -26,6 +28,7 @@ from app.services.issue_sync import (
     detect_pr_review_webhook,
     detect_pr_webhook,
     lookup_gitlab_user_id,
+    parse_repo_url,
     reopen_github_issue,
     reopen_gitlab_issue,
     replace_github_issue_labels,
@@ -675,3 +678,64 @@ async def sync_labels_to_external(task: Task, db: Session) -> bool:
     if task.external_provider == "github":
         return await replace_github_issue_labels(task.external_repo, task.external_id, names, token, base)
     return await replace_gitlab_issue_labels(task.external_repo, task.external_id, names, token, base)
+
+
+async def create_external_issue_from_task(task: Task, project: Project, db: Session, provider: str | None = None):
+    """Create a new external issue from a Shard-origin task and link it back.
+
+    Explicit user action (last-write-wins does not apply — the task is the source
+    of truth here). Requires an active issue_sync integration with a token and a
+    project repo URL. On success, sets the task's external_* fields so all later
+    two-way sync (state, fields, comments, labels) flows through the usual paths.
+    Raises HTTPException with an actionable message on any precondition failure.
+    """
+    if task.external_id:
+        raise HTTPException(status_code=409, detail="Task is already linked to an external issue")
+
+    integration = _get_sync_integration(task.project_id, db)
+    if not integration or not integration.secret:
+        raise HTTPException(
+            status_code=400,
+            detail="No active issue_sync integration with a token is configured for this project",
+        )
+
+    parsed = parse_repo_url(project.repo_url or "", provider)
+    if not parsed:
+        raise HTTPException(
+            status_code=400,
+            detail="Project has no valid repo URL; set the project's repo URL first",
+        )
+
+    token = integration.secret
+    labels = [tl.label.name for tl in task.task_labels if tl.label.type == "label"]
+
+    if parsed["provider"] == "github":
+        result = await create_github_issue(
+            parsed["repo"], task.title, task.description or "", labels, task.assignee, token, parsed["base"]
+        )
+    else:
+        result = await create_gitlab_issue(
+            parsed["repo"], task.title, task.description or "", labels, token, parsed["base"]
+        )
+
+    if not result:
+        raise HTTPException(status_code=502, detail="External issue creation failed; check the token and repo URL")
+
+    task.external_provider = parsed["provider"]
+    task.external_id = result["number"]
+    task.external_url = result["url"]
+    task.external_repo = parsed["repo"]
+
+    log_activity(
+        db,
+        "task.issue_created",
+        project_id=task.project_id,
+        task_id=task.id,
+        actor=f"issue-sync:{parsed['provider']}",
+        detail=f'Created {parsed["provider"]} issue #{result["number"]} from task "{task.title}"',
+        meta={"external_url": result["url"], "external_repo": parsed["repo"]},
+    )
+    db.commit()
+    db.refresh(task)
+    await ws_manager.broadcast("task.updated", {"project_id": task.project_id, "task_id": task.id})
+    return task

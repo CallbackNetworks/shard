@@ -460,3 +460,138 @@ class TestOutboundSync:
 
         result = await sync_task_closure_to_external(task, db)
         assert result is False
+
+
+class TestParseRepoUrl:
+    """Unit tests for parse_repo_url provider/repo extraction."""
+
+    def test_github_com(self):
+        from app.services.issue_sync import parse_repo_url
+
+        r = parse_repo_url("https://github.com/owner/repo")
+        assert r["provider"] == "github"
+        assert r["repo"] == "owner/repo"
+        assert r["base"] == "https://api.github.com"
+
+    def test_github_strips_git_suffix_and_extra_path(self):
+        from app.services.issue_sync import parse_repo_url
+
+        r = parse_repo_url("https://github.com/owner/repo.git")
+        assert r["repo"] == "owner/repo"
+
+    def test_gitea_host_uses_api_v1(self):
+        from app.services.issue_sync import parse_repo_url
+
+        r = parse_repo_url("https://gitea.example.com/owner/repo")
+        assert r["provider"] == "github"
+        assert r["base"] == "https://gitea.example.com/api/v1"
+
+    def test_gitlab_detected_and_keeps_namespace(self):
+        from app.services.issue_sync import parse_repo_url
+
+        r = parse_repo_url("https://gitlab.com/group/sub/project")
+        assert r["provider"] == "gitlab"
+        assert r["repo"] == "group/sub/project"
+        assert r["base"] == "https://gitlab.com"
+
+    def test_explicit_provider_override(self):
+        from app.services.issue_sync import parse_repo_url
+
+        r = parse_repo_url("https://git.example.com/team/app", provider="gitlab")
+        assert r["provider"] == "gitlab"
+        assert r["repo"] == "team/app"
+
+    def test_invalid_url(self):
+        from app.services.issue_sync import parse_repo_url
+
+        assert parse_repo_url("") is None
+        assert parse_repo_url("https://github.com/") is None
+
+
+class TestCreateExternalIssue:
+    """The explicit 'create external issue from task' action."""
+
+    def _integration(self, db, project_id, url="https://github.com", secret="ghp_tok"):
+        integ = Integration(name="sync", type="issue_sync", url=url, project_id=project_id, secret=secret, active=True)
+        db.add(integ)
+        db.commit()
+
+    @patch(
+        "app.routers.issue_sync.create_github_issue",
+        new_callable=AsyncMock,
+        return_value={"number": "101", "url": "https://github.com/owner/repo/issues/101"},
+    )
+    def test_creates_github_issue_and_links_task(self, mock_create, client, db, sample_project):
+        sample_project.repo_url = "https://github.com/owner/repo"
+        self._integration(db, sample_project.id)
+        task = Task(project_id=sample_project.id, title="Ship it", description="body")
+        db.add(task)
+        db.commit()
+
+        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["external_provider"] == "github"
+        assert data["external_id"] == "101"
+        assert data["external_url"].endswith("/issues/101")
+        assert data["external_repo"] == "owner/repo"
+        mock_create.assert_called_once()
+
+    @patch(
+        "app.routers.issue_sync.create_gitlab_issue",
+        new_callable=AsyncMock,
+        return_value={"number": "7", "url": "https://gitlab.com/group/app/-/issues/7"},
+    )
+    def test_creates_gitlab_issue(self, mock_create, client, db, sample_project):
+        sample_project.repo_url = "https://gitlab.com/group/app"
+        self._integration(db, sample_project.id, url="https://gitlab.com", secret="glpat")
+        task = Task(project_id=sample_project.id, title="GL task")
+        db.add(task)
+        db.commit()
+
+        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["external_provider"] == "gitlab"
+        assert resp.json()["external_id"] == "7"
+
+    def test_rejects_already_linked(self, client, db, sample_project):
+        self._integration(db, sample_project.id)
+        sample_project.repo_url = "https://github.com/owner/repo"
+        task = Task(
+            project_id=sample_project.id,
+            title="Linked",
+            external_provider="github",
+            external_id="1",
+            external_repo="owner/repo",
+        )
+        db.add(task)
+        db.commit()
+        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        assert resp.status_code == 409
+
+    def test_rejects_without_integration(self, client, db, sample_project):
+        sample_project.repo_url = "https://github.com/owner/repo"
+        db.commit()
+        task = Task(project_id=sample_project.id, title="No integ")
+        db.add(task)
+        db.commit()
+        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        assert resp.status_code == 400
+
+    def test_rejects_without_repo_url(self, client, db, sample_project):
+        self._integration(db, sample_project.id)
+        task = Task(project_id=sample_project.id, title="No repo")
+        db.add(task)
+        db.commit()
+        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        assert resp.status_code == 400
+
+    @patch("app.routers.issue_sync.create_github_issue", new_callable=AsyncMock, return_value=None)
+    def test_upstream_failure_returns_502(self, mock_create, client, db, sample_project):
+        sample_project.repo_url = "https://github.com/owner/repo"
+        self._integration(db, sample_project.id)
+        task = Task(project_id=sample_project.id, title="Fails upstream")
+        db.add(task)
+        db.commit()
+        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        assert resp.status_code == 502

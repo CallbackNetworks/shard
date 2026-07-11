@@ -1,8 +1,8 @@
 import { useState, memo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin } from 'lucide-react'
+import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, ExternalLink, GitPullRequestArrow } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { regenerateToken } from '../api/client'
+import { regenerateToken, createExternalIssue } from '../api/client'
 import { PRIORITY, DARK } from '../constants/theme'
 import { PriorityIcon, StatusIcon, LabelChip, PrBadge } from './TaskIcons'
 import TaskEditForm from './TaskEditForm'
@@ -36,6 +36,11 @@ export default memo(function IssueRow({
   const regenMut = useMutation({
     mutationFn: () => regenerateToken(projectId, task.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['project', projectId] }),
+  })
+  const createIssueMut = useMutation({
+    mutationFn: () => createExternalIssue(projectId, task.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['project', projectId] }),
+    onError: (e) => window.alert(e?.response?.data?.detail || 'Could not create external issue'),
   })
 
   const issueId = `${(projectCode || 'TSK')}-${task.id.slice(-4).toUpperCase()}`
@@ -275,6 +280,27 @@ export default memo(function IssueRow({
             <button onClick={copyWebhook} title="Copy webhook URL" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Link2 size={12} />
             </button>
+            {task.external_url ? (
+              <a
+                href={task.external_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={`Open linked ${task.external_provider || 'external'} issue #${task.external_id}`}
+                style={{ display: 'inline-flex', color: '#818cf8', padding: '2px 5px', borderRadius: 4 }}
+              >
+                <ExternalLink size={12} />
+              </a>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); createIssueMut.mutate() }}
+                disabled={createIssueMut.isPending}
+                title="Create a linked issue in the project's repository"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}
+              >
+                <GitPullRequestArrow size={12} />
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); if (confirm('Regenerate webhook token? Old URLs will stop working.')) regenMut.mutate() }}
               title="Regenerate webhook token"
