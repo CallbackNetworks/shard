@@ -28,7 +28,9 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks down -v
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-backend-checks down -v
+          docker image prune -f
 
   # The two databases are first-class, symmetric test targets: same suite,
   # same coverage gate. Neither is primary. See ADR-0018 / ADR-0020.
@@ -49,7 +51,9 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-sqlite down -v
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-backend-sqlite down -v
+          docker image prune -f
 
   backend-postgres:
     name: Backend tests (PostgreSQL)
@@ -82,7 +86,9 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest down -v
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest down -v
+          docker image prune -f
 
   frontend:
     name: Frontend tests
@@ -107,7 +113,9 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml -p ci-frontend down -v
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-frontend down -v
+          docker image prune -f
 
   integration:
     name: Integration smoke test (prod)
@@ -152,7 +160,10 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration down -v
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration down -v
+          docker image prune -f
+          docker builder prune -f --filter until=48h
 
   publish:
     name: Publish Docker images
