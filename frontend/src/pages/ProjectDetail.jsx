@@ -369,11 +369,13 @@ export default function ProjectDetail() {
             </div>
             <button
               onClick={() => {
-                const url = `${window.location.origin}/ical/${id}.ics`
+                if (!project.share_token) return
+                const url = `${window.location.origin}/ical/${project.share_token}.ics`
                 navigator.clipboard.writeText(url)
                 setCopiedIcal(true)
                 setTimeout(() => setCopiedIcal(false), 2000)
               }}
+              disabled={!project.share_token}
               className={s.archiveBtn}
               title="Copy iCal subscribe URL"
             >

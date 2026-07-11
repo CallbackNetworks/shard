@@ -1,14 +1,15 @@
 import csv
 import io
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task, TaskLabel
+from app.models import Project, Task, TaskLabel
 from app.routers.deps import get_project_or_404
 from app.schemas import (
     BulkActionResult,
@@ -44,6 +45,23 @@ _ICAL_STATUS_MAP = {
     "todo": "NEEDS-ACTION",
     "failed": "CANCELLED",
 }
+
+
+def _ical_escape(text: str) -> str:
+    """Escape reserved characters in an iCalendar TEXT value (RFC 5545 §3.3.11)."""
+    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def _ical_dt(dt: datetime) -> str:
+    """Format a datetime as an iCalendar UTC timestamp (e.g. 20260711T140000Z)."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _aware(dt: datetime) -> datetime:
+    """Treat naive datetimes (as returned by SQLite) as UTC for comparisons."""
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
 @router.post(
@@ -249,39 +267,71 @@ async def import_tasks(
 
 
 @router.get(
-    "/ical/{project_id}.ics",
+    "/ical/{share_token}.ics",
     tags=["ical"],
     response_class=PlainTextResponse,
 )
 def ical_feed(
-    project_id: str,
+    share_token: str,
+    alarm: int = Query(
+        30,
+        ge=0,
+        le=10080,
+        description="Reminder lead time in minutes before the due date; 0 disables reminders.",
+    ),
     db: Session = Depends(get_db),
 ):
-    get_project_or_404(project_id, db)
+    # The per-project share_token is the sole credential for this feed: the URL is
+    # unguessable and gates read-only access, so it is never derived from project_id.
+    project = db.query(Project).filter(Project.share_token == share_token).first()
+    if project is None:
+        raise HTTPException(status_code=404, detail="Calendar not found")
 
-    tasks = db.query(Task).filter(Task.project_id == project_id, Task.due_date.isnot(None)).all()
+    tasks = db.query(Task).filter(Task.project_id == project.id, Task.due_date.isnot(None)).all()
 
+    stamp = _ical_dt(datetime.now(UTC))
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "PRODID:-//Shard//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{_ical_escape(project.name)}",
     ]
 
     for t in tasks:
-        dt_str = t.due_date.strftime("%Y%m%d")
+        due = _aware(t.due_date)
+        start = _aware(t.start_date) if (t.start_date and _aware(t.start_date) < due) else due
+        end = due if start < due else start + timedelta(minutes=30)
         ical_status = _ICAL_STATUS_MAP.get(t.status, "NEEDS-ACTION")
-        description = (t.description or "").replace("\n", "\\n")
+
         lines.extend(
             [
                 "BEGIN:VEVENT",
                 f"UID:{t.id}@shard",
-                f"DTSTART;VALUE=DATE:{dt_str}",
-                f"SUMMARY:{t.title}",
-                f"DESCRIPTION:{description}",
+                f"DTSTAMP:{stamp}",
+                f"DTSTART:{_ical_dt(start)}",
+                f"DTEND:{_ical_dt(end)}",
+                f"SUMMARY:{_ical_escape(t.title)}",
+                f"DESCRIPTION:{_ical_escape(t.description or '')}",
                 f"STATUS:{ical_status}",
-                "END:VEVENT",
+                f"LAST-MODIFIED:{_ical_dt(_aware(t.updated_at))}",
             ]
         )
+
+        # Only remind for work that is still open.
+        if alarm > 0 and t.status not in ("done", "failed"):
+            lines.extend(
+                [
+                    "BEGIN:VALARM",
+                    "ACTION:DISPLAY",
+                    f"DESCRIPTION:{_ical_escape(t.title)}",
+                    f"TRIGGER:-PT{alarm}M",
+                    "END:VALARM",
+                ]
+            )
+
+        lines.append("END:VEVENT")
 
     lines.append("END:VCALENDAR")
 
