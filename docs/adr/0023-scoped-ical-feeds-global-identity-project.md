@@ -41,9 +41,16 @@ login):
 
 Token-management endpoints (`GET/POST /settings/ical-token…`) live under the authenticated
 `/settings/` prefix, deliberately separate from the public `/ical/` feeds. The
-`Project.ical_token` column from ADR-0022 is dropped (migration `a1c3e5f7b9d2`). Event
-formatting (timed UTC events, optional `VALARM`, RFC 5545 escaping) is unchanged from
-ADR-0021.
+`Project.ical_token` column from ADR-0022 is dropped (migration `a1c3e5f7b9d2`). Events
+are timed UTC `VEVENT`s with optional `VALARM` reminders and RFC 5545 TEXT escaping.
+
+For Apple/Google parity, two formatting choices are deliberate: (1) **no `STATUS`
+field** — the VTODO-style values previously emitted are invalid on a `VEVENT`, and
+`STATUS:CANCELLED` can hide or strike events differently across clients, so every task is
+a plain event; task state is not surfaced in the calendar (the calendar is a read-only
+window, not a checkbox surface). (2) **RFC 5545 line folding** — content lines are folded
+at 75 octets on UTF-8 boundaries so multibyte (e.g. CJK) titles remain valid and parse
+identically everywhere.
 
 This supersedes ADR-0022 (and, transitively, ADR-0021).
 

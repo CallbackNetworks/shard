@@ -40,17 +40,33 @@ _TASK_EXPORT_FIELDS = [
     "time_spent",
 ]
 
-_ICAL_STATUS_MAP = {
-    "done": "COMPLETED",
-    "in_progress": "IN-PROCESS",
-    "todo": "NEEDS-ACTION",
-    "failed": "CANCELLED",
-}
-
 
 def _ical_escape(text: str) -> str:
     """Escape reserved characters in an iCalendar TEXT value (RFC 5545 §3.3.11)."""
     return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def _ical_fold(line: str) -> str:
+    """Fold a content line to <=75 octets per RFC 5545 §3.1.
+
+    Continuation lines start with a single space. Folding is done on UTF-8 octet
+    boundaries (never mid-character) so multibyte titles (e.g. CJK) stay valid and
+    parse identically on Apple and Google.
+    """
+    if len(line.encode("utf-8")) <= 75:
+        return line
+    chunks: list[bytes] = []
+    current = b""
+    for ch in line:
+        encoded = ch.encode("utf-8")
+        # First line fits 75 octets; continuation lines reserve 1 for the leading space.
+        limit = 75 if not chunks else 74
+        if len(current) + len(encoded) > limit:
+            chunks.append(current)
+            current = b""
+        current += encoded
+    chunks.append(current)
+    return "\r\n ".join(c.decode("utf-8") for c in chunks)
 
 
 def _ical_dt(dt: datetime) -> str:
@@ -297,8 +313,9 @@ def _render_calendar(calname: str, tasks: list[Task], alarm: int) -> PlainTextRe
         due = _aware(t.due_date)
         start = _aware(t.start_date) if (t.start_date and _aware(t.start_date) < due) else due
         end = due if start < due else start + timedelta(minutes=30)
-        ical_status = _ICAL_STATUS_MAP.get(t.status, "NEEDS-ACTION")
-
+        # No STATUS field: the VTODO-style values we used are invalid on a VEVENT,
+        # and STATUS:CANCELLED can hide/strike events inconsistently across clients.
+        # Every task is emitted as a plain event so Apple and Google render it the same.
         lines.extend(
             [
                 "BEGIN:VEVENT",
@@ -308,7 +325,6 @@ def _render_calendar(calname: str, tasks: list[Task], alarm: int) -> PlainTextRe
                 f"DTEND:{_ical_dt(end)}",
                 f"SUMMARY:{_ical_escape(t.title)}",
                 f"DESCRIPTION:{_ical_escape(t.description or '')}",
-                f"STATUS:{ical_status}",
                 f"LAST-MODIFIED:{_ical_dt(_aware(t.updated_at))}",
             ]
         )
@@ -328,7 +344,8 @@ def _render_calendar(calname: str, tasks: list[Task], alarm: int) -> PlainTextRe
         lines.append("END:VEVENT")
 
     lines.append("END:VCALENDAR")
-    return PlainTextResponse(content="\r\n".join(lines), media_type="text/calendar")
+    body = "\r\n".join(_ical_fold(ln) for ln in lines) + "\r\n"
+    return PlainTextResponse(content=body, media_type="text/calendar")
 
 
 @router.get("/ical/all/{token}.ics", tags=["ical"], response_class=PlainTextResponse)

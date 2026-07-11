@@ -65,7 +65,30 @@ def test_no_alarm_for_completed_tasks(client, db, sample_project):
 
     body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
     assert "BEGIN:VALARM" not in body
-    assert "STATUS:COMPLETED" in body
+
+
+def test_no_status_field_for_cross_client_parity(client, db, sample_project):
+    # STATUS is omitted so Apple/Google render every task as a plain event
+    # (STATUS:CANCELLED can hide/strike events inconsistently).
+    due = datetime.now(UTC) + timedelta(days=1)
+    _add_task(db, sample_project, title="A", due_date=due, status="done")
+    _add_task(db, sample_project, title="B", due_date=due, status="failed")
+
+    body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
+    assert "STATUS:" not in body
+
+
+def test_long_cjk_summary_is_folded(client, db, sample_project):
+    # A long multibyte title exceeds 75 octets and must be folded onto
+    # continuation lines (each beginning with a space) to stay valid.
+    due = datetime.now(UTC) + timedelta(days=1)
+    long_title = "工作" * 20  # 40 CJK chars ~= 120 octets
+    _add_task(db, sample_project, title=long_title, due_date=due)
+
+    body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
+    assert "\r\n " in body  # folded continuation line present
+    for line in body.split("\r\n"):
+        assert len(line.encode("utf-8")) <= 75
 
 
 def test_special_characters_are_escaped(client, db, sample_project):
