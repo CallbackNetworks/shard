@@ -7,30 +7,49 @@ on:
     branches: [main]
 
 jobs:
-  backend:
-    name: Backend tests
+  # DB-independent backend checks — run once, not per database.
+  backend-checks:
+    name: Backend checks
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
 
       - name: Build backend image
-        run: docker compose -f docker-compose.ci.yml -p ci-backend build backend
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks build backend
 
       - name: Lint
-        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend ruff check app/ tests/
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend ruff check app/ tests/
 
       - name: Format check
-        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend ruff format --check app/ tests/
-
-      - name: Run tests with coverage
-        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend ruff format --check app/ tests/
 
       - name: Security audit
-        run: docker compose -f docker-compose.ci.yml -p ci-backend run --rm backend sh -c "pip install pip-audit && pip-audit --strict"
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend sh -c "pip install pip-audit && pip-audit --strict"
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-compose.ci.yml -p ci-backend down -v
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks down -v
+
+  # The two databases are first-class, symmetric test targets: same suite,
+  # same coverage gate. Neither is primary. See ADR-0018 / ADR-0020.
+  backend-sqlite:
+    name: Backend tests (SQLite)
+    runs-on: ci-builder
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-sqlite build backend
+
+      - name: Run tests with coverage
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-backend-sqlite run --rm --no-deps \
+            -e TEST_DATABASE_URL=sqlite:///:memory: \
+            backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-sqlite down -v
 
   backend-postgres:
     name: Backend tests (PostgreSQL)
@@ -55,11 +74,11 @@ jobs:
           docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest logs postgres
           exit 1
 
-      - name: Run tests against PostgreSQL
+      - name: Run tests with coverage
         run: |
           docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest run --rm --no-deps \
             -e TEST_DATABASE_URL=postgresql+psycopg://todo:todo_dev@postgres:5432/shard_test \
-            backend pytest tests/ -v --tb=short
+            backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
 
       - name: Cleanup
         if: always()
@@ -92,7 +111,7 @@ jobs:
 
   integration:
     name: Integration smoke test (prod)
-    needs: [backend, backend-postgres, frontend]
+    needs: [backend-checks, backend-sqlite, backend-postgres, frontend]
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4

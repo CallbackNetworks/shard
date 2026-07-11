@@ -84,9 +84,16 @@ docker compose exec backend pytest tests/test_tasks.py -v
 docker compose exec backend pytest tests/test_tasks.py::test_create_task -v
 ```
 
-Tests use an in-memory SQLite database (via `StaticPool`). The `conftest.py` provides `db`, `client`, `sample_identity`, and `sample_project` fixtures. Auth middleware is disabled in tests (`AUTH_PASSWORD=""`).
+**SQLite and PostgreSQL are equal, parallel test targets.** `conftest.py` reads `TEST_DATABASE_URL` (default `sqlite:///:memory:` via `StaticPool`); point it at PostgreSQL to run the identical suite there. `scripts/test.sh` wraps both (dev stack must be up):
 
-CI enforces `--cov-fail-under=70`.
+```bash
+scripts/test.sh              # both databases (default)
+scripts/test.sh sqlite       # SQLite only
+scripts/test.sh postgres     # PostgreSQL only (isolated shard_test DB, never app data)
+scripts/test.sh both -k foo  # extra args after the target pass through to pytest
+```
+
+`conftest.py` provides `db`, `client`, `sample_identity`, and `sample_project` fixtures. Auth middleware is disabled in tests (`AUTH_PASSWORD=""`). Both databases enforce `--cov-fail-under=70` in CI. Some tests are dialect-aware (e.g. skip under enforced foreign keys) — see ADR-0018.
 
 ### Frontend (vitest)
 
@@ -125,13 +132,14 @@ Config in `frontend/eslint.config.js` (flat config). CI allows up to 300 warning
 
 ## CI/CD pipeline (`.github/workflows/ci.yml`)
 
-Runs on push/PR to `main`. Six jobs:
-1. **Backend**: ruff lint + format check, pytest with coverage (>=70%), pip-audit (SQLite)
-2. **Backend (PostgreSQL)**: same pytest suite against a `postgres:16-alpine` service via the `pgtest` profile in `docker-compose.ci.yml`, with `TEST_DATABASE_URL` pointing at it — guards SQLite/PostgreSQL behavior parity (see ADR-0018)
-3. **Frontend**: ESLint, vitest, npm audit, vite build
-4. **Integration**: production compose up, backend health check, frontend smoke test (needs backend + backend-postgres + frontend)
-5. **Publish**: build and push Docker images to registry (main branch only)
-6. **Deploy**: pull images on `cd-deployer`, generate compose file at `$DEPLOY_DIR` (configurable via `vars.DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`), bring services up with health checks (main branch only). Requires `.env` pre-configured in the deploy directory.
+Runs on push/PR to `main`. Seven jobs:
+1. **Backend checks**: ruff lint + format check, pip-audit (DB-independent, runs once)
+2. **Backend tests (SQLite)**: pytest with coverage (>=70%) against SQLite
+3. **Backend tests (PostgreSQL)**: the same suite with the same coverage gate against a `postgres:16-alpine` service (`pgtest` profile in `docker-compose.ci.yml`). SQLite and PostgreSQL are co-equal, symmetric targets — neither is primary; both gate deploy (see ADR-0018, ADR-0020)
+4. **Frontend**: ESLint, vitest, npm audit, vite build
+5. **Integration**: production compose up, backend health check, frontend smoke test (needs backend-checks + backend-sqlite + backend-postgres + frontend)
+6. **Publish**: build and push Docker images to registry (main branch only)
+7. **Deploy**: pull images on `cd-deployer`, generate compose file at `$DEPLOY_DIR` (configurable via `vars.DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`), bring services up with health checks (main branch only). Requires `.env` pre-configured in the deploy directory.
 
 ## Schema migrations (Alembic)
 

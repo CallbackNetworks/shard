@@ -21,3 +21,4 @@
 | [0017](0017-pr-signal-sync-content-stays-external.md) | PR Signal Sync — Signals In, Content Stays External | Accepted | 2026-07-10 |
 | [0018](0018-postgres-parity-and-fresh-db-bootstrap.md) | PostgreSQL Behavior Parity and Fresh-Database Alembic Bootstrap | Accepted | 2026-07-10 |
 | [0019](0019-scheduler-long-run-resilience.md) | Scheduler Long-Run Resilience — Check Isolation, Persistent Dedup, Heartbeat, Fake-Clock Tests | Accepted | 2026-07-10 |
+| [0020](0020-databases-as-coequal-test-targets.md) | SQLite and PostgreSQL as Co-Equal Test Targets | Accepted | 2026-07-11 |

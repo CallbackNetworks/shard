@@ -16,7 +16,7 @@ services:
     networks:
       - ci-network
 
-  # ---------- PostgreSQL parity tests ----------
+  # ---------- PostgreSQL test target (co-equal with SQLite, see ADR-0020) ----------
   postgres:
     profiles: [pgtest]
     image: postgres:16-alpine
