@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, WebhookDelivery, now_utc
+from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, UserPreference, WebhookDelivery, now_utc
 from app.services import backup as backup_service
 from app.services import email_sender
 from app.services.activity import log_activity
@@ -31,6 +31,27 @@ def _ensure_aware(dt: datetime) -> datetime:
     the same timezone-aware column, so Python-side comparisons must normalize.
     """
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+# Once-per-day/week dedup markers, persisted in the user_preferences KV table
+# so a process restart cannot cause duplicate summary emails or backups.
+STATE_KEY = "scheduler-state"
+
+
+def _get_state(db: Session) -> dict:
+    pref = db.query(UserPreference).filter(UserPreference.key == STATE_KEY).first()
+    return dict(pref.value) if pref and isinstance(pref.value, dict) else {}
+
+
+def _set_state(db: Session, key: str, value: str) -> None:
+    pref = db.query(UserPreference).filter(UserPreference.key == STATE_KEY).first()
+    if pref:
+        state = dict(pref.value) if isinstance(pref.value, dict) else {}
+        state[key] = value
+        pref.value = state
+    else:
+        db.add(UserPreference(key=STATE_KEY, value={key: value}))
+    db.commit()
 
 
 async def _check_and_fire(db: Session) -> None:
@@ -157,20 +178,20 @@ async def _retry_failed_webhooks(db: Session) -> None:
 
 
 DIGEST_DAY = int(os.getenv("DIGEST_DAY", "1"))  # Day of week for weekly digest (0=Mon, 6=Sun), default Monday
-_last_summary_date: str | None = None
-_last_backup_date: str | None = None
-_last_weekly_digest_date: str | None = None
 
 
 async def _run_daily_backup(db: Session) -> None:
     """Write a full backup archive once per day at/after the configured hour."""
-    global _last_backup_date
     now = now_utc()
     today_str = now.strftime("%Y-%m-%d")
     settings = get_system_settings(db)
-    if not settings["backup_enabled"] or _last_backup_date == today_str or now.hour < settings["backup_hour"]:
+    if (
+        not settings["backup_enabled"]
+        or _get_state(db).get("last_backup_date") == today_str
+        or now.hour < settings["backup_hour"]
+    ):
         return
-    _last_backup_date = today_str
+    _set_state(db, "last_backup_date", today_str)
     try:
         backup_service.write_backup(db)
         backup_service.prune_backups(settings["backup_keep"])
@@ -180,15 +201,14 @@ async def _run_daily_backup(db: Session) -> None:
 
 async def _send_daily_summary(db: Session) -> None:
     """Generate and send a daily summary email to all email-type integrations."""
-    global _last_summary_date
     now = now_utc()
     today_str = now.strftime("%Y-%m-%d")
     summary_hour = get_system_settings(db)["summary_hour"]
 
     # Only send once per day, at or after the configured hour
-    if _last_summary_date == today_str or now.hour < summary_hour:
+    if _get_state(db).get("last_summary_date") == today_str or now.hour < summary_hour:
         return
-    _last_summary_date = today_str
+    _set_state(db, "last_summary_date", today_str)
 
     # Gather data
     projects = db.query(Project).filter(Project.status == "active").all()
@@ -283,7 +303,6 @@ async def _send_daily_summary(db: Session) -> None:
 
 async def _send_weekly_digest(db: Session) -> None:
     """Generate and send a weekly digest email to all email-type integrations."""
-    global _last_weekly_digest_date
     now = now_utc()
     summary_hour = get_system_settings(db)["summary_hour"]
 
@@ -293,9 +312,9 @@ async def _send_weekly_digest(db: Session) -> None:
 
     # Use ISO week identifier to ensure we only send once per week
     week_str = now.strftime("%Y-W%W")
-    if _last_weekly_digest_date == week_str:
+    if _get_state(db).get("last_weekly_digest") == week_str:
         return
-    _last_weekly_digest_date = week_str
+    _set_state(db, "last_weekly_digest", week_str)
 
     # Gather data for the past 7 days
     week_ago = now - timedelta(days=7)
@@ -500,21 +519,48 @@ async def _check_sla_aging(db: Session) -> None:
                 logger.warning("Failed to fire SLA notification for task %s: %s", task.id, exc)
 
 
+_last_tick_at: datetime | None = None
+
+
+async def _run_tick(db: Session) -> None:
+    """Run all scheduler checks, isolating failures so one broken check cannot starve the rest."""
+    global _last_tick_at
+    for check in (
+        _check_and_fire,
+        _check_recurring,
+        _retry_failed_webhooks,
+        _send_daily_summary,
+        _send_weekly_digest,
+        _check_sla_aging,
+        _run_daily_backup,
+    ):
+        try:
+            await check(db)
+        except Exception as exc:
+            # Roll back so the next check gets a usable session
+            # (PostgreSQL aborts the transaction after any failed statement).
+            db.rollback()
+            logger.error("Scheduler check %s failed: %s", check.__name__, exc)
+    _last_tick_at = now_utc()
+
+
+def get_scheduler_health() -> dict:
+    """Liveness signal for /health: the scheduler is alive if it ticked recently."""
+    if _last_tick_at is None:
+        return {"alive": False, "last_tick_at": None}
+    age = (now_utc() - _last_tick_at).total_seconds()
+    return {"alive": age < CHECK_INTERVAL_SECONDS * 2, "last_tick_at": _last_tick_at.isoformat()}
+
+
 async def due_date_reminder_loop() -> None:
     """Long-running asyncio task. Ticks every hour for reminders, recurring tasks, webhook retries, and daily summary."""
+    global _last_tick_at
+    _last_tick_at = now_utc()  # startup counts as the first heartbeat
     logger.info("Scheduler started (interval=%ds)", CHECK_INTERVAL_SECONDS)
     while True:
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)
         db: Session = SessionLocal()
         try:
-            await _check_and_fire(db)
-            await _check_recurring(db)
-            await _retry_failed_webhooks(db)
-            await _send_daily_summary(db)
-            await _send_weekly_digest(db)
-            await _check_sla_aging(db)
-            await _run_daily_backup(db)
-        except Exception as exc:
-            logger.error("Scheduler error: %s", exc)
+            await _run_tick(db)
         finally:
             db.close()

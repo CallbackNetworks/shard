@@ -374,10 +374,6 @@ class TestRetryFailedWebhooks:
 class TestSendDailySummary:
     @pytest.mark.asyncio
     async def test_sends_once_per_day(self, db):
-        import app.services.scheduler as sched
-
-        sched._last_summary_date = None
-
         p = Project(name="P", status="active")
         db.add(p)
         db.flush()
@@ -399,10 +395,6 @@ class TestSendDailySummary:
 
     @pytest.mark.asyncio
     async def test_skips_before_summary_hour(self, db):
-        import app.services.scheduler as sched
-
-        sched._last_summary_date = None
-
         with (
             patch("app.services.scheduler.get_system_settings", return_value=_settings(summary_hour=23)),
             patch("app.services.scheduler.email_sender") as mock_email,

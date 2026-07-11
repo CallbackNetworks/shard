@@ -50,7 +50,7 @@ from app.routers import ws as ws_router
 from app.routers.auth import router as auth_router
 from app.routers.auth import verify_token
 from app.routers.labels import task_label_router
-from app.services.scheduler import due_date_reminder_loop
+from app.services.scheduler import due_date_reminder_loop, get_scheduler_health
 from app.services.search_backend import get_search_backend
 from app.services.usage_tracker import UsageTrackingMiddleware
 
@@ -221,4 +221,4 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "scheduler": get_scheduler_health()}
