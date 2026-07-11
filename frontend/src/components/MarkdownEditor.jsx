@@ -14,7 +14,7 @@ const toolbarBtnStyle = (active) => ({
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',
-  color: active ? '#facc15' : 'rgba(var(--kt-ink-rgb), 0.4)',
+  color: active ? 'var(--kt-hit)' : 'rgba(var(--kt-ink-rgb), 0.4)',
   padding: '3px 5px',
   display: 'flex',
   alignItems: 'center',
@@ -28,8 +28,8 @@ const modeBtnStyle = (active) => ({
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',
-  background: active ? '#facc15' : 'transparent',
-  color: active ? '#fff' : 'rgba(var(--kt-ink-rgb), 0.4)',
+  background: active ? 'var(--kt-hit)' : 'transparent',
+  color: active ? 'var(--kt-bg)' : 'rgba(var(--kt-ink-rgb), 0.4)',
 })
 
 function Toolbar({ editor }) {
@@ -87,7 +87,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
       }),
       Link.configure({
         openOnClick: false,
-        HTMLAttributes: { style: 'color: #facc15; text-decoration: underline;' },
+        HTMLAttributes: { style: 'color: var(--kt-hit); text-decoration: underline;' },
       }),
       Placeholder.configure({
         placeholder: placeholder || 'Write something...',
@@ -179,14 +179,14 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
         >
           <EditorContent editor={editor} />
           <style>{`
-            .tiptap { outline: none; color: #ffffff; }
+            .tiptap { outline: none; color: var(--kt-ink); }
             .tiptap p { margin: 0 0 0.4em; }
             .tiptap h1 { font-size: 1.5em; font-weight: 700; margin: 0.4em 0 0.2em; }
             .tiptap h2 { font-size: 1.25em; font-weight: 700; margin: 0.4em 0 0.2em; }
             .tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
             .tiptap ul, .tiptap ol { padding-left: 1.4em; margin: 0.3em 0; }
             .tiptap li { margin: 0.1em 0; }
-            .tiptap code { background: rgba(var(--kt-ink-rgb), 0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: #facc15; }
+            .tiptap code { background: rgba(var(--kt-ink-rgb), 0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: var(--kt-hit); }
             .tiptap pre { background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
             .tiptap pre code { background: none; padding: 0; color: inherit; }
             .tiptap blockquote { border-left: 3px solid rgba(var(--kt-ink-rgb), 0.15); padding-left: 12px; margin: 0.4em 0; color: rgba(var(--kt-ink-rgb), 0.4); }
