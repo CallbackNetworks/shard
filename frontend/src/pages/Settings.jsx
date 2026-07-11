@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, DatabaseBackup, Download } from 'lucide-react'
-import { getSettings, changePassword, setPreference, updateSystemSettings, getBackupStatus, runBackup, exportBackup, downloadBackupFile } from '../api/client'
+import { Settings2, Shield, Bot, Lock, CheckCircle2, AlertCircle, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, DatabaseBackup, Download, CalendarClock, RefreshCw } from 'lucide-react'
+import { getSettings, changePassword, setPreference, updateSystemSettings, getBackupStatus, runBackup, exportBackup, downloadBackupFile, getIcalToken, rotateGlobalIcalToken } from '../api/client'
 import { DARK } from '../constants/theme'
 import { useTheme } from '../context/ThemeContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
@@ -157,6 +157,18 @@ export default function Settings() {
     mutationFn: updateSystemSettings,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
+
+  const { data: icalToken } = useQuery({
+    queryKey: ['ical-token'],
+    queryFn: getIcalToken,
+    staleTime: 60000,
+  })
+  const [copiedIcal, setCopiedIcal] = useState(false)
+  const rotateIcalMut = useMutation({
+    mutationFn: rotateGlobalIcalToken,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ical-token'] }),
+  })
+  const icalUrl = icalToken?.token ? `${window.location.origin}/ical/all/${icalToken.token}.ics` : ''
 
   const { data: backupStatus } = useQuery({
     queryKey: ['backup-status'],
@@ -418,6 +430,50 @@ export default function Settings() {
             </div>
           )
         })}
+      </div>
+
+      {/* Calendar feed (personal global iCal subscription) */}
+      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        <SectionTitle
+          icon={<CalendarClock size={16} color="#818cf8" />}
+          title={t('settings.calendarFeed')}
+        />
+        <p style={{ margin: '0 0 12px', fontSize: 12, color: DARK.textDim }}>
+          {t('settings.calendarFeedHint')}
+        </p>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            readOnly
+            value={icalUrl}
+            className="kt-input"
+            style={{ flex: 1, fontFamily: 'monospace', fontSize: 12 }}
+            onFocus={e => e.target.select()}
+          />
+          <button
+            className="kt-btn"
+            disabled={!icalUrl}
+            onClick={() => {
+              if (!icalUrl) return
+              navigator.clipboard.writeText(icalUrl)
+              setCopiedIcal(true)
+              setTimeout(() => setCopiedIcal(false), 2000)
+            }}
+          >
+            {copiedIcal ? <Check size={12} /> : null}
+            {copiedIcal ? t('settings.calendarFeedCopied') : t('settings.calendarFeedCopy')}
+          </button>
+          <button
+            className="kt-btn"
+            disabled={rotateIcalMut.isPending}
+            title={t('settings.calendarFeedRegen')}
+            aria-label={t('settings.calendarFeedRegen')}
+            onClick={() => {
+              if (window.confirm(t('settings.calendarFeedRegenConfirm'))) rotateIcalMut.mutate()
+            }}
+          >
+            <RefreshCw size={12} />
+          </button>
+        </div>
       </div>
 
       {settings && (

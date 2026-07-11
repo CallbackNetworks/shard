@@ -99,7 +99,6 @@ class ProjectOut(BaseModel):
     description: str | None
     status: str
     share_token: str | None = None
-    ical_token: str | None = None
     allow_guest_notes: bool = False
     repo_url: str | None = None
     wip_limits: dict | None = None

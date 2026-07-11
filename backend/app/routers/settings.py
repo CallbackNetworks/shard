@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import UserPreference
 from app.routers.auth import AUTH_PASSWORD
+from app.services.ical_token import get_global_ical_token, rotate_global_ical_token
 from app.services.runtime_settings import get_system_settings, update_system_settings
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -50,6 +51,18 @@ def put_system_settings(body: SystemSettingsUpdate, db: Session = Depends(get_db
     """Update runtime-adjustable scheduler settings (persisted, no restart needed)."""
     updated = update_system_settings(db, body.model_dump(exclude_none=True))
     return updated
+
+
+@router.get("/ical-token")
+def get_ical_token(db: Session = Depends(get_db)):
+    """Return the global iCal token for the personal 'all projects' feed."""
+    return {"token": get_global_ical_token(db)}
+
+
+@router.post("/ical-token/rotate")
+def rotate_ical_token(db: Session = Depends(get_db)):
+    """Issue a new global iCal token, invalidating the previous subscribe URL."""
+    return {"token": rotate_global_ical_token(db)}
 
 
 class PasswordChangeRequest(BaseModel):

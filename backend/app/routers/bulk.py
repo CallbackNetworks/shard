@@ -9,7 +9,7 @@ from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Task, TaskLabel
+from app.models import Identity, Project, Task, TaskLabel
 from app.routers.deps import get_project_or_404
 from app.schemas import (
     BulkActionResult,
@@ -19,6 +19,7 @@ from app.schemas import (
     TaskImportResult,
 )
 from app.services.activity import log_activity
+from app.services.ical_token import verify_global_ical_token
 from app.services.ws_manager import ws_manager
 
 router = APIRouter()
@@ -262,47 +263,26 @@ async def import_tasks(
 
 
 # ---------------------------------------------------------------------------
-# 4. iCal Feed
+# 4. iCal Feeds
 # ---------------------------------------------------------------------------
+#
+# Three scoped feeds, all read-only and unauthenticated at the middleware layer
+# (calendar clients cannot log in), so each is gated by an unguessable token:
+#   - /ical/all/{token}.ics       personal, every project (global token, see below)
+#   - /ical/identity/{token}.ics  everything under one identity (Identity.share_token)
+#   - /ical/project/{token}.ics   a single project (Project.share_token)
+# The identity/project feeds reuse the same share_token as their /share/ page, so a
+# calendar and its share page are revoked together (see ADR-0023).
 
-
-@router.post("/projects/{project_id}/ical-token/rotate", tags=["ical"])
-def rotate_ical_token(project_id: str, db: Session = Depends(get_db)):
-    """Issue a new iCal token, invalidating every existing subscription URL.
-
-    Independent of share_token so the calendar feed and public share page can be
-    revoked separately (see ADR-0022)."""
-    project = get_project_or_404(project_id, db)
-    project.ical_token = str(uuid.uuid4())
-    db.commit()
-    db.refresh(project)
-    return {"ical_token": project.ical_token}
-
-
-@router.get(
-    "/ical/{ical_token}.ics",
-    tags=["ical"],
-    response_class=PlainTextResponse,
+_ALARM_QUERY = Query(
+    30,
+    ge=0,
+    le=10080,
+    description="Reminder lead time in minutes before the due date; 0 disables reminders.",
 )
-def ical_feed(
-    ical_token: str,
-    alarm: int = Query(
-        30,
-        ge=0,
-        le=10080,
-        description="Reminder lead time in minutes before the due date; 0 disables reminders.",
-    ),
-    db: Session = Depends(get_db),
-):
-    # The per-project ical_token is the sole credential for this feed: the URL is
-    # unguessable and gates read-only access, and is independent of share_token so
-    # the two can be revoked separately.
-    project = db.query(Project).filter(Project.ical_token == ical_token).first()
-    if project is None:
-        raise HTTPException(status_code=404, detail="Calendar not found")
 
-    tasks = db.query(Task).filter(Task.project_id == project.id, Task.due_date.isnot(None)).all()
 
+def _render_calendar(calname: str, tasks: list[Task], alarm: int) -> PlainTextResponse:
     stamp = _ical_dt(datetime.now(UTC))
     lines = [
         "BEGIN:VCALENDAR",
@@ -310,7 +290,7 @@ def ical_feed(
         "PRODID:-//Shard//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        f"X-WR-CALNAME:{_ical_escape(project.name)}",
+        f"X-WR-CALNAME:{_ical_escape(calname)}",
     ]
 
     for t in tasks:
@@ -348,8 +328,36 @@ def ical_feed(
         lines.append("END:VEVENT")
 
     lines.append("END:VCALENDAR")
+    return PlainTextResponse(content="\r\n".join(lines), media_type="text/calendar")
 
-    return PlainTextResponse(
-        content="\r\n".join(lines),
-        media_type="text/calendar",
+
+@router.get("/ical/all/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
+def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
+    """Personal feed: every due-dated task across all projects (global token)."""
+    if not verify_global_ical_token(db, token):
+        raise HTTPException(status_code=404, detail="Calendar not found")
+    tasks = db.query(Task).filter(Task.due_date.isnot(None)).all()
+    return _render_calendar("All tasks", tasks, alarm)
+
+
+@router.get("/ical/identity/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
+def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
+    """Shared feed: every due-dated task across one identity's projects."""
+    identity = db.query(Identity).filter(Identity.share_token == token).first()
+    if identity is None:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+    project_ids = [pi.project_id for pi in identity.project_identities]
+    tasks = (
+        db.query(Task).filter(Task.project_id.in_(project_ids), Task.due_date.isnot(None)).all() if project_ids else []
     )
+    return _render_calendar(identity.name, tasks, alarm)
+
+
+@router.get("/ical/project/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
+def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
+    """Shared feed: a single project's due-dated tasks (same token as its share page)."""
+    project = db.query(Project).filter(Project.share_token == token).first()
+    if project is None:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+    tasks = db.query(Task).filter(Task.project_id == project.id, Task.due_date.isnot(None)).all()
+    return _render_calendar(project.name, tasks, alarm)

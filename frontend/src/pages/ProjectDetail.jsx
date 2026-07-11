@@ -1,9 +1,9 @@
 import { useState, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2, MessageSquare, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2, MessageSquare } from 'lucide-react'
 import {
-  getProject, createTask, updateTask, deleteTask, updateProject, rotateIcalToken,
+  getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
   createCycle, updateCycle, deleteCycle, addTaskToCycle, removeTaskFromCycle,
   reorderTasks,
@@ -205,11 +205,6 @@ export default function ProjectDetail() {
     onSuccess: invalidate,
   })
 
-  const rotateIcalMut = useMutation({
-    mutationFn: () => rotateIcalToken(id),
-    onSuccess: invalidate,
-  })
-
   const saveAgentInstrMut = useMutation({
     mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null, repo_url: repoUrl || null }),
     onSuccess: () => { invalidate(); setAgentInstrDirty(false) },
@@ -374,30 +369,18 @@ export default function ProjectDetail() {
             </div>
             <button
               onClick={() => {
-                if (!project.ical_token) return
-                const url = `${window.location.origin}/ical/${project.ical_token}.ics`
+                if (!project.share_token) return
+                const url = `${window.location.origin}/ical/project/${project.share_token}.ics`
                 navigator.clipboard.writeText(url)
                 setCopiedIcal(true)
                 setTimeout(() => setCopiedIcal(false), 2000)
               }}
-              disabled={!project.ical_token}
+              disabled={!project.share_token}
               className={s.archiveBtn}
-              title="Copy iCal subscribe URL"
+              title="Copy iCal subscribe URL (same token as the share link)"
             >
               {copiedIcal ? <Check size={12} /> : <Rss size={12} />}
               {copiedIcal ? 'Copied!' : 'iCal'}
-            </button>
-            <button
-              onClick={() => {
-                if (window.confirm('Generate a new iCal link? Existing calendar subscriptions will stop updating.')) {
-                  rotateIcalMut.mutate()
-                }
-              }}
-              disabled={!project.ical_token || rotateIcalMut.isPending}
-              className={s.archiveBtn}
-              title="Revoke and regenerate the iCal link (does not affect the share link)"
-            >
-              <RefreshCw size={12} />
             </button>
             <button
               onClick={() => {

@@ -1,7 +1,7 @@
 # ADR-0022: Independent iCal Token Separate from Share Token
 
 ## Status
-Accepted
+Superseded by ADR-0023
 
 ## Date
 2026-07-11

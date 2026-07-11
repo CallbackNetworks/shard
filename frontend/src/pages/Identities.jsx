@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit3, Trash2, Link2, Unlink, ExternalLink, Share2, RefreshCw, Check, Shield, Clock, Eye, MessageSquare } from 'lucide-react'
+import { Plus, Edit3, Trash2, Link2, Unlink, ExternalLink, Share2, RefreshCw, Check, Shield, Clock, Eye, MessageSquare, Rss } from 'lucide-react'
 import {
   getIdentities, createIdentity, updateIdentity, deleteIdentity,
   getProjects, linkProjectIdentity, unlinkProjectIdentity, rotateShareToken,
@@ -242,6 +242,7 @@ export default function Identities() {
   const [editingId, setEditingId] = useState(null)
   const [linkingId, setLinkingId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
+  const [copiedIcalId, setCopiedIcalId] = useState(null)
   const [settingsId, setSettingsId] = useState(null)
 
   const invalidate = () => {
@@ -276,6 +277,13 @@ export default function Identities() {
     navigator.clipboard.writeText(url)
     setCopiedId(identity.id)
     setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const copyIcalLink = (identity) => {
+    const url = `${window.location.origin}/ical/identity/${identity.share_token}.ics`
+    navigator.clipboard.writeText(url)
+    setCopiedIcalId(identity.id)
+    setTimeout(() => setCopiedIcalId(null), 2000)
   }
 
   const linkedProjectIds = (identityId) => {
@@ -365,6 +373,16 @@ export default function Identities() {
                             color: copiedId === identity.id ? DARK.success : DARK.text,
                           }}>
                           {copiedId === identity.id ? <Check size={13} /> : <Share2 size={13} />}
+                        </button>
+                        <button
+                          onClick={() => copyIcalLink(identity)}
+                          title="Copy iCal subscribe URL" aria-label="Copy iCal subscribe URL"
+                          style={{
+                            background: copiedIcalId === identity.id ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                            border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
+                            color: copiedIcalId === identity.id ? DARK.success : DARK.text,
+                          }}>
+                          {copiedIcalId === identity.id ? <Check size={13} /> : <Rss size={13} />}
                         </button>
                         <button
                           onClick={() => { if (confirm('Revoke current share link and generate a new one?')) rotateMut.mutate(identity.id) }}

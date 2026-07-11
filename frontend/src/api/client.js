@@ -56,7 +56,8 @@ export const createProject = (data) => api.post('/projects', data).then(r => r.d
 export const updateProject = (id, data) => api.patch(`/projects/${id}`, data).then(r => r.data)
 export const deleteProject = (id) => api.delete(`/projects/${id}`)
 export const getProject = (id) => api.get(`/projects/${id}`).then(r => r.data)
-export const rotateIcalToken = (id) => api.post(`/projects/${id}/ical-token/rotate`).then(r => r.data)
+export const getIcalToken = () => api.get('/settings/ical-token').then(r => r.data)
+export const rotateGlobalIcalToken = () => api.post('/settings/ical-token/rotate').then(r => r.data)
 
 // Tasks
 export const getTasks = (projectId) => api.get(`/projects/${projectId}/tasks`).then(r => r.data)
