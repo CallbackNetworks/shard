@@ -46,12 +46,17 @@ See [**docs/highlights.md**](docs/highlights.md) for detailed descriptions of al
 ## Quick Start
 
 ```bash
+# One-time setup: creates .env, generates SECRET_KEY, checks prerequisites
+scripts/setup.sh
+
 # First run (or after dependency changes)
 docker compose up --build
 
 # Subsequent runs
 docker compose up
 ```
+
+`scripts/setup.sh --check` verifies your environment is ready without changing anything.
 
 - Management UI: http://localhost:5173/app
 - Public status page: http://localhost:5173/
