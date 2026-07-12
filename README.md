@@ -1,5 +1,7 @@
 # Shard
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A personal multi-identity task management platform with CI/CD integration, AI agent support, and bidirectional issue sync. Built for developers who manage work across multiple roles, repositories, and tools.
 
 ## Key Highlights
@@ -89,6 +91,8 @@ The management UI at `/app` requires login; the public status page at `/` is alw
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./shard.db` | Database connection (`sqlite`, `postgresql+psycopg`, `mysql+pymysql`) |
 | `AUTH_PASSWORD` | _(empty)_ | Password for management UI; empty = no auth |
+| `SECRET_KEY` | _(empty)_ | Signs share-PIN session cookies. **Set in production** (`python -c "import secrets; print(secrets.token_hex(32))"`); empty = ephemeral per-process secret |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:4173` | Comma-separated allowed CORS origins; set to your deployed frontend origin |
 | `SMTP_HOST` | _(empty)_ | SMTP server hostname |
 | `SMTP_PORT` | `587` | SMTP port |
 | `SMTP_USER` / `SMTP_PASS` | _(empty)_ | SMTP credentials |
@@ -100,10 +104,12 @@ The management UI at `/app` requires login; the public status page at `/` is alw
 | `MCP_API_KEY` | _(empty)_ | API key for MCP server to call backend |
 | `SUMMARY_HOUR` | `8` | Hour (UTC) to send daily summary email |
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` in the project root and adjust:
 
 ```env
 AUTH_PASSWORD=your_password
+SECRET_KEY=change_me_to_a_random_64_char_hex
+CORS_ORIGINS=https://your-frontend.example.com
 SMTP_HOST=smtp.example.com
 SMTP_FROM=notify@example.com
 SMTP_USER=notify@example.com
@@ -142,3 +148,14 @@ docker compose up --build
 - [Deployment](docs/deployment.md) — VPS/production setup guide
 - [Integrations](docs/integrations.md) — CI/CD webhook setup
 - [ADRs](docs/adr/) — architecture decision records
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING](.github/CONTRIBUTING.md) for the
+development setup and quality bar, and the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+Before deploying beyond localhost, read the hardening notes in
+[SECURITY](.github/SECURITY.md).
+
+## License
+
+Released under the [MIT License](LICENSE).
