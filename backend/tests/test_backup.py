@@ -168,6 +168,21 @@ def test_restore_rejects_bad_format_version(client):
     assert resp.status_code == 422
 
 
+def test_restore_uploads_blocks_zip_slip(tmp_path):
+    uploads = tmp_path / "uploads"
+    outside = tmp_path / "outside.txt"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("uploads/safe.txt", b"ok")
+        zf.writestr("uploads/../outside.txt", b"pwned")
+    with zipfile.ZipFile(io.BytesIO(buf.getvalue())) as zf:
+        written = backup_service.restore_uploads(zf, upload_dir=uploads)
+    # Only the safe entry is written; the traversal entry is skipped.
+    assert written == 1
+    assert (uploads / "safe.txt").read_bytes() == b"ok"
+    assert not outside.exists()
+
+
 def test_restore_rejects_unknown_table(client, db):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:

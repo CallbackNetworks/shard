@@ -228,12 +228,20 @@ def restore_uploads(zf: zipfile.ZipFile, upload_dir: Path | None = None) -> int:
     if dest.is_dir():
         shutil.rmtree(dest)
     dest.mkdir(parents=True, exist_ok=True)
+    dest_root = dest.resolve()
+    written = 0
     for name in members:
         rel = name[len("uploads/") :]
-        target = dest / rel
+        target = (dest / rel).resolve()
+        # Guard against zip-slip: a crafted "uploads/../../x" entry must not
+        # escape the uploads directory.
+        if target != dest_root and dest_root not in target.parents:
+            logger.warning("Skipping unsafe archive path during restore: %s", name)
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(zf.read(name))
-    return len(members)
+        written += 1
+    return written
 
 
 def restore_archive(db: Session, data: bytes, restore_files: bool = True) -> dict:
