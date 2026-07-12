@@ -1,6 +1,8 @@
 import hashlib
 import hmac
+import logging
 import os
+import secrets
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -23,9 +25,30 @@ from app.services.activity import log_activity
 from app.services.pin_utils import check_pin
 from app.services.rate_limiter import share_rate_limit
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/share", tags=["share"])
 
-_PIN_SECRET = os.getenv("SECRET_KEY", "share-pin-default-secret")
+
+def _resolve_pin_secret() -> str:
+    """Secret used to sign share-PIN session cookies.
+
+    Never fall back to a fixed constant: a public default would let anyone forge
+    a PIN session and bypass a share PIN. When SECRET_KEY is unset we use a random
+    per-process secret (PIN sessions then simply do not survive a restart) and
+    warn, so a real deployment sets SECRET_KEY explicitly.
+    """
+    secret = os.getenv("SECRET_KEY", "")
+    if secret:
+        return secret
+    logger.warning(
+        "SECRET_KEY is not set; using an ephemeral per-process secret for share PIN sessions. "
+        "Set SECRET_KEY in production so PIN sessions survive restarts and cannot be forged."
+    )
+    return secrets.token_hex(32)
+
+
+_PIN_SECRET = _resolve_pin_secret()
 _PIN_TTL = 900  # 15 minutes
 _NOTE_DAILY_LIMIT = 20  # guest notes per visitor (ip hash) per UTC day
 

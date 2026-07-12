@@ -20,6 +20,8 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - SECRET_KEY=${SECRET_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:4173}
       - LLM_PROVIDER=${LLM_PROVIDER:-stub}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}

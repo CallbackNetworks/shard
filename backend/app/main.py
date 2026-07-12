@@ -168,11 +168,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def _cors_origins() -> list[str]:
+    """Allowed CORS origins, from CORS_ORIGINS (comma-separated) or dev defaults.
+
+    Deployments serving the frontend from another origin must set CORS_ORIGINS;
+    the default only covers the local Vite dev/preview ports.
+    """
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:4173")
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
 app.add_middleware(UsageTrackingMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:4173"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
