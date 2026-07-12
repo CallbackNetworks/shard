@@ -45,10 +45,17 @@ See [**docs/highlights.md**](docs/highlights.md) for detailed descriptions of al
 
 ## Quick Start
 
-```bash
-# One-time setup: creates .env, generates SECRET_KEY, checks prerequisites
-scripts/setup.sh
+New here? Run the interactive first-run wizard once — it checks that Docker is
+installed (and tells you how to install it if not), walks you through the few
+settings that matter, and can start the app for you:
 
+```bash
+scripts/setup.sh
+```
+
+Prefer to do it by hand? The wizard is optional:
+
+```bash
 # First run (or after dependency changes)
 docker compose up --build
 
