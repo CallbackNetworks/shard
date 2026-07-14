@@ -613,6 +613,8 @@
   "settings.off": "關閉",
   "settings.accent": "強調色",
   "settings.accentHint": "全站的主要強調顏色",
+  "settings.displayFont": "標題字體",
+  "settings.displayFontHint": "標題與大型動態排版所用的字體",
   "settings.uiScale": "介面大小",
   "settings.uiScaleHint": "整體放大或縮小介面",
   "settings.scaleCompact": "緊湊",

@@ -15,7 +15,9 @@
   --kt-line: #3a3a3a;
   --kt-hover: rgba(var(--kt-ink-rgb), 0.05);
   --kt-hit: var(--accent, #facc15);
-  --kt-display: 'Impact', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  /* Display font is overridable at runtime via the `displayFont` UI pref, which
+     rewrites --kt-display (see utils/uiPrefs.js). This is the default. */
+  --kt-display: 'Anton', 'Bebas Neue', 'Impact', 'Arial Narrow', sans-serif;
   --kt-body: 'Inter', 'Arial Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 /* Light mode palette: must come after :root so equal-specificity override wins.

@@ -63,7 +63,9 @@ export const SPACE = {
 
 export const FONT = {
   family: "'Inter', 'Arial Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  display: "'Impact', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif",
+  // Resolves through --kt-display so the runtime `displayFont` UI pref recolors
+  // every inline usage at once (see utils/uiPrefs.js), mirroring the accent system.
+  display: "var(--kt-display, 'Anton', 'Bebas Neue', 'Impact', 'Arial Narrow', sans-serif)",
   mono: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
   xs: 10,
   sm: 11,
@@ -71,6 +73,17 @@ export const FONT = {
   lg: 15,
   xl: 18,
   xxl: 24,
+}
+
+// Kinetic weight scale. Inter is loaded at 300–900; 800/900 read as "black" for
+// the heavy, high-contrast headings and labels the design leans on.
+export const WEIGHT = {
+  regular: 400,
+  medium: 500,
+  semibold: 600,
+  bold: 700,
+  heavy: 800,
+  black: 900,
 }
 
 export const RADIUS = {

@@ -25,6 +25,16 @@ export const ACCENT_PRESETS = [
   { key: 'orange', main: '#fb923c', deep: '#f97316', mainLight: '#ea580c', deepLight: '#c2410c' },
 ]
 
+// Display (heading/watermark) font presets. The `stack` is written to
+// --kt-display, which every heading and the big kinetic watermarks resolve
+// through. Anton is the heavy default; Bebas is a lighter, more elegant
+// condensed face; Impact is the legacy system fallback.
+export const DISPLAY_FONTS = [
+  { key: 'anton', label: 'Anton', stack: "'Anton', 'Bebas Neue', 'Impact', 'Arial Narrow', sans-serif" },
+  { key: 'bebas', label: 'Bebas Neue', stack: "'Bebas Neue', 'Anton', 'Impact', 'Arial Narrow', sans-serif" },
+  { key: 'impact', label: 'Impact', stack: "'Impact', 'Anton', 'Arial Narrow', sans-serif" },
+]
+
 // UI scale factors applied via document zoom.
 export const UI_SCALES = [
   { value: 0.9, labelKey: 'settings.scaleCompact' },
@@ -51,6 +61,7 @@ export const DEFAULT_UI_PREFS = {
   defaultPriority: 'medium',
   reduceMotion: false,
   accent: 'amber',
+  displayFont: 'anton',
   uiScale: 1.0,
   sidebarHidden: [], // list of nav `to` paths to hide
   sidebarOrder: [], // list of nav `to` paths giving explicit order
@@ -109,6 +120,10 @@ export function resolveAccent(prefs = current) {
   return ACCENT_PRESETS.find(a => a.key === prefs.accent) || ACCENT_PRESETS[0]
 }
 
+export function resolveDisplayFont(prefs = current) {
+  return DISPLAY_FONTS.find(f => f.key === prefs.displayFont) || DISPLAY_FONTS[0]
+}
+
 // Apply preferences that affect the document: reduced motion, accent color,
 // and UI scale.
 export function applyUiPrefs(prefs = current) {
@@ -124,6 +139,7 @@ export function applyUiPrefs(prefs = current) {
     // win; setting --accent inline would defeat the light-mode override.
     root.style.removeProperty('--accent')
     root.style.removeProperty('--accent-2')
+    root.style.setProperty('--kt-display', resolveDisplayFont(prefs).stack)
     root.style.zoom = prefs.uiScale && prefs.uiScale !== 1 ? String(prefs.uiScale) : ''
   } catch {
     /* document unavailable (SSR/tests) */

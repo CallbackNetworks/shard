@@ -8,7 +8,7 @@ import { useTheme } from '../context/ThemeContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
 import {
   useUiPrefs, setUiPref, PROJECT_VIEWS, TASK_PRIORITIES,
-  ACCENT_PRESETS, UI_SCALES, TIME_FORMATS, WEEK_STARTS, TIMESTAMP_STYLES,
+  ACCENT_PRESETS, DISPLAY_FONTS, UI_SCALES, TIME_FORMATS, WEEK_STARTS, TIMESTAMP_STYLES,
   LIST_DENSITIES, REFRESH_RATES,
 } from '../utils/uiPrefs'
 
@@ -312,6 +312,16 @@ export default function Settings() {
               )
             })}
           </div>
+        </ControlRow>
+        <ControlRow label={t('settings.displayFont')} hint={t('settings.displayFontHint')}>
+          <Segmented
+            value={uiPrefs.displayFont}
+            onChange={v => persistPref('displayFont', v)}
+            options={DISPLAY_FONTS.map(f => ({
+              value: f.key,
+              label: <span style={{ fontFamily: f.stack, fontSize: 15 }}>{f.label}</span>,
+            }))}
+          />
         </ControlRow>
         <ControlRow label={t('settings.uiScale')} hint={t('settings.uiScaleHint')}>
           <Segmented

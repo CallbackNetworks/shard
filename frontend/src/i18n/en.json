@@ -613,6 +613,8 @@
   "settings.off": "Off",
   "settings.accent": "Accent Color",
   "settings.accentHint": "Primary highlight color across the app",
+  "settings.displayFont": "Display Font",
+  "settings.displayFontHint": "Font for headings and the large kinetic titles",
   "settings.uiScale": "Interface Size",
   "settings.uiScaleHint": "Scale the whole interface up or down",
   "settings.scaleCompact": "Compact",
