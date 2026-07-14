@@ -230,6 +230,10 @@ jobs:
           DB_POOL_TIMEOUT: ${{ vars.DB_POOL_TIMEOUT }}
           DB_SSL_MODE: ${{ vars.DB_SSL_MODE }}
           AUTH_PASSWORD: ${{ secrets.AUTH_PASSWORD }}
+          AUTH_PROXY_HEADER: ${{ vars.AUTH_PROXY_HEADER }}
+          AUTH_TOKEN_TTL: ${{ vars.AUTH_TOKEN_TTL }}
+          AUTH_MAX_ATTEMPTS: ${{ vars.AUTH_MAX_ATTEMPTS }}
+          AUTH_LOCKOUT_SECONDS: ${{ vars.AUTH_LOCKOUT_SECONDS }}
           SMTP_HOST: ${{ vars.SMTP_HOST }}
           SMTP_PORT: ${{ vars.SMTP_PORT }}
           SMTP_USER: ${{ vars.SMTP_USER }}
@@ -252,6 +256,10 @@ jobs:
           DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
           DB_SSL_MODE=${DB_SSL_MODE:-}
           AUTH_PASSWORD=${AUTH_PASSWORD:-}
+          AUTH_PROXY_HEADER=${AUTH_PROXY_HEADER:-}
+          AUTH_TOKEN_TTL=${AUTH_TOKEN_TTL:-604800}
+          AUTH_MAX_ATTEMPTS=${AUTH_MAX_ATTEMPTS:-5}
+          AUTH_LOCKOUT_SECONDS=${AUTH_LOCKOUT_SECONDS:-300}
           SMTP_HOST=${SMTP_HOST:-}
           SMTP_PORT=${SMTP_PORT:-587}
           SMTP_USER=${SMTP_USER:-}

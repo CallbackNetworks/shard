@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import UserPreference
-from app.routers.auth import AUTH_PASSWORD
+from app.routers import auth as auth_mod
 from app.services.ical_token import get_global_ical_token, rotate_global_ical_token
 from app.services.runtime_settings import get_system_settings, update_system_settings
 
@@ -27,8 +27,15 @@ DASHBOARD_WIDGETS = [
 def get_settings(request: Request, db: Session = Depends(get_db)):
     """Return current system settings (non-sensitive)."""
     runtime = get_system_settings(db)
+    if auth_mod.AUTH_PROXY_HEADER:
+        auth_mode = "proxy"
+    elif auth_mod.AUTH_PASSWORD:
+        auth_mode = "password"
+    else:
+        auth_mode = "none"
     return {
-        "auth_enabled": bool(AUTH_PASSWORD),
+        "auth_enabled": auth_mod.auth_enabled(),
+        "auth_mode": auth_mode,
         "llm_provider": os.getenv("LLM_PROVIDER", "stub"),
         "llm_model": os.getenv("LLM_MODEL", ""),
         "smtp_configured": bool(os.getenv("SMTP_HOST")),
@@ -73,8 +80,6 @@ class PasswordChangeRequest(BaseModel):
 @router.post("/change-password")
 def change_password(body: PasswordChangeRequest, request: Request):
     """Change the auth password at runtime (non-persistent across restarts)."""
-    import app.routers.auth as auth_mod
-
     if not auth_mod.AUTH_PASSWORD:
         raise HTTPException(status_code=400, detail="Authentication is not enabled")
 

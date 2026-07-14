@@ -46,9 +46,9 @@ from app.routers import (
     webhooks,
     workflow_rules,
 )
+from app.routers import auth as auth_mod
 from app.routers import ws as ws_router
 from app.routers.auth import router as auth_router
-from app.routers.auth import verify_token
 from app.routers.labels import task_label_router
 from app.services.scheduler import due_date_reminder_loop, get_scheduler_health
 from app.services.search_backend import get_search_backend
@@ -148,14 +148,14 @@ _AUTH_BYPASS = (
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if not os.environ.get("AUTH_PASSWORD", ""):
+        if not auth_mod.auth_enabled():
             return await call_next(request)
         path = request.url.path
         if any(path.startswith(p) for p in _AUTH_BYPASS):
             return await call_next(request)
         auth_header = request.headers.get("authorization", "")
         token = auth_header.removeprefix("Bearer ").strip()
-        if not verify_token(token):
+        if not auth_mod.is_authenticated(request, token):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
         return await call_next(request)
 

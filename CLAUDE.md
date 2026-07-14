@@ -53,7 +53,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up
 | `DB_MAX_OVERFLOW` | Max overflow connections for PostgreSQL/MySQL (default `10`) |
 | `DB_POOL_TIMEOUT` | Pool timeout in seconds for PostgreSQL/MySQL (default `30`) |
 | `DB_SSL_MODE` | SSL mode for PostgreSQL cloud connections (e.g. `require`) |
-| `AUTH_PASSWORD` | Password-protect `/app`; leave empty for no auth |
+| `AUTH_PASSWORD` | Built-in shared-password gate for `/app`; leave empty for no auth |
+| `AUTH_TOKEN_TTL` | Session token lifetime in seconds (default `604800`, 7 days) |
+| `AUTH_MAX_ATTEMPTS` | Failed logins per IP before lockout (default `5`) |
+| `AUTH_LOCKOUT_SECONDS` | Login lockout window in seconds (default `300`) |
+| `AUTH_PROXY_HEADER` | Forward-auth: trust this header from an upstream SSO proxy (e.g. `Cf-Access-Authenticated-User-Email`). Only safe when the origin is reachable exclusively via that proxy — see ADR-0030 |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_USE_TLS` | Email notifications |
 | `LLM_PROVIDER` | `claude` \| `openai` \| `stub` (default `stub`) |
 | `LLM_API_KEY` | API key for the chosen LLM provider |
@@ -155,7 +159,7 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh databas
 **Entry point: `main.py`**
 - Registers all routers
 - `lifespan` context: runs `Base.metadata.create_all()` and stamps a fresh database to the Alembic head, then starts the background scheduler as an `asyncio.Task`
-- Auth middleware reads `AUTH_PASSWORD`; bypasses `/auth/`, `/health`, `/webhook/`, `/share/`, `/docs`, `/openapi.json`, `/redoc`, `/api/v1/`
+- Auth middleware gates the human UI when `AUTH_PASSWORD` or `AUTH_PROXY_HEADER` is set (see ADR-0030); bypasses `/auth/`, `/health`, `/webhook/`, `/share/`, `/ical/`, `/ws`, `/docs`, `/openapi.json`, `/redoc`, `/api/v1/`. Password tokens expire (`AUTH_TOKEN_TTL`) and logins are IP-throttled; forward-auth trusts an upstream SSO proxy's identity header
 
 **Data layer**
 - `models.py` — all SQLAlchemy ORM models (SQLite)
