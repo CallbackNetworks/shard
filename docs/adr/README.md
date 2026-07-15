@@ -33,3 +33,4 @@
 | [0029](0029-milestone-cycle-sync.md) | Milestone ↔ Cycle Sync | Accepted | 2026-07-11 |
 | [0030](0030-app-auth-hardening-and-forward-auth.md) | Application Auth Hardening and Forward-Auth Delegation | Accepted | 2026-07-14 |
 | [0031](0031-kinetic-typography-system.md) | Kinetic Typography System and Runtime-Switchable Display Font | Accepted | 2026-07-14 |
+| [0032](0032-unified-node-edge-graph-model.md) | Unified Node/Edge Graph Model over Fixed Container Relations | Accepted | 2026-07-15 |
