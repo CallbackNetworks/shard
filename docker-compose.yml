@@ -55,7 +55,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5173/"]
+      # node:20-slim ships neither wget nor curl; use node's http module
+      # (dependency-free, mirrors the backend's python urllib check).
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173/',r=>process.exit(r.statusCode<400?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
