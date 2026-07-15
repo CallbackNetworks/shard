@@ -1,0 +1,203 @@
+"""Graph layer for the unified node/edge model (see ADR-0032).
+
+Single place that owns node/edge CRUD and traversal. Callers should go through
+these helpers rather than querying ``Node`` / ``Edge`` directly so that cycle
+prevention and the "nearest ancestor" rules stay consistent.
+"""
+
+from collections import deque
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import Edge, Node
+
+# Node types
+NODE_PROJECT = "project"
+NODE_TASK = "task"
+NODE_IDENTITY = "identity"
+NODE_GOAL = "goal"
+NODE_CYCLE = "cycle"
+NODE_LABEL = "label"
+
+# Edge relationship types (canonical direction: source -> target)
+REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id
+REL_MEMBER_OF = "member_of"  # identity -> project
+REL_ASSIGNED_TO = "assigned_to"  # task -> identity
+REL_DEPENDS_ON = "depends_on"  # blocked task -> prerequisite task
+REL_LABELED = "labeled"  # task -> label
+REL_IN_CYCLE = "in_cycle"  # task -> cycle
+REL_PART_OF = "part_of"  # project -> goal
+
+
+# --- Node CRUD ---------------------------------------------------------------
+
+
+def create_node(db: Session, node_type: str, *, id: str | None = None, title: str = "", **fields) -> Node:
+    """Create a node. Unknown keyword fields are folded into ``data``."""
+    columns = {"status", "priority", "start_date", "due_date", "position", "is_pinned"}
+    col_values = {k: fields.pop(k) for k in list(fields) if k in columns}
+    node = Node(type=node_type, title=title, data=fields or None, **col_values)
+    if id is not None:
+        node.id = id
+    db.add(node)
+    db.flush()
+    return node
+
+
+def get_node(db: Session, node_id: str) -> Node | None:
+    return db.get(Node, node_id)
+
+
+def update_node(db: Session, node_id: str, **fields) -> Node | None:
+    node = db.get(Node, node_id)
+    if node is None:
+        return None
+    columns = {"title", "status", "priority", "start_date", "due_date", "position", "is_pinned"}
+    data = dict(node.data or {})
+    for key, value in fields.items():
+        if key in columns:
+            setattr(node, key, value)
+        else:
+            data[key] = value
+    node.data = data or None
+    db.flush()
+    return node
+
+
+def delete_node(db: Session, node_id: str) -> bool:
+    """Delete a node and every edge touching it."""
+    node = db.get(Node, node_id)
+    if node is None:
+        return False
+    db.query(Edge).filter((Edge.source_id == node_id) | (Edge.target_id == node_id)).delete(synchronize_session=False)
+    db.delete(node)
+    db.flush()
+    return True
+
+
+# --- Edge CRUD ---------------------------------------------------------------
+
+
+def add_edge(
+    db: Session, source_id: str, target_id: str, rel_type: str, *, position: int = 0, data: dict | None = None
+) -> Edge:
+    """Create an edge if it does not already exist; otherwise return the existing one.
+
+    For ``contains`` edges this guards against introducing a cycle.
+    """
+    if rel_type == REL_CONTAINS and detect_cycle(db, source_id, target_id):
+        raise ValueError(f"adding contains edge {source_id} -> {target_id} would create a cycle")
+    existing = db.execute(
+        select(Edge).where(Edge.source_id == source_id, Edge.target_id == target_id, Edge.rel_type == rel_type)
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    edge = Edge(source_id=source_id, target_id=target_id, rel_type=rel_type, position=position, data=data)
+    db.add(edge)
+    db.flush()
+    return edge
+
+
+def remove_edge(db: Session, source_id: str, target_id: str, rel_type: str) -> bool:
+    deleted = (
+        db.query(Edge)
+        .filter(Edge.source_id == source_id, Edge.target_id == target_id, Edge.rel_type == rel_type)
+        .delete(synchronize_session=False)
+    )
+    db.flush()
+    return bool(deleted)
+
+
+# --- Traversal ---------------------------------------------------------------
+
+
+def neighbors(db: Session, node_id: str, rel_type: str, *, direction: str = "out") -> list[Node]:
+    """Return nodes connected to ``node_id`` by ``rel_type``.
+
+    direction "out": nodes this node points at (targets).
+    direction "in": nodes pointing at this node (sources).
+    """
+    if direction == "out":
+        stmt = (
+            select(Node)
+            .join(Edge, Edge.target_id == Node.id)
+            .where(Edge.source_id == node_id, Edge.rel_type == rel_type)
+            .order_by(Edge.position)
+        )
+    else:
+        stmt = (
+            select(Node)
+            .join(Edge, Edge.source_id == Node.id)
+            .where(Edge.target_id == node_id, Edge.rel_type == rel_type)
+            .order_by(Edge.position)
+        )
+    return list(db.execute(stmt).scalars().all())
+
+
+def children_of(db: Session, node_id: str) -> list[Node]:
+    """Direct children via ``contains`` (task's subtasks / project's tasks)."""
+    return neighbors(db, node_id, REL_CONTAINS, direction="out")
+
+
+def parents_of(db: Session, node_id: str) -> list[Node]:
+    """Direct parents via ``contains``. May be more than one (multi-membership)."""
+    return neighbors(db, node_id, REL_CONTAINS, direction="in")
+
+
+def ancestors_of(db: Session, node_id: str) -> list[Node]:
+    """All transitive parents via ``contains``, breadth-first, de-duplicated."""
+    seen: set[str] = set()
+    ordered: list[Node] = []
+    queue: deque[str] = deque([node_id])
+    while queue:
+        current = queue.popleft()
+        for parent in parents_of(db, current):
+            if parent.id not in seen:
+                seen.add(parent.id)
+                ordered.append(parent)
+                queue.append(parent.id)
+    return ordered
+
+
+def nearest_ancestor_of_type(db: Session, node_id: str, node_type: str) -> Node | None:
+    """Nearest ``contains`` ancestor of the given type (e.g. a task's home project).
+
+    Breadth-first from the node; within a level the deterministic tie-break is
+    edge ``position`` then ``created_at`` (already applied by ``parents_of``).
+    """
+    queue: deque[str] = deque([node_id])
+    seen: set[str] = {node_id}
+    while queue:
+        current = queue.popleft()
+        for parent in parents_of(db, current):
+            if parent.type == node_type:
+                return parent
+            if parent.id not in seen:
+                seen.add(parent.id)
+                queue.append(parent.id)
+    return None
+
+
+def descendants_of(db: Session, node_id: str) -> set[str]:
+    """Ids of all transitive children via ``contains``."""
+    seen: set[str] = set()
+    queue: deque[str] = deque([node_id])
+    while queue:
+        current = queue.popleft()
+        for child in children_of(db, current):
+            if child.id not in seen:
+                seen.add(child.id)
+                queue.append(child.id)
+    return seen
+
+
+def detect_cycle(db: Session, source_id: str, target_id: str) -> bool:
+    """Would adding ``contains`` edge source -> target create a cycle?
+
+    True if source == target, or if source is already a descendant of target
+    (which would close a loop once target also contains source).
+    """
+    if source_id == target_id:
+        return True
+    return source_id in descendants_of(db, target_id)

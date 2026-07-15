@@ -24,17 +24,17 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 
 ---
 
-## 階段 1 — 基礎層(additive,零行為變更)
+## 階段 1 — 基礎層(additive,零行為變更) ✅ 已完成
 
-- [ ] `models.py`:新增 `Node`、`Edge` ORM;`type`、`status`、`source_id`、`target_id`、`rel_type` 建索引;`UniqueConstraint(source_id, target_id, rel_type)`。
-- [ ] Alembic:`alembic revision --autogenerate -m "add nodes and edges tables"`,`render_as_batch=True` 確認 SQLite 相容。
-- [ ] 回填 migration(data migration,與建表分開一支):
+- [x] `models.py`:新增 `Node`、`Edge` ORM;`type`、`status`、`due_date`、`source_id`、`target_id`、`rel_type` 建索引;`UniqueConstraint(source_id, target_id, rel_type)`。
+- [x] 建表 migration `c1a2b3d4e5f6`(idempotent,check `inspector.get_table_names()`)。
+- [x] 回填 migration `d2e4f6a8c0b2`(與建表分開一支,idempotent 以 nodes 是否已有列判斷):
   - 每個 project/task/identity/goal/cycle/label 插入 `nodes`(沿用 id,熱欄位對映,其餘進 `data`)。
   - `project_id`/`parent_id`/五張關聯表 → 對映 `edges`。
-  - 於 SQLite 與 PostgreSQL 皆驗證回填筆數守恆。
-- [ ] `services/graph.py`:`create_node`、`update_node`、`delete_node`、`add_edge`、`remove_edge`、`neighbors(node_id, rel_type, direction)`、`children_of`、`parents_of`、`ancestors_of`、`nearest_ancestor_of_type`、`detect_cycle`。
-- [ ] `tests/test_graph.py`:節點/邊 CRUD、遍歷、環偵測、回填守恆。
-- [ ] 舊表仍為權威來源,app 行為不變。**Commit。**
+  - 已於 dev SQLite 驗證回填筆數守恆(nodes: 17/122/9/11/17/78;edges contains=137、member_of=26、part_of=5、depends_on=11、labeled=43、in_cycle=41 全部 OK)。
+- [x] `services/graph.py`:`create_node`、`update_node`、`delete_node`、`add_edge`、`remove_edge`、`neighbors`、`children_of`、`parents_of`、`ancestors_of`、`descendants_of`、`nearest_ancestor_of_type`、`detect_cycle`。
+- [x] `tests/test_graph.py`:12 項涵蓋 CRUD、遍歷、多重歸屬、環偵測;SQLite 與 PostgreSQL 皆綠。
+- [x] 全套 668 項測試綠、app 行為不變;舊表仍為權威來源。**Committed。**
 
 ## 階段 2 — 讀取切換(回應形狀不變)
 

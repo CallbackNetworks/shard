@@ -534,6 +534,57 @@ class UserPreference(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
 
+class Node(Base):
+    """Unified graph node for first-class entities (see ADR-0032).
+
+    Project / Task / Identity / Goal / Cycle / Label are all stored here,
+    keeping their original UUIDs so peripheral tables (comments, attachments,
+    activity logs) that reference those ids stay valid. Hot query fields are
+    real indexed columns; type-specific long-tail fields live in ``data``.
+    """
+
+    __tablename__ = "nodes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)  # project/task/identity/goal/cycle/label
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    status: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    priority: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # type-specific fields not needing indexed query
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+
+class Edge(Base):
+    """Typed relationship between two nodes (see ADR-0032).
+
+    The single relationship primitive replacing rigid container FKs
+    (project_id, parent_id) and the association tables (task_dependencies,
+    project_identities, goal_projects, task_labels, cycle_tasks). Canonical
+    direction is source -> target; see the rel_type vocabulary in ADR-0032.
+    """
+
+    __tablename__ = "edges"
+    __table_args__ = (UniqueConstraint("source_id", "target_id", "rel_type", name="uq_edge"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # contains / member_of / assigned_to / depends_on / labeled / in_cycle / part_of
+    rel_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
 class WorkflowRule(Base):
     """User-defined if-this-then-that automation rule."""
 
