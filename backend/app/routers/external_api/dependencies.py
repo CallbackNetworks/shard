@@ -14,7 +14,6 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.routers.external_api.helpers import _get_task_or_404
-from app.services import graph
 
 sub_router = APIRouter()
 
@@ -87,11 +86,8 @@ def api_add_dependency(
         .first()
     )
     if existing:
-        graph.link_dependency(db, task_id, depends_on_id)  # backfill edge if missing
-        db.commit()
         return {"task_id": task_id, "depends_on_id": depends_on_id}
-    db.add(TaskDependency(task_id=task_id, depends_on_id=depends_on_id))
-    graph.link_dependency(db, task_id, depends_on_id)
+    db.add(TaskDependency(task_id=task_id, depends_on_id=depends_on_id))  # edge mirrored by graph_sync listener
     db.commit()
     return {"task_id": task_id, "depends_on_id": depends_on_id}
 
@@ -122,6 +118,5 @@ def api_remove_dependency(
     )
     if not dep:
         raise HTTPException(status_code=404, detail="Dependency not found")
-    db.delete(dep)
-    graph.unlink_dependency(db, task_id, depends_on_id)
+    db.delete(dep)  # edge removed by graph_sync listener
     db.commit()

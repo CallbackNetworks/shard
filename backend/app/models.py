@@ -584,6 +584,11 @@ class Edge(Base):
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
+    # Relationships declared so the unit-of-work inserts referenced nodes before edges
+    # (PostgreSQL enforces the FK within the flush; see graph_sync).
+    source: Mapped["Node"] = relationship("Node", foreign_keys=[source_id])
+    target: Mapped["Node"] = relationship("Node", foreign_keys=[target_id])
+
 
 class WorkflowRule(Base):
     """User-defined if-this-then-that automation rule."""

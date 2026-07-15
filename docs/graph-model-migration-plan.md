@@ -44,9 +44,15 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] `POST/DELETE /projects/{pid}/tasks/{tid}/memberships/{target}`:以 `contains` 邊管理跨專案歸屬;`ensure_node` 對回填後新建的列 lazy 建節點。
 - [x] `tests/test_task_membership.py`(5 項)+ 全套 673 綠。
 
+**已交付的全域雙寫(`services/graph_sync.py`):**
+- [x] `before_flush` 監聽器把**五張關聯表**(`TaskLabel`/`TaskDependency`/`CycleTask`/`ProjectIdentity`/`GoalProject`)的 insert/delete 自動鏡射成對應邊,涵蓋所有 9+ 個寫入點,不需逐檔改。節點缺就 lazy 建。
+- [x] `Edge` 加上對 `Node` 的 relationship,讓 unit-of-work 在同一 flush 內先插 node 再插 edge(PostgreSQL 即時強制 FK,見 [ADR-0018](adr/0018-postgres-parity-and-fresh-db-bootstrap.md))。
+- [x] `tests/test_graph_sync.py`(6 項)SQLite + PostgreSQL 皆綠。
+
 **尚未做(刻意保留,見下方風險判斷):**
-- [ ] 把 `project_id` / `parent_id` / `labels` / `blocked_by` 等**全部**欄位改由邊推導(目前 primary 仍讀舊欄位,邊為附加)。
-- [ ] 全域 mutation 雙寫(目前只有 membership 端點寫邊;其餘 task/project 建立仍只寫舊表,靠 `ensure_node` 在需要時補節點)。
+- [ ] 把 `project_id` / `parent_id` / `labels` / `blocked_by` 等**讀取**改由邊推導(目前 primary 仍讀舊欄位/關聯,邊為鏡射)。
+- [ ] 實體本身(task/project/…)的 create/delete → node 與 `contains` 邊尚未全域雙寫(新建 task 的 primary 歸屬邊靠 backfill + `ensure_node` lazy 補;主鏈路仍走 `project_id` 欄位)。
+- [ ] 已知限制:bulk `query(...).delete()` 繞過 ORM 事件(如 `bulk.py` 的標籤移除),鏡射會漏;讀取切換前需處理。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 
