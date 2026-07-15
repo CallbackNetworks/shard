@@ -49,6 +49,19 @@ def get_node(db: Session, node_id: str) -> Node | None:
     return db.get(Node, node_id)
 
 
+def ensure_node(db: Session, node_id: str, node_type: str, *, title: str = "") -> Node:
+    """Return the node with this id, creating a minimal one if it does not exist.
+
+    Used when linking entities whose node was not yet mirrored into the graph
+    (e.g. rows created after the initial backfill, before the write path is cut
+    over in a later phase).
+    """
+    node = db.get(Node, node_id)
+    if node is None:
+        node = create_node(db, node_type, id=node_id, title=title)
+    return node
+
+
 def update_node(db: Session, node_id: str, **fields) -> Node | None:
     node = db.get(Node, node_id)
     if node is None:
@@ -190,6 +203,16 @@ def descendants_of(db: Session, node_id: str) -> set[str]:
                 seen.add(child.id)
                 queue.append(child.id)
     return seen
+
+
+def member_project_ids(db: Session, task_id: str) -> list[str]:
+    """Ids of every project a task belongs to via incoming ``contains`` edges."""
+    return [n.id for n in parents_of(db, task_id) if n.type == NODE_PROJECT]
+
+
+def contained_task_ids(db: Session, project_id: str) -> list[str]:
+    """Ids of tasks contained by a project via outgoing ``contains`` edges."""
+    return [n.id for n in children_of(db, project_id) if n.type == NODE_TASK]
 
 
 def detect_cycle(db: Session, source_id: str, target_id: str) -> bool:

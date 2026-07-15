@@ -1,5 +1,16 @@
-from app.models import RecurrenceRule
+from app.models import RecurrenceRule, Task
 from app.schemas import CycleOut, IdentityOut, LabelOut, ProjectOut, RecurrenceRuleOut, TaskOut, TaskPullRequestOut
+from app.services import graph
+
+
+def _membership_project_ids(task, db) -> list[str]:
+    """Unique projects a task belongs to: primary column plus graph ``contains`` edges."""
+    ids = [task.project_id] if task.project_id else []
+    if db is not None:
+        for pid in graph.member_project_ids(db, task.id):
+            if pid not in ids:
+                ids.append(pid)
+    return ids
 
 
 def enrich_task(task, db=None) -> TaskOut:
@@ -10,6 +21,7 @@ def enrich_task(task, db=None) -> TaskOut:
     out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
     out.blocking = [d.task_id for d in task.blocking_deps]
     out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
+    out.project_ids = _membership_project_ids(task, db)
     if task.assigned_agent is not None:
         out.assigned_agent_name = task.assigned_agent.name
     if db is not None:
@@ -41,6 +53,16 @@ def enrich_project(project, db=None) -> ProjectOut:
     out.done_tasks = done
     out.progress = progress
     out.tasks = [enrich_task(t, db) for t in project.tasks]
+
+    # Tasks linked into this project via graph contains edges but whose primary
+    # project_id is elsewhere — cross-project membership (ADR-0032).
+    if db is not None:
+        own_ids = {t.id for t in project.tasks}
+        extra_ids = [tid for tid in graph.contained_task_ids(db, project.id) if tid not in own_ids]
+        if extra_ids:
+            extra_tasks = db.query(Task).filter(Task.id.in_(extra_ids)).all()
+            out.tasks += [enrich_task(t, db) for t in extra_tasks]
+
     out.labels = [LabelOut.model_validate(lb) for lb in project.labels]
 
     enriched_cycles = []

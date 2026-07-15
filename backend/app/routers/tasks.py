@@ -14,7 +14,9 @@ from app.routers.issue_sync import (
     sync_task_reopen_to_external,
 )
 from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate, TaskWithSubtasksOut
+from app.services import graph
 from app.services.activity import log_activity
+from app.services.enrichment import enrich_task
 from app.services.notifier import fire_notifications
 from app.services.rules_engine import run_rules
 from app.services.ws_manager import ws_manager
@@ -269,6 +271,61 @@ def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Ses
         raise HTTPException(status_code=404, detail="Dependency not found")
     db.delete(dep)
     db.commit()
+
+
+@router.post("/{task_id}/memberships/{target_project_id}", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
+async def add_membership(project_id: str, task_id: str, target_project_id: str, db: Session = Depends(get_db)):
+    """Link a task into an additional project via a graph ``contains`` edge (ADR-0032).
+
+    The task keeps its home project (project_id); this adds cross-project
+    membership so the task also surfaces under target_project_id.
+    """
+    _get_project_or_404(project_id, db)
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if target_project_id == project_id:
+        raise HTTPException(status_code=400, detail="Task already belongs to its home project")
+    _get_project_or_404(target_project_id, db)
+
+    graph.ensure_node(db, target_project_id, graph.NODE_PROJECT)
+    graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
+    graph.add_edge(db, target_project_id, task_id, graph.REL_CONTAINS)
+    log_activity(
+        db,
+        "task.membership_added",
+        project_id=target_project_id,
+        task_id=task_id,
+        actor="api",
+        detail=f"Task linked into project {target_project_id}",
+    )
+    db.commit()
+    await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": target_project_id})
+    db.refresh(task)
+    return enrich_task(task, db)
+
+
+@router.delete("/{task_id}/memberships/{target_project_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_membership(project_id: str, task_id: str, target_project_id: str, db: Session = Depends(get_db)):
+    """Unlink a task from an additional project. The home project cannot be removed."""
+    _get_project_or_404(project_id, db)
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if target_project_id == project_id:
+        raise HTTPException(status_code=400, detail="Cannot remove a task from its home project")
+    if not graph.remove_edge(db, target_project_id, task_id, graph.REL_CONTAINS):
+        raise HTTPException(status_code=404, detail="Membership not found")
+    log_activity(
+        db,
+        "task.membership_removed",
+        project_id=target_project_id,
+        task_id=task_id,
+        actor="api",
+        detail=f"Task unlinked from project {target_project_id}",
+    )
+    db.commit()
+    await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": target_project_id})
 
 
 @router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)

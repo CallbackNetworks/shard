@@ -36,13 +36,19 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] `tests/test_graph.py`:12 項涵蓋 CRUD、遍歷、多重歸屬、環偵測;SQLite 與 PostgreSQL 皆綠。
 - [x] 全套 668 項測試綠、app 行為不變;舊表仍為權威來源。**Committed。**
 
-## 階段 2 — 讀取切換(回應形狀不變)
+## 階段 2 — 讀取切換(回應形狀不變) 🟡 部分完成
 
-- [ ] `routers/projects.py` 的 `_enrich_task` / `_enrich` 改由邊推導:`project_id`(最近 project 祖先)、`parent_id`(首個 task 父)、`labels`、`blocked_by`、`blocking`、`subtask_count`、identities。
-- [ ] 全部 GET 端點改讀圖;`TaskOut` / `ProjectOut` 欄位不變。
-- [ ] mutation 暫行**雙寫**(舊表 + 圖),確保讀圖與舊資料一致。
-- [ ] 加 `nearest_ancestor_of_type` 的決定性規則(多祖先時取 position 最小 / created_at 最早)。
-- [ ] 既有 API 測試全綠(形狀未變即為通過)。**Commit。**
+**已交付的可用能力(跨專案歸屬 end-to-end,已測):**
+- [x] `TaskOut` 新增 `project_ids`(相容、additive);`enrichment.enrich_task` 由「primary `project_id` + 圖 `contains` 邊」推導。
+- [x] `enrichment.enrich_project` union 進「由邊掛入本專案、但 primary 不在此」的任務 → 任務可同時出現在多個專案。
+- [x] `POST/DELETE /projects/{pid}/tasks/{tid}/memberships/{target}`:以 `contains` 邊管理跨專案歸屬;`ensure_node` 對回填後新建的列 lazy 建節點。
+- [x] `tests/test_task_membership.py`(5 項)+ 全套 673 綠。
+
+**尚未做(刻意保留,見下方風險判斷):**
+- [ ] 把 `project_id` / `parent_id` / `labels` / `blocked_by` 等**全部**欄位改由邊推導(目前 primary 仍讀舊欄位,邊為附加)。
+- [ ] 全域 mutation 雙寫(目前只有 membership 端點寫邊;其餘 task/project 建立仍只寫舊表,靠 `ensure_node` 在需要時補節點)。
+
+> **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 
 ## 階段 3 — 寫入切換
 

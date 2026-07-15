@@ -178,7 +178,8 @@ class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    project_id: str
+    project_id: str  # primary/home project (legacy container)
+    project_ids: list[str] = []  # every project this task belongs to, incl. graph edges (ADR-0032)
     parent_id: str | None = None
     title: str
     description: str | None
