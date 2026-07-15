@@ -115,7 +115,7 @@ export default function Sidebar({ onOpenPalette }) {
           title={t('nav.statusPage')}
           className="kt-mini-action"
         >
-          <span className="kt-rail-ico"><ExternalLink size={14} /></span>
+          <span className="kt-rail-ico"><ExternalLink size={16} /></span>
           <span className="kt-rail-label">{t('nav.statusPage')}</span>
         </a>
         <button
@@ -124,7 +124,7 @@ export default function Sidebar({ onOpenPalette }) {
           title={mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
           className="kt-mini-action"
         >
-          <span className="kt-rail-ico">{mode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}</span>
+          <span className="kt-rail-ico">{mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}</span>
           <span className="kt-rail-label">{mode === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}</span>
         </button>
         <button
