@@ -1333,31 +1333,32 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   cursor: pointer;
 }
 .kt-focus-avatar {
-  width: 22px;
-  height: 22px;
+  width: 23px;
+  height: 23px;
   display: grid;
   place-items: center;
   font-family: var(--kt-display);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 400;
   line-height: 1;
-  color: #0b0b0f;
-  background: var(--focus-color, #6b7280);
-  filter: grayscale(1);
-  opacity: 0.68;
-  transition: opacity 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
+  color: var(--kt-muted);
+  background: rgba(var(--kt-ink-rgb), 0.045);
+  border: 1px solid var(--kt-line);
+  transition: color 0.14s ease, background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .kt-focus-btn:hover .kt-focus-avatar {
-  opacity: 1;
-  filter: grayscale(0.4);
+  color: var(--kt-ink);
+  border-color: color-mix(in srgb, var(--focus-color, var(--kt-muted)) 55%, var(--kt-line));
+  background: color-mix(in srgb, var(--focus-color, var(--kt-muted)) 12%, transparent);
 }
 .kt-focus-btn.is-focused {
   color: var(--kt-ink);
   background: var(--kt-hover);
 }
 .kt-focus-btn.is-focused .kt-focus-avatar {
-  opacity: 1;
-  filter: none;
+  color: #0b0b0f;
+  background: var(--focus-color, var(--kt-hit));
+  border-color: var(--focus-color, var(--kt-hit));
   box-shadow: 0 0 0 2px var(--kt-bg), 0 0 0 3px var(--focus-color);
 }
 .kt-focus-btn.is-focused::before {
