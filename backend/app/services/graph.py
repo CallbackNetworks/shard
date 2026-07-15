@@ -205,6 +205,20 @@ def descendants_of(db: Session, node_id: str) -> set[str]:
     return seen
 
 
+def link_dependency(db: Session, task_id: str, depends_on_id: str) -> None:
+    """Mirror a task dependency as a ``depends_on`` edge (blocked task -> prerequisite).
+
+    Idempotent; lazily creates task nodes not yet mirrored into the graph.
+    """
+    ensure_node(db, task_id, NODE_TASK)
+    ensure_node(db, depends_on_id, NODE_TASK)
+    add_edge(db, task_id, depends_on_id, REL_DEPENDS_ON)
+
+
+def unlink_dependency(db: Session, task_id: str, depends_on_id: str) -> None:
+    remove_edge(db, task_id, depends_on_id, REL_DEPENDS_ON)
+
+
 def member_project_ids(db: Session, task_id: str) -> list[str]:
     """Ids of every project a task belongs to via incoming ``contains`` edges."""
     return [n.id for n in parents_of(db, task_id) if n.type == NODE_PROJECT]

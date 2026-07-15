@@ -248,9 +248,12 @@ def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Sessio
         .first()
     )
     if existing:
+        graph.link_dependency(db, task_id, depends_on_id)  # backfill edge if missing
+        db.commit()
         return {"task_id": task_id, "depends_on_id": depends_on_id}
     dep = TaskDependency(task_id=task_id, depends_on_id=depends_on_id)
     db.add(dep)
+    graph.link_dependency(db, task_id, depends_on_id)
     db.commit()
     return {"task_id": task_id, "depends_on_id": depends_on_id}
 
@@ -270,6 +273,7 @@ def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Ses
     if not dep:
         raise HTTPException(status_code=404, detail="Dependency not found")
     db.delete(dep)
+    graph.unlink_dependency(db, task_id, depends_on_id)
     db.commit()
 
 
