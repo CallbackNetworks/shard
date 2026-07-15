@@ -1343,11 +1343,13 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   line-height: 1;
   color: #0b0b0f;
   background: var(--focus-color, #6b7280);
-  opacity: 0.72;
-  transition: opacity 0.14s ease, box-shadow 0.14s ease;
+  filter: grayscale(1);
+  opacity: 0.68;
+  transition: opacity 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
 }
 .kt-focus-btn:hover .kt-focus-avatar {
   opacity: 1;
+  filter: grayscale(0.4);
 }
 .kt-focus-btn.is-focused {
   color: var(--kt-ink);
@@ -1355,6 +1357,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-focus-btn.is-focused .kt-focus-avatar {
   opacity: 1;
+  filter: none;
   box-shadow: 0 0 0 2px var(--kt-bg), 0 0 0 3px var(--focus-color);
 }
 .kt-focus-btn.is-focused::before {
@@ -3781,6 +3784,29 @@ select[style*="border-radius"],
   bottom: 20px;
   right: 20px;
   z-index: 290;
+}
+/* Kinetic hover: a light bar sweeps across the tile — no positional bounce, so
+   the button stays anchored like the rail logo. See ADR-0031. */
+.kt-assistant-fab {
+  overflow: hidden;
+  transition: filter 0.15s ease;
+}
+.kt-assistant-fab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.5) 50%, transparent 100%);
+  transform: translateX(-110%);
+}
+.kt-assistant-fab:hover {
+  filter: brightness(1.08);
+}
+.kt-assistant-fab:hover::before {
+  animation: kineticScan 0.5s ease;
+}
+[data-motion="reduced"] .kt-assistant-fab:hover::before {
+  animation: none;
 }
 .kt-offline-indicator {
   position: fixed;

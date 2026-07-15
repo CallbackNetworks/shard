@@ -228,15 +228,12 @@ export default function AssistantPanel() {
         title="AI Assistant"
         style={{
           position: 'fixed', bottom: 20, right: 20, zIndex: 290,
-          width: 48, height: 48, borderRadius: 0,
+          width: 44, height: 44, borderRadius: 0,
           background: ACCENT,
           border: 'none', cursor: 'pointer', color: 'var(--kt-bg)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '6px 6px 0 rgba(0,0,0,0.45)',
-          transition: 'transform 0.2s, box-shadow 0.2s',
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'translate(-2px, -2px)'; e.currentTarget.style.boxShadow = '10px 10px 0 rgba(0,0,0,0.5)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '6px 6px 0 rgba(0,0,0,0.45)' }}
       >
         <MessageCircle size={20} />
       </button>
