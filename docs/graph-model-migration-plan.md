@@ -49,10 +49,16 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] `Edge` 加上對 `Node` 的 relationship,讓 unit-of-work 在同一 flush 內先插 node 再插 edge(PostgreSQL 即時強制 FK,見 [ADR-0018](adr/0018-postgres-parity-and-fresh-db-bootstrap.md))。
 - [x] `tests/test_graph_sync.py`(6 項)SQLite + PostgreSQL 皆綠。
 
-**尚未做(刻意保留,見下方風險判斷):**
-- [ ] 把 `project_id` / `parent_id` / `labels` / `blocked_by` 等**讀取**改由邊推導(目前 primary 仍讀舊欄位/關聯,邊為鏡射)。
-- [ ] 實體本身(task/project/…)的 create/delete → node 與 `contains` 邊尚未全域雙寫(新建 task 的 primary 歸屬邊靠 backfill + `ensure_node` lazy 補;主鏈路仍走 `project_id` 欄位)。
-- [ ] 已知限制:bulk `query(...).delete()` 繞過 ORM 事件(如 `bulk.py` 的標籤移除),鏡射會漏;讀取切換前需處理。
+**實體 + 容器也全域雙寫(`graph_sync` 擴充):**
+- [x] 監聽器新增:新建 Project/Task/Identity/Goal/Cycle/Label → 對應型別 `nodes` 列;Task 另建 `project_id`/`parent_id` 的 `contains` 邊。用「在 `before_flush` 內先指派 pk」避開 flush-time id 未定問題。
+- [x] 刪除實體 → 清掉該 node 與所有相連邊(明確刪,因 SQLite 不強制 ondelete CASCADE)。
+- [x] `tests/test_graph_sync.py` 增至 9 項;task 生命週期 SQLite + PostgreSQL 皆綠。
+- [x] **至此圖已是完整的即時鏡射(實體 + 容器 + 五種關係)。**
+
+**尚未做(下一步):**
+- [ ] 把 `project_id` / `parent_id` / `labels` / `blocked_by` 等**讀取**改由邊推導(需批次載入避免 N+1)。這是讓邊成為唯一權威、進而 drop 欄位的前置。
+- [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;讀取切換時處理)。
+- [ ] 已知限制:bulk `query(...).delete()` / `update()` 繞過 ORM 事件(如 `bulk.py` 標籤移除、任何 bulk 狀態更新),鏡射會漏;讀取切換前需補這些點。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 

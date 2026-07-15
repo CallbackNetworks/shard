@@ -116,3 +116,38 @@ def test_nodes_lazily_created_for_association(db):
     # Both endpoints now exist as nodes with the correct type.
     assert db.get(Node, t.id).type == "task"
     assert db.get(Node, label.id).type == "label"
+
+
+def test_task_create_mirrors_node_and_contains_edge(db):
+    from app.models import Node
+
+    p = _project(db)
+    t = _task(db, p.id)
+
+    assert db.get(Node, p.id).type == "project"
+    assert db.get(Node, t.id).type == "task"
+    assert _edge(db, p.id, t.id, "contains") is not None
+
+
+def test_subtask_create_mirrors_parent_containment(db):
+    p = _project(db)
+    parent = _task(db, p.id, "parent")
+    child = Task(project_id=p.id, parent_id=parent.id, title="child")
+    db.add(child)
+    db.commit()
+
+    assert _edge(db, parent.id, child.id, "contains") is not None  # parent contains child
+    assert _edge(db, p.id, child.id, "contains") is not None  # project contains child too
+
+
+def test_entity_delete_removes_node(db):
+    from app.models import Node
+
+    p = _project(db)
+    t = _task(db, p.id)
+    tid = t.id
+    db.delete(t)
+    db.commit()
+
+    assert db.get(Node, tid) is None
+    assert _edge(db, p.id, tid, "contains") is None
