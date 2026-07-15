@@ -72,6 +72,14 @@ export default defineConfig({
     },
   },
   server: {
+    // Hosts allowed to reach the dev server. Needed when exposing it through a
+    // Cloudflare tunnel for live preview — Vite otherwise blocks the tunnel's
+    // *.trycloudflare.com Host header. Extend via VITE_ALLOWED_HOSTS (comma-list).
+    allowedHosts: [
+      '.trycloudflare.com',
+      'localhost',
+      ...(process.env.VITE_ALLOWED_HOSTS?.split(',').map(h => h.trim()).filter(Boolean) || []),
+    ],
     proxy: {
       '/projects': backendUrl,
       '/webhook': backendUrl,
