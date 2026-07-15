@@ -64,6 +64,10 @@ services:
       - app-network
 
   mcp:
+    # Off by default: the stdio transport is launched on demand by an MCP client,
+    # not run as a standing service. Start explicitly for HTTP transport:
+    #   MCP_TRANSPORT=http docker compose --profile mcp up mcp
+    profiles: ["mcp"]
     build: ./mcp_server
     volumes:
       - ./mcp_server:/app/mcp_server
