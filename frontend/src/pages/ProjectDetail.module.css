@@ -1,12 +1,26 @@
-/* ── LabelChip ── */
+/* ── LabelChip ──
+   Header labels read as bold graphic tags, not contained pills: display font,
+   uppercase, and a solid colored tick instead of a filled box. --label-color is
+   set inline per label. */
 .labelChip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 0;
-  font-weight: 500;
+  gap: 6px;
+  font-family: var(--kt-display);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--label-color);
+  padding: 0;
+}
+.labelChip::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 0.92em;
+  background: var(--label-color);
 }
 
 .labelChipRemoveBtn {
@@ -250,9 +264,10 @@
 
 .projectLabels {
   display: flex;
-  gap: 4px;
+  gap: 16px;
   flex-wrap: wrap;
-  margin-top: 6px;
+  align-items: center;
+  margin-top: 9px;
 }
 
 .headerActions {

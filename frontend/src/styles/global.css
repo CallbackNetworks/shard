@@ -2365,7 +2365,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-width: 200%;
   height: 100%;
   white-space: nowrap;
-  animation: kineticTicker 34s linear infinite;
+  animation: kineticTicker 58s linear infinite;
 }
 .kt-alert-strip-track span {
   display: inline-flex;
@@ -2420,7 +2420,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   gap: 0;
   width: max-content;
   height: 100%;
-  animation: kineticTicker 40s linear infinite;
+  animation: kineticTicker 78s linear infinite;
 }
 .kt-ticker-track span {
   flex-shrink: 0;

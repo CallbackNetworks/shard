@@ -25,10 +25,7 @@ import s from './ProjectDetail.module.css'
 
 function LabelChip({ label, onRemove }) {
   return (
-    <span className={s.labelChip} style={{
-      background: label.color + '22', color: label.color,
-      border: `1px solid ${label.color}44`,
-    }}>
+    <span className={s.labelChip} style={{ '--label-color': label.color }}>
       {label.name}
       {onRemove && (
         <button onClick={onRemove} className={s.labelChipRemoveBtn} style={{ color: label.color }}>
