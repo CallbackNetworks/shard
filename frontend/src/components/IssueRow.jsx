@@ -1,6 +1,6 @@
 import { useState, memo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, ExternalLink, GitPullRequestArrow } from 'lucide-react'
+import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, ExternalLink, GitPullRequestArrow, Boxes } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { regenerateToken, createExternalIssue } from '../api/client'
 import { PRIORITY, DARK } from '../constants/theme'
@@ -8,6 +8,7 @@ import { PriorityIcon, StatusIcon, LabelChip, PrBadge } from './TaskIcons'
 import TaskEditForm from './TaskEditForm'
 import CommentsPanel from './CommentsPanel'
 import DependenciesPanel from './DependenciesPanel'
+import MembershipPanel from './MembershipPanel'
 import RecurrencePanel from './RecurrencePanel'
 import AttachmentsPanel from './AttachmentsPanel'
 import BuildHistoryPanel from './BuildHistoryPanel'
@@ -27,6 +28,7 @@ export default memo(function IssueRow({
   const [subtaskTitle, setSubtaskTitle] = useState('')
   const [showComments, setShowComments] = useState(false)
   const [showDeps, setShowDeps] = useState(false)
+  const [showMembership, setShowMembership] = useState(false)
   const [showRecurrence, setShowRecurrence] = useState(false)
   const [showAttachments, setShowAttachments] = useState(false)
   const [showBuildHistory, setShowBuildHistory] = useState(false)
@@ -151,6 +153,21 @@ export default memo(function IssueRow({
           </span>
         )}
 
+        {/* Multi-project membership badge (ADR-0032) */}
+        {(task.project_ids || []).length > 1 && (
+          <span
+            onClick={(e) => { e.stopPropagation(); setShowMembership(v => !v) }}
+            title={t('membership.badge', { count: task.project_ids.length })}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              fontSize: 10, color: showMembership ? '#818cf8' : 'rgba(129,140,248,0.75)',
+              cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+            }}
+          >
+            <Boxes size={11} />{task.project_ids.length}
+          </span>
+        )}
+
         {/* Recurrence badge */}
         {task.recurrence && (
           <span
@@ -265,6 +282,10 @@ export default memo(function IssueRow({
               style={{ background: showDeps ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDeps ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <GitBranch size={12} />
             </button>
+            <button onClick={(e) => { e.stopPropagation(); setShowMembership(v => !v) }} title={t('membership.title')}
+              style={{ background: showMembership ? 'rgba(129,140,248,0.14)' : 'none', border: 'none', cursor: 'pointer', color: showMembership ? '#818cf8' : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              <Boxes size={12} />
+            </button>
             <button onClick={(e) => { e.stopPropagation(); setShowRecurrence(v => !v) }} title="Recurrence"
               style={{ background: showRecurrence ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showRecurrence ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Repeat2 size={12} />
@@ -361,6 +382,11 @@ export default memo(function IssueRow({
       {/* Dependencies panel */}
       {showDeps && (
         <DependenciesPanel projectId={projectId} task={task} allTasks={allTasks} depth={depth} />
+      )}
+
+      {/* Cross-project membership panel */}
+      {showMembership && (
+        <MembershipPanel projectId={projectId} task={task} depth={depth} />
       )}
 
       {/* Recurrence panel */}

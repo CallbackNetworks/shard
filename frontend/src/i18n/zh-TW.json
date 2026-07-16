@@ -800,5 +800,11 @@
   "settings.backupRestoreUpload": "從檔案還原…",
   "settings.backupRestoreConfirm": "這會用備份內容取代目前所有資料，且無法復原。確定要繼續嗎？",
   "settings.backupRestoreDone": "還原完成",
-  "settings.backupRestoreFailed": "還原失敗"
+  "settings.backupRestoreFailed": "還原失敗",
+  "membership.title": "同時屬於專案",
+  "membership.badge": "屬於 {{count}} 個專案",
+  "membership.onlyHere": "僅在此專案。",
+  "membership.pickProject": "— 連結到其他專案 —",
+  "membership.link": "連結",
+  "membership.thisProject": "此專案"
 }

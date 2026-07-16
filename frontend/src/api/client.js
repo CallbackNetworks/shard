@@ -67,6 +67,11 @@ export const deleteTask = (projectId, taskId) => api.delete(`/projects/${project
 export const createExternalIssue = (projectId, taskId, provider) => api.post(`/projects/${projectId}/tasks/${taskId}/create-external-issue`, provider ? { provider } : {}).then(r => r.data)
 export const regenerateToken = (projectId, taskId) => api.post(`/projects/${projectId}/tasks/${taskId}/regenerate-token`).then(r => r.data)
 export const reorderTasks = (projectId, taskIds) => api.post(`/projects/${projectId}/tasks/reorder`, { task_ids: taskIds })
+// Cross-project membership (ADR-0032): a task can belong to multiple projects via contains edges.
+export const addTaskMembership = (projectId, taskId, targetProjectId) =>
+  api.post(`/projects/${projectId}/tasks/${taskId}/memberships/${targetProjectId}`).then(r => r.data)
+export const removeTaskMembership = (projectId, taskId, targetProjectId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}/memberships/${targetProjectId}`)
 
 // Labels
 export const getLabels = (projectId) => api.get(`/projects/${projectId}/labels`).then(r => r.data)

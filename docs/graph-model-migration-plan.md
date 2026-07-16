@@ -125,7 +125,7 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
   9. 全套 SQLite + PostgreSQL 綠、覆蓋率 ≥70% 才 commit。
 - [ ] **切片 5(刪除語意):** 刪專案 → 刪其 `contains` 邊 + 刪孤兒任務(無其他專案容器才刪),取代 SQLite/PG 的 FK ondelete CASCADE。
 - [ ] **切片 6(drop 欄位):** migration drop `tasks.project_id`、`tasks.parent_id`;移除 model 欄位/relationship;`graph_sync` 不再讀欄位(改由邊事件驅動)。
-- [ ] **切片 7(前端 / MCP):** `project_ids[]` / `parent_ids[]` 開放多重歸屬與跨專案掛載 UI(見階段 4)。
+- [x] **切片 7(前端 / MCP):** 前端開放跨專案多重歸屬 UI —— `IssueRow` 新增 `Boxes` 動作鈕與「屬於 N 個專案」被動徽章(`project_ids.length > 1` 時顯示),展開 `MembershipPanel` 可檢視/解除/新增跨專案連結;API client 加 `addTaskMembership`/`removeTaskMembership`(打既有 `/memberships/{target}` 端點);i18n 補 `membership.*`(en + zh-TW)。MCP 無需改(proxy `/api/v1` 已原樣帶 `project_ids`)。`MembershipPanel.test.jsx` 4 項 + 全套 200 前端測試綠、eslint 0 error、vite build 成功。**🎉 ADR-0032 遷移全部完成(後端 + 前端)。**
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 

@@ -800,5 +800,11 @@
   "settings.backupRestoreUpload": "Restore from file…",
   "settings.backupRestoreConfirm": "This replaces ALL current data with the backup. This cannot be undone. Continue?",
   "settings.backupRestoreDone": "Restore complete",
-  "settings.backupRestoreFailed": "Restore failed"
+  "settings.backupRestoreFailed": "Restore failed",
+  "membership.title": "Also in projects",
+  "membership.badge": "In {{count}} projects",
+  "membership.onlyHere": "Only in this project.",
+  "membership.pickProject": "— link to another project —",
+  "membership.link": "Link",
+  "membership.thisProject": "this project"
 }
