@@ -178,3 +178,37 @@ def test_task_reparent_parent_moves_contains_edge(db):
     child.parent_id = None
     db.commit()
     assert _edge(db, parent2.id, child.id, "contains") is None
+
+
+def test_subtask_helpers_from_contains_edges(db):
+    p = _project(db)
+    parent = _task(db, p.id, "parent")
+    child1 = Task(project_id=p.id, parent_id=parent.id, title="child1")
+    child2 = Task(project_id=p.id, parent_id=parent.id, title="child2")
+    db.add_all([child1, child2])
+    db.commit()
+
+    all_ids = [parent.id, child1.id, child2.id]
+
+    # subtask_ids_among: only the two children are subtasks (parent has no task-parent).
+    assert graph.subtask_ids_among(db, all_ids) == {child1.id, child2.id}
+
+    # child_task_ids_map: parent -> its two subtasks, children -> none.
+    child_map = graph.child_task_ids_map(db, all_ids)
+    assert set(child_map.get(parent.id, [])) == {child1.id, child2.id}
+    assert child_map.get(child1.id, []) == []
+
+    # subtasks(): task rows of the parent's children.
+    assert {s.id for s in graph.subtasks(db, parent.id)} == {child1.id, child2.id}
+
+
+def test_top_level_task_filter_excludes_subtasks(db):
+    p = _project(db)
+    top = _task(db, p.id, "top")
+    child = Task(project_id=p.id, parent_id=top.id, title="child")
+    db.add(child)
+    db.commit()
+
+    top_ids = {t.id for t in db.query(Task).filter(graph.top_level_task_filter()).all()}
+    assert top.id in top_ids
+    assert child.id not in top_ids

@@ -17,10 +17,10 @@ def _project_progress(db: Session, project_id: str) -> float:
     task_ids = graph.contained_task_ids(db, project_id)
     if not task_ids:
         return 0.0
-    total = db.query(Task).filter(Task.id.in_(task_ids), Task.parent_id.is_(None)).count()
+    total = db.query(Task).filter(Task.id.in_(task_ids), graph.top_level_task_filter()).count()
     if total == 0:
         return 0.0
-    done = db.query(Task).filter(Task.id.in_(task_ids), Task.parent_id.is_(None), Task.status == "done").count()
+    done = db.query(Task).filter(Task.id.in_(task_ids), graph.top_level_task_filter(), Task.status == "done").count()
     return round(done / total * 100, 1)
 
 

@@ -38,14 +38,24 @@ def list_tasks(
     if status_filter:
         q = q.filter(Task.status == status_filter)
     want_subtasks = include and "subtasks" in include.split(",")
-    if want_subtasks:
-        from sqlalchemy.orm import selectinload
-
-        q = q.options(selectinload(Task.subtasks))
     tasks = q.order_by(Task.position.asc(), Task.created_at.asc()).offset(offset).limit(limit).all()
-    if want_subtasks:
-        return [TaskWithSubtasksOut.model_validate(t, from_attributes=True).model_dump() for t in tasks]
-    return [TaskOut.model_validate(t, from_attributes=True).model_dump() for t in tasks]
+    if not want_subtasks:
+        return [TaskOut.model_validate(t, from_attributes=True).model_dump() for t in tasks]
+
+    # Nest subtasks from task->task contains edges (ADR-0032).
+    children_map = graph.child_task_ids_map(db, [t.id for t in tasks])
+    child_ids = {cid for lst in children_map.values() for cid in lst}
+    child_by_id = {c.id: c for c in db.query(Task).filter(Task.id.in_(child_ids)).all()} if child_ids else {}
+    result = []
+    for t in tasks:
+        out = TaskWithSubtasksOut(**TaskOut.model_validate(t, from_attributes=True).model_dump())
+        out.subtasks = [
+            TaskOut.model_validate(child_by_id[cid], from_attributes=True)
+            for cid in children_map.get(t.id, [])
+            if cid in child_by_id
+        ]
+        result.append(out.model_dump())
+    return result
 
 
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)

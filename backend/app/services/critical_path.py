@@ -34,7 +34,7 @@ def compute_critical_path(db: Session, project_id: str) -> dict:
         .filter(
             Task.id.in_(task_ids),
             Task.status.notin_(["done", "failed"]),
-            Task.parent_id == None,  # noqa: E711 — top-level tasks only
+            graph.top_level_task_filter(),
         )
         .all()
         if task_ids

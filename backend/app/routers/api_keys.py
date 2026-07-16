@@ -81,16 +81,16 @@ def get_agent_summary(db: Session = Depends(get_db)):
         db.query(Task)
         .filter(Task.assigned_agent_key_id.in_(key_ids))
         .options(
-            joinedload(Task.subtasks),
             joinedload(Task.comments),
         )
         .all()
     )
 
-    # Batch-load dependency and label edges for every agent task (ADR-0032).
+    # Batch-load dependency, label, and subtask edges for every agent task (ADR-0032).
     _all_ids = [t.id for t in all_tasks]
     blocked_by_map, blocking_map = graph.dependency_maps(db, _all_ids)
     labels_by_task = graph.labels_map(db, _all_ids)
+    subtasks_by_task = graph.child_task_ids_map(db, _all_ids)
 
     # Group tasks by agent key in Python — no further DB round-trips.
     tasks_by_key: dict[str, list[Task]] = defaultdict(list)
@@ -106,7 +106,7 @@ def get_agent_summary(db: Session = Depends(get_db)):
             counts[t.status] += 1
             out = TaskOut.model_validate(t)
             out.labels = [LabelOut.model_validate(lb) for lb in labels_by_task.get(t.id, [])]
-            out.subtask_count = len(t.subtasks)
+            out.subtask_count = len(subtasks_by_task.get(t.id, []))
             out.comment_count = len(t.comments)
             out.blocked_by = blocked_by_map.get(t.id, [])
             out.blocking = blocking_map.get(t.id, [])

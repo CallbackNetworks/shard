@@ -266,9 +266,10 @@ async def _tool_get_summary(db: Session) -> str:
     result = []
     for p in projects:
         p_tasks = graph.tasks_in_project(db, p.id)
-        total = len([t for t in p_tasks if t.parent_id is None])
-        done = sum(1 for t in p_tasks if t.status == "done" and t.parent_id is None)
-        in_prog = sum(1 for t in p_tasks if t.status == "in_progress" and t.parent_id is None)
+        sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
+        total = len([t for t in p_tasks if t.id not in sub])
+        done = sum(1 for t in p_tasks if t.status == "done" and t.id not in sub)
+        in_prog = sum(1 for t in p_tasks if t.status == "in_progress" and t.id not in sub)
         overdue = sum(
             1 for t in p_tasks if t.due_date and t.due_date < datetime.now(UTC) and t.status not in ("done", "failed")
         )
@@ -423,7 +424,7 @@ def _tool_manage_labels(
 
 
 def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
-    q = db.query(Task).filter(Task.parent_id == None)  # noqa: E711
+    q = db.query(Task).filter(graph.top_level_task_filter())
     if project_id:
         q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
     tasks = q.all()

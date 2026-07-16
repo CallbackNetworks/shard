@@ -41,9 +41,9 @@ def api_agent_context(
     for p in projects:
         label_names = [lb.name for lb in p.labels if lb.type == "label"]
 
-        active = [
-            t for t in graph.tasks_in_project(db, p.id) if t.status in ("todo", "in_progress") and t.parent_id is None
-        ]
+        p_tasks = graph.tasks_in_project(db, p.id)
+        sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
+        active = [t for t in p_tasks if t.status in ("todo", "in_progress") and t.id not in sub]
         active.sort(
             key=lambda t: (
                 0 if t.status == "in_progress" else 1,

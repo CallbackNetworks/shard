@@ -119,12 +119,7 @@ def _serialize_comment(c: Comment):
 def _serialize_project(p: Project, db: Session, include_notes: bool):
     task_ids = graph.contained_task_ids(db, p.id)
     tasks = (
-        db.query(Task)
-        .options(selectinload(Task.subtasks), selectinload(Task.comments))
-        .filter(Task.id.in_(task_ids))
-        .all()
-        if task_ids
-        else []
+        db.query(Task).options(selectinload(Task.comments)).filter(Task.id.in_(task_ids)).all() if task_ids else []
     )
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
@@ -155,17 +150,21 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
     comment_count = sum(len(t.comments) for t in tasks)
 
     task_map = {t.id: t.title for t in tasks}
+    tasks_by_id = {t.id: t for t in tasks}
     _ids = list(task_map.keys())
     blocked_by_map, blocking_map = graph.dependency_maps(db, _ids)
     labels_by_task = graph.labels_map(db, _ids)
+    subtask_set = graph.subtask_ids_among(db, _ids)
+    children_map = graph.child_task_ids_map(db, _ids)
 
     task_list = []
     for t in tasks:
-        if t.parent_id is not None:
+        if t.id in subtask_set:
             continue
         t_labels = [{"name": lb.name, "color": lb.color} for lb in labels_by_task.get(t.id, [])]
+        t_subtasks = [tasks_by_id[cid] for cid in children_map.get(t.id, []) if cid in tasks_by_id]
         subtask_details = [
-            {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority} for s in t.subtasks
+            {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority} for s in t_subtasks
         ]
         blocked_by = [{"id": bid, "title": task_map.get(bid, "Unknown")} for bid in blocked_by_map.get(t.id, [])]
         blocking = [{"id": bid, "title": task_map.get(bid, "Unknown")} for bid in blocking_map.get(t.id, [])]
@@ -183,7 +182,7 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
                 "time_estimate": t.time_estimate,
                 "time_spent": t.time_spent,
                 "labels": t_labels,
-                "subtask_count": len(t.subtasks),
+                "subtask_count": len(t_subtasks),
                 "subtasks": subtask_details,
                 "comment_count": len(t.comments),
                 "comments": (

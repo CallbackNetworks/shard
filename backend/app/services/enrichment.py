@@ -44,10 +44,23 @@ def _task_labels(task, db, labels_by_task) -> list[LabelOut]:
     return [LabelOut.model_validate(lb) for lb in labels]
 
 
-def enrich_task(task, db=None, dep_maps=None, labels_by_task=None) -> TaskOut:
+def _subtask_count(task, db, subtasks_by_task) -> int:
+    """Number of subtasks via task->task ``contains`` edges (ADR-0032).
+
+    ``subtasks_by_task`` is an optional prefetched ``{task_id: [child_id]}`` map
+    (``graph.child_task_ids_map``) used to batch a whole list of tasks (avoids N+1).
+    """
+    if subtasks_by_task is not None:
+        return len(subtasks_by_task.get(task.id, []))
+    if db is not None:
+        return len(graph.contained_task_ids(db, task.id))
+    return len(task.subtasks)
+
+
+def enrich_task(task, db=None, dep_maps=None, labels_by_task=None, subtasks_by_task=None) -> TaskOut:
     out = TaskOut.model_validate(task)
     out.labels = _task_labels(task, db, labels_by_task)
-    out.subtask_count = len(task.subtasks)
+    out.subtask_count = _subtask_count(task, db, subtasks_by_task)
     out.comment_count = len(task.comments)
     out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
     out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
@@ -60,10 +73,10 @@ def enrich_task(task, db=None, dep_maps=None, labels_by_task=None) -> TaskOut:
     return out
 
 
-def enrich_task_as_dict(task, db=None, dep_maps=None, labels_by_task=None) -> dict:
+def enrich_task_as_dict(task, db=None, dep_maps=None, labels_by_task=None, subtasks_by_task=None) -> dict:
     out = TaskOut.model_validate(task)
     out.labels = _task_labels(task, db, labels_by_task)
-    out.subtask_count = len(task.subtasks)
+    out.subtask_count = _subtask_count(task, db, subtasks_by_task)
     out.comment_count = len(task.comments)
     out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
     out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
@@ -81,7 +94,6 @@ def enrich_project(project, db=None) -> ProjectOut:
         tasks = (
             db.query(Task)
             .options(
-                selectinload(Task.subtasks),
                 selectinload(Task.comments),
                 selectinload(Task.pull_requests),
                 selectinload(Task.assigned_agent),
@@ -94,7 +106,12 @@ def enrich_project(project, db=None) -> ProjectOut:
     else:
         tasks = list(project.tasks)
 
-    top_tasks = [t for t in tasks if t.parent_id is None]
+    # Top-level tasks = not a subtask of any task (no incoming task->task contains edge).
+    if db is not None:
+        subtask_set = graph.subtask_ids_among(db, [t.id for t in tasks])
+        top_tasks = [t for t in tasks if t.id not in subtask_set]
+    else:
+        top_tasks = [t for t in tasks if t.parent_id is None]
     total = len(top_tasks)
     done = sum(1 for t in top_tasks if t.status == "done")
     progress = round(done / total * 100, 1) if total > 0 else 0.0
@@ -103,11 +120,12 @@ def enrich_project(project, db=None) -> ProjectOut:
     out.done_tasks = done
     out.progress = progress
 
-    # Batch-load dependency and label edges once for all tasks in the project.
+    # Batch-load dependency, label, and subtask edges once for all tasks in the project.
     task_ids = [t.id for t in tasks]
     dep_maps = graph.dependency_maps(db, task_ids) if db is not None else None
     labels_by_task = graph.labels_map(db, task_ids) if db is not None else None
-    out.tasks = [enrich_task(t, db, dep_maps, labels_by_task) for t in tasks]
+    subtasks_by_task = graph.child_task_ids_map(db, task_ids) if db is not None else None
+    out.tasks = [enrich_task(t, db, dep_maps, labels_by_task, subtasks_by_task) for t in tasks]
 
     out.labels = [LabelOut.model_validate(lb) for lb in project.labels]
 

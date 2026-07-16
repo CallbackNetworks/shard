@@ -234,7 +234,7 @@ async def _send_daily_summary(db: Session) -> None:
         .all()
     )
 
-    in_progress = db.query(Task).filter(Task.status == "in_progress", Task.parent_id == None).all()
+    in_progress = db.query(Task).filter(Task.status == "in_progress", graph.top_level_task_filter()).all()
 
     # Yesterday's completions
     yesterday = now - timedelta(days=1)
@@ -252,8 +252,9 @@ async def _send_daily_summary(db: Session) -> None:
     project_summaries = []
     for p in projects:
         p_tasks = graph.tasks_in_project(db, p.id)
-        total = sum(1 for t in p_tasks if t.parent_id is None)
-        done = sum(1 for t in p_tasks if t.status == "done" and t.parent_id is None)
+        sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
+        total = sum(1 for t in p_tasks if t.id not in sub)
+        done = sum(1 for t in p_tasks if t.status == "done" and t.id not in sub)
         pct = round(done / total * 100) if total else 0
         project_summaries.append(f"<li><strong>{p.name}</strong>: {done}/{total} done ({pct}%)</li>")
 
@@ -339,7 +340,7 @@ async def _send_weekly_digest(db: Session) -> None:
         db.query(Task)
         .filter(
             Task.created_at >= week_ago,
-            Task.parent_id == None,
+            graph.top_level_task_filter(),
         )
         .all()
     )
@@ -359,8 +360,9 @@ async def _send_weekly_digest(db: Session) -> None:
     project_activity = []
     for p in projects:
         p_tasks = graph.tasks_in_project(db, p.id)
-        total = sum(1 for t in p_tasks if t.parent_id is None)
-        done = sum(1 for t in p_tasks if t.status == "done" and t.parent_id is None)
+        sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
+        total = sum(1 for t in p_tasks if t.id not in sub)
+        done = sum(1 for t in p_tasks if t.status == "done" and t.id not in sub)
         pct = round(done / total * 100) if total else 0
         # Text-based progress bar: 20 chars wide
         filled = round(pct / 5)

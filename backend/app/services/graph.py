@@ -433,20 +433,63 @@ def tasks_in_project(db: Session, project_id: str) -> list["Task"]:
     return [by_id[i] for i in ids if i in by_id]
 
 
-def project_task_id_map(db: Session, project_ids) -> dict[str, list[str]]:
-    """Batch-load ``{project_id: [task_id, ...]}`` for many projects in one query."""
-    ids = set(project_ids)
+def child_task_ids_map(db: Session, parent_ids) -> dict[str, list[str]]:
+    """Batch-load ``{parent_id: [child_task_id, ...]}`` for many parents in one query.
+
+    Works for both project parents (-> their tasks) and task parents (-> subtasks),
+    since both use ``contains`` edges.
+    """
+    ids = set(parent_ids)
     result: dict[str, list[str]] = defaultdict(list)
     if not ids:
         return result
     rows = db.execute(
         select(Edge.source_id, Edge.target_id).where(Edge.rel_type == REL_CONTAINS, Edge.source_id.in_(ids))
     ).all()
-    # Only project->task contains edges (a task's subtasks also use contains, but
-    # their source is a task node, never in ``project_ids``).
     for source_id, target_id in rows:
         result[source_id].append(target_id)
     return result
+
+
+def subtasks(db: Session, task_id: str) -> list["Task"]:
+    """Subtask rows of a task via task->task ``contains`` edges (replaces ``task.subtasks``)."""
+    ids = contained_task_ids(db, task_id)
+    if not ids:
+        return []
+    by_id = {t.id: t for t in db.query(Task).filter(Task.id.in_(ids)).all()}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+def subtask_ids_among(db: Session, task_ids) -> set[str]:
+    """Subset of ``task_ids`` that are subtasks (have an incoming task->task ``contains`` edge).
+
+    A task always has a project->task edge too, so the parent node type must be
+    ``task`` to distinguish a real subtask relationship. Replaces ``t.parent_id is
+    not None`` checks on an already-loaded set of tasks.
+    """
+    ids = set(task_ids)
+    if not ids:
+        return set()
+    rows = db.execute(
+        select(Edge.target_id)
+        .join(Node, Node.id == Edge.source_id)
+        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_TASK, Edge.target_id.in_(ids))
+    ).scalars()
+    return set(rows)
+
+
+def top_level_task_filter():
+    """SQL filter expression selecting top-level tasks (not a subtask of any task).
+
+    A subtask is the target of a ``contains`` edge whose source is a task node;
+    top-level tasks have no such edge. Replaces ``Task.parent_id == None`` in queries.
+    """
+    subquery = (
+        select(Edge.target_id)
+        .join(Node, Node.id == Edge.source_id)
+        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_TASK)
+    )
+    return Task.id.notin_(subquery)
 
 
 def detect_cycle(db: Session, source_id: str, target_id: str) -> bool:
