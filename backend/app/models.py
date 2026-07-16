@@ -84,9 +84,6 @@ class Task(Base):
     parent: Mapped["Task | None"] = relationship(
         "Task", back_populates="subtasks", remote_side="Task.id", foreign_keys="Task.parent_id"
     )
-    cycle_tasks: Mapped[list["CycleTask"]] = relationship(
-        "CycleTask", back_populates="task", cascade="all, delete-orphan"
-    )
     comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
     assigned_agent: Mapped["ApiKey | None"] = relationship("ApiKey", foreign_keys=[assigned_agent_key_id])
     pull_requests: Mapped[list["TaskPullRequest"]] = relationship(
@@ -157,19 +154,6 @@ class Cycle(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
     project: Mapped["Project"] = relationship("Project", back_populates="cycles")
-    cycle_tasks: Mapped[list["CycleTask"]] = relationship(
-        "CycleTask", back_populates="cycle", cascade="all, delete-orphan"
-    )
-
-
-class CycleTask(Base):
-    __tablename__ = "cycle_tasks"
-
-    cycle_id: Mapped[str] = mapped_column(String(36), ForeignKey("cycles.id", ondelete="CASCADE"), primary_key=True)
-    task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
-
-    cycle: Mapped["Cycle"] = relationship("Cycle", back_populates="cycle_tasks")
-    task: Mapped["Task"] = relationship("Task", back_populates="cycle_tasks")
 
 
 class Integration(Base):

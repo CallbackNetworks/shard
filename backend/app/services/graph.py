@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, Label, Node
+from app.models import Edge, Label, Node, Task
 
 # Node types
 NODE_PROJECT = "project"
@@ -308,6 +308,38 @@ def labels_map(db: Session, task_ids) -> dict[str, list[Label]]:
     all_ids = {lid for lst in id_map.values() for lid in lst}
     labels = {lb.id: lb for lb in db.query(Label).filter(Label.id.in_(all_ids)).all()} if all_ids else {}
     return {tid: [labels[lid] for lid in lids if lid in labels] for tid, lids in id_map.items()}
+
+
+def add_to_cycle(db: Session, cycle_id: str, task_id: str) -> None:
+    """Attach a task to a cycle as an ``in_cycle`` edge (idempotent)."""
+    ensure_node(db, task_id, NODE_TASK)
+    ensure_node(db, cycle_id, NODE_CYCLE)
+    add_edge(db, task_id, cycle_id, REL_IN_CYCLE)
+
+
+def remove_from_cycle(db: Session, cycle_id: str, task_id: str) -> bool:
+    return remove_edge(db, task_id, cycle_id, REL_IN_CYCLE)
+
+
+def task_ids_in_cycle(db: Session, cycle_id: str) -> list[str]:
+    """Ids of tasks in a cycle via ``in_cycle`` edges."""
+    rows = db.execute(select(Edge.source_id).where(Edge.target_id == cycle_id, Edge.rel_type == REL_IN_CYCLE)).scalars()
+    return list(rows)
+
+
+def tasks_in_cycle(db: Session, cycle_id: str) -> list["Task"]:
+    """Task rows in a cycle via ``in_cycle`` edges."""
+    ids = task_ids_in_cycle(db, cycle_id)
+    if not ids:
+        return []
+    by_id = {t.id: t for t in db.query(Task).filter(Task.id.in_(ids)).all()}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+def cycle_ids_for_task(db: Session, task_id: str) -> list[str]:
+    """Ids of cycles a task belongs to via ``in_cycle`` edges."""
+    rows = db.execute(select(Edge.target_id).where(Edge.source_id == task_id, Edge.rel_type == REL_IN_CYCLE)).scalars()
+    return list(rows)
 
 
 def member_project_ids(db: Session, task_id: str) -> list[str]:

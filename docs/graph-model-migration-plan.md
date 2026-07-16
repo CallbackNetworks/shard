@@ -74,8 +74,15 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] migration `f4a6b8c0d2e4` drop `task_labels`(43 邊零損失);dev DB 已套用。
 - [x] 683 tests SQLite 綠、98 項 PG 子集綠。**第二張舊關聯表移除。**
 
+**第三張表完成 — cycles(`cycle_tasks`):**
+- [x] 寫入:`cycles`(add/remove/clone)、`issue_sync`(milestone 同步)改用 `graph.add_to_cycle` / `remove_from_cycle`(直接建/刪 `in_cycle` 邊)。
+- [x] 讀取全部改由邊:`enrichment`、`analytics`(3 處)、`external_api/analytics`、`cycles`(_enrich/compare 用 `object_session`)、`share`、`issue_sync`(_task_primary_cycle 用 `cycle_ids_for_task`);移除各處 `selectinload(cycle_tasks)`。
+- [x] 移除 `CycleTask` model + `Cycle.cycle_tasks`/`Task.cycle_tasks` relationship + `graph_sync` 條目。
+- [x] migration `a5b7c9d1e3f5` drop `cycle_tasks`(41 邊零損失);dev DB 已套用。
+- [x] 682 tests SQLite 綠、72 項 PG 子集綠。**第三張舊關聯表移除。**
+
 **尚未做(下一步):**
-- [ ] 同法逐一切 `in_cycle`(`cycle_tasks`)/ `member_of`(`project_identities`)/ `part_of`(`goal_projects`),再 drop 各表。
+- [ ] `member_of`(`project_identities`)/ `part_of`(`goal_projects`)—— 剩最後兩張關聯表,同法。
 - [ ] 最後才是 `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點,留到關聯表都清乾淨後再動。
 - [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;`contains` 讀取切換時處理)。
 

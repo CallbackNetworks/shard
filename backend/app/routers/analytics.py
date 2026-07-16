@@ -5,7 +5,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Cycle, CycleTask, Project, Task
+from app.models import ActivityLog, Cycle, Project, Task
+from app.services import graph
 from app.services.critical_path import compute_critical_path
 from app.services.usage_tracker import tracker
 
@@ -86,7 +87,7 @@ def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
         return []
 
     # Total tasks in cycle
-    task_ids = [ct.task_id for ct in db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id).all()]
+    task_ids = graph.task_ids_in_cycle(db, cycle_id)
     if not task_ids:
         return []
 
@@ -129,8 +130,9 @@ def get_velocity(project_id: str, db: Session = Depends(get_db)):
 
     result = []
     for cycle in cycles:
-        task_ids = [ct.task_id for ct in cycle.cycle_tasks]
-        done_count = sum(1 for ct in cycle.cycle_tasks if ct.task and ct.task.status == "done")
+        c_tasks = graph.tasks_in_cycle(db, cycle.id)
+        task_ids = [t.id for t in c_tasks]
+        done_count = sum(1 for t in c_tasks if t.status == "done")
         result.append(
             {
                 "cycle_id": cycle.id,
@@ -154,7 +156,7 @@ def get_cycle_burndown(
     if not cycle:
         return []
 
-    cycle_task_ids = [ct.task_id for ct in cycle.cycle_tasks]
+    cycle_task_ids = graph.task_ids_in_cycle(db, cycle.id)
     if not cycle_task_ids:
         return []
 

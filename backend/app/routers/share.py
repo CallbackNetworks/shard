@@ -13,8 +13,6 @@ from app.database import get_db
 from app.models import (
     ActivityLog,
     Comment,
-    Cycle,
-    CycleTask,
     Identity,
     Project,
     ProjectIdentity,
@@ -110,9 +108,7 @@ def _load_identity(db: Session, token: str) -> Identity | None:
             .selectinload(Project.labels),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
-            .selectinload(Project.cycles)
-            .selectinload(Cycle.cycle_tasks)
-            .selectinload(CycleTask.task),
+            .selectinload(Project.cycles),
         )
         .first()
     )
@@ -123,7 +119,7 @@ def _project_eager_options():
         selectinload(Project.tasks).selectinload(Task.subtasks),
         selectinload(Project.tasks).selectinload(Task.comments),
         selectinload(Project.labels),
-        selectinload(Project.cycles).selectinload(Cycle.cycle_tasks).selectinload(CycleTask.task),
+        selectinload(Project.cycles),
         selectinload(Project.project_identities).selectinload(ProjectIdentity.identity),
     ]
 
@@ -158,8 +154,9 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
     active_cycle = None
     for c in p.cycles:
         if c.status == "active":
-            ct_total = len(c.cycle_tasks)
-            ct_done = sum(1 for ct in c.cycle_tasks if ct.task and ct.task.status == "done")
+            c_tasks = graph.tasks_in_cycle(db, c.id)
+            ct_total = len(c_tasks)
+            ct_done = sum(1 for t in c_tasks if t.status == "done")
             active_cycle = {
                 "name": c.name,
                 "total_tasks": ct_total,

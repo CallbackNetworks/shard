@@ -15,7 +15,6 @@ from app.database import get_db
 from app.models import (
     Comment,
     Cycle,
-    CycleTask,
     Integration,
     Label,
     Notification,
@@ -719,13 +718,10 @@ def _task_primary_cycle(task: Task, db: Session) -> Cycle | None:
     An external issue has a single milestone slot but a Shard task may sit in
     several cycles; the earliest-created cycle wins, deterministically.
     """
-    return (
-        db.query(Cycle)
-        .join(CycleTask, CycleTask.cycle_id == Cycle.id)
-        .filter(CycleTask.task_id == task.id)
-        .order_by(Cycle.created_at.asc())
-        .first()
-    )
+    cycle_ids = graph.cycle_ids_for_task(db, task.id)
+    if not cycle_ids:
+        return None
+    return db.query(Cycle).filter(Cycle.id.in_(cycle_ids)).order_by(Cycle.created_at.asc()).first()
 
 
 async def sync_task_milestone_to_external(task: Task, db: Session) -> bool:
@@ -773,11 +769,8 @@ def apply_inbound_milestone_cycle(task: Task, milestone_title: str | None, db: S
     cycle = db.query(Cycle).filter(Cycle.project_id == task.project_id, Cycle.name == milestone_title).first()
     if not cycle:
         return
-    exists = (
-        db.query(CycleTask).filter(CycleTask.cycle_id == cycle.id, CycleTask.task_id == task.id).first()
-    )
-    if not exists:
-        db.add(CycleTask(cycle_id=cycle.id, task_id=task.id))
+    if task.id not in graph.task_ids_in_cycle(db, cycle.id):
+        graph.add_to_cycle(db, cycle.id, task.id)
 
 
 async def create_external_issue_from_task(task: Task, project: Project, db: Session, provider: str | None = None):

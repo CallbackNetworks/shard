@@ -98,8 +98,8 @@ def enrich_project(project, db=None) -> ProjectOut:
 
     enriched_cycles = []
     for cycle in project.cycles:
-        task_ids = [ct.task_id for ct in cycle.cycle_tasks]
-        tasks = [ct.task for ct in cycle.cycle_tasks if ct.task is not None]
+        tasks = graph.tasks_in_cycle(db, cycle.id) if db is not None else []
+        task_ids = [t.id for t in tasks]
         c_total = len(tasks)
         c_done = sum(1 for t in tasks if t.status == "done")
         cout = CycleOut.model_validate(cycle)

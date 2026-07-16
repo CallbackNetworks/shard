@@ -1,21 +1,22 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.database import get_db
-from app.models import Cycle, CycleTask, Task
+from app.models import Cycle, Task
 from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import sync_task_milestone_to_external
 from app.schemas import CycleCreate, CycleOut, CycleUpdate
+from app.services import graph
 
 router = APIRouter(prefix="/projects/{project_id}/cycles", tags=["cycles"])
 
 
 def _enrich_cycle(cycle: Cycle) -> CycleOut:
-    task_ids = [ct.task_id for ct in cycle.cycle_tasks]
-    tasks = [ct.task for ct in cycle.cycle_tasks if ct.task is not None]
+    tasks = graph.tasks_in_cycle(object_session(cycle), cycle.id)
+    task_ids = [t.id for t in tasks]
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
     out = CycleOut.model_validate(cycle)
@@ -73,10 +74,8 @@ async def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Se
     _get_project_or_404(project_id, db)
     get_cycle_or_404(cycle_id, db, project_id=project_id)
     task = get_task_or_404(task_id, db, project_id=project_id)
-    existing = db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id).first()
-    if not existing:
-        ct = CycleTask(cycle_id=cycle_id, task_id=task_id)
-        db.add(ct)
+    if task_id not in graph.task_ids_in_cycle(db, cycle_id):
+        graph.add_to_cycle(db, cycle_id, task_id)
         db.commit()
         if task.external_provider:
             await sync_task_milestone_to_external(task, db)
@@ -86,10 +85,8 @@ async def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Se
 @router.delete("/{cycle_id}/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    ct = db.query(CycleTask).filter(CycleTask.cycle_id == cycle_id, CycleTask.task_id == task_id).first()
-    if not ct:
+    if not graph.remove_from_cycle(db, cycle_id, task_id):
         raise HTTPException(status_code=404, detail="Task not in cycle")
-    db.delete(ct)
     db.commit()
     task = db.query(Task).filter(Task.id == task_id).first()
     if task and task.external_provider:
@@ -113,10 +110,7 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
     db.flush()
 
     # Clone tasks as new todo tasks and link to new cycle
-    for ct in source.cycle_tasks:
-        src_task = ct.task
-        if not src_task:
-            continue
+    for src_task in graph.tasks_in_cycle(db, source.id):
         new_task = Task(
             id=str(uuid.uuid4()),
             project_id=project_id,
@@ -130,7 +124,7 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
         )
         db.add(new_task)
         db.flush()
-        db.add(CycleTask(cycle_id=new_cycle.id, task_id=new_task.id))
+        graph.add_to_cycle(db, new_cycle.id, new_task.id)
 
     db.commit()
     db.refresh(new_cycle)
@@ -151,7 +145,7 @@ def compare_cycles(
         cycle = db.query(Cycle).filter(Cycle.id == cid, Cycle.project_id == project_id).first()
         if not cycle:
             return None
-        tasks = [ct.task for ct in cycle.cycle_tasks if ct.task]
+        tasks = graph.tasks_in_cycle(db, cycle.id)
         total = len(tasks)
         done = sum(1 for t in tasks if t.status == "done")
         failed = sum(1 for t in tasks if t.status == "failed")

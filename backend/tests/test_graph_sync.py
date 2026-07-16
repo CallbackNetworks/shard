@@ -1,8 +1,6 @@
 """The before_flush listener mirrors association tables into edges (ADR-0032)."""
 
 from app.models import (
-    Cycle,
-    CycleTask,
     Edge,
     Goal,
     GoalProject,
@@ -35,18 +33,6 @@ def _task(db, project_id, title="t"):
     return t
 
 
-def test_cycle_task_mirrored(db):
-    p = _project(db)
-    t = _task(db, p.id)
-    cycle = Cycle(project_id=p.id, name="sprint")
-    db.add(cycle)
-    db.flush()
-
-    db.add(CycleTask(cycle_id=cycle.id, task_id=t.id))
-    db.commit()
-    assert _edge(db, t.id, cycle.id, "in_cycle") is not None
-
-
 def test_project_identity_mirrored(db):
     p = _project(db)
     ident = Identity(name="me")
@@ -69,20 +55,19 @@ def test_goal_project_mirrored(db):
     assert _edge(db, p.id, goal.id, "part_of") is not None
 
 
-def test_nodes_created_for_cycle_association(db):
+def test_nodes_created_for_project_identity_association(db):
     from app.models import Node
 
     p = _project(db)
-    t = _task(db, p.id)
-    cycle = Cycle(project_id=p.id, name="sprint")
-    db.add(cycle)
+    ident = Identity(name="lazy")
+    db.add(ident)
     db.flush()
-    db.add(CycleTask(cycle_id=cycle.id, task_id=t.id))
+    db.add(ProjectIdentity(project_id=p.id, identity_id=ident.id))
     db.commit()
 
     # Both endpoints exist as nodes with the correct type.
-    assert db.get(Node, t.id).type == "task"
-    assert db.get(Node, cycle.id).type == "cycle"
+    assert db.get(Node, ident.id).type == "identity"
+    assert db.get(Node, p.id).type == "project"
 
 
 def test_task_create_mirrors_node_and_contains_edge(db):

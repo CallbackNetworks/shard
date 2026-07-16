@@ -16,6 +16,7 @@ from app.routers.external_api.auth import (
     _get_api_key,
     _require_scope,
 )
+from app.services import graph
 
 sub_router = APIRouter()
 
@@ -172,8 +173,9 @@ def api_analytics_velocity(
     )
     result = []
     for cycle in cycles:
-        task_ids = [ct.task_id for ct in cycle.cycle_tasks]
-        done_count = sum(1 for ct in cycle.cycle_tasks if ct.task and ct.task.status == "done")
+        c_tasks = graph.tasks_in_cycle(db, cycle.id)
+        task_ids = [t.id for t in c_tasks]
+        done_count = sum(1 for t in c_tasks if t.status == "done")
         result.append(
             {
                 "cycle_id": cycle.id,

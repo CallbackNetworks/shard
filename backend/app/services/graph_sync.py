@@ -6,9 +6,9 @@ mirrored without being individually patched:
 
 * Entities (Project/Task/Identity/Goal/Cycle/Label) -> a ``nodes`` row of the
   matching type. Tasks also get their ``contains`` edges from project_id/parent_id.
-* Association objects (CycleTask/ProjectIdentity/GoalProject) -> the matching
-  ``edges`` row. (Dependencies and labels are written directly as edges by their
-  endpoints, so they are not mirrored here.)
+* Association objects (ProjectIdentity/GoalProject) -> the matching ``edges``
+  row. (Dependencies, labels and cycle membership are written directly as edges
+  by their endpoints, so they are not mirrored here.)
 
 Edge direction matches the backfill migration (source -> target).
 
@@ -26,7 +26,6 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Cycle,
-    CycleTask,
     Edge,
     Goal,
     GoalProject,
@@ -52,7 +51,6 @@ _ENTITY_TYPES = {
 # Dependencies and labels are written directly as edges (no association table), so
 # they are not listed here.
 _ASSOC_SPECS = {
-    CycleTask: ("task_id", "cycle_id", "in_cycle", "task", "cycle"),
     ProjectIdentity: ("identity_id", "project_id", "member_of", "identity", "project"),
     GoalProject: ("project_id", "goal_id", "part_of", "project", "goal"),
 }
