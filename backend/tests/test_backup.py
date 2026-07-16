@@ -6,6 +6,7 @@ import pytest
 
 from app.models import Comment, Task
 from app.services import backup as backup_service
+from app.services import graph
 
 
 def _make_backup_file(tmp_path, name):
@@ -131,9 +132,9 @@ def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
     db.expire_all()
     titles = {t.title for t in db.query(Task).all()}
     assert titles == {"Parent task", "Child task"}
-    # Self-referential parent link survives the restore.
+    # Parent link (now a contains edge, ADR-0032) survives the restore.
     restored_child = db.query(Task).filter_by(title="Child task").one()
-    assert restored_child.parent_id == parent_id
+    assert graph.parent_task_map(db, [restored_child.id]).get(restored_child.id) == parent_id
     assert db.query(Comment).count() == 1
 
 

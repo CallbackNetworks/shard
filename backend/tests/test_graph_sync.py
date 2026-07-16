@@ -147,20 +147,22 @@ def test_project_update_resyncs_node(db):
     assert node.status == "archived"
 
 
-def test_task_reparent_project_moves_contains_edge(db):
+def test_task_reparent_project_via_edges(db):
+    # Re-parenting is now an explicit edge operation (ADR-0032), not a column write.
     p1 = _project(db)
     p2 = _project(db)
     t = _task(db, p1.id)
     assert _edge(db, p1.id, t.id, "contains") is not None
 
-    t.project_id = p2.id
+    graph.remove_edge(db, p1.id, t.id, graph.REL_CONTAINS)
+    graph.add_edge(db, p2.id, t.id, graph.REL_CONTAINS)
     db.commit()
 
-    assert _edge(db, p1.id, t.id, "contains") is None  # old project edge dropped
-    assert _edge(db, p2.id, t.id, "contains") is not None  # new project edge added
+    assert _edge(db, p1.id, t.id, "contains") is None
+    assert _edge(db, p2.id, t.id, "contains") is not None
 
 
-def test_task_reparent_parent_moves_contains_edge(db):
+def test_task_reparent_parent_via_edges(db):
     p = _project(db)
     parent1 = _task(db, p.id, "parent1")
     parent2 = _task(db, p.id, "parent2")
@@ -169,15 +171,11 @@ def test_task_reparent_parent_moves_contains_edge(db):
     db.commit()
     assert _edge(db, parent1.id, child.id, "contains") is not None
 
-    child.parent_id = parent2.id
+    graph.remove_edge(db, parent1.id, child.id, graph.REL_CONTAINS)
+    graph.add_edge(db, parent2.id, child.id, graph.REL_CONTAINS)
     db.commit()
     assert _edge(db, parent1.id, child.id, "contains") is None
     assert _edge(db, parent2.id, child.id, "contains") is not None
-
-    # Un-parenting drops the parent containment edge entirely.
-    child.parent_id = None
-    db.commit()
-    assert _edge(db, parent2.id, child.id, "contains") is None
 
 
 def test_subtask_helpers_from_contains_edges(db):

@@ -275,11 +275,12 @@ def get_estimation_calibration(
         bucket_ratio = sum(t.time_spent for t in bucket_tasks) / sum(t.time_estimate for t in bucket_tasks)
         buckets.append({"label": label, "count": len(bucket_tasks), "avg_ratio": round(bucket_ratio, 2)})
 
+    recent_projects = graph.project_ids_map(db, [t.id for t in tasks[:20]])
     recent = [
         {
             "id": t.id,
             "title": t.title,
-            "project_id": t.project_id,
+            "project_id": next(iter(recent_projects.get(t.id, [])), None),
             "time_estimate": t.time_estimate,
             "time_spent": t.time_spent,
             "ratio": round(t.time_spent / t.time_estimate, 2),

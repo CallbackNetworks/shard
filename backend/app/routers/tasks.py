@@ -39,20 +39,32 @@ def list_tasks(
         q = q.filter(Task.status == status_filter)
     want_subtasks = include and "subtasks" in include.split(",")
     tasks = q.order_by(Task.position.asc(), Task.created_at.asc()).offset(offset).limit(limit).all()
+
+    def _to_out(t, proj_map, par_map):
+        out = TaskOut.model_validate(t, from_attributes=True)
+        out.project_ids = proj_map.get(t.id, [])
+        out.project_id = out.project_ids[0] if out.project_ids else None
+        out.parent_id = par_map.get(t.id)
+        return out
+
     if not want_subtasks:
-        return [TaskOut.model_validate(t, from_attributes=True).model_dump() for t in tasks]
+        ids = [t.id for t in tasks]
+        proj_map = graph.project_ids_map(db, ids)
+        par_map = graph.parent_task_map(db, ids)
+        return [_to_out(t, proj_map, par_map).model_dump() for t in tasks]
 
     # Nest subtasks from task->task contains edges (ADR-0032).
     children_map = graph.child_task_ids_map(db, [t.id for t in tasks])
     child_ids = {cid for lst in children_map.values() for cid in lst}
     child_by_id = {c.id: c for c in db.query(Task).filter(Task.id.in_(child_ids)).all()} if child_ids else {}
+    all_ids = [t.id for t in tasks] + list(child_ids)
+    proj_map = graph.project_ids_map(db, all_ids)
+    par_map = graph.parent_task_map(db, all_ids)
     result = []
     for t in tasks:
-        out = TaskWithSubtasksOut(**TaskOut.model_validate(t, from_attributes=True).model_dump())
+        out = TaskWithSubtasksOut(**_to_out(t, proj_map, par_map).model_dump())
         out.subtasks = [
-            TaskOut.model_validate(child_by_id[cid], from_attributes=True)
-            for cid in children_map.get(t.id, [])
-            if cid in child_by_id
+            _to_out(child_by_id[cid], proj_map, par_map) for cid in children_map.get(t.id, []) if cid in child_by_id
         ]
         result.append(out.model_dump())
     return result
@@ -78,7 +90,7 @@ async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(g
     db.refresh(task)
     await fire_notifications(db, task, "task.created")
     await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
-    return task
+    return enrich_task(task, db)
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
@@ -89,6 +101,15 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
         raise HTTPException(status_code=404, detail="Task not found")
 
     changes = body.model_dump(exclude_none=True)
+
+    # Re-parenting is a graph move, not a column write (ADR-0032): swap the
+    # incoming task->task contains edge.
+    new_parent_id = changes.pop("parent_id", None)
+    if new_parent_id is not None:
+        for old_parent in graph.parents_of(db, task_id):
+            if old_parent.type == graph.NODE_TASK:
+                graph.remove_edge(db, old_parent.id, task_id, graph.REL_CONTAINS)
+        graph.add_edge(db, new_parent_id, task_id, graph.REL_CONTAINS)
 
     _validated_agent: ApiKey | None = None
     if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] is not None:
@@ -185,7 +206,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
         db.refresh(task)
 
     await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task_id})
-    return task
+    return enrich_task(task, db)
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -203,7 +224,7 @@ async def delete_task(project_id: str, task_id: str, db: Session = Depends(get_d
         detail=f'Task "{task.title}" deleted',
         meta={"title": task.title},
     )
-    db.delete(task)
+    graph.delete_task_tree(db, task.id)
     db.commit()
     await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": task_id})
 
@@ -356,4 +377,4 @@ def regenerate_token(project_id: str, task_id: str, db: Session = Depends(get_db
     )
     db.commit()
     db.refresh(task)
-    return task
+    return enrich_task(task, db)

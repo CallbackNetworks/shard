@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app.models import ActivityLog, Project
 from app.schemas import ProjectCreate, ProjectOut, ProjectUpdate
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.enrichment import enrich_project
 from app.services.ws_manager import ws_manager
@@ -88,7 +89,7 @@ async def delete_project(project_id: str, db: Session = Depends(get_db)):
         project_id=project_id,
         detail=f'Project "{project.name}" deleted',
     )
-    db.delete(project)
+    graph.delete_project_and_tasks(db, project)
     db.commit()
     await ws_manager.broadcast("project.deleted", {"project_id": project_id})
 

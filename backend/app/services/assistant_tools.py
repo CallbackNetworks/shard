@@ -388,7 +388,7 @@ async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, pri
     task = graph.create_task(
         db,
         id=str(uuid.uuid4()),
-        project_id=parent.project_id,
+        project_id=graph.project_id_of_task(db, parent.id),
         title=title,
         priority=priority,
         parent_id=parent_task_id,
@@ -476,9 +476,18 @@ def _tool_search(db: Session, query: str) -> str:
     projects = (
         db.query(Project).filter(or_(Project.name.ilike(f"%{q}%"), Project.description.ilike(f"%{q}%"))).limit(10).all()
     )
+    task_projects = graph.project_ids_map(db, [t.id for t in tasks])
     return json.dumps(
         {
-            "tasks": [{"id": t.id, "title": t.title, "status": t.status, "project_id": t.project_id} for t in tasks],
+            "tasks": [
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "status": t.status,
+                    "project_id": next(iter(task_projects.get(t.id, [])), None),
+                }
+                for t in tasks
+            ],
             "projects": [{"id": p.id, "name": p.name} for p in projects],
         }
     )

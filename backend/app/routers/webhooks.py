@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Task, WebhookEvent
+from app.models import Task, WebhookEvent
 from app.schemas import TaskOut, WebhookEventOut
 from app.services import graph
 from app.services.activity import log_activity
@@ -127,7 +127,7 @@ async def webhook_callback(
     log_activity(
         db,
         "task.status_changed",
-        project_id=task.project_id,
+        project_id=graph.project_id_of_task(db, task.id),
         task_id=task.id,
         actor="webhook",
         detail=f'Task "{task.title}" changed from {prev_status} to {normalized["status"]} via webhook',
@@ -163,9 +163,7 @@ async def webhook_callback(
     db.commit()
     db.refresh(task)
 
-    # Reload with project relationship
     task = db.query(Task).filter(Task.id == task.id).first()
-    _ = task.project
 
     event = f"task.{normalized['status']}"
     await fire_notifications(db, task, event)
@@ -175,12 +173,13 @@ async def webhook_callback(
         await run_rules(db, "task.status_changed", task, {"old_status": prev_status, "_rule_depth": 1})
 
     # If all tasks are done, also fire project.complete
-    project: Project = task.project
-    project_tasks = graph.tasks_in_project(db, project.id)
-    total = len(project_tasks)
-    done = sum(1 for t in project_tasks if t.status == "done")
-    if total > 0 and done == total:
-        await fire_notifications(db, task, "project.complete")
+    project = graph.project_of_task(db, task.id)
+    if project is not None:
+        project_tasks = graph.tasks_in_project(db, project.id)
+        total = len(project_tasks)
+        done = sum(1 for t in project_tasks if t.status == "done")
+        if total > 0 and done == total:
+            await fire_notifications(db, task, "project.complete")
 
     return task
 

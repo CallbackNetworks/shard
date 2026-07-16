@@ -29,9 +29,9 @@ class Project(Base):
     repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     wip_limits: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {"todo": N, "in_progress": N, ...}
 
-    tasks: Mapped[list["Task"]] = relationship(
-        "Task", back_populates="project", cascade="all, delete-orphan", foreign_keys="Task.project_id"
-    )
+    # Task containment lives in graph ``contains`` edges now (ADR-0032); there is no
+    # ``Project.tasks`` relationship. Deletion of contained tasks is handled by
+    # ``graph.delete_project_and_tasks``.
     labels: Mapped[list["Label"]] = relationship("Label", back_populates="project", cascade="all, delete-orphan")
     cycles: Mapped[list["Cycle"]] = relationship("Cycle", back_populates="project", cascade="all, delete-orphan")
 
@@ -40,12 +40,6 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    parent_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True, index=True
-    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
@@ -74,18 +68,21 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
-    project: Mapped["Project"] = relationship("Project", back_populates="tasks", foreign_keys=[project_id])
-    subtasks: Mapped[list["Task"]] = relationship(
-        "Task", back_populates="parent", cascade="all, delete-orphan", foreign_keys="Task.parent_id"
-    )
-    parent: Mapped["Task | None"] = relationship(
-        "Task", back_populates="subtasks", remote_side="Task.id", foreign_keys="Task.parent_id"
-    )
+    # Containment (project and parent task) lives in graph ``contains`` edges now
+    # (ADR-0032); there are no project/parent/subtasks relationships.
     comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
     assigned_agent: Mapped["ApiKey | None"] = relationship("ApiKey", foreign_keys=[assigned_agent_key_id])
     pull_requests: Mapped[list["TaskPullRequest"]] = relationship(
         "TaskPullRequest", back_populates="task", cascade="all, delete-orphan"
     )
+
+    def __init__(self, **kw):
+        # ``project_id``/``parent_id`` are no longer columns (ADR-0032): accept them
+        # as transient constructor hints that graph_sync turns into ``contains`` edges,
+        # so callers can still write ``Task(project_id=..., parent_id=...)``.
+        self._graph_project_id = kw.pop("project_id", None)
+        self._graph_parent_id = kw.pop("parent_id", None)
+        super().__init__(**kw)
 
 
 class TaskPullRequest(Base):

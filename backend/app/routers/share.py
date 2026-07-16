@@ -541,4 +541,4 @@ def create_guest_task_note(
     task = db.query(Task).filter(Task.id == task_id).first() if task_id in task_ids else None
     if not task:
         raise HTTPException(status_code=404, detail="Task not found in this share")
-    return _create_note(db, task.project_id, task.id, body, request)
+    return _create_note(db, graph.project_id_of_task(db, task.id), task.id, body, request)

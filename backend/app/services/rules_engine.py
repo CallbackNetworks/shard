@@ -69,7 +69,7 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
         label = (
             db.query(Label)
             .filter(
-                Label.project_id == task.project_id,
+                Label.project_id == graph.project_id_of_task(db, task.id),
                 Label.id == value,
             )
             .first()
@@ -81,7 +81,7 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
     elif atype == "add_comment":
         comment = Comment(
             task_id=task.id,
-            project_id=task.project_id,
+            project_id=graph.project_id_of_task(db, task.id),
             author="workflow",
             body=value,
         )
@@ -122,9 +122,10 @@ async def run_rules(
         .all()
     )
 
+    task_project_id = graph.project_id_of_task(db, task.id)
     for rule in rules:
         # Check project scope
-        if rule.project_id and rule.project_id != task.project_id:
+        if rule.project_id and rule.project_id != task_project_id:
             continue
 
         try:
@@ -144,7 +145,7 @@ async def run_rules(
             log_activity(
                 db,
                 action="rule.executed",
-                project_id=task.project_id,
+                project_id=task_project_id,
                 task_id=task.id,
                 actor="workflow",
                 detail=f'Rule "{rule.name}" executed on task "{task.title}"',

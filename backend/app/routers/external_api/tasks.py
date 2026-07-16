@@ -17,6 +17,7 @@ from app.routers.external_api.auth import (
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 from app.services import graph
 from app.services.activity import log_activity
+from app.services.enrichment import enrich_task
 from app.services.notifier import fire_notifications
 
 sub_router = APIRouter()
@@ -43,7 +44,7 @@ def api_list_tasks(
         query = query.filter(Task.status == status_filter)
     if priority:
         query = query.filter(Task.priority == priority)
-    return query.order_by(Task.created_at.asc()).all()
+    return [enrich_task(t, db) for t in query.order_by(Task.created_at.asc()).all()]
 
 
 @sub_router.get(
@@ -64,7 +65,7 @@ def api_get_task(
     task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return enrich_task(task, db)
 
 
 @sub_router.post(
@@ -100,7 +101,7 @@ def api_create_task(
     )
     db.commit()
     db.refresh(task)
-    return task
+    return enrich_task(task, db)
 
 
 @sub_router.patch(
@@ -147,11 +148,11 @@ async def api_update_task(
         event = f"task.{body.status}"
         await fire_notifications(db, task, event)
         if body.status == "done":
-            project = task.project
-            if all(t.status == "done" for t in graph.tasks_in_project(db, project.id)):
+            project = graph.project_of_task(db, task.id)
+            if project is not None and all(t.status == "done" for t in graph.tasks_in_project(db, project.id)):
                 await fire_notifications(db, task, "project.complete")
 
-    return task
+    return enrich_task(task, db)
 
 
 @sub_router.delete(
@@ -172,7 +173,7 @@ def api_delete_task(
     task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(task)
+    graph.delete_task_tree(db, task.id)
     db.commit()
 
 
@@ -204,7 +205,7 @@ async def api_bulk_create_tasks(
     db.commit()
     for t in created:
         db.refresh(t)
-    return created
+    return [enrich_task(t, db) for t in created]
 
 
 @sub_router.post(

@@ -3,7 +3,7 @@
 > ## ▶ 交接狀態(2026-07-15)
 > **五張關聯表已全部改為純邊並 drop**(`task_dependencies` / `task_labels` / `cycle_tasks` / `project_identities` / `goal_projects`)。所有多對多關係現在只透過 `edges` 表達;`graph_sync` 只維護實體節點 + `contains` 容器邊。
 >
-> **▶ 下一步(唯一剩下的一塊):容器 `contains`** —— 把 `Task.project_id` / `Task.parent_id`(backend 171 處、遍佈 ~30 檔)改為 `contains`-edge 遍歷,最後 drop 這兩個欄位。這是最大、破窗風險最高的一步。前置的回同步(entity 熱欄位更新、task re-parent 搬邊)**已補齊並測綠**。設計決策**已定:完全多重容器、無 primary**(見下方「只剩最後一塊」)。動工按下方「有序切片 0→7」逐片推進,**不做 big-bang**,每片 SQLite+PG 綠才 commit。
+> **▶ 後端遷移已完成。** `Task.project_id` / `Task.parent_id` 欄位已 drop(migration `d8e0f2a4b6c8`);容器只透過 `contains` 邊表達,五張關聯表也早已收斂為邊。設計決策:**完全多重容器、無 primary**。切片 0→6(讀取切換、寫入集中化、寫入/刪除/drop 欄位)全部完成並雙 DB 驗證。**唯一剩下的是切片 7:前端 / MCP 的多重歸屬 UI**(相容欄位 `project_id`/`project_ids[]`/`parent_id` 仍由 `enrich_task` 由邊推導提供,故現有前端不會壞)。
 >
 > 每切一塊的紀律:寫入→邊、讀取→批次邊 helper、drop 表;**只在測試全綠(SQLite + PostgreSQL 皆驗)時 commit**。詳見下方各階段勾選。
 
@@ -113,7 +113,16 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 > **⚠️ 耦合分析:** 讀取切換可乾淨分片,但 **寫入/刪除/drop 欄位彼此耦合**——`Task.project_id` 是 NOT NULL + ondelete CASCADE。只要欄位還在:(a) `graph_sync` 從欄位建邊,故無法「停止寫欄位」而不同時改 `graph_sync`;(b) 刪專案時 FK CASCADE 會連跨專案任務一起刪,無法乾淨實作「孤兒才刪」。因此切片 4/5/6 實質是一次協調變更,拆成兩個檢查點降風險。
 
 - [x] **切片 4(建立集中化,additive、可獨立綠):** 新增 `graph.create_task(db, **fields)`(construct→add→flush),成為唯一 task 建立入口(仍設欄位、`graph_sync` 照舊鏡射邊 → 行為不變)。全部 15 處 `Task(...)` 收斂進來(`tasks.py`、`external_api/tasks.py`×2、`imports.py`×3、`scheduler`、`cycles`、`issue_sync`、`assistant_tools`×4、`bulk` 遞迴)。有 post-construction 設 `due_date` 的點靠 slice-1 的 dirty-entity 回同步保持 node 正確。688 SQLite 綠。最終 drop 欄位的風險面已縮到「`create_task` + `graph_sync` + migration」3 處。
-- [ ] **切片 4b/5/6(協調的一刀):** migration 讓欄位 nullable→drop;`graph_sync` task 分支只建 node(邊改由 `create_task` + memberships + 顯式 re-parent 提供);`create_task` 停止設欄位、顯式建邊;刪專案改為顯式移除邊 + 孤兒任務(無其他專案容器才刪),取代 FK CASCADE;移除 Task 的 `project`/`parent`/`subtasks` relationship 與 `enrichment` 的 `db is None` fallback。雙 DB 綠才 commit。
+- [x] **切片 4b/5/6(協調的一刀,drop 欄位)✅ 完成。** `tasks.project_id` / `parent_id` 欄位已 drop(migration `d8e0f2a4b6c8`,upgrade/downgrade round-trip 已驗)。容器只存在於 `contains` 邊。`project_id`/`parent_id` 現為 `Task.__init__` 的 transient 建構提示,`graph_sync` 轉成邊(呼叫端 `Task(project_id=...)` 仍可用,但無欄位)。寫入經 `graph.create_task`;re-parent 經 PATCH 的邊搬移;刪除經 `graph.delete_task_tree` / `delete_project_and_tasks`(孤兒感知)。`task.project`/`.project_id` 讀取全改 `graph.project_of_task`/`project_id_of_task`;raw task 回應改走 `enrich_task` 補相容欄位;`TaskOut.project_id` 改為 `str | None`。新增 `tests/test_delete_semantics.py`(3 項:子任務串聯刪除、專案刪除連任務、跨專案任務存活)。691 SQLite 綠、覆蓋率 78.6%。原配方:
+  1. **`graph.create_task(db, *, project_id=None, parent_id=None, **fields)`**:`Task(**fields)`(不含容器欄位)→flush→顯式 `add_edge(project_id→task, contains)`、`add_edge(parent_id→task, contains)`。呼叫端不變(已用 kwargs)。
+  2. **`graph_sync`**:task 新建分支只 ensure node(移除從欄位建邊);移除 `_reparent` 與 dirty-task 搬邊。
+  3. **`enrichment`**:`out.project_id`/`out.parent_id` 相容欄位改由圖批次推導(`project_of_task` 取最近 project 祖先、新增 batched `parent_task_map`);移除三處 `db is None` 讀欄位 fallback。
+  4. **`task.project` 4 處**(`notifier`、`webhooks`×2 含移除 `_ = task.project`、`external_api/tasks`)→ 新增 `graph.project_of_task(db, task_id)`(最近 project 祖先→Project row)。
+  5. **PATCH `update_task`**:攔截 `changes` 裡的 `parent_id`,改成搬 `contains` 邊(移除舊 task-parent 邊、加新),不再 `setattr`。
+  6. **⚠️ 刪除語意(新發現,非機械式):** 移除 `Task.subtasks`(delete-orphan)+ `parent_id` FK CASCADE 後,刪任務不再自動刪子任務。需新增 `graph.delete_task_tree(db, task_id)`(遞迴刪子任務樹;comment/attachment/PR 仍靠各自 task_id FK CASCADE)。`delete_task` 改用它;`delete_project` 改為:逐一 contained task → 若無其他專案容器則 `delete_task_tree`,否則只移除本專案的 contains 邊,最後刪 project(取代 project_id FK CASCADE)。
+  7. **`models.py`**:移除 `Task.project_id`/`parent_id` 欄位與 `Task.project`/`subtasks`/`parent`、`Project.tasks` relationship。
+  8. **migration**:batch mode drop `tasks.project_id`、`tasks.parent_id`(含 FK);downgrade 重建欄位並由邊回填。
+  9. 全套 SQLite + PostgreSQL 綠、覆蓋率 ≥70% 才 commit。
 - [ ] **切片 5(刪除語意):** 刪專案 → 刪其 `contains` 邊 + 刪孤兒任務(無其他專案容器才刪),取代 SQLite/PG 的 FK ondelete CASCADE。
 - [ ] **切片 6(drop 欄位):** migration drop `tasks.project_id`、`tasks.parent_id`;移除 model 欄位/relationship;`graph_sync` 不再讀欄位(改由邊事件驅動)。
 - [ ] **切片 7(前端 / MCP):** `project_ids[]` / `parent_ids[]` 開放多重歸屬與跨專案掛載 UI(見階段 4)。

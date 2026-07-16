@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Task
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.cicd_trigger import (
     trigger_generic_webhook,
@@ -70,7 +71,7 @@ async def trigger_github(body: GitHubTrigger, task_id: str | None = None, db: Se
             log_activity(
                 db,
                 "cicd.triggered",
-                project_id=task.project_id,
+                project_id=graph.project_id_of_task(db, task.id),
                 task_id=task.id,
                 actor="user",
                 detail=f"Triggered GitHub workflow '{body.workflow_id}' on {body.repo}@{body.ref}",
@@ -103,7 +104,7 @@ async def trigger_gitlab(body: GitLabTrigger, task_id: str | None = None, db: Se
             log_activity(
                 db,
                 "cicd.triggered",
-                project_id=task.project_id,
+                project_id=graph.project_id_of_task(db, task.id),
                 task_id=task.id,
                 actor="user",
                 detail=f"Triggered GitLab pipeline for project {body.project_id}@{body.ref}",
@@ -130,7 +131,7 @@ async def trigger_jenkins(body: JenkinsTrigger, task_id: str | None = None, db: 
             log_activity(
                 db,
                 "cicd.triggered",
-                project_id=task.project_id,
+                project_id=graph.project_id_of_task(db, task.id),
                 task_id=task.id,
                 actor="user",
                 detail=f"Triggered Jenkins build at {body.url}",
@@ -157,7 +158,7 @@ async def trigger_generic(body: GenericTrigger, task_id: str | None = None, db: 
             log_activity(
                 db,
                 "cicd.triggered",
-                project_id=task.project_id,
+                project_id=graph.project_id_of_task(db, task.id),
                 task_id=task.id,
                 actor="user",
                 detail=f"Triggered {body.method} {body.url}",

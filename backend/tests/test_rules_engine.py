@@ -56,7 +56,7 @@ class TestEvalCondition:
         assert _eval_condition({"field": "title_contains", "op": "neq", "value": "login"}, task, {}) is False
 
     def test_has_label(self, db, task):
-        label = Label(project_id=task.project_id, name="bug", color="#ff0000")
+        label = Label(project_id=graph.project_id_of_task(db, task.id), name="bug", color="#ff0000")
         db.add(label)
         db.flush()
         graph.set_label(db, task.id, label.id)

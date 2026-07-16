@@ -122,5 +122,5 @@ def api_delete_project(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    db.delete(project)
+    graph.delete_project_and_tasks(db, project)
     db.commit()

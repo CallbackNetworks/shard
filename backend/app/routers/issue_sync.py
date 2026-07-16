@@ -104,15 +104,16 @@ def _apply_external_labels(task: Task, label_names: list[str], db: Session) -> N
     """
     wanted = set(label_names)
     current = {lb.name: lb for lb in graph.labels_for_task(db, task.id) if lb.type == "label"}
+    task_project_id = graph.project_id_of_task(db, task.id)
 
     for name in wanted - set(current):
         label = (
             db.query(Label)
-            .filter(Label.project_id == task.project_id, Label.name == name, Label.type == "label")
+            .filter(Label.project_id == task_project_id, Label.name == name, Label.type == "label")
             .first()
         )
         if not label:
-            label = Label(project_id=task.project_id, name=name, source="issue_sync")
+            label = Label(project_id=task_project_id, name=name, source="issue_sync")
             db.add(label)
             db.flush()
         graph.set_label(db, task.id, label.id)
@@ -163,7 +164,7 @@ async def receive_issue_webhook(
 
     if action == "deleted":
         if existing:
-            db.delete(existing)
+            graph.delete_task_tree(db, existing.id)
             log_activity(
                 db,
                 "task.deleted",
@@ -562,7 +563,7 @@ def _external_sync_target(task: Task, db: Session) -> tuple[str, str] | None:
     """Return (token, api_base_or_gitlab_url) when the task is linked and sync is configured."""
     if not task.external_provider or not task.external_id or not task.external_repo:
         return None
-    integration = _get_sync_integration(task.project_id, db)
+    integration = _get_sync_integration(graph.project_id_of_task(db, task.id), db)
     if not integration or not integration.secret:
         return None
     if task.external_provider == "github":
@@ -765,7 +766,11 @@ def apply_inbound_milestone_cycle(task: Task, milestone_title: str | None, db: S
     """
     if not milestone_title:
         return
-    cycle = db.query(Cycle).filter(Cycle.project_id == task.project_id, Cycle.name == milestone_title).first()
+    cycle = (
+        db.query(Cycle)
+        .filter(Cycle.project_id == graph.project_id_of_task(db, task.id), Cycle.name == milestone_title)
+        .first()
+    )
     if not cycle:
         return
     if task.id not in graph.task_ids_in_cycle(db, cycle.id):
@@ -784,7 +789,7 @@ async def create_external_issue_from_task(task: Task, project: Project, db: Sess
     if task.external_id:
         raise HTTPException(status_code=409, detail="Task is already linked to an external issue")
 
-    integration = _get_sync_integration(task.project_id, db)
+    integration = _get_sync_integration(graph.project_id_of_task(db, task.id), db)
     if not integration or not integration.secret:
         raise HTTPException(
             status_code=400,
@@ -821,7 +826,7 @@ async def create_external_issue_from_task(task: Task, project: Project, db: Sess
     log_activity(
         db,
         "task.issue_created",
-        project_id=task.project_id,
+        project_id=graph.project_id_of_task(db, task.id),
         task_id=task.id,
         actor=f"issue-sync:{parsed['provider']}",
         detail=f'Created {parsed["provider"]} issue #{result["number"]} from task "{task.title}"',
@@ -829,5 +834,7 @@ async def create_external_issue_from_task(task: Task, project: Project, db: Sess
     )
     db.commit()
     db.refresh(task)
-    await ws_manager.broadcast("task.updated", {"project_id": task.project_id, "task_id": task.id})
+    await ws_manager.broadcast(
+        "task.updated", {"project_id": graph.project_id_of_task(db, task.id), "task_id": task.id}
+    )
     return task

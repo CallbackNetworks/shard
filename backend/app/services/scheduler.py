@@ -126,11 +126,12 @@ async def _check_recurring(db: Session) -> None:
             continue
 
         try:
+            template_project_id = graph.project_id_of_task(db, template.id)
             # Clone the template task
             new_task = graph.create_task(
                 db,
                 id=str(uuid.uuid4()),
-                project_id=template.project_id,
+                project_id=template_project_id,
                 parent_id=None,
                 title=template.title,
                 description=template.description,
@@ -147,7 +148,7 @@ async def _check_recurring(db: Session) -> None:
             log_activity(
                 db,
                 action="task.recurred",
-                project_id=template.project_id,
+                project_id=template_project_id,
                 task_id=new_task.id,
                 actor="scheduler",
                 detail=f"Recurring task created from template '{template.title}'",
@@ -354,7 +355,10 @@ async def _send_weekly_digest(db: Session) -> None:
         .all()
     )
 
-    # Per-project progress bars and activity tracking
+    # Per-project progress bars and activity tracking. Resolve each week's task
+    # project memberships once (edges, ADR-0032) to avoid per-project lookups.
+    created_projects = graph.project_ids_map(db, [t.id for t in created_this_week])
+    completed_projects = graph.project_ids_map(db, [t.id for t in completed_this_week])
     project_rows = []
     project_activity = []
     for p in projects:
@@ -372,8 +376,8 @@ async def _send_weekly_digest(db: Session) -> None:
             f"<td style='padding: 6px 12px;'>{pct}% ({done}/{total})</td></tr>"
         )
         # Count task changes this week for top-5 ranking
-        created_count = sum(1 for t in created_this_week if t.project_id == p.id)
-        completed_count = sum(1 for t in completed_this_week if t.project_id == p.id)
+        created_count = sum(1 for t in created_this_week if p.id in created_projects.get(t.id, []))
+        completed_count = sum(1 for t in completed_this_week if p.id in completed_projects.get(t.id, []))
         change_count = created_count + completed_count
         if change_count > 0:
             project_activity.append((p.name, change_count, created_count, completed_count))
@@ -489,7 +493,7 @@ async def _check_sla_aging(db: Session) -> None:
             log_activity(
                 db,
                 action="task.sla_escalated",
-                project_id=task.project_id,
+                project_id=graph.project_id_of_task(db, task.id),
                 task_id=task.id,
                 actor="scheduler",
                 detail=f"Priority escalated from '{old_priority}' to 'high' (stuck {days_stuck} days)",
@@ -507,7 +511,7 @@ async def _check_sla_aging(db: Session) -> None:
             log_activity(
                 db,
                 action="task.sla_escalated",
-                project_id=task.project_id,
+                project_id=graph.project_id_of_task(db, task.id),
                 task_id=task.id,
                 actor="scheduler",
                 detail=f"Task stuck for {days_stuck} days, notification fired",

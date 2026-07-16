@@ -224,7 +224,9 @@ async def _send_webhook_inline(
 
 
 async def fire_notifications(db: Session, task: Task, event: str) -> None:
-    project: Project = task.project
+    project: Project | None = graph.project_of_task(db, task.id)
+    if project is None:
+        return
     total, done, progress = _compute_progress(project, db)
 
     payload = {

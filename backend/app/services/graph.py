@@ -420,17 +420,94 @@ def contained_task_ids(db: Session, project_id: str) -> list[str]:
 
 
 def create_task(db: Session, **fields) -> "Task":
-    """Single entry point for creating a task (ADR-0032).
+    """Single entry point for creating a task (ADR-0032, no columns).
 
-    Today this sets the ``project_id``/``parent_id`` columns and the ``graph_sync``
-    listener mirrors the ``contains`` edges. Centralizing creation here means the
-    eventual column drop only has to change this one place (set edges explicitly,
-    stop setting columns) instead of every call site.
+    ``project_id``/``parent_id`` are transient constructor hints (not columns);
+    ``graph_sync`` turns them into ``project -> task`` / ``parent-task -> task``
+    ``contains`` edges. Containment lives only in edges now.
     """
     task = Task(**fields)
     db.add(task)
-    db.flush()
+    db.flush()  # graph_sync mirrors the node and creates the contains edges
     return task
+
+
+def delete_task_tree(db: Session, task_id: str) -> None:
+    """Delete a task and all its subtask descendants (replaces ORM delete-orphan).
+
+    Peripheral rows (comments/attachments/pull requests) still cascade via their own
+    ``task_id`` FK; ``graph_sync`` drops each task's node and touching edges.
+    """
+    ids = [task_id, *descendants_of(db, task_id)]
+    for tid in ids:
+        task = db.get(Task, tid)
+        if task is not None:
+            db.delete(task)
+
+
+def delete_project_and_tasks(db: Session, project) -> None:
+    """Delete a project, its exclusively-owned task trees, and unlink shared tasks.
+
+    Replaces the ``project_id`` FK ``ondelete CASCADE`` (ADR-0032, no primary): a
+    top-level task belonging only to this project is deleted with its subtask tree;
+    a task also linked into another project is merely unlinked from this one. The
+    project node's own edges are cleaned up by ``graph_sync`` on delete.
+    """
+    contained = contained_task_ids(db, project.id)
+    subtasks_set = subtask_ids_among(db, contained)
+    for tid in contained:
+        if tid in subtasks_set:
+            continue  # a subtask is removed together with its parent's tree
+        others = [pid for pid in member_project_ids(db, tid) if pid != project.id]
+        if others:
+            remove_edge(db, project.id, tid, REL_CONTAINS)
+        else:
+            delete_task_tree(db, tid)
+    db.delete(project)
+
+
+def project_id_of_task(db: Session, task_id: str) -> str | None:
+    """Id of the task's project: nearest ``project``-type ``contains`` ancestor (ADR-0032)."""
+    node = nearest_ancestor_of_type(db, task_id, NODE_PROJECT)
+    return node.id if node is not None else None
+
+
+def project_of_task(db: Session, task_id: str) -> Project | None:
+    """The task's project: nearest ``project``-type ``contains`` ancestor (ADR-0032)."""
+    node = nearest_ancestor_of_type(db, task_id, NODE_PROJECT)
+    return db.get(Project, node.id) if node is not None else None
+
+
+def parent_task_map(db: Session, task_ids) -> dict[str, str]:
+    """Batch ``{task_id: parent_task_id}`` for subtasks (incoming task->task contains edge)."""
+    ids = set(task_ids)
+    result: dict[str, str] = {}
+    if not ids:
+        return result
+    rows = db.execute(
+        select(Edge.target_id, Edge.source_id)
+        .join(Node, Node.id == Edge.source_id)
+        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_TASK, Edge.target_id.in_(ids))
+    ).all()
+    for target_id, source_id in rows:
+        result[target_id] = source_id
+    return result
+
+
+def project_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
+    """Batch ``{task_id: [project_id, ...]}`` from incoming project->task contains edges."""
+    ids = set(task_ids)
+    result: dict[str, list[str]] = defaultdict(list)
+    if not ids:
+        return result
+    rows = db.execute(
+        select(Edge.target_id, Edge.source_id)
+        .join(Node, Node.id == Edge.source_id)
+        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_PROJECT, Edge.target_id.in_(ids))
+    ).all()
+    for target_id, source_id in rows:
+        result[target_id].append(source_id)
+    return result
 
 
 def tasks_in_project(db: Session, project_id: str) -> list["Task"]:
