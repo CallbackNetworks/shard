@@ -118,9 +118,7 @@ def _serialize_comment(c: Comment):
 
 def _serialize_project(p: Project, db: Session, include_notes: bool):
     task_ids = graph.contained_task_ids(db, p.id)
-    tasks = (
-        db.query(Task).options(selectinload(Task.comments)).filter(Task.id.in_(task_ids)).all() if task_ids else []
-    )
+    tasks = db.query(Task).options(selectinload(Task.comments)).filter(Task.id.in_(task_ids)).all() if task_ids else []
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
 

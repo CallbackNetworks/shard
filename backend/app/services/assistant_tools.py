@@ -327,7 +327,8 @@ async def _tool_create_task(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         return f"Project {project_id} not found"
-    task = Task(
+    task = graph.create_task(
+        db,
         id=str(uuid.uuid4()),
         project_id=project_id,
         title=title,
@@ -338,7 +339,6 @@ async def _tool_create_task(
     )
     if due_date:
         task.due_date = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=UTC)
-    db.add(task)
     db.commit()
     return json.dumps({"id": task.id, "title": task.title, "status": task.status})
 
@@ -385,7 +385,8 @@ async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, pri
     parent = db.query(Task).filter(Task.id == parent_task_id).first()
     if not parent:
         return f"Parent task {parent_task_id} not found"
-    task = Task(
+    task = graph.create_task(
+        db,
         id=str(uuid.uuid4()),
         project_id=parent.project_id,
         title=title,
@@ -393,7 +394,6 @@ async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, pri
         parent_id=parent_task_id,
         callback_token=str(uuid.uuid4()),
     )
-    db.add(task)
     db.commit()
     return json.dumps({"id": task.id, "title": task.title, "parent_id": parent_task_id})
 
@@ -656,7 +656,8 @@ async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dic
         if len(title) > 500:
             title = title[:500]
 
-        task = Task(
+        task = graph.create_task(
+            db,
             project_id=project_id,
             title=title,
             priority=item.get("priority", "medium"),
@@ -667,22 +668,19 @@ async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dic
                 task.due_date = datetime.fromisoformat(item["due_date"])
             except (ValueError, TypeError):
                 pass
-        db.add(task)
-        db.flush()
         created_ids.append(task.id)
 
         for sub in item.get("subtasks") or []:
             sub_title = (sub.get("title") or "").strip()
             if not sub_title:
                 continue
-            subtask = Task(
+            subtask = graph.create_task(
+                db,
                 project_id=project_id,
                 title=sub_title,
                 priority=sub.get("priority", "medium"),
                 parent_id=task.id,
             )
-            db.add(subtask)
-            db.flush()
             created_ids.append(subtask.id)
 
     db.commit()

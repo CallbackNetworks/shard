@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Label, Project, Task
+from app.models import Label, Project
 from app.services import graph
 from app.services.activity import log_activity
 
@@ -148,7 +148,8 @@ def import_trello(project_id: str, body: TrelloImport, db: Session = Depends(get
                 except (ValueError, TypeError):
                     pass
 
-            task = Task(
+            task = graph.create_task(
+                db,
                 id=str(uuid.uuid4()),
                 project_id=project_id,
                 title=card.name.strip(),
@@ -158,8 +159,6 @@ def import_trello(project_id: str, body: TrelloImport, db: Session = Depends(get
                 due_date=due_date,
                 callback_token=str(uuid.uuid4()),
             )
-            db.add(task)
-            db.flush()
 
             for lbl in card.labels:
                 if lbl.name and lbl.name.strip():
@@ -225,7 +224,8 @@ def import_linear(project_id: str, body: LinearImport, db: Session = Depends(get
                 skipped += 1
                 continue
 
-            task = Task(
+            task = graph.create_task(
+                db,
                 id=str(uuid.uuid4()),
                 project_id=project_id,
                 title=issue.title.strip(),
@@ -235,8 +235,6 @@ def import_linear(project_id: str, body: LinearImport, db: Session = Depends(get
                 assignee=issue.assignee,
                 callback_token=str(uuid.uuid4()),
             )
-            db.add(task)
-            db.flush()
 
             for lbl_name in issue.labels:
                 if lbl_name and lbl_name.strip():
@@ -282,7 +280,8 @@ def import_github(project_id: str, body: GitHubImport, db: Session = Depends(get
             status = "done" if issue.state == "closed" else "todo"
             assignee = issue.assignee.login if issue.assignee else None
 
-            task = Task(
+            task = graph.create_task(
+                db,
                 id=str(uuid.uuid4()),
                 project_id=project_id,
                 title=issue.title.strip(),
@@ -295,8 +294,6 @@ def import_github(project_id: str, body: GitHubImport, db: Session = Depends(get
                 external_url=issue.html_url,
                 callback_token=str(uuid.uuid4()),
             )
-            db.add(task)
-            db.flush()
 
             for lbl in issue.labels:
                 if lbl.name and lbl.name.strip():

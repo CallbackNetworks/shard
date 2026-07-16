@@ -61,9 +61,7 @@ def list_tasks(
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(get_db)):
     project = _get_project_or_404(project_id, db)
-    task = Task(project_id=project_id, **body.model_dump())
-    db.add(task)
-    db.flush()
+    task = graph.create_task(db, project_id=project_id, **body.model_dump())
     log_activity(
         db,
         "task.created",

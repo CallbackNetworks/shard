@@ -87,9 +87,7 @@ def api_create_task(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    task = Task(project_id=project_id, **body.model_dump())
-    db.add(task)
-    db.flush()
+    task = graph.create_task(db, project_id=project_id, **body.model_dump())
     actor = _build_actor(api_key, x_agent_id)
     log_activity(
         db,
@@ -201,8 +199,7 @@ async def api_bulk_create_tasks(
         raise HTTPException(status_code=404, detail="Project not found")
     created = []
     for body in tasks:
-        task = Task(project_id=project_id, **body.model_dump())
-        db.add(task)
+        task = graph.create_task(db, project_id=project_id, **body.model_dump())
         created.append(task)
     db.commit()
     for t in created:

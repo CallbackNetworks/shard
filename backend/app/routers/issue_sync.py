@@ -205,7 +205,8 @@ async def receive_issue_webhook(
         await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": existing.id})
         return {"ok": True, "action": "updated", "task_id": existing.id}
 
-    task = Task(
+    task = graph.create_task(
+        db,
         project_id=project_id,
         title=normalized["title"],
         description=normalized["description"],
@@ -217,8 +218,6 @@ async def receive_issue_webhook(
         external_url=normalized["external_url"],
         external_repo=repo,
     )
-    db.add(task)
-    db.flush()
     _apply_external_labels(task, normalized.get("labels", []), db)
     apply_inbound_milestone_cycle(task, normalized.get("milestone"), db)
 

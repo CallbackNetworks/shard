@@ -419,6 +419,20 @@ def contained_task_ids(db: Session, project_id: str) -> list[str]:
     return [n.id for n in children_of(db, project_id) if n.type == NODE_TASK]
 
 
+def create_task(db: Session, **fields) -> "Task":
+    """Single entry point for creating a task (ADR-0032).
+
+    Today this sets the ``project_id``/``parent_id`` columns and the ``graph_sync``
+    listener mirrors the ``contains`` edges. Centralizing creation here means the
+    eventual column drop only has to change this one place (set edges explicitly,
+    stop setting columns) instead of every call site.
+    """
+    task = Task(**fields)
+    db.add(task)
+    db.flush()
+    return task
+
+
 def tasks_in_project(db: Session, project_id: str) -> list["Task"]:
     """Task rows contained by a project via ``contains`` edges (ADR-0032, no primary).
 

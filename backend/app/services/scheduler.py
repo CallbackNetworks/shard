@@ -127,7 +127,8 @@ async def _check_recurring(db: Session) -> None:
 
         try:
             # Clone the template task
-            new_task = Task(
+            new_task = graph.create_task(
+                db,
                 id=str(uuid.uuid4()),
                 project_id=template.project_id,
                 parent_id=None,
@@ -138,8 +139,6 @@ async def _check_recurring(db: Session) -> None:
                 assignee=template.assignee,
                 callback_token=str(uuid.uuid4()),
             )
-            db.add(new_task)
-            db.flush()
 
             rule.last_run_at = now
             rule.next_run_at = _compute_next_run(rule, now)

@@ -111,7 +111,8 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
 
     # Clone tasks as new todo tasks and link to new cycle
     for src_task in graph.tasks_in_cycle(db, source.id):
-        new_task = Task(
+        new_task = graph.create_task(
+            db,
             id=str(uuid.uuid4()),
             project_id=project_id,
             title=src_task.title,
@@ -122,8 +123,6 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
             callback_token=str(uuid.uuid4()),
             time_estimate=src_task.time_estimate,
         )
-        db.add(new_task)
-        db.flush()
         graph.add_to_cycle(db, new_cycle.id, new_task.id)
 
     db.commit()

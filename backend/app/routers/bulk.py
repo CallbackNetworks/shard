@@ -224,7 +224,8 @@ def _create_task_recursive(
     parent_id: str | None,
     created_ids: list[str],
 ) -> None:
-    task = Task(
+    task = graph.create_task(
+        db,
         id=str(uuid.uuid4()),
         project_id=project_id,
         parent_id=parent_id,
@@ -238,8 +239,6 @@ def _create_task_recursive(
         time_estimate=item.time_estimate,
         time_spent=item.time_spent,
     )
-    db.add(task)
-    db.flush()
     created_ids.append(task.id)
 
     for sub in item.subtasks:
