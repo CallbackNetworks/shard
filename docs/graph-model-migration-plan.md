@@ -152,6 +152,23 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 4. 前端「未分類」bucket 清單 + 從那裡指派到專案(=新增一條 `contains` 邊)。
 5. 檢查所有假設「task 一定有專案」的讀取/enrich 路徑(compat `project_id` 已容忍 null,但 UI 樹、分析、summary 需逐一確認零歸屬不會爆)。SQLite + PostgreSQL 兩套綠。
 
+### 🔮 更遠的方向 — 用戶自訂層(user-defined node types / 全 node-only)
+
+**動機(2026-07-16,使用者):** 舊的樹狀容器(project/identity 是寫死的 FK 層級)太死板 —— 想加一層(如 `topic`)整棵底層樹就崩、每次改「包含」都引出資料結構問題。把包含搬到 edge 已解決「加層會崩」;下一步是把 **node type(= category / 層級)本身也開放給用戶自訂**:平台只給預設幾個內建 type,其餘的層由用戶自己定義。
+
+**已確認的形狀(2026-07-16):**
+- **包含規則:完全自由** —— 任何 node 可包含任何 node,不存「可包含哪些 type」白名單。唯一結構護欄是既有的 `detect_cycle`,其餘靠 UX。
+- **內建 vs 自訂:逐步全 node-only** —— 最終連 task/project 也收成純 node,實體表消失、type 詞彙全資料化。分階段、非 big-bang。
+
+**為何可行:** `nodes.type` 是純字串欄(無 enum/check),`contains` 遍歷 type-agnostic,DB 今天就接受任意 type 與任意層深。把 type 寫死的只有三處 Python:固定常數集、`graph_sync._ENTITY_TYPES`、幾支 hardcode `n.type == NODE_TASK/PROJECT` 的 leaf helper(graph.py:349/421/523/545/609/623)。所以這是「把 type 詞彙從程式碼搬到資料」的加法,不是重寫儲存。
+
+**分階段路徑(⏸️ 僅記錄,未實作):**
+- **Phase A — 地基(先交付用戶自訂層):** `node_types` 註冊表(type 資料化、seed 內建)+ 通用 Node CRUD API + **通用「刪 node → 清邊」路徑**(補 node-only 的 dangling-edge 陷阱,`graph_sync` 目前只對 `_ENTITY_TYPES` 觸發清邊)+ 通用 `NodeOut` 序列化。做完用戶即可自訂層(純 node),task/project 不動。
+- **Phase B — 逐型收斂(一次一 type,兩套 DB 綠):** 內建實體逐一搬進 node(欄位→hot columns/`data`,endpoint 轉通用層,drop 表)。輕的先做(label/cycle/goal/identity),最後才碰 task/project(有 endpoint/MCP/前端/大量測試依賴)。
+- **Phase C — 清理:** 移除 `_ENTITY_TYPES`;hardcode type 過濾改由註冊表驅動;實體 ORM 類別消失。compat `project_id` 屆時轉為通用「父容器」概念(呼應「未分類任務」)。
+
+**風險提醒:** Phase B 碰 task/project 時牽動 enrichment、Pydantic typed schema、MCP 工具、前端 `IssueRow`/`ProjectDetail`、幾乎每個測試 —— 以季為單位的漸進工程,底層已備妥故非高風險重設計,但**嚴禁 big-bang**。
+
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 
 ## 階段 3 — 寫入切換
