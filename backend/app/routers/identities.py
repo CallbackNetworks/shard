@@ -4,19 +4,20 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.database import get_db
-from app.models import ActivityLog, Identity, Project, ProjectIdentity
+from app.models import ActivityLog, Identity, Project
 from app.routers.deps import get_identity_or_404, get_project_or_404
 from app.schemas import IdentityCreate, IdentityHubOut, IdentityOut, IdentityUpdate
+from app.services import graph
 
 router = APIRouter(prefix="/identities", tags=["identities"])
 
 
 def _enrich(identity: Identity) -> IdentityOut:
     out = IdentityOut.model_validate(identity)
-    out.project_count = len(identity.project_identities)
+    out.project_count = len(graph.project_ids_for_identity(object_session(identity), identity.id))
     out.share_pin_set = identity.share_pin_hash is not None
     out.share_expires_at = identity.share_expires_at
     return out
@@ -38,7 +39,7 @@ def get_hub_stats(db: Session = Depends(get_db)):
     result = []
 
     for ident in identities:
-        ident_project_ids = [pi.project_id for pi in ident.project_identities]
+        ident_project_ids = graph.project_ids_for_identity(db, ident.id)
         projects_data = []
         ident_stats = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
 
@@ -135,46 +136,24 @@ def delete_identity(identity_id: str, db: Session = Depends(get_db)):
 def link_project(identity_id: str, project_id: str, db: Session = Depends(get_db)):
     get_identity_or_404(identity_id, db)
     get_project_or_404(project_id, db)
-    existing = (
-        db.query(ProjectIdentity)
-        .filter(
-            ProjectIdentity.identity_id == identity_id,
-            ProjectIdentity.project_id == project_id,
-        )
-        .first()
-    )
-    if existing:
+    if project_id in graph.project_ids_for_identity(db, identity_id):
         return {"status": "already linked"}
-    link = ProjectIdentity(project_id=project_id, identity_id=identity_id)
-    db.add(link)
+    graph.link_membership(db, identity_id, project_id)
     db.commit()
     return {"status": "linked"}
 
 
 @router.delete("/{identity_id}/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def unlink_project(identity_id: str, project_id: str, db: Session = Depends(get_db)):
-    link = (
-        db.query(ProjectIdentity)
-        .filter(
-            ProjectIdentity.identity_id == identity_id,
-            ProjectIdentity.project_id == project_id,
-        )
-        .first()
-    )
-    if not link:
+    if not graph.unlink_membership(db, identity_id, project_id):
         raise HTTPException(status_code=404, detail="Link not found")
-    db.delete(link)
     db.commit()
 
 
 @router.get("/{identity_id}/projects")
 def get_identity_projects(identity_id: str, db: Session = Depends(get_db)):
-    identity = get_identity_or_404(identity_id, db)
-    return [
-        {"id": pi.project.id, "name": pi.project.name, "status": pi.project.status}
-        for pi in identity.project_identities
-        if pi.project is not None
-    ]
+    get_identity_or_404(identity_id, db)
+    return [{"id": p.id, "name": p.name, "status": p.status} for p in graph.projects_for_identity(db, identity_id)]
 
 
 # ── Share PIN management ─────────────────────────────────────────

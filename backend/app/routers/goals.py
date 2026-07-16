@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Goal, GoalProject, Project, Task
+from app.models import Goal, Project, Task
 from app.routers.deps import get_goal_or_404
 from app.schemas import GoalCreate, GoalOut, GoalProjectOut, GoalUpdate
 from app.services import graph
@@ -24,10 +24,7 @@ def _project_progress(db: Session, project_id: str) -> float:
 def _enrich_goal(goal: Goal, db: Session) -> GoalOut:
     """Build GoalOut with computed progress from linked projects."""
     projects: list[GoalProjectOut] = []
-    for gp in goal.goal_projects:
-        proj = gp.project
-        if proj is None:
-            continue
+    for proj in graph.projects_for_goal(db, goal.id):
         prog = _project_progress(db, proj.id)
         projects.append(GoalProjectOut(project_id=proj.id, project_name=proj.name, progress=prog))
 
@@ -71,7 +68,7 @@ async def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
         project = db.query(Project).filter(Project.id == pid).first()
         if not project:
             raise HTTPException(status_code=404, detail=f"Project {pid} not found")
-        db.add(GoalProject(goal_id=goal.id, project_id=pid))
+        graph.link_goal_project(db, goal.id, pid)
 
     log_activity(
         db,
@@ -95,14 +92,13 @@ async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_
         setattr(goal, field, value)
 
     if project_ids is not None:
-        # Replace linked projects (bulk delete bypasses graph_sync; clear part_of edges too)
-        db.query(GoalProject).filter(GoalProject.goal_id == goal_id).delete()
+        # Replace linked projects: clear all part_of edges for this goal, then re-add.
         graph.remove_edges(db, target_id=goal_id, rel_type=graph.REL_PART_OF)
         for pid in project_ids:
             project = db.query(Project).filter(Project.id == pid).first()
             if not project:
                 raise HTTPException(status_code=404, detail=f"Project {pid} not found")
-            db.add(GoalProject(goal_id=goal_id, project_id=pid))
+            graph.link_goal_project(db, goal_id, pid)
 
     log_activity(
         db,

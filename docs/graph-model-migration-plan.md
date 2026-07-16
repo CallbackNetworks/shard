@@ -81,10 +81,18 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] migration `a5b7c9d1e3f5` drop `cycle_tasks`(41 邊零損失);dev DB 已套用。
 - [x] 682 tests SQLite 綠、72 項 PG 子集綠。**第三張舊關聯表移除。**
 
-**尚未做(下一步):**
-- [ ] `member_of`(`project_identities`)/ `part_of`(`goal_projects`)—— 剩最後兩張關聯表,同法。
-- [ ] 最後才是 `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點,留到關聯表都清乾淨後再動。
-- [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;`contains` 讀取切換時處理)。
+**最後兩張表完成 — memberships(`project_identities` + `goal_projects`):**
+- [x] `member_of`:`identities`(link/unlink/enrich/hub-stats)、`enrichment`、`bulk`(ical)、`external_api/summary`、`share`(改用 `graph.projects_for_identity`/`identities_for_project`,`_load_identity` 不再 eager-load projects)全改邊。
+- [x] `part_of`:`goals`(create/update/enrich)改用 `graph.link_goal_project`/`projects_for_goal`。
+- [x] 移除 `ProjectIdentity`、`GoalProject` model 與所有 relationship;`_ASSOC_SPECS` 清空 → `graph_sync` 只剩實體/容器鏡射(移除關聯迴圈)。
+- [x] migration `b6c8d0e2f4a6` drop 兩表(26 + 5 邊零損失);dev DB 已套用。
+- [x] 681 tests SQLite 綠、54 項 PG 子集綠。
+
+> **🎉 五張關聯表全部移除。** `task_dependencies` / `task_labels` / `cycle_tasks` / `project_identities` / `goal_projects` 皆已改為純邊並 drop。所有多對多關係現在只透過 `edges` 表達。
+
+**只剩最後一塊 — 容器 `contains`:**
+- [ ] `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點(685 處),是壓軸也是最大的一步。
+- [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;`contains` 讀取切換時需一併處理)。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 

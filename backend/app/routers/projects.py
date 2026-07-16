@@ -15,7 +15,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 def _project_eager_options():
-    from app.models import ProjectIdentity, Task
+    from app.models import Task
 
     return [
         selectinload(Project.tasks).selectinload(Task.subtasks),
@@ -23,7 +23,6 @@ def _project_eager_options():
         selectinload(Project.tasks).selectinload(Task.assigned_agent),
         selectinload(Project.labels),
         selectinload(Project.cycles),
-        selectinload(Project.project_identities).selectinload(ProjectIdentity.identity),
     ]
 
 

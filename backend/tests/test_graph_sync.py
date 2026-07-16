@@ -1,14 +1,12 @@
-"""The before_flush listener mirrors association tables into edges (ADR-0032)."""
+"""The before_flush listener mirrors entities/containment into the graph (ADR-0032)."""
 
 from app.models import (
     Edge,
-    Goal,
-    GoalProject,
     Identity,
     Project,
-    ProjectIdentity,
     Task,
 )
+from app.services import graph
 
 
 def _edge(db, source_id, target_id, rel_type):
@@ -33,41 +31,35 @@ def _task(db, project_id, title="t"):
     return t
 
 
-def test_project_identity_mirrored(db):
+def test_membership_edge_via_helper(db):
     p = _project(db)
     ident = Identity(name="me")
     db.add(ident)
     db.flush()
 
-    db.add(ProjectIdentity(project_id=p.id, identity_id=ident.id))
+    graph.link_membership(db, ident.id, p.id)
     db.commit()
     assert _edge(db, ident.id, p.id, "member_of") is not None
-
-
-def test_goal_project_mirrored(db):
-    p = _project(db)
-    goal = Goal(title="ship it")
-    db.add(goal)
-    db.flush()
-
-    db.add(GoalProject(goal_id=goal.id, project_id=p.id))
+    assert graph.unlink_membership(db, ident.id, p.id) is True
     db.commit()
-    assert _edge(db, p.id, goal.id, "part_of") is not None
+    assert _edge(db, ident.id, p.id, "member_of") is None
 
 
-def test_nodes_created_for_project_identity_association(db):
+def test_entity_delete_clears_membership_edge(db):
     from app.models import Node
 
     p = _project(db)
-    ident = Identity(name="lazy")
+    ident = Identity(name="me")
     db.add(ident)
     db.flush()
-    db.add(ProjectIdentity(project_id=p.id, identity_id=ident.id))
+    graph.link_membership(db, ident.id, p.id)
     db.commit()
 
-    # Both endpoints exist as nodes with the correct type.
-    assert db.get(Node, ident.id).type == "identity"
-    assert db.get(Node, p.id).type == "project"
+    db.delete(ident)
+    db.commit()
+    # Deleting the identity node drops the touching member_of edge.
+    assert db.get(Node, ident.id) is None
+    assert _edge(db, ident.id, p.id, "member_of") is None
 
 
 def test_task_create_mirrors_node_and_contains_edge(db):

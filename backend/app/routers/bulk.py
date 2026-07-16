@@ -362,7 +362,7 @@ def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depe
     identity = db.query(Identity).filter(Identity.share_token == token).first()
     if identity is None:
         raise HTTPException(status_code=404, detail="Calendar not found")
-    project_ids = [pi.project_id for pi in identity.project_identities]
+    project_ids = graph.project_ids_for_identity(db, identity.id)
     tasks = (
         db.query(Task).filter(Task.project_id.in_(project_ids), Task.due_date.isnot(None)).all() if project_ids else []
     )

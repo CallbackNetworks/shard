@@ -15,7 +15,6 @@ from app.models import (
     Comment,
     Identity,
     Project,
-    ProjectIdentity,
     Task,
 )
 from app.services import graph
@@ -90,28 +89,8 @@ def _as_utc(value: datetime | str | None) -> datetime | None:
 
 
 def _load_identity(db: Session, token: str) -> Identity | None:
-    """Load identity with all relationships eagerly to avoid N+1 queries."""
-    return (
-        db.query(Identity)
-        .filter(Identity.share_token == token)
-        .options(
-            selectinload(Identity.project_identities)
-            .selectinload(ProjectIdentity.project)
-            .selectinload(Project.tasks)
-            .selectinload(Task.subtasks),
-            selectinload(Identity.project_identities)
-            .selectinload(ProjectIdentity.project)
-            .selectinload(Project.tasks)
-            .selectinload(Task.comments),
-            selectinload(Identity.project_identities)
-            .selectinload(ProjectIdentity.project)
-            .selectinload(Project.labels),
-            selectinload(Identity.project_identities)
-            .selectinload(ProjectIdentity.project)
-            .selectinload(Project.cycles),
-        )
-        .first()
-    )
+    # An identity's projects are resolved via member_of edges (see _build_response).
+    return db.query(Identity).filter(Identity.share_token == token).first()
 
 
 def _project_eager_options():
@@ -120,7 +99,6 @@ def _project_eager_options():
         selectinload(Project.tasks).selectinload(Task.comments),
         selectinload(Project.labels),
         selectinload(Project.cycles),
-        selectinload(Project.project_identities).selectinload(ProjectIdentity.identity),
     ]
 
 
@@ -305,7 +283,7 @@ def _build_payload(owner: dict, source_projects: list[Project], db: Session, sco
 
 
 def _build_response(identity: Identity, db: Session):
-    projects = [pi.project for pi in identity.project_identities]
+    projects = graph.projects_for_identity(db, identity.id)
     owner = {
         "id": identity.id,
         "name": identity.name,
@@ -317,7 +295,8 @@ def _build_response(identity: Identity, db: Session):
 
 
 def _build_project_response(project: Project, db: Session):
-    identity = project.project_identities[0].identity if project.project_identities else None
+    idents = graph.identities_for_project(db, project.id)
+    identity = idents[0] if idents else None
     owner = {
         "id": project.id,
         "name": project.name,
@@ -487,7 +466,7 @@ def _resolve_note_target(scope: str, token: str, request: Request, db: Session) 
             session_token = request.cookies.get("share_session")
             if not session_token or not _verify_token(session_token, identity.id):
                 raise HTTPException(status_code=403, detail="PIN verification required")
-        return [pi.project for pi in identity.project_identities if pi.project and pi.project.status == "active"]
+        return [p for p in graph.projects_for_identity(db, identity.id) if p.status == "active"]
     if scope == "project":
         project = db.query(Project).filter(Project.share_token == token).first()
         if not project or project.status != "active":

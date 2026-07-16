@@ -2,7 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.models import ActivityLog, Comment, Project, ProjectIdentity, Task
+from app.models import ActivityLog, Comment, Project, Task
+from app.services import graph
 from app.services.rate_limiter import _share_limiter
 
 
@@ -25,7 +26,7 @@ def test_get_project_share_only_returns_that_project(client, db, sample_identity
     other = Project(name="Other Project")
     db.add(other)
     db.flush()
-    db.add(ProjectIdentity(project_id=other.id, identity_id=sample_identity.id))
+    graph.link_membership(db, sample_identity.id, other.id)
     db.commit()
     db.refresh(sample_project)
 
@@ -80,7 +81,7 @@ def test_verify_pin_handles_naive_due_date(client, db, pinned_identity):
     project = Project(name="Pinned Project")
     db.add(project)
     db.flush()
-    db.add(ProjectIdentity(project_id=project.id, identity_id=pinned_identity.id))
+    graph.link_membership(db, pinned_identity.id, project.id)
     db.add(
         Task(
             project_id=project.id,
@@ -225,7 +226,7 @@ def test_task_note_outside_scope_rejected(client, db, sample_project):
 
 def test_pinned_identity_note_requires_session(client, db, pinned_identity, sample_project):
     pinned_identity.allow_guest_notes = True
-    db.add(ProjectIdentity(project_id=sample_project.id, identity_id=pinned_identity.id))
+    graph.link_membership(db, pinned_identity.id, sample_project.id)
     db.commit()
     payload = {"guest_name": "Visitor", "body": "hello", "project_id": sample_project.id}
 

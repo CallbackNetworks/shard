@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, Label, Node, Task
+from app.models import Edge, Identity, Label, Node, Project, Task
 
 # Node types
 NODE_PROJECT = "project"
@@ -345,6 +345,73 @@ def cycle_ids_for_task(db: Session, task_id: str) -> list[str]:
 def member_project_ids(db: Session, task_id: str) -> list[str]:
     """Ids of every project a task belongs to via incoming ``contains`` edges."""
     return [n.id for n in parents_of(db, task_id) if n.type == NODE_PROJECT]
+
+
+# --- Identity ↔ Project membership (member_of edges) ---
+
+
+def link_membership(db: Session, identity_id: str, project_id: str) -> None:
+    """Attach an identity to a project as a ``member_of`` edge (idempotent)."""
+    ensure_node(db, identity_id, NODE_IDENTITY)
+    ensure_node(db, project_id, NODE_PROJECT)
+    add_edge(db, identity_id, project_id, REL_MEMBER_OF)
+
+
+def unlink_membership(db: Session, identity_id: str, project_id: str) -> bool:
+    return remove_edge(db, identity_id, project_id, REL_MEMBER_OF)
+
+
+def project_ids_for_identity(db: Session, identity_id: str) -> list[str]:
+    rows = db.execute(
+        select(Edge.target_id).where(Edge.source_id == identity_id, Edge.rel_type == REL_MEMBER_OF)
+    ).scalars()
+    return list(rows)
+
+
+def identity_ids_for_project(db: Session, project_id: str) -> list[str]:
+    rows = db.execute(
+        select(Edge.source_id).where(Edge.target_id == project_id, Edge.rel_type == REL_MEMBER_OF)
+    ).scalars()
+    return list(rows)
+
+
+def projects_for_identity(db: Session, identity_id: str) -> list[Project]:
+    ids = project_ids_for_identity(db, identity_id)
+    if not ids:
+        return []
+    by_id = {p.id: p for p in db.query(Project).filter(Project.id.in_(ids)).all()}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+def identities_for_project(db: Session, project_id: str) -> list[Identity]:
+    ids = identity_ids_for_project(db, project_id)
+    if not ids:
+        return []
+    by_id = {i.id: i for i in db.query(Identity).filter(Identity.id.in_(ids)).all()}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+# --- Project ↔ Goal membership (part_of edges) ---
+
+
+def link_goal_project(db: Session, goal_id: str, project_id: str) -> None:
+    """Attach a project to a goal as a ``part_of`` edge (idempotent)."""
+    ensure_node(db, project_id, NODE_PROJECT)
+    ensure_node(db, goal_id, NODE_GOAL)
+    add_edge(db, project_id, goal_id, REL_PART_OF)
+
+
+def project_ids_for_goal(db: Session, goal_id: str) -> list[str]:
+    rows = db.execute(select(Edge.source_id).where(Edge.target_id == goal_id, Edge.rel_type == REL_PART_OF)).scalars()
+    return list(rows)
+
+
+def projects_for_goal(db: Session, goal_id: str) -> list[Project]:
+    ids = project_ids_for_goal(db, goal_id)
+    if not ids:
+        return []
+    by_id = {p.id: p for p in db.query(Project).filter(Project.id.in_(ids)).all()}
+    return [by_id[i] for i in ids if i in by_id]
 
 
 def contained_task_ids(db: Session, project_id: str) -> list[str]:

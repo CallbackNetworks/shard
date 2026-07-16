@@ -6,9 +6,11 @@ mirrored without being individually patched:
 
 * Entities (Project/Task/Identity/Goal/Cycle/Label) -> a ``nodes`` row of the
   matching type. Tasks also get their ``contains`` edges from project_id/parent_id.
-* Association objects (ProjectIdentity/GoalProject) -> the matching ``edges``
-  row. (Dependencies, labels and cycle membership are written directly as edges
-  by their endpoints, so they are not mirrored here.)
+  Deleting an entity drops its node and every touching edge.
+
+All relationships (dependencies, labels, cycle membership, identity membership,
+goal membership) are now written directly as edges by their endpoints via the
+``graph`` service, so only the entity/containment mirror remains here.
 
 Edge direction matches the backfill migration (source -> target).
 
@@ -28,12 +30,10 @@ from app.models import (
     Cycle,
     Edge,
     Goal,
-    GoalProject,
     Identity,
     Label,
     Node,
     Project,
-    ProjectIdentity,
     Task,
 )
 
@@ -45,14 +45,6 @@ _ENTITY_TYPES = {
     Goal: "goal",
     Cycle: "cycle",
     Label: "label",
-}
-
-# association class -> (source_attr, target_attr, rel_type, source_node_type, target_node_type)
-# Dependencies and labels are written directly as edges (no association table), so
-# they are not listed here.
-_ASSOC_SPECS = {
-    ProjectIdentity: ("identity_id", "project_id", "member_of", "identity", "project"),
-    GoalProject: ("project_id", "goal_id", "part_of", "project", "goal"),
 }
 
 
@@ -105,19 +97,7 @@ def _mirror(session, flush_context, instances):
             _ensure_node_and_edge(session, seen_nodes, seen_edges, obj.project_id, "project", obj.id)
             _ensure_node_and_edge(session, seen_nodes, seen_edges, obj.parent_id, "task", obj.id)
 
-    # 2. New associations -> edges.
-    for obj in session.new:
-        spec = _ASSOC_SPECS.get(type(obj))
-        if spec is None:
-            continue
-        src_attr, tgt_attr, rel_type, src_type, tgt_type = spec
-        source_id = getattr(obj, src_attr)
-        target_id = getattr(obj, tgt_attr)
-        _upsert_node(session, seen_nodes, source_id, src_type)
-        _upsert_node(session, seen_nodes, target_id, tgt_type)
-        _ensure_edge(session, seen_edges, source_id, target_id, rel_type)
-
-    # 3. Deletes -> drop nodes / edges.
+    # 2. Deleted entities -> drop their node and every touching edge.
     for obj in session.deleted:
         if type(obj) in _ENTITY_TYPES:
             # Explicitly clear touching edges — SQLite does not enforce ondelete CASCADE.
@@ -127,16 +107,6 @@ def _mirror(session, flush_context, instances):
             node = session.get(Node, obj.id)
             if node is not None:
                 session.delete(node)
-            continue
-        spec = _ASSOC_SPECS.get(type(obj))
-        if spec is None:
-            continue
-        src_attr, tgt_attr, rel_type, _s, _t = spec
-        session.query(Edge).filter(
-            Edge.source_id == getattr(obj, src_attr),
-            Edge.target_id == getattr(obj, tgt_attr),
-            Edge.rel_type == rel_type,
-        ).delete(synchronize_session=False)
 
 
 def _ensure_node_and_edge(session, seen_nodes, seen_edges, parent_id, parent_type, child_id):

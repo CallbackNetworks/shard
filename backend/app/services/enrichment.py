@@ -109,18 +109,21 @@ def enrich_project(project, db=None) -> ProjectOut:
         enriched_cycles.append(cout)
     out.cycles = enriched_cycles
 
-    out.identities = [
-        IdentityOut(
-            id=pi.identity.id,
-            name=pi.identity.name,
-            color=pi.identity.color,
-            description=pi.identity.description,
-            avatar=pi.identity.avatar,
-            created_at=pi.identity.created_at,
-            project_count=len(pi.identity.project_identities),
-        )
-        for pi in project.project_identities
-        if pi.identity is not None
-    ]
+    out.identities = (
+        [
+            IdentityOut(
+                id=i.id,
+                name=i.name,
+                color=i.color,
+                description=i.description,
+                avatar=i.avatar,
+                created_at=i.created_at,
+                project_count=len(graph.project_ids_for_identity(db, i.id)),
+            )
+            for i in graph.identities_for_project(db, project.id)
+        ]
+        if db is not None
+        else []
+    )
 
     return out

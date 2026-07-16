@@ -34,9 +34,6 @@ class Project(Base):
     )
     labels: Mapped[list["Label"]] = relationship("Label", back_populates="project", cascade="all, delete-orphan")
     cycles: Mapped[list["Cycle"]] = relationship("Cycle", back_populates="project", cascade="all, delete-orphan")
-    project_identities: Mapped[list["ProjectIdentity"]] = relationship(
-        "ProjectIdentity", back_populates="project", cascade="all, delete-orphan"
-    )
 
 
 class Task(Base):
@@ -193,22 +190,6 @@ class Identity(Base):
     share_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     allow_guest_notes: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-
-    project_identities: Mapped[list["ProjectIdentity"]] = relationship(
-        "ProjectIdentity", back_populates="identity", cascade="all, delete-orphan"
-    )
-
-
-class ProjectIdentity(Base):
-    __tablename__ = "project_identities"
-
-    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
-    identity_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("identities.id", ondelete="CASCADE"), primary_key=True
-    )
-
-    project: Mapped["Project"] = relationship("Project", back_populates="project_identities")
-    identity: Mapped["Identity"] = relationship("Identity", back_populates="project_identities")
 
 
 class ActivityLog(Base):
@@ -451,22 +432,6 @@ class Goal(Base):
     target_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    goal_projects: Mapped[list["GoalProject"]] = relationship(
-        "GoalProject", back_populates="goal", cascade="all, delete-orphan"
-    )
-
-
-class GoalProject(Base):
-    """Association between goals and projects."""
-
-    __tablename__ = "goal_projects"
-
-    goal_id: Mapped[str] = mapped_column(String(36), ForeignKey("goals.id", ondelete="CASCADE"), primary_key=True)
-    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
-
-    goal: Mapped["Goal"] = relationship("Goal", back_populates="goal_projects")
-    project: Mapped["Project"] = relationship("Project")
 
 
 class UserPreference(Base):

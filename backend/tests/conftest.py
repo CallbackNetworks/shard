@@ -11,7 +11,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db, get_dialect
 from app.main import app
-from app.models import Identity, Project, ProjectIdentity
+from app.models import Identity, Project
+from app.services import graph
 from app.services.pin_utils import hash_pin
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
@@ -69,8 +70,7 @@ def sample_project(db, sample_identity):
     project = Project(name="Test Project")
     db.add(project)
     db.flush()
-    link = ProjectIdentity(project_id=project.id, identity_id=sample_identity.id)
-    db.add(link)
+    graph.link_membership(db, sample_identity.id, project.id)
     db.commit()
     db.refresh(project)
     return project
