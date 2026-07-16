@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import Goal, GoalProject, Project, Task
 from app.routers.deps import get_goal_or_404
 from app.schemas import GoalCreate, GoalOut, GoalProjectOut, GoalUpdate
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.ws_manager import ws_manager
 
@@ -94,8 +95,9 @@ async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_
         setattr(goal, field, value)
 
     if project_ids is not None:
-        # Replace linked projects
+        # Replace linked projects (bulk delete bypasses graph_sync; clear part_of edges too)
         db.query(GoalProject).filter(GoalProject.goal_id == goal_id).delete()
+        graph.remove_edges(db, target_id=goal_id, rel_type=graph.REL_PART_OF)
         for pid in project_ids:
             project = db.query(Project).filter(Project.id == pid).first()
             if not project:

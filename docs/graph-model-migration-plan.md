@@ -55,10 +55,14 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] `tests/test_graph_sync.py` 增至 9 項;task 生命週期 SQLite + PostgreSQL 皆綠。
 - [x] **至此圖已是完整的即時鏡射(實體 + 容器 + 五種關係)。**
 
+**bulk 缺口已補(繞過 ORM 事件的三處):**
+- [x] `bulk.py` 標籤移除、`rules_engine.py` remove_label、`goals.py` 專案連結替換 → 明確呼叫 `graph.remove_edge` / `graph.remove_edges` 補鏡射。
+- [x] `tests/test_graph_bulk_sync.py`(2 項,API 層)SQLite + PostgreSQL 皆綠。
+- 已查核:其餘 bulk 寫入(`notifications` 標記已讀、`tasks` position 更新)不是圖關係,無需處理。
+
 **尚未做(下一步):**
 - [ ] 把 `project_id` / `parent_id` / `labels` / `blocked_by` 等**讀取**改由邊推導(需批次載入避免 N+1)。這是讓邊成為唯一權威、進而 drop 欄位的前置。
 - [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;讀取切換時處理)。
-- [ ] 已知限制:bulk `query(...).delete()` / `update()` 繞過 ORM 事件(如 `bulk.py` 標籤移除、任何 bulk 狀態更新),鏡射會漏;讀取切換前需補這些點。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 

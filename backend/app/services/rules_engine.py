@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.models import Comment, Label, Task, TaskLabel, WorkflowRule
+from app.services import graph
 from app.services.activity import log_activity
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
                 db.add(TaskLabel(task_id=task.id, label_id=label.id))
     elif atype == "remove_label":
         db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == value).delete()
+        graph.remove_edge(db, task.id, value, graph.REL_LABELED)  # bulk delete bypasses graph_sync
     elif atype == "add_comment":
         comment = Comment(
             task_id=task.id,

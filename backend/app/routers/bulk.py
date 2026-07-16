@@ -18,6 +18,7 @@ from app.schemas import (
     TaskImportRequest,
     TaskImportResult,
 )
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.ical_token import verify_global_ical_token
 from app.services.ws_manager import ws_manager
@@ -118,9 +119,10 @@ async def bulk_update_tasks(
             if not exists:
                 db.add(TaskLabel(task_id=task.id, label_id=label_id))
 
-        # Remove labels
+        # Remove labels (bulk delete bypasses the graph_sync listener, so mirror explicitly)
         for label_id in body.remove_label_ids:
             db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label_id).delete()
+            graph.remove_edge(db, task.id, label_id, graph.REL_LABELED)
 
         updated_ids.append(task.id)
 

@@ -112,6 +112,22 @@ def add_edge(
     return edge
 
 
+def remove_edges(db: Session, *, source_id: str | None = None, target_id: str | None = None, rel_type: str) -> int:
+    """Delete every edge of ``rel_type`` matching the given endpoint(s).
+
+    Used to keep the mirror consistent after bulk association deletes that
+    bypass the ORM unit of work (and thus the graph_sync listener).
+    """
+    q = db.query(Edge).filter(Edge.rel_type == rel_type)
+    if source_id is not None:
+        q = q.filter(Edge.source_id == source_id)
+    if target_id is not None:
+        q = q.filter(Edge.target_id == target_id)
+    deleted = q.delete(synchronize_session=False)
+    db.flush()
+    return deleted
+
+
 def remove_edge(db: Session, source_id: str, target_id: str, rel_type: str) -> bool:
     deleted = (
         db.query(Edge)
