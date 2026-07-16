@@ -102,8 +102,8 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 **設計決策已定(2026-07-15):完全多重容器、無 primary。** 任務對等地屬於 N 個專案,不保留「home / 主專案」概念。`TaskOut.project_id` 僅作為相容欄位由 `nearest_ancestor_of_type(project)` 推導(給尚未改的舊 client/MCP),不再具語意權威;語意權威是 `project_ids[]`(= 全部 `contains` 專案父)。刪除專案改為刪邊 + 清孤兒(無其他專案容器才刪),取代 FK CASCADE。此為 [ADR-0032](adr/0032-unified-node-edge-graph-model.md) 已接受方向(第 33/43 行:多重歸屬、所屬專案 = 專案型祖先)的落地細化,故記於本計畫而非另開 ADR。
 
 **`contains` 讀寫切換 + drop 欄位 — 有序切片(每片:SQLite + PostgreSQL 綠、commit):**
-- [ ] **切片 0(前置查核):** 確認每個 task 建立路徑(含 `imports`、`bulk`、`issue_sync`、recurrence 生成)都會經 ORM unit-of-work 而被 `graph_sync` 鏡射出 `contains` 邊;任何繞過 ORM 的插入補呼叫 `graph.add_edge`。這是讀取改 edge-only 的安全前提。
-- [ ] **切片 1(membership 讀取 edge-only):** `enrichment._membership_project_ids` 純由邊推導(去掉 `task.project_id` 前綴);`TaskOut.project_id` 相容欄位改由 `nearest_ancestor_of_type(project)` 推導。
+- [x] **切片 0(前置查核):** 已查核所有 15 處 `Task(...)` 建立點皆走 ORM(`db.add`),無 `bulk_insert_mappings`/Core insert 繞過 unit-of-work;故 `graph_sync` before_flush 必鏡射 `contains` 邊。edge-only 讀取的安全前提成立。
+- [x] **切片 1(membership 讀取 edge-only):** `enrichment._membership_project_ids` 改為 db 在場時純由 `graph.member_project_ids`(邊)推導,`project_id` 欄位僅在無 db session 時作 compat fallback;`external_api` search 路徑 thread `db` 進 `_enrich_task_for_search`。686 SQLite 綠、63 項 PG 子集綠。**Committed。** (`TaskOut.project_id` 相容欄位仍讀欄位,待切片 2/4 一併改由 `nearest_ancestor_of_type` 推導。)
 - [ ] **切片 2(專案任務清單):** 逐檔把「列某專案的任務」由 `project.tasks` relationship / `WHERE project_id` 改為 `graph.contained_task_ids` / edge join —— `projects.py`、`analytics.py`、`external_api/*`、`search.py`、`scheduler.py`、`issue_sync.py`、`share.py`、`bulk.py`、`cicd.py`。
 - [ ] **切片 3(子任務樹):** `parent_id` 讀取(`subtask_count`、遞迴 subtasks、`critical_path`)改由 task→task 的 `contains` 邊。
 - [ ] **切片 4(寫入切換):** task 建立/移動只寫邊,停止寫 `project_id`/`parent_id`;移動任務 = 改邊並呼叫 `detect_cycle` 擋環;移除雙寫。

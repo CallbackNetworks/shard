@@ -4,13 +4,14 @@ from app.services import graph
 
 
 def _membership_project_ids(task, db) -> list[str]:
-    """Unique projects a task belongs to: primary column plus graph ``contains`` edges."""
-    ids = [task.project_id] if task.project_id else []
+    """Projects a task belongs to, derived from ``contains`` edges (ADR-0032, no primary).
+
+    The graph is the authority for membership; the ``project_id`` column is only a
+    compat fallback when no db session is available to consult the edges.
+    """
     if db is not None:
-        for pid in graph.member_project_ids(db, task.id):
-            if pid not in ids:
-                ids.append(pid)
-    return ids
+        return graph.member_project_ids(db, task.id)
+    return [task.project_id] if task.project_id else []
 
 
 def _dependency_lists(task, db, dep_maps) -> tuple[list[str], list[str]]:

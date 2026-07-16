@@ -66,6 +66,6 @@ def api_search(
 
     return {
         "query": q,
-        "tasks": [_enrich_task_for_search(t) for t in tasks],
+        "tasks": [_enrich_task_for_search(t, db) for t in tasks],
         "projects": projects,
     }

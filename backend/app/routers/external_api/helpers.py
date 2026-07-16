@@ -30,6 +30,6 @@ def _get_task_or_404(project_id: str, task_id: str, db: Session) -> Task:
     return _deps_get_task_or_404(task_id, db, project_id=project_id)
 
 
-def _enrich_task_for_search(task: Task) -> dict:
+def _enrich_task_for_search(task: Task, db: Session) -> dict:
     """Attach labels, counts, and dependency IDs to a TaskOut dict."""
-    return enrich_task_as_dict(task)
+    return enrich_task_as_dict(task, db)
