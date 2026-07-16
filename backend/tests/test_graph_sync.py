@@ -95,3 +95,86 @@ def test_entity_delete_removes_node(db):
 
     assert db.get(Node, tid) is None
     assert _edge(db, p.id, tid, "contains") is None
+
+
+def test_task_create_syncs_node_hot_fields(db):
+    from datetime import datetime
+
+    from app.models import Node
+
+    p = _project(db)
+    due = datetime(2026, 8, 1, 12, 0)
+    t = Task(project_id=p.id, title="t", status="in_progress", priority="high", due_date=due, is_pinned=True)
+    db.add(t)
+    db.commit()
+
+    node = db.get(Node, t.id)
+    assert node.status == "in_progress"
+    assert node.priority == "high"
+    assert node.is_pinned is True
+    assert node.due_date is not None
+
+
+def test_task_update_resyncs_node_hot_fields(db):
+    from app.models import Node
+
+    p = _project(db)
+    t = _task(db, p.id, "old title")
+
+    t.title = "new title"
+    t.status = "done"
+    t.priority = "low"
+    t.is_pinned = True
+    db.commit()
+
+    node = db.get(Node, t.id)
+    assert node.title == "new title"
+    assert node.status == "done"
+    assert node.priority == "low"
+    assert node.is_pinned is True
+
+
+def test_project_update_resyncs_node(db):
+    from app.models import Node
+
+    p = _project(db)
+    p.name = "renamed"
+    p.status = "archived"
+    db.commit()
+
+    node = db.get(Node, p.id)
+    assert node.title == "renamed"
+    assert node.status == "archived"
+
+
+def test_task_reparent_project_moves_contains_edge(db):
+    p1 = _project(db)
+    p2 = _project(db)
+    t = _task(db, p1.id)
+    assert _edge(db, p1.id, t.id, "contains") is not None
+
+    t.project_id = p2.id
+    db.commit()
+
+    assert _edge(db, p1.id, t.id, "contains") is None  # old project edge dropped
+    assert _edge(db, p2.id, t.id, "contains") is not None  # new project edge added
+
+
+def test_task_reparent_parent_moves_contains_edge(db):
+    p = _project(db)
+    parent1 = _task(db, p.id, "parent1")
+    parent2 = _task(db, p.id, "parent2")
+    child = Task(project_id=p.id, parent_id=parent1.id, title="child")
+    db.add(child)
+    db.commit()
+    assert _edge(db, parent1.id, child.id, "contains") is not None
+
+    child.parent_id = parent2.id
+    db.commit()
+    assert _edge(db, parent1.id, child.id, "contains") is None
+    assert _edge(db, parent2.id, child.id, "contains") is not None
+
+    # Un-parenting drops the parent containment edge entirely.
+    child.parent_id = None
+    db.commit()
+    assert _edge(db, parent2.id, child.id, "contains") is None

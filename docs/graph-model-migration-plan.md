@@ -3,7 +3,7 @@
 > ## ▶ 交接狀態(2026-07-15)
 > **五張關聯表已全部改為純邊並 drop**(`task_dependencies` / `task_labels` / `cycle_tasks` / `project_identities` / `goal_projects`)。所有多對多關係現在只透過 `edges` 表達;`graph_sync` 只維護實體節點 + `contains` 容器邊。
 >
-> **▶ 下一步(唯一剩下的一塊):容器 `contains`** —— 把 `Task.project_id` / `Task.parent_id`(約 685 處引用、遍佈 ~30 檔)改為 `contains`-edge 遍歷,最後 drop 這兩個欄位。這是最大、破窗風險最高的一步;動工前需先決定 `project_id` 是否真的開放多重容器(目前單一必填),並補上 `graph_sync` 對 entity title/status 更新與 task re-parent 的回同步。
+> **▶ 下一步(唯一剩下的一塊):容器 `contains`** —— 把 `Task.project_id` / `Task.parent_id`(約 685 處引用、遍佈 ~30 檔)改為 `contains`-edge 遍歷,最後 drop 這兩個欄位。這是最大、破窗風險最高的一步。前置的回同步(entity 熱欄位更新、task re-parent 搬邊)**已補齊並測綠**;剩下唯一的擋路決策是 **`project_id` 是否真的開放多重容器**(目前單一必填)——這決定讀取切換要不要保留 primary 概念。
 >
 > 每切一塊的紀律:寫入→邊、讀取→批次邊 helper、drop 表;**只在測試全綠(SQLite + PostgreSQL 皆驗)時 commit**。詳見下方各階段勾選。
 
@@ -98,8 +98,8 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 > **🎉 五張關聯表全部移除。** `task_dependencies` / `task_labels` / `cycle_tasks` / `project_identities` / `goal_projects` 皆已改為純邊並 drop。所有多對多關係現在只透過 `edges` 表達。
 
 **只剩最後一塊 — 容器 `contains`:**
-- [ ] `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點(685 處),是壓軸也是最大的一步。
-- [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;`contains` 讀取切換時需一併處理)。
+- [x] **回同步先補齊(讀取切換的前置):** `graph_sync` 現在(a)新建實體時把全部熱欄位(status/priority/dates/position/is_pinned)寫進 node,不再只有 title;(b)`session.dirty` 的實體更新回同步 node 熱欄位;(c)task re-parent(`project_id`/`parent_id` 變動)用 attribute history 搬移 `contains` 邊(含 un-parent 清邊)。熱欄位對映與回填 migration 一致。`tests/test_graph_sync.py` 增至 10 項,SQLite + PostgreSQL 皆綠。**Committed。**
+- [ ] `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點(685 處),是壓軸也是最大的一步。**動工前的設計決策仍待確認:`project_id` 是否真的開放多重容器(目前單一必填)。**
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 
