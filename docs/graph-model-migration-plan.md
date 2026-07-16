@@ -1,5 +1,12 @@
 # 圖模型遷移計畫(ADR-0032)
 
+> ## ▶ 交接狀態(2026-07-15)
+> **五張關聯表已全部改為純邊並 drop**(`task_dependencies` / `task_labels` / `cycle_tasks` / `project_identities` / `goal_projects`)。所有多對多關係現在只透過 `edges` 表達;`graph_sync` 只維護實體節點 + `contains` 容器邊。
+>
+> **▶ 下一步(唯一剩下的一塊):容器 `contains`** —— 把 `Task.project_id` / `Task.parent_id`(約 685 處引用、遍佈 ~30 檔)改為 `contains`-edge 遍歷,最後 drop 這兩個欄位。這是最大、破窗風險最高的一步;動工前需先決定 `project_id` 是否真的開放多重容器(目前單一必填),並補上 `graph_sync` 對 entity title/status 更新與 task re-parent 的回同步。
+>
+> 每切一塊的紀律:寫入→邊、讀取→批次邊 helper、drop 表;**只在測試全綠(SQLite + PostgreSQL 皆驗)時 commit**。詳見下方各階段勾選。
+
 本文件是 [ADR-0032](adr/0032-unified-node-edge-graph-model.md) 的可執行落地計畫。每個階段都必須維持 app 可運作、測試綠、覆蓋率 ≥70%,並在階段末 commit。階段順序不可跳。
 
 ## 目標模型速覽
