@@ -134,10 +134,23 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
   新增 10 項測試(delete 語意 ×2、human re-parent 驗證 ×5、external API ×3)。SQLite 701 綠 + PostgreSQL 700 綠。
 - [x] **切片 9(語意收尾,2026-07-16):** 審查剩餘四項非致命問題,已修:
   1. **Compat `project_id` 不確定性:** `neighbors`/`project_ids_map`/`parent_task_map`/`child_task_ids_map` 全部改為 `ORDER BY edge.position, edge.created_at` —— compat `project_id` = 最舊歸屬,跨讀取路徑一致且確定。
-  2. **假 home 守衛:** `remove_membership` 原本擋「不能移除 home」但 home 概念已不存在(no primary)。改為對稱語意:任何歸屬皆可移除,唯「最後一個歸屬」回 400。前端 `MembershipPanel` 同步開放解除目前專案的 chip。
+  2. **假 home 守衛:** `remove_membership` 原本擋「不能移除 home」但 home 概念已不存在(no primary)。改為對稱語意:任何歸屬皆可移除,唯「最後一個歸屬」回 400。前端 `MembershipPanel` 同步開放解除目前專案的 chip。**⚠️ 過渡狀態:** 這條「最後一個歸屬」守衛在未來會被放寬(見下方「未分類任務」),因為已決定 task 可以合法地零歸屬。目前保留只是因為還沒有『未分類』清單能看到歸零後的任務,先不讓它隱形。
   3. **訪客留言歸屬:** 跨專案任務的 share 留言原本可能記到 share 範圍外的專案;改為在 share scope 內挑該任務實際歸屬的專案。
   4. **Webhook callback 回傳裸 task:** `/webhook/callback/{token}` 原本回傳未 enrich 的 ORM row(`project_id`/`project_ids` 缺失);改走 `enrich_task`。
   新增測試:membership ×3、share ×1、webhook 斷言 ×2、前端 MembershipPanel ×1。SQLite 705 綠 + PostgreSQL 綠、前端 201 綠。
+
+### 🔜 未來能力 — 未分類任務(unfiled tasks,零歸屬)
+
+**動機(2026-07-16,使用者):** 當初砍掉 `tasks.project_id` NOT NULL FK 的真正原因 —— 有些 task/issue 是**後來才確定歸屬**的,一開始沒有準確的 project 或上游。邊模型已天然支援這件事:`graph.create_task(**fields)` 不帶 `project_id` 時 `graph_sync._ensure_contains_edge` 對 falsy parent 直接 return,產生一個**沒有 incoming `contains` 邊的合法 task node**。`TaskOut.project_id` 已是 `str | None`,回應層能表達 null 專案。
+
+**決定(2026-07-16):** ✅ 方向確定 —— task 可合法零歸屬,`remove_membership` 未來允許移到零(退回未分類)。「未分類」不是新表或 inbox 機制,就是**「沒有 project 來源的 `contains` 邊」這個狀態本身**。⏸️ 現在只記錄,不實作。
+
+**實作時要補的缺口(尚未做):**
+1. `graph.unfiled_task_ids(db)` / filter —— task node 且沒有任何 source 為 project node 的 incoming `contains` 邊(對比 `top_level_task_filter` 管的是 task→task 子任務,不是專案歸屬)。
+2. 無專案的 create 入口(`graph.create_task` 本身已支援;缺的是一支不掛在 `/projects/{id}` 下的路由 / 或人類 API 的「未分類」建立)。
+3. 放寬 `remove_membership` 的「最後一個歸屬」守衛 → 允許歸零(見切片 9 #2 的過渡註記)。
+4. 前端「未分類」bucket 清單 + 從那裡指派到專案(=新增一條 `contains` 邊)。
+5. 檢查所有假設「task 一定有專案」的讀取/enrich 路徑(compat `project_id` 已容忍 null,但 UI 樹、分析、summary 需逐一確認零歸屬不會爆)。SQLite + PostgreSQL 兩套綠。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 
