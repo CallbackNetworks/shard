@@ -57,8 +57,14 @@ describe('MembershipPanel', () => {
 
   it('unlinks a secondary membership', () => {
     render(<MembershipPanel projectId="pA" task={task} />)
-    fireEvent.click(screen.getByLabelText('unlink'))
+    fireEvent.click(screen.getByLabelText('unlink Beta'))
     expect(mocks.removeTaskMembership).toHaveBeenCalledWith('pA', 't1', 'pB')
+  })
+
+  it('can unlink the current project too (no primary, ADR-0032)', () => {
+    render(<MembershipPanel projectId="pA" task={task} />)
+    fireEvent.click(screen.getByLabelText('unlink Alpha'))
+    expect(mocks.removeTaskMembership).toHaveBeenCalledWith('pA', 't1', 'pA')
   })
 
   it('links the task into another project', () => {

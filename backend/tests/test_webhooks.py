@@ -19,6 +19,9 @@ def test_valid_callback_updates_status(client, db, sample_project):
     data = resp.json()
     assert data["status"] == "done"
     assert data["id"] == task.id
+    # The response is enriched: containment compat fields come from edges (ADR-0032).
+    assert data["project_id"] == sample_project.id
+    assert data["project_ids"] == [sample_project.id]
 
 
 def test_invalid_callback_token_returns_404(client):

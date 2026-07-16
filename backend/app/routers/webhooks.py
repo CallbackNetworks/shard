@@ -12,6 +12,7 @@ from app.schemas import TaskOut, WebhookEventOut
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.cicd_adapters import normalize_webhook_payload
+from app.services.enrichment import enrich_task
 from app.services.notifier import fire_notifications
 from app.services.rules_engine import run_rules
 
@@ -163,8 +164,6 @@ async def webhook_callback(
     db.commit()
     db.refresh(task)
 
-    task = db.query(Task).filter(Task.id == task.id).first()
-
     event = f"task.{normalized['status']}"
     await fire_notifications(db, task, event)
 
@@ -181,7 +180,7 @@ async def webhook_callback(
         if total > 0 and done == total:
             await fire_notifications(db, task, "project.complete")
 
-    return task
+    return enrich_task(task, db)
 
 
 @router.get("/events/{task_id}", response_model=list[WebhookEventOut])

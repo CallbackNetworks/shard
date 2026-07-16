@@ -54,6 +54,49 @@ def test_membership_to_home_project_rejected(client):
     assert resp.status_code == 400
 
 
+def test_remove_original_membership_from_other_project(client):
+    """No primary (ADR-0032): any membership may be removed, including the original one."""
+    a = _make_project(client, "A")
+    b = _make_project(client, "B")
+    tid = _make_task(client, a, "t")
+    client.post(f"/projects/{a}/tasks/{tid}/memberships/{b}")
+
+    # From B's view, unlink the task from A (the project it was created in).
+    resp = client.delete(f"/projects/{b}/tasks/{tid}/memberships/{a}")
+    assert resp.status_code == 204
+
+    proj_a = client.get(f"/projects/{a}").json()
+    assert tid not in [t["id"] for t in proj_a["tasks"]]
+    proj_b = client.get(f"/projects/{b}").json()
+    task = next(t for t in proj_b["tasks"] if t["id"] == tid)
+    assert task["project_ids"] == [b]
+    assert task["project_id"] == b
+
+
+def test_remove_last_membership_rejected(client):
+    a = _make_project(client, "A")
+    tid = _make_task(client, a, "t")
+    resp = client.delete(f"/projects/{a}/tasks/{tid}/memberships/{a}")
+    assert resp.status_code == 400
+
+
+def test_compat_project_id_is_oldest_membership_everywhere(client):
+    """The compat project_id is deterministic (oldest membership) across read paths."""
+    a = _make_project(client, "A")
+    b = _make_project(client, "B")
+    tid = _make_task(client, a, "t")
+    client.post(f"/projects/{a}/tasks/{tid}/memberships/{b}")
+
+    # Enriched project view from B still reports A as the compat project.
+    proj_b = client.get(f"/projects/{b}").json()
+    task = next(t for t in proj_b["tasks"] if t["id"] == tid)
+    assert task["project_id"] == a
+    assert task["project_ids"][0] == a
+    # The flat list endpoint agrees.
+    listed = {t["id"]: t for t in client.get(f"/projects/{b}/tasks").json()}
+    assert listed[tid]["project_id"] == a
+
+
 def test_remove_missing_membership_404(client):
     a = _make_project(client, "A")
     b = _make_project(client, "B")

@@ -292,15 +292,15 @@ def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Ses
 async def add_membership(project_id: str, task_id: str, target_project_id: str, db: Session = Depends(get_db)):
     """Link a task into an additional project via a graph ``contains`` edge (ADR-0032).
 
-    The task keeps its home project (project_id); this adds cross-project
-    membership so the task also surfaces under target_project_id.
+    Memberships are symmetric (no primary): this simply adds another
+    project -> task edge so the task also surfaces under target_project_id.
     """
     _get_project_or_404(project_id, db)
     task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     if target_project_id == project_id:
-        raise HTTPException(status_code=400, detail="Task already belongs to its home project")
+        raise HTTPException(status_code=400, detail="Task already belongs to this project")
     _get_project_or_404(target_project_id, db)
 
     graph.ensure_node(db, target_project_id, graph.NODE_PROJECT)
@@ -322,15 +322,21 @@ async def add_membership(project_id: str, task_id: str, target_project_id: str, 
 
 @router.delete("/{task_id}/memberships/{target_project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_membership(project_id: str, task_id: str, target_project_id: str, db: Session = Depends(get_db)):
-    """Unlink a task from an additional project. The home project cannot be removed."""
+    """Unlink a task from a project (ADR-0032, no primary: any membership may go).
+
+    The only invariant is that a task keeps at least one project membership,
+    so removing the last one is rejected.
+    """
     _get_project_or_404(project_id, db)
     task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if target_project_id == project_id:
-        raise HTTPException(status_code=400, detail="Cannot remove a task from its home project")
-    if not graph.remove_edge(db, target_project_id, task_id, graph.REL_CONTAINS):
+    member_ids = graph.member_project_ids(db, task_id)
+    if target_project_id not in member_ids:
         raise HTTPException(status_code=404, detail="Membership not found")
+    if len(member_ids) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot remove the task's last project membership")
+    graph.remove_edge(db, target_project_id, task_id, graph.REL_CONTAINS)
     log_activity(
         db,
         "task.membership_removed",

@@ -53,11 +53,11 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
             return (
               <span key={pid} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.25)', color: '#818cf8' }}>
                 {nameOf(pid)}{isCurrent ? ` (${t('membership.thisProject')})` : ''}
-                {!isCurrent && (
-                  <button aria-label="unlink" onClick={() => handleRemove(pid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#818cf8', padding: 0, display: 'flex' }}>
-                    <X size={9} />
-                  </button>
-                )}
+                {/* No primary (ADR-0032): any membership can be unlinked, incl. the
+                    current project, as long as it is not the last one. */}
+                <button aria-label={`unlink ${nameOf(pid)}`} onClick={() => handleRemove(pid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#818cf8', padding: 0, display: 'flex' }}>
+                  <X size={9} />
+                </button>
               </span>
             )
           })}

@@ -189,6 +189,25 @@ def test_task_note_created_and_visible(client, db, sample_project):
     assert task_out["comments"][0]["is_guest"] is True
 
 
+def test_task_note_attributed_inside_share_scope(client, db, sample_project):
+    """A cross-project task's note lands in a shared project, not its outside origin (ADR-0032)."""
+    sample_project.allow_guest_notes = True
+    other = Project(name="Private origin")
+    db.add(other)
+    db.commit()
+    # The task originates in the unshared project, then is linked into the shared one.
+    tid = client.post(f"/projects/{other.id}/tasks", json={"title": "Cross"}).json()["id"]
+    client.post(f"/projects/{other.id}/tasks/{tid}/memberships/{sample_project.id}")
+
+    resp = client.post(
+        f"/share/project/{sample_project.share_token}/tasks/{tid}/notes",
+        json={"guest_name": "Visitor", "body": "hi"},
+    )
+    assert resp.status_code == 201
+    note = db.query(Comment).filter(Comment.task_id == tid).one()
+    assert note.project_id == sample_project.id
+
+
 def test_identity_note_requires_project_in_scope(client, db, sample_identity, sample_project):
     sample_identity.allow_guest_notes = True
     other = Project(name="Not shared")

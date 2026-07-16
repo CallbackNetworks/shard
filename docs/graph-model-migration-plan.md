@@ -132,6 +132,12 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
   3. **幽靈節點 / dangling edge:** 建立或 re-parent 帶不存在的 `parent_id` 時,`graph_sync._ensure_contains_edge` 會 mint 空 task node(或留下 dangling edge),task 從 UI 隱形。所有入口(human router create/update、external API create/update/bulk-create/bulk-update)現在都先驗證 parent。
   4. **External API re-parent 靜默失效:** `parent_id` 已非欄位,`setattr` 只設了 stray attribute;改走圖搬邊。另修 `reorder_tasks` 的 N+1(每個 task 重查一次 contained ids)。
   新增 10 項測試(delete 語意 ×2、human re-parent 驗證 ×5、external API ×3)。SQLite 701 綠 + PostgreSQL 700 綠。
+- [x] **切片 9(語意收尾,2026-07-16):** 審查剩餘四項非致命問題,已修:
+  1. **Compat `project_id` 不確定性:** `neighbors`/`project_ids_map`/`parent_task_map`/`child_task_ids_map` 全部改為 `ORDER BY edge.position, edge.created_at` —— compat `project_id` = 最舊歸屬,跨讀取路徑一致且確定。
+  2. **假 home 守衛:** `remove_membership` 原本擋「不能移除 home」但 home 概念已不存在(no primary)。改為對稱語意:任何歸屬皆可移除,唯「最後一個歸屬」回 400。前端 `MembershipPanel` 同步開放解除目前專案的 chip。
+  3. **訪客留言歸屬:** 跨專案任務的 share 留言原本可能記到 share 範圍外的專案;改為在 share scope 內挑該任務實際歸屬的專案。
+  4. **Webhook callback 回傳裸 task:** `/webhook/callback/{token}` 原本回傳未 enrich 的 ORM row(`project_id`/`project_ids` 缺失);改走 `enrich_task`。
+  新增測試:membership ×3、share ×1、webhook 斷言 ×2、前端 MembershipPanel ×1。SQLite 705 綠 + PostgreSQL 綠、前端 201 綠。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 

@@ -146,20 +146,22 @@ def neighbors(db: Session, node_id: str, rel_type: str, *, direction: str = "out
 
     direction "out": nodes this node points at (targets).
     direction "in": nodes pointing at this node (sources).
+
+    Deterministic order: edge ``position``, then ``created_at`` (oldest first).
     """
     if direction == "out":
         stmt = (
             select(Node)
             .join(Edge, Edge.target_id == Node.id)
             .where(Edge.source_id == node_id, Edge.rel_type == rel_type)
-            .order_by(Edge.position)
+            .order_by(Edge.position, Edge.created_at)
         )
     else:
         stmt = (
             select(Node)
             .join(Edge, Edge.source_id == Node.id)
             .where(Edge.target_id == node_id, Edge.rel_type == rel_type)
-            .order_by(Edge.position)
+            .order_by(Edge.position, Edge.created_at)
         )
     return list(db.execute(stmt).scalars().all())
 
@@ -519,14 +521,20 @@ def parent_task_map(db: Session, task_ids) -> dict[str, str]:
         select(Edge.target_id, Edge.source_id)
         .join(Node, Node.id == Edge.source_id)
         .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_TASK, Edge.target_id.in_(ids))
+        .order_by(Edge.position, Edge.created_at)
     ).all()
     for target_id, source_id in rows:
-        result[target_id] = source_id
+        result.setdefault(target_id, source_id)
     return result
 
 
 def project_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
-    """Batch ``{task_id: [project_id, ...]}`` from incoming project->task contains edges."""
+    """Batch ``{task_id: [project_id, ...]}`` from incoming project->task contains edges.
+
+    Ordered like ``parents_of`` (edge position, then created_at) so element 0 is the
+    same deterministic "compat project" that ``nearest_ancestor_of_type`` would pick
+    among direct parents.
+    """
     ids = set(task_ids)
     result: dict[str, list[str]] = defaultdict(list)
     if not ids:
@@ -535,6 +543,7 @@ def project_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
         select(Edge.target_id, Edge.source_id)
         .join(Node, Node.id == Edge.source_id)
         .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_PROJECT, Edge.target_id.in_(ids))
+        .order_by(Edge.position, Edge.created_at)
     ).all()
     for target_id, source_id in rows:
         result[target_id].append(source_id)
@@ -566,7 +575,9 @@ def child_task_ids_map(db: Session, parent_ids) -> dict[str, list[str]]:
     if not ids:
         return result
     rows = db.execute(
-        select(Edge.source_id, Edge.target_id).where(Edge.rel_type == REL_CONTAINS, Edge.source_id.in_(ids))
+        select(Edge.source_id, Edge.target_id)
+        .where(Edge.rel_type == REL_CONTAINS, Edge.source_id.in_(ids))
+        .order_by(Edge.position, Edge.created_at)
     ).all()
     for source_id, target_id in rows:
         result[source_id].append(target_id)
