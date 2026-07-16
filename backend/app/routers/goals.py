@@ -14,10 +14,13 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 
 def _project_progress(db: Session, project_id: str) -> float:
     """Compute progress for a single project (top-level tasks only)."""
-    total = db.query(Task).filter(Task.project_id == project_id, Task.parent_id.is_(None)).count()
+    task_ids = graph.contained_task_ids(db, project_id)
+    if not task_ids:
+        return 0.0
+    total = db.query(Task).filter(Task.id.in_(task_ids), Task.parent_id.is_(None)).count()
     if total == 0:
         return 0.0
-    done = db.query(Task).filter(Task.project_id == project_id, Task.parent_id.is_(None), Task.status == "done").count()
+    done = db.query(Task).filter(Task.id.in_(task_ids), Task.parent_id.is_(None), Task.status == "done").count()
     return round(done / total * 100, 1)
 
 

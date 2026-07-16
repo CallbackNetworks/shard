@@ -11,6 +11,7 @@ from app.models import (
     Project,
     Task,
 )
+from app.services import graph
 
 
 def get_project_or_404(project_id: str, db: Session) -> Project:
@@ -21,11 +22,9 @@ def get_project_or_404(project_id: str, db: Session) -> Project:
 
 
 def get_task_or_404(task_id: str, db: Session, *, project_id: str | None = None) -> Task:
-    query = db.query(Task).filter(Task.id == task_id)
-    if project_id:
-        query = query.filter(Task.project_id == project_id)
-    task = query.first()
-    if not task:
+    # Project scoping is by graph ``contains`` membership (ADR-0032, no primary).
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task or (project_id and task_id not in graph.contained_task_ids(db, project_id)):
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 

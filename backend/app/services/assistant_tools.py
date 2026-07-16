@@ -265,11 +265,12 @@ async def _tool_get_summary(db: Session) -> str:
     projects = db.query(Project).filter(Project.status == "active").all()
     result = []
     for p in projects:
-        total = len([t for t in p.tasks if t.parent_id is None])
-        done = sum(1 for t in p.tasks if t.status == "done" and t.parent_id is None)
-        in_prog = sum(1 for t in p.tasks if t.status == "in_progress" and t.parent_id is None)
+        p_tasks = graph.tasks_in_project(db, p.id)
+        total = len([t for t in p_tasks if t.parent_id is None])
+        done = sum(1 for t in p_tasks if t.status == "done" and t.parent_id is None)
+        in_prog = sum(1 for t in p_tasks if t.status == "in_progress" and t.parent_id is None)
         overdue = sum(
-            1 for t in p.tasks if t.due_date and t.due_date < datetime.now(UTC) and t.status not in ("done", "failed")
+            1 for t in p_tasks if t.due_date and t.due_date < datetime.now(UTC) and t.status not in ("done", "failed")
         )
         result.append(
             {
@@ -286,7 +287,7 @@ async def _tool_get_summary(db: Session) -> str:
 
 
 def _tool_list_tasks(db: Session, project_id: str, status: str | None = None) -> str:
-    q = db.query(Task).filter(Task.project_id == project_id)
+    q = db.query(Task).filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
     if status:
         q = q.filter(Task.status == status)
     tasks = q.order_by(Task.created_at.desc()).limit(50).all()
@@ -422,9 +423,9 @@ def _tool_manage_labels(
 
 
 def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
-    q = db.query(Task).filter(Task.parent_id == None)
+    q = db.query(Task).filter(Task.parent_id == None)  # noqa: E711
     if project_id:
-        q = q.filter(Task.project_id == project_id)
+        q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
     tasks = q.all()
 
     now = datetime.now(UTC)
@@ -504,7 +505,13 @@ def _tool_analyze_decisions(db: Session, project_id: str) -> str:
         return f"Project {project_id} not found"
 
     # Tasks with details
-    tasks = db.query(Task).filter(Task.project_id == project_id).order_by(Task.created_at.desc()).limit(100).all()
+    tasks = (
+        db.query(Task)
+        .filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
+        .order_by(Task.created_at.desc())
+        .limit(100)
+        .all()
+    )
     tasks_data = [
         {
             "id": t.id,

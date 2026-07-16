@@ -34,7 +34,7 @@ def list_tasks(
     db: Session = Depends(get_db),
 ):
     _get_project_or_404(project_id, db)
-    q = db.query(Task).filter(Task.project_id == project_id)
+    q = db.query(Task).filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
     if status_filter:
         q = q.filter(Task.status == status_filter)
     want_subtasks = include and "subtasks" in include.split(",")

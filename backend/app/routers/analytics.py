@@ -244,7 +244,7 @@ def get_estimation_calibration(
         Task.time_spent > 0,
     )
     if project_id:
-        q = q.filter(Task.project_id == project_id)
+        q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
     tasks = q.order_by(Task.updated_at.desc()).limit(limit).all()
 
     if not tasks:
@@ -329,7 +329,7 @@ def get_estimate_suggestion(
             Task.time_spent > 0,
         )
         if scoped_project:
-            q = q.filter(Task.project_id == scoped_project)
+            q = q.filter(Task.id.in_(graph.contained_task_ids(db, scoped_project)))
         return q.order_by(Task.updated_at.desc()).limit(2000).all()
 
     tasks = _completed(project_id)
@@ -396,7 +396,7 @@ def get_status_trend(
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
         q = db.query(Task.status, func.count(Task.id)).filter(Task.created_at <= day)
         if project_id:
-            q = q.filter(Task.project_id == project_id)
+            q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
         rows = q.group_by(Task.status).all()
         entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
         for status, count in rows:

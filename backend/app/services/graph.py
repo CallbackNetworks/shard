@@ -419,6 +419,36 @@ def contained_task_ids(db: Session, project_id: str) -> list[str]:
     return [n.id for n in children_of(db, project_id) if n.type == NODE_TASK]
 
 
+def tasks_in_project(db: Session, project_id: str) -> list["Task"]:
+    """Task rows contained by a project via ``contains`` edges (ADR-0032, no primary).
+
+    Replaces ``project.tasks`` / ``WHERE Task.project_id == pid`` reads: naturally
+    includes cross-project members. Order is not guaranteed; callers that need a
+    specific order should sort explicitly.
+    """
+    ids = contained_task_ids(db, project_id)
+    if not ids:
+        return []
+    by_id = {t.id: t for t in db.query(Task).filter(Task.id.in_(ids)).all()}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+def project_task_id_map(db: Session, project_ids) -> dict[str, list[str]]:
+    """Batch-load ``{project_id: [task_id, ...]}`` for many projects in one query."""
+    ids = set(project_ids)
+    result: dict[str, list[str]] = defaultdict(list)
+    if not ids:
+        return result
+    rows = db.execute(
+        select(Edge.source_id, Edge.target_id).where(Edge.rel_type == REL_CONTAINS, Edge.source_id.in_(ids))
+    ).all()
+    # Only project->task contains edges (a task's subtasks also use contains, but
+    # their source is a task node, never in ``project_ids``).
+    for source_id, target_id in rows:
+        result[source_id].append(target_id)
+    return result
+
+
 def detect_cycle(db: Session, source_id: str, target_id: str) -> bool:
     """Would adding ``contains`` edge source -> target create a cycle?
 

@@ -99,7 +99,9 @@ async def bulk_update_tasks(
 
         raise HTTPException(status_code=400, detail="Bulk update limited to 500 tasks per request")
 
-    tasks = db.query(Task).filter(Task.project_id == project_id, Task.id.in_(body.task_ids)).all()
+    contained = set(graph.contained_task_ids(db, project_id))
+    ids = [tid for tid in body.task_ids if tid in contained]
+    tasks = db.query(Task).filter(Task.id.in_(ids)).all() if ids else []
 
     updated_ids: list[str] = []
 
@@ -173,8 +175,11 @@ def export_tasks(
 ):
     get_project_or_404(project_id, db)
 
+    task_ids = graph.contained_task_ids(db, project_id)
     tasks = (
-        db.query(Task).filter(Task.project_id == project_id).order_by(Task.position.asc(), Task.created_at.asc()).all()
+        db.query(Task).filter(Task.id.in_(task_ids)).order_by(Task.position.asc(), Task.created_at.asc()).all()
+        if task_ids
+        else []
     )
 
     rows = []
@@ -363,8 +368,9 @@ def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depe
     if identity is None:
         raise HTTPException(status_code=404, detail="Calendar not found")
     project_ids = graph.project_ids_for_identity(db, identity.id)
+    task_ids = {tid for pid in project_ids for tid in graph.contained_task_ids(db, pid)}
     tasks = (
-        db.query(Task).filter(Task.project_id.in_(project_ids), Task.due_date.isnot(None)).all() if project_ids else []
+        db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
     )
     return _render_calendar(identity.name, tasks, alarm)
 
@@ -375,5 +381,8 @@ def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depen
     project = db.query(Project).filter(Project.share_token == token).first()
     if project is None:
         raise HTTPException(status_code=404, detail="Calendar not found")
-    tasks = db.query(Task).filter(Task.project_id == project.id, Task.due_date.isnot(None)).all()
+    task_ids = graph.contained_task_ids(db, project.id)
+    tasks = (
+        db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
+    )
     return _render_calendar(project.name, tasks, alarm)

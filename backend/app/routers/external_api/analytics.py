@@ -37,11 +37,12 @@ def api_analytics_overview(
     now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
     pid = api_key.project_id  # None means platform-wide
+    pid_task_ids = graph.contained_task_ids(db, pid) if pid else None
 
     def _task_count(*filters):
         q = db.query(func.count(Task.id))
         if pid:
-            q = q.filter(Task.project_id == pid)
+            q = q.filter(Task.id.in_(pid_task_ids))
         return (q.filter(*filters).scalar() or 0) if filters else (q.scalar() or 0)
 
     total_tasks = _task_count()
@@ -134,7 +135,7 @@ def api_analytics_status_trend(
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
         q = db.query(Task.status, func.count(Task.id)).filter(Task.created_at <= day)
         if project_id:
-            q = q.filter(Task.project_id == project_id)
+            q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
         rows = q.group_by(Task.status).all()
         entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
         for s, count in rows:

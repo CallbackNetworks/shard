@@ -15,6 +15,7 @@ from app.routers.external_api.auth import (
 )
 from app.routers.external_api.helpers import _enrich_project
 from app.schemas import ProjectCreate, ProjectUpdate
+from app.services import graph
 
 sub_router = APIRouter()
 
@@ -34,7 +35,7 @@ def api_list_projects(
     if api_key.project_id:
         query = query.filter(Project.id == api_key.project_id)
     projects = query.order_by(Project.created_at.desc()).all()
-    return [_enrich_project(p) for p in projects]
+    return [_enrich_project(p, db) for p in projects]
 
 
 @sub_router.get(
@@ -53,8 +54,10 @@ def api_get_project(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    result = _enrich_project(project)
-    result["tasks"] = [{c.name: getattr(t, c.name) for c in t.__table__.columns} for t in project.tasks]
+    result = _enrich_project(project, db)
+    result["tasks"] = [
+        {c.name: getattr(t, c.name) for c in t.__table__.columns} for t in graph.tasks_in_project(db, project.id)
+    ]
     return result
 
 
@@ -75,7 +78,7 @@ def api_create_project(
     db.add(project)
     db.commit()
     db.refresh(project)
-    return _enrich_project(project)
+    return _enrich_project(project, db)
 
 
 @sub_router.patch(
@@ -99,7 +102,7 @@ def api_update_project(
         setattr(project, field, value)
     db.commit()
     db.refresh(project)
-    return _enrich_project(project)
+    return _enrich_project(project, db)
 
 
 @sub_router.delete(

@@ -27,15 +27,18 @@ def compute_critical_path(db: Session, project_id: str) -> dict:
       - tasks: per-task timing info (title, duration, earliest_start, latest_start, slack)
       - error: set if a cycle is detected
     """
-    # Query all non-done, non-failed tasks in the project
+    # Query all non-done, non-failed top-level tasks in the project (via contains edges).
+    task_ids = graph.contained_task_ids(db, project_id)
     tasks = (
         db.query(Task)
         .filter(
-            Task.project_id == project_id,
+            Task.id.in_(task_ids),
             Task.status.notin_(["done", "failed"]),
             Task.parent_id == None,  # noqa: E711 — top-level tasks only
         )
         .all()
+        if task_ids
+        else []
     )
 
     if not tasks:

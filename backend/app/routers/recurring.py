@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import RecurrenceRule, Task
 from app.schemas import RecurrenceRuleCreate, RecurrenceRuleOut, RecurrenceRuleUpdate
+from app.services import graph
 
 router = APIRouter(
     prefix="/projects/{project_id}/tasks/{task_id}/recurrence",
@@ -12,8 +13,8 @@ router = APIRouter(
 
 
 def _get_task_or_404(project_id: str, task_id: str, db: Session) -> Task:
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
-    if not task:
+    task = db.get(Task, task_id)
+    if not task or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 

@@ -9,6 +9,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.models import Integration, Notification, Project, Task, WebhookDelivery
+from app.services import graph
 from app.services.email_sender import build_notification_email, send_email
 from app.services.email_sender import is_configured as smtp_configured
 from app.services.ws_manager import ws_manager
@@ -20,9 +21,10 @@ RETRY_BACKOFF_MINUTES = [1, 5, 30, 120, 360]
 MAX_ATTEMPTS = len(RETRY_BACKOFF_MINUTES)
 
 
-def _compute_progress(project: Project) -> tuple[int, int, float]:
-    total = len(project.tasks)
-    done = sum(1 for t in project.tasks if t.status == "done")
+def _compute_progress(project: Project, db: Session) -> tuple[int, int, float]:
+    tasks = graph.tasks_in_project(db, project.id)
+    total = len(tasks)
+    done = sum(1 for t in tasks if t.status == "done")
     progress = round(done / total * 100, 1) if total > 0 else 0.0
     return total, done, progress
 
@@ -223,7 +225,7 @@ async def _send_webhook_inline(
 
 async def fire_notifications(db: Session, task: Task, event: str) -> None:
     project: Project = task.project
-    total, done, progress = _compute_progress(project)
+    total, done, progress = _compute_progress(project, db)
 
     payload = {
         "event": event,

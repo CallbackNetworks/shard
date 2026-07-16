@@ -1,3 +1,5 @@
+from sqlalchemy.orm import selectinload
+
 from app.models import RecurrenceRule, Task
 from app.schemas import CycleOut, IdentityOut, LabelOut, ProjectOut, RecurrenceRuleOut, TaskOut, TaskPullRequestOut
 from app.services import graph
@@ -71,7 +73,28 @@ def enrich_task_as_dict(task, db=None, dep_maps=None, labels_by_task=None) -> di
 
 
 def enrich_project(project, db=None) -> ProjectOut:
-    top_tasks = [t for t in project.tasks if t.parent_id is None]
+    # Tasks belonging to this project come from graph ``contains`` edges (ADR-0032,
+    # no primary): this naturally includes cross-project members. Falls back to the
+    # ORM relationship only when no db session is available.
+    if db is not None:
+        task_ids = graph.contained_task_ids(db, project.id)
+        tasks = (
+            db.query(Task)
+            .options(
+                selectinload(Task.subtasks),
+                selectinload(Task.comments),
+                selectinload(Task.pull_requests),
+                selectinload(Task.assigned_agent),
+            )
+            .filter(Task.id.in_(task_ids))
+            .all()
+            if task_ids
+            else []
+        )
+    else:
+        tasks = list(project.tasks)
+
+    top_tasks = [t for t in tasks if t.parent_id is None]
     total = len(top_tasks)
     done = sum(1 for t in top_tasks if t.status == "done")
     progress = round(done / total * 100, 1) if total > 0 else 0.0
@@ -79,15 +102,6 @@ def enrich_project(project, db=None) -> ProjectOut:
     out.total_tasks = total
     out.done_tasks = done
     out.progress = progress
-    tasks = list(project.tasks)
-
-    # Tasks linked into this project via graph contains edges but whose primary
-    # project_id is elsewhere — cross-project membership (ADR-0032).
-    if db is not None:
-        own_ids = {t.id for t in tasks}
-        extra_ids = [tid for tid in graph.contained_task_ids(db, project.id) if tid not in own_ids]
-        if extra_ids:
-            tasks += db.query(Task).filter(Task.id.in_(extra_ids)).all()
 
     # Batch-load dependency and label edges once for all tasks in the project.
     task_ids = [t.id for t in tasks]

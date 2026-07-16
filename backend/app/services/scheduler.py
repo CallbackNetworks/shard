@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, UserPreference, WebhookDelivery, now_utc
 from app.services import backup as backup_service
-from app.services import email_sender
+from app.services import email_sender, graph
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications, retry_delivery
 from app.services.runtime_settings import get_system_settings
@@ -251,8 +251,9 @@ async def _send_daily_summary(db: Session) -> None:
     # Build summary
     project_summaries = []
     for p in projects:
-        total = sum(1 for t in p.tasks if t.parent_id is None)
-        done = sum(1 for t in p.tasks if t.status == "done" and t.parent_id is None)
+        p_tasks = graph.tasks_in_project(db, p.id)
+        total = sum(1 for t in p_tasks if t.parent_id is None)
+        done = sum(1 for t in p_tasks if t.status == "done" and t.parent_id is None)
         pct = round(done / total * 100) if total else 0
         project_summaries.append(f"<li><strong>{p.name}</strong>: {done}/{total} done ({pct}%)</li>")
 
@@ -357,8 +358,9 @@ async def _send_weekly_digest(db: Session) -> None:
     project_rows = []
     project_activity = []
     for p in projects:
-        total = sum(1 for t in p.tasks if t.parent_id is None)
-        done = sum(1 for t in p.tasks if t.status == "done" and t.parent_id is None)
+        p_tasks = graph.tasks_in_project(db, p.id)
+        total = sum(1 for t in p_tasks if t.parent_id is None)
+        done = sum(1 for t in p_tasks if t.status == "done" and t.parent_id is None)
         pct = round(done / total * 100) if total else 0
         # Text-based progress bar: 20 chars wide
         filled = round(pct / 5)

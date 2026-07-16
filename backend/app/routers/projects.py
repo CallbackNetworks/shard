@@ -15,12 +15,9 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 def _project_eager_options():
-    from app.models import Task
-
+    # Tasks are loaded from graph contains edges inside enrich_project (with their
+    # own eager options), so only the project's own relationships are pre-loaded here.
     return [
-        selectinload(Project.tasks).selectinload(Task.subtasks),
-        selectinload(Project.tasks).selectinload(Task.comments),
-        selectinload(Project.tasks).selectinload(Task.assigned_agent),
         selectinload(Project.labels),
         selectinload(Project.cycles),
     ]

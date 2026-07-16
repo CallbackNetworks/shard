@@ -52,7 +52,7 @@ def api_summary(
     project_summaries = []
 
     for p in projects:
-        tasks = p.tasks
+        tasks = graph.tasks_in_project(db, p.id)
         total = len(tasks)
         done = 0
         in_progress = 0

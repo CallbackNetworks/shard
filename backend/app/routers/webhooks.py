@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Project, Task, WebhookEvent
 from app.schemas import TaskOut, WebhookEventOut
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.cicd_adapters import normalize_webhook_payload
 from app.services.notifier import fire_notifications
@@ -175,8 +176,9 @@ async def webhook_callback(
 
     # If all tasks are done, also fire project.complete
     project: Project = task.project
-    total = len(project.tasks)
-    done = sum(1 for t in project.tasks if t.status == "done")
+    project_tasks = graph.tasks_in_project(db, project.id)
+    total = len(project_tasks)
+    done = sum(1 for t in project_tasks if t.status == "done")
     if total > 0 and done == total:
         await fire_notifications(db, task, "project.complete")
 

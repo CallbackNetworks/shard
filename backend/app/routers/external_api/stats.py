@@ -16,6 +16,7 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.schemas import EmailStatusOut, ProjectStatsOut
+from app.services import graph
 
 sub_router = APIRouter()
 
@@ -38,7 +39,7 @@ def api_project_stats(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    tasks = project.tasks
+    tasks = graph.tasks_in_project(db, project.id)
     total = len(tasks)
     by_status = {}
     by_priority = {}

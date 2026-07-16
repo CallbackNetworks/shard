@@ -15,6 +15,7 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications
 
@@ -37,7 +38,7 @@ def api_list_tasks(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    query = db.query(Task).filter(Task.project_id == project_id)
+    query = db.query(Task).filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
     if status_filter:
         query = query.filter(Task.status == status_filter)
     if priority:
@@ -149,7 +150,7 @@ async def api_update_task(
         await fire_notifications(db, task, event)
         if body.status == "done":
             project = task.project
-            if all(t.status == "done" for t in project.tasks):
+            if all(t.status == "done" for t in graph.tasks_in_project(db, project.id)):
                 await fire_notifications(db, task, "project.complete")
 
     return task

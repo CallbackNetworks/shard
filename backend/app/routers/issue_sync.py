@@ -86,7 +86,7 @@ def _find_external_task(project_id: str, provider: str, external_id: str, repo: 
     return (
         db.query(Task)
         .filter(
-            Task.project_id == project_id,
+            Task.id.in_(graph.contained_task_ids(db, project_id)),
             Task.external_provider == provider,
             Task.external_id == external_id,
             Task.external_repo == repo,
@@ -316,7 +316,7 @@ def _find_pr_tasks(pr_data: dict, project_id: str, db: Session) -> list[Task]:
         db.query(TaskPullRequest)
         .join(Task, Task.id == TaskPullRequest.task_id)
         .filter(
-            Task.project_id == project_id,
+            Task.id.in_(graph.contained_task_ids(db, project_id)),
             TaskPullRequest.repo == repo,
             TaskPullRequest.pr_number == pr_number,
         )
@@ -465,7 +465,7 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         tasks_with_pr_url = (
             db.query(Task)
             .filter(
-                Task.project_id == project_id,
+                Task.id.in_(graph.contained_task_ids(db, project_id)),
                 Task.description.contains(pr_url),
                 Task.status != "done",
             )

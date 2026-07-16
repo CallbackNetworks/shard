@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import ApiKey, Project, Task
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.routers.external_api.helpers import _enrich_task_for_search
+from app.services import graph
 
 sub_router = APIRouter()
 
@@ -41,15 +42,16 @@ def api_search(
 
     task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
     if project_id:
-        task_query = task_query.filter(Task.project_id == project_id)
+        task_query = task_query.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
     tasks = task_query.order_by(Task.updated_at.desc()).offset(offset).limit(limit).all()
 
     projects = []
     if not project_id:
         proj_query = db.query(Project).filter((Project.name.ilike(pattern)) | (Project.description.ilike(pattern)))
         for p in proj_query.limit(20).all():
-            total = len(p.tasks)
-            done = sum(1 for t in p.tasks if t.status == "done")
+            p_tasks = graph.tasks_in_project(db, p.id)
+            total = len(p_tasks)
+            done = sum(1 for t in p_tasks if t.status == "done")
             projects.append(
                 {
                     "id": p.id,

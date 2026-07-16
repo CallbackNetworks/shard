@@ -47,7 +47,7 @@ def get_hub_stats(db: Session = Depends(get_db)):
             projects = db.query(Project).filter(Project.id.in_(ident_project_ids)).all()
             for p in projects:
                 p_stats = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
-                for t in p.tasks:
+                for t in graph.tasks_in_project(db, p.id):
                     p_stats["total_tasks"] += 1
                     if t.status in p_stats:
                         p_stats[t.status] += 1

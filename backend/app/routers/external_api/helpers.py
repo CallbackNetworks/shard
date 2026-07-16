@@ -8,12 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.models import Project, Task
 from app.routers.deps import get_task_or_404 as _deps_get_task_or_404
+from app.services import graph
 from app.services.enrichment import enrich_task_as_dict
 
 
-def _enrich_project(project: Project) -> dict:
-    total = len(project.tasks)
-    done = sum(1 for t in project.tasks if t.status == "done")
+def _enrich_project(project: Project, db: Session) -> dict:
+    tasks = graph.tasks_in_project(db, project.id)
+    total = len(tasks)
+    done = sum(1 for t in tasks if t.status == "done")
     return {
         **{c.name: getattr(project, c.name) for c in project.__table__.columns},
         "progress": round(done / total * 100, 1) if total > 0 else 0.0,

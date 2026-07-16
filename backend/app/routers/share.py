@@ -94,9 +94,8 @@ def _load_identity(db: Session, token: str) -> Identity | None:
 
 
 def _project_eager_options():
+    # Tasks are loaded from graph contains edges in _serialize_project.
     return [
-        selectinload(Project.tasks).selectinload(Task.subtasks),
-        selectinload(Project.tasks).selectinload(Task.comments),
         selectinload(Project.labels),
         selectinload(Project.cycles),
     ]
@@ -118,7 +117,15 @@ def _serialize_comment(c: Comment):
 
 
 def _serialize_project(p: Project, db: Session, include_notes: bool):
-    tasks = p.tasks
+    task_ids = graph.contained_task_ids(db, p.id)
+    tasks = (
+        db.query(Task)
+        .options(selectinload(Task.subtasks), selectinload(Task.comments))
+        .filter(Task.id.in_(task_ids))
+        .all()
+        if task_ids
+        else []
+    )
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
 

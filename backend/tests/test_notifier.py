@@ -30,7 +30,7 @@ class TestComputeProgress:
             db.add(Task(project_id=p.id, title=f"T-{s}", status=s))
         db.flush()
         db.refresh(p)
-        total, done, progress = _compute_progress(p)
+        total, done, progress = _compute_progress(p, db)
         assert total == 3
         assert done == 3
         assert progress == 100.0
@@ -43,7 +43,7 @@ class TestComputeProgress:
         db.add(Task(project_id=p.id, title="T2", status="todo"))
         db.flush()
         db.refresh(p)
-        total, done, progress = _compute_progress(p)
+        total, done, progress = _compute_progress(p, db)
         assert total == 2
         assert done == 1
         assert progress == 50.0
@@ -53,7 +53,7 @@ class TestComputeProgress:
         db.add(p)
         db.flush()
         db.refresh(p)
-        total, done, progress = _compute_progress(p)
+        total, done, progress = _compute_progress(p, db)
         assert total == 0
         assert progress == 0.0
 
