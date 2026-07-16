@@ -3,7 +3,7 @@
 > ## ▶ 交接狀態(2026-07-15)
 > **五張關聯表已全部改為純邊並 drop**(`task_dependencies` / `task_labels` / `cycle_tasks` / `project_identities` / `goal_projects`)。所有多對多關係現在只透過 `edges` 表達;`graph_sync` 只維護實體節點 + `contains` 容器邊。
 >
-> **▶ 下一步(唯一剩下的一塊):容器 `contains`** —— 把 `Task.project_id` / `Task.parent_id`(約 685 處引用、遍佈 ~30 檔)改為 `contains`-edge 遍歷,最後 drop 這兩個欄位。這是最大、破窗風險最高的一步。前置的回同步(entity 熱欄位更新、task re-parent 搬邊)**已補齊並測綠**;剩下唯一的擋路決策是 **`project_id` 是否真的開放多重容器**(目前單一必填)——這決定讀取切換要不要保留 primary 概念。
+> **▶ 下一步(唯一剩下的一塊):容器 `contains`** —— 把 `Task.project_id` / `Task.parent_id`(backend 171 處、遍佈 ~30 檔)改為 `contains`-edge 遍歷,最後 drop 這兩個欄位。這是最大、破窗風險最高的一步。前置的回同步(entity 熱欄位更新、task re-parent 搬邊)**已補齊並測綠**。設計決策**已定:完全多重容器、無 primary**(見下方「只剩最後一塊」)。動工按下方「有序切片 0→7」逐片推進,**不做 big-bang**,每片 SQLite+PG 綠才 commit。
 >
 > 每切一塊的紀律:寫入→邊、讀取→批次邊 helper、drop 表;**只在測試全綠(SQLite + PostgreSQL 皆驗)時 commit**。詳見下方各階段勾選。
 
@@ -99,7 +99,17 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 
 **只剩最後一塊 — 容器 `contains`:**
 - [x] **回同步先補齊(讀取切換的前置):** `graph_sync` 現在(a)新建實體時把全部熱欄位(status/priority/dates/position/is_pinned)寫進 node,不再只有 title;(b)`session.dirty` 的實體更新回同步 node 熱欄位;(c)task re-parent(`project_id`/`parent_id` 變動)用 attribute history 搬移 `contains` 邊(含 un-parent 清邊)。熱欄位對映與回填 migration 一致。`tests/test_graph_sync.py` 增至 10 項,SQLite + PostgreSQL 皆綠。**Committed。**
-- [ ] `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點(685 處),是壓軸也是最大的一步。**動工前的設計決策仍待確認:`project_id` 是否真的開放多重容器(目前單一必填)。**
+**設計決策已定(2026-07-15):完全多重容器、無 primary。** 任務對等地屬於 N 個專案,不保留「home / 主專案」概念。`TaskOut.project_id` 僅作為相容欄位由 `nearest_ancestor_of_type(project)` 推導(給尚未改的舊 client/MCP),不再具語意權威;語意權威是 `project_ids[]`(= 全部 `contains` 專案父)。刪除專案改為刪邊 + 清孤兒(無其他專案容器才刪),取代 FK CASCADE。此為 [ADR-0032](adr/0032-unified-node-edge-graph-model.md) 已接受方向(第 33/43 行:多重歸屬、所屬專案 = 專案型祖先)的落地細化,故記於本計畫而非另開 ADR。
+
+**`contains` 讀寫切換 + drop 欄位 — 有序切片(每片:SQLite + PostgreSQL 綠、commit):**
+- [ ] **切片 0(前置查核):** 確認每個 task 建立路徑(含 `imports`、`bulk`、`issue_sync`、recurrence 生成)都會經 ORM unit-of-work 而被 `graph_sync` 鏡射出 `contains` 邊;任何繞過 ORM 的插入補呼叫 `graph.add_edge`。這是讀取改 edge-only 的安全前提。
+- [ ] **切片 1(membership 讀取 edge-only):** `enrichment._membership_project_ids` 純由邊推導(去掉 `task.project_id` 前綴);`TaskOut.project_id` 相容欄位改由 `nearest_ancestor_of_type(project)` 推導。
+- [ ] **切片 2(專案任務清單):** 逐檔把「列某專案的任務」由 `project.tasks` relationship / `WHERE project_id` 改為 `graph.contained_task_ids` / edge join —— `projects.py`、`analytics.py`、`external_api/*`、`search.py`、`scheduler.py`、`issue_sync.py`、`share.py`、`bulk.py`、`cicd.py`。
+- [ ] **切片 3(子任務樹):** `parent_id` 讀取(`subtask_count`、遞迴 subtasks、`critical_path`)改由 task→task 的 `contains` 邊。
+- [ ] **切片 4(寫入切換):** task 建立/移動只寫邊,停止寫 `project_id`/`parent_id`;移動任務 = 改邊並呼叫 `detect_cycle` 擋環;移除雙寫。
+- [ ] **切片 5(刪除語意):** 刪專案 → 刪其 `contains` 邊 + 刪孤兒任務(無其他專案容器才刪),取代 SQLite/PG 的 FK ondelete CASCADE。
+- [ ] **切片 6(drop 欄位):** migration drop `tasks.project_id`、`tasks.parent_id`;移除 model 欄位/relationship;`graph_sync` 不再讀欄位(改由邊事件驅動)。
+- [ ] **切片 7(前端 / MCP):** `project_ids[]` / `parent_ids[]` 開放多重歸屬與跨專案掛載 UI(見階段 4)。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 
