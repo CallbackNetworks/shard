@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Label, TaskLabel
+from app.models import Label
 from app.routers.deps import get_label_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import sync_labels_to_external
 from app.schemas import LabelCreate, LabelOut, LabelUpdate
+from app.services import graph
 
 router = APIRouter(prefix="/projects/{project_id}/labels", tags=["labels"])
 
@@ -58,10 +59,8 @@ async def add_label_to_task(project_id: str, task_id: str, label_id: str, db: Se
     _get_project_or_404(project_id, db)
     task = get_task_or_404(task_id, db, project_id=project_id)
     label = get_label_or_404(label_id, db, project_id=project_id)
-    existing = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
-    if not existing:
-        tl = TaskLabel(task_id=task_id, label_id=label_id)
-        db.add(tl)
+    if label_id not in graph.label_ids_for_task(db, task_id):
+        graph.set_label(db, task_id, label_id)
         db.commit()
         if task.external_provider:
             await sync_labels_to_external(task, db)
@@ -71,11 +70,9 @@ async def add_label_to_task(project_id: str, task_id: str, label_id: str, db: Se
 @task_label_router.delete("/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_label_from_task(project_id: str, task_id: str, label_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    tl = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
-    if not tl:
-        raise HTTPException(status_code=404, detail="Label not assigned to task")
     task = get_task_or_404(task_id, db, project_id=project_id)
-    db.delete(tl)
+    if not graph.unset_label(db, task_id, label_id):
+        raise HTTPException(status_code=404, detail="Label not assigned to task")
     db.commit()
     if task.external_provider:
         await sync_labels_to_external(task, db)

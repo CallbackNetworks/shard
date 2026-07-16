@@ -2,7 +2,8 @@
 
 import pytest
 
-from app.models import Comment, Label, Project, Task, TaskLabel, WorkflowRule
+from app.models import Comment, Label, Project, Task, WorkflowRule
+from app.services import graph
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
 
 # ── _eval_condition ──────────────────────────────────────────────────────
@@ -58,7 +59,7 @@ class TestEvalCondition:
         label = Label(project_id=task.project_id, name="bug", color="#ff0000")
         db.add(label)
         db.flush()
-        db.add(TaskLabel(task_id=task.id, label_id=label.id))
+        graph.set_label(db, task.id, label.id)
         db.flush()
         db.refresh(task)
         assert _eval_condition({"field": "has_label", "value": "bug"}, task, {}) is True
@@ -125,36 +126,33 @@ class TestExecAction:
         _exec_action(db, {"type": "add_label", "value": label.id}, task)
         db.flush()
 
-        tl = db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label.id).first()
-        assert tl is not None
+        assert label.id in graph.label_ids_for_task(db, task.id)
 
     def test_add_label_no_duplicate(self, db, project_and_task):
         project, task = project_and_task
         label = Label(project_id=project.id, name="urgent", color="#ff0000")
         db.add(label)
         db.flush()
-        db.add(TaskLabel(task_id=task.id, label_id=label.id))
+        graph.set_label(db, task.id, label.id)
         db.flush()
 
         _exec_action(db, {"type": "add_label", "value": label.id}, task)
         db.flush()
 
-        count = db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label.id).count()
-        assert count == 1
+        assert graph.label_ids_for_task(db, task.id).count(label.id) == 1
 
     def test_remove_label(self, db, project_and_task):
         project, task = project_and_task
         label = Label(project_id=project.id, name="old", color="#aaa")
         db.add(label)
         db.flush()
-        db.add(TaskLabel(task_id=task.id, label_id=label.id))
+        graph.set_label(db, task.id, label.id)
         db.flush()
 
         _exec_action(db, {"type": "remove_label", "value": label.id}, task)
         db.flush()
 
-        tl = db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label.id).first()
-        assert tl is None
+        assert label.id not in graph.label_ids_for_task(db, task.id)
 
     def test_add_comment(self, db, project_and_task):
         _, task = project_and_task

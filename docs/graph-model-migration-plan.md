@@ -67,8 +67,15 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] migration `e3f5a7b9c1d3` drop `task_dependencies`(回填已保 11 筆為邊,零資料損失);dev DB 已套用驗證。
 - [x] 684 tests SQLite 綠、PG 子集綠。**第一張舊關聯表正式移除。**
 
+**第二張表完成 — labels(`task_labels`):**
+- [x] 寫入:10 個寫入點 + remove 端點全改用 `graph.set_label` / `unset_label`(直接建/刪 `labeled` 邊);`issue_sync`、`assistant_tools`、`imports`、`bulk`、`rules_engine`、`labels`、`external_api/labels` 全數轉換。
+- [x] 讀取全部改由邊 + 批次 `graph.labels_map` 避 N+1:`enrichment`、`api_keys`、`share`、`issue_sync`(3 處 name/type 過濾)、`rules_engine`(has_label 用 `object_session`);移除各處 `selectinload/joinedload(task_labels)`。
+- [x] 移除 `TaskLabel` model + `Task.task_labels`/`Label.task_labels` relationship + `graph_sync` 條目。
+- [x] migration `f4a6b8c0d2e4` drop `task_labels`(43 邊零損失);dev DB 已套用。
+- [x] 683 tests SQLite 綠、98 項 PG 子集綠。**第二張舊關聯表移除。**
+
 **尚未做(下一步):**
-- [ ] 同法逐一切 `labels` / `in_cycle` / `member_of` / `part_of`,再 drop 各關聯表。
+- [ ] 同法逐一切 `in_cycle`(`cycle_tasks`)/ `member_of`(`project_identities`)/ `part_of`(`goal_projects`),再 drop 各表。
 - [ ] 最後才是 `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點,留到關聯表都清乾淨後再動。
 - [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;`contains` 讀取切換時處理)。
 

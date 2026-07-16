@@ -8,7 +8,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import ActivityLog, Comment, Label, Project, Task, TaskLabel, WorkflowRule
+from app.models import ActivityLog, Comment, Label, Project, Task, WorkflowRule
+from app.services import graph
 
 TOOLS = [
     {
@@ -406,18 +407,15 @@ def _tool_manage_labels(
     elif action == "add":
         if not task_id or not label_id:
             return "task_id and label_id required for add action"
-        existing = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
-        if existing:
+        if label_id in graph.label_ids_for_task(db, task_id):
             return "Label already assigned"
-        db.add(TaskLabel(task_id=task_id, label_id=label_id))
+        graph.set_label(db, task_id, label_id)
         db.commit()
         return json.dumps({"status": "added", "task_id": task_id, "label_id": label_id})
     elif action == "remove":
         if not task_id or not label_id:
             return "task_id and label_id required for remove action"
-        tl = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == label_id).first()
-        if tl:
-            db.delete(tl)
+        if graph.unset_label(db, task_id, label_id):
             db.commit()
         return json.dumps({"status": "removed", "task_id": task_id, "label_id": label_id})
     return f"Unknown label action: {action}"
@@ -615,10 +613,8 @@ def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: s
     if not label:
         return f"Decision label {decision_label_id} not found"
 
-    # Add label to task if not already attached
-    existing = db.query(TaskLabel).filter(TaskLabel.task_id == task_id, TaskLabel.label_id == decision_label_id).first()
-    if not existing:
-        db.add(TaskLabel(task_id=task_id, label_id=decision_label_id))
+    # Add label to task if not already attached (idempotent)
+    graph.set_label(db, task_id, decision_label_id)
 
     # Add comment explaining the relevance
     comment = Comment(

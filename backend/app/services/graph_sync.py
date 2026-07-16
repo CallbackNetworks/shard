@@ -6,9 +6,9 @@ mirrored without being individually patched:
 
 * Entities (Project/Task/Identity/Goal/Cycle/Label) -> a ``nodes`` row of the
   matching type. Tasks also get their ``contains`` edges from project_id/parent_id.
-* Association objects (TaskLabel/CycleTask/ProjectIdentity/GoalProject) -> the
-  matching ``edges`` row. (Dependencies are written directly as depends_on edges
-  by the dependency endpoints, so they are not mirrored here.)
+* Association objects (CycleTask/ProjectIdentity/GoalProject) -> the matching
+  ``edges`` row. (Dependencies and labels are written directly as edges by their
+  endpoints, so they are not mirrored here.)
 
 Edge direction matches the backfill migration (source -> target).
 
@@ -36,7 +36,6 @@ from app.models import (
     Project,
     ProjectIdentity,
     Task,
-    TaskLabel,
 )
 
 # entity class -> node type
@@ -50,10 +49,9 @@ _ENTITY_TYPES = {
 }
 
 # association class -> (source_attr, target_attr, rel_type, source_node_type, target_node_type)
-# Dependencies are written directly as depends_on edges (no association table), so
+# Dependencies and labels are written directly as edges (no association table), so
 # they are not listed here.
 _ASSOC_SPECS = {
-    TaskLabel: ("task_id", "label_id", "labeled", "task", "label"),
     CycleTask: ("task_id", "cycle_id", "in_cycle", "task", "cycle"),
     ProjectIdentity: ("identity_id", "project_id", "member_of", "identity", "project"),
     GoalProject: ("project_id", "goal_id", "part_of", "project", "goal"),

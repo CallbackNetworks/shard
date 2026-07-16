@@ -21,9 +21,9 @@ from app.models import (
     Notification,
     Project,
     Task,
-    TaskLabel,
     TaskPullRequest,
 )
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.issue_sync import (
     GITHUB_API_BASE,
@@ -104,7 +104,7 @@ def _apply_external_labels(task: Task, label_names: list[str], db: Session) -> N
     Missing labels are created project-scoped with source "issue_sync".
     """
     wanted = set(label_names)
-    current = {tl.label.name: tl for tl in task.task_labels if tl.label.type == "label"}
+    current = {lb.name: lb for lb in graph.labels_for_task(db, task.id) if lb.type == "label"}
 
     for name in wanted - set(current):
         label = (
@@ -116,11 +116,11 @@ def _apply_external_labels(task: Task, label_names: list[str], db: Session) -> N
             label = Label(project_id=task.project_id, name=name, source="issue_sync")
             db.add(label)
             db.flush()
-        db.add(TaskLabel(task_id=task.id, label_id=label.id))
+        graph.set_label(db, task.id, label.id)
 
-    for name, tl in current.items():
+    for name, lb in current.items():
         if name not in wanted:
-            db.delete(tl)
+            graph.unset_label(db, task.id, lb.id)
 
 
 @router.post("/{project_id}")
@@ -707,7 +707,7 @@ async def sync_labels_to_external(task: Task, db: Session) -> bool:
     if not target:
         return False
     token, base = target
-    names = [tl.label.name for tl in task.task_labels if tl.label.type == "label"]
+    names = [lb.name for lb in graph.labels_for_task(db, task.id) if lb.type == "label"]
     if task.external_provider == "github":
         return await replace_github_issue_labels(task.external_repo, task.external_id, names, token, base)
     return await replace_gitlab_issue_labels(task.external_repo, task.external_id, names, token, base)
@@ -807,7 +807,7 @@ async def create_external_issue_from_task(task: Task, project: Project, db: Sess
         )
 
     token = integration.secret
-    labels = [tl.label.name for tl in task.task_labels if tl.label.type == "label"]
+    labels = [lb.name for lb in graph.labels_for_task(db, task.id) if lb.type == "label"]
 
     if parsed["provider"] == "github":
         result = await create_github_issue(

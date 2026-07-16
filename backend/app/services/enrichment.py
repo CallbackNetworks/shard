@@ -26,9 +26,24 @@ def _dependency_lists(task, db, dep_maps) -> tuple[list[str], list[str]]:
     return [], []
 
 
-def enrich_task(task, db=None, dep_maps=None) -> TaskOut:
+def _task_labels(task, db, labels_by_task) -> list[LabelOut]:
+    """Resolve a task's labels from ``labeled`` edges (ADR-0032).
+
+    ``labels_by_task`` is an optional prefetched ``{task_id: [Label]}`` map from
+    ``graph.labels_map`` used to batch a whole list of tasks (avoids N+1).
+    """
+    if labels_by_task is not None:
+        labels = labels_by_task.get(task.id, [])
+    elif db is not None:
+        labels = graph.labels_for_task(db, task.id)
+    else:
+        labels = []
+    return [LabelOut.model_validate(lb) for lb in labels]
+
+
+def enrich_task(task, db=None, dep_maps=None, labels_by_task=None) -> TaskOut:
     out = TaskOut.model_validate(task)
-    out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
+    out.labels = _task_labels(task, db, labels_by_task)
     out.subtask_count = len(task.subtasks)
     out.comment_count = len(task.comments)
     out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
@@ -42,9 +57,9 @@ def enrich_task(task, db=None, dep_maps=None) -> TaskOut:
     return out
 
 
-def enrich_task_as_dict(task, db=None, dep_maps=None) -> dict:
+def enrich_task_as_dict(task, db=None, dep_maps=None, labels_by_task=None) -> dict:
     out = TaskOut.model_validate(task)
-    out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
+    out.labels = _task_labels(task, db, labels_by_task)
     out.subtask_count = len(task.subtasks)
     out.comment_count = len(task.comments)
     out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
@@ -73,9 +88,11 @@ def enrich_project(project, db=None) -> ProjectOut:
         if extra_ids:
             tasks += db.query(Task).filter(Task.id.in_(extra_ids)).all()
 
-    # Batch-load dependency edges once for all tasks in the project.
-    dep_maps = graph.dependency_maps(db, [t.id for t in tasks]) if db is not None else None
-    out.tasks = [enrich_task(t, db, dep_maps) for t in tasks]
+    # Batch-load dependency and label edges once for all tasks in the project.
+    task_ids = [t.id for t in tasks]
+    dep_maps = graph.dependency_maps(db, task_ids) if db is not None else None
+    labels_by_task = graph.labels_map(db, task_ids) if db is not None else None
+    out.tasks = [enrich_task(t, db, dep_maps, labels_by_task) for t in tasks]
 
     out.labels = [LabelOut.model_validate(lb) for lb in project.labels]
 

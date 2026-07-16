@@ -9,7 +9,7 @@ from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Identity, Project, Task, TaskLabel
+from app.models import Identity, Project, Task
 from app.routers.deps import get_project_or_404
 from app.schemas import (
     BulkActionResult,
@@ -115,14 +115,11 @@ async def bulk_update_tasks(
 
         # Add labels
         for label_id in body.add_label_ids:
-            exists = db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label_id).first()
-            if not exists:
-                db.add(TaskLabel(task_id=task.id, label_id=label_id))
+            graph.set_label(db, task.id, label_id)
 
-        # Remove labels (bulk delete bypasses the graph_sync listener, so mirror explicitly)
+        # Remove labels
         for label_id in body.remove_label_ids:
-            db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == label_id).delete()
-            graph.remove_edge(db, task.id, label_id, graph.REL_LABELED)
+            graph.unset_label(db, task.id, label_id)
 
         updated_ids.append(task.id)
 

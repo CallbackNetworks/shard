@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Label, Project, Task, TaskLabel
+from app.models import Label, Project, Task
+from app.services import graph
 from app.services.activity import log_activity
 
 logger = logging.getLogger(__name__)
@@ -164,8 +165,7 @@ def import_trello(project_id: str, body: TrelloImport, db: Session = Depends(get
                 if lbl.name and lbl.name.strip():
                     label = _get_or_create_label(db, project_id, lbl.name)
                     if label:
-                        tl = TaskLabel(task_id=task.id, label_id=label.id)
-                        db.add(tl)
+                        graph.set_label(db, task.id, label.id)
 
             imported += 1
         except Exception as exc:
@@ -242,8 +242,7 @@ def import_linear(project_id: str, body: LinearImport, db: Session = Depends(get
                 if lbl_name and lbl_name.strip():
                     label = _get_or_create_label(db, project_id, lbl_name)
                     if label:
-                        tl = TaskLabel(task_id=task.id, label_id=label.id)
-                        db.add(tl)
+                        graph.set_label(db, task.id, label.id)
 
             imported += 1
         except Exception as exc:
@@ -303,8 +302,7 @@ def import_github(project_id: str, body: GitHubImport, db: Session = Depends(get
                 if lbl.name and lbl.name.strip():
                     label = _get_or_create_label(db, project_id, lbl.name)
                     if label:
-                        tl = TaskLabel(task_id=task.id, label_id=label.id)
-                        db.add(tl)
+                        graph.set_label(db, task.id, label.id)
 
             imported += 1
         except Exception as exc:

@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, Node
+from app.models import Edge, Label, Node
 
 # Node types
 NODE_PROJECT = "project"
@@ -260,6 +260,54 @@ def dependency_maps(db: Session, task_ids) -> tuple[dict[str, list[str]], dict[s
         if target_id in ids:
             blocking[target_id].append(source_id)
     return blocked_by, blocking
+
+
+def set_label(db: Session, task_id: str, label_id: str) -> None:
+    """Attach a label to a task as a ``labeled`` edge (idempotent)."""
+    ensure_node(db, task_id, NODE_TASK)
+    ensure_node(db, label_id, NODE_LABEL)
+    add_edge(db, task_id, label_id, REL_LABELED)
+
+
+def unset_label(db: Session, task_id: str, label_id: str) -> bool:
+    return remove_edge(db, task_id, label_id, REL_LABELED)
+
+
+def label_ids_for_task(db: Session, task_id: str) -> list[str]:
+    """Ids of labels attached to a task via ``labeled`` edges."""
+    rows = db.execute(select(Edge.target_id).where(Edge.source_id == task_id, Edge.rel_type == REL_LABELED)).scalars()
+    return list(rows)
+
+
+def labeled_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
+    """Batch-load ``labeled`` edges: returns ``{task_id: [label_id, ...]}`` in one query."""
+    ids = set(task_ids)
+    result: dict[str, list[str]] = defaultdict(list)
+    if not ids:
+        return result
+    rows = db.execute(
+        select(Edge.source_id, Edge.target_id).where(Edge.rel_type == REL_LABELED, Edge.source_id.in_(ids))
+    ).all()
+    for source_id, target_id in rows:
+        result[source_id].append(target_id)
+    return result
+
+
+def labels_for_task(db: Session, task_id: str) -> list[Label]:
+    """Label rows attached to a task via ``labeled`` edges (single task)."""
+    ids = label_ids_for_task(db, task_id)
+    if not ids:
+        return []
+    by_id = {label.id: label for label in db.query(Label).filter(Label.id.in_(ids)).all()}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+def labels_map(db: Session, task_ids) -> dict[str, list[Label]]:
+    """Batch-load labels for many tasks: ``{task_id: [Label, ...]}`` in two queries."""
+    id_map = labeled_ids_map(db, task_ids)
+    all_ids = {lid for lst in id_map.values() for lid in lst}
+    labels = {lb.id: lb for lb in db.query(Label).filter(Label.id.in_(all_ids)).all()} if all_ids else {}
+    return {tid: [labels[lid] for lid in lids if lid in labels] for tid, lids in id_map.items()}
 
 
 def member_project_ids(db: Session, task_id: str) -> list[str]:

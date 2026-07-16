@@ -4,7 +4,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import Comment, Integration, Label, Task, TaskLabel
+from app.models import Comment, Integration, Label, Task
+from app.services import graph
 
 
 def _make_external_task(db, project_id, **overrides):
@@ -209,7 +210,7 @@ class TestInboundLabelMirror:
         )
         assert r.status_code == 200
         db.expire_all()
-        names = sorted(tl.label.name for tl in task.task_labels)
+        names = sorted(lb.name for lb in graph.labels_for_task(db, task.id))
         assert names == ["bug", "urgent"]
         bug = db.query(Label).filter(Label.project_id == sample_project.id, Label.name == "bug").first()
         assert bug.source == "issue_sync"
@@ -220,7 +221,7 @@ class TestInboundLabelMirror:
             label = Label(project_id=sample_project.id, name=name)
             db.add(label)
             db.flush()
-            db.add(TaskLabel(task_id=task.id, label_id=label.id))
+            graph.set_label(db, task.id, label.id)
         db.commit()
 
         r = client.post(
@@ -230,7 +231,7 @@ class TestInboundLabelMirror:
         )
         assert r.status_code == 200
         db.expire_all()
-        names = [tl.label.name for tl in task.task_labels]
+        names = [lb.name for lb in graph.labels_for_task(db, task.id)]
         assert names == ["bug"]
 
     def test_decision_labels_untouched(self, client, sample_project, db):
@@ -238,7 +239,7 @@ class TestInboundLabelMirror:
         decision = Label(project_id=sample_project.id, name="use-postgres", type="decision")
         db.add(decision)
         db.flush()
-        db.add(TaskLabel(task_id=task.id, label_id=decision.id))
+        graph.set_label(db, task.id, decision.id)
         db.commit()
 
         r = client.post(
@@ -248,7 +249,7 @@ class TestInboundLabelMirror:
         )
         assert r.status_code == 200
         db.expire_all()
-        names = sorted(tl.label.name for tl in task.task_labels)
+        names = sorted(lb.name for lb in graph.labels_for_task(db, task.id))
         assert names == ["bug", "use-postgres"]
 
     def test_new_task_gets_labels(self, client, sample_project, db):
@@ -260,7 +261,7 @@ class TestInboundLabelMirror:
         assert r.status_code == 200
         task = db.query(Task).filter(Task.external_id == "77").first()
         assert task is not None
-        assert [tl.label.name for tl in task.task_labels] == ["feature"]
+        assert [lb.name for lb in graph.labels_for_task(db, task.id)] == ["feature"]
 
 
 class TestOutboundReopen:
@@ -479,7 +480,7 @@ class TestOutboundLabels:
         label = Label(project_id=sample_project.id, name="bug")
         db.add(label)
         db.flush()
-        db.add(TaskLabel(task_id=task.id, label_id=label.id))
+        graph.set_label(db, task.id, label.id)
         db.commit()
 
         r = client.delete(f"/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")

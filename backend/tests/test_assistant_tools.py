@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from app.models import ActivityLog, Label, Project, Task, TaskLabel
+from app.models import ActivityLog, Label, Project, Task
+from app.services import graph
 from app.services.assistant_tools import dispatch_tool
 
 
@@ -200,7 +201,7 @@ class TestManageLabels:
         label = Label(project_id=p.id, name="dup", color="#000")
         db.add(label)
         db.flush()
-        db.add(TaskLabel(task_id=t1.id, label_id=label.id))
+        graph.set_label(db, t1.id, label.id)
         db.flush()
 
         result = await dispatch_tool("manage_labels", {"action": "add", "task_id": t1.id, "label_id": label.id}, db)
@@ -212,7 +213,7 @@ class TestManageLabels:
         label = Label(project_id=p.id, name="old", color="#000")
         db.add(label)
         db.flush()
-        db.add(TaskLabel(task_id=t1.id, label_id=label.id))
+        graph.set_label(db, t1.id, label.id)
         db.flush()
 
         result = await dispatch_tool("manage_labels", {"action": "remove", "task_id": t1.id, "label_id": label.id}, db)

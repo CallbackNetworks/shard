@@ -6,9 +6,9 @@ Evaluates WorkflowRule conditions against a task and executes actions.
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
-from app.models import Comment, Label, Task, TaskLabel, WorkflowRule
+from app.models import Comment, Label, Task, WorkflowRule
 from app.services import graph
 from app.services.activity import log_activity
 
@@ -36,7 +36,8 @@ def _eval_condition(cond: dict, task: Task, context: dict) -> bool:
     elif field == "title_contains":
         return (value.lower() in task.title.lower()) if op != "neq" else (value.lower() not in task.title.lower())
     elif field == "has_label":
-        label_names = [tl.label.name for tl in task.task_labels if tl.label]
+        db = object_session(task)
+        label_names = [lb.name for lb in graph.labels_for_task(db, task.id)] if db is not None else []
         return value in label_names
     else:
         return False
@@ -74,12 +75,9 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
             .first()
         )
         if label:
-            existing = db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == value).first()
-            if not existing:
-                db.add(TaskLabel(task_id=task.id, label_id=label.id))
+            graph.set_label(db, task.id, label.id)
     elif atype == "remove_label":
-        db.query(TaskLabel).filter(TaskLabel.task_id == task.id, TaskLabel.label_id == value).delete()
-        graph.remove_edge(db, task.id, value, graph.REL_LABELED)  # bulk delete bypasses graph_sync
+        graph.unset_label(db, task.id, value)
     elif atype == "add_comment":
         comment = Comment(
             task_id=task.id,

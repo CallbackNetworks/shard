@@ -7,11 +7,9 @@ from app.models import (
     Goal,
     GoalProject,
     Identity,
-    Label,
     Project,
     ProjectIdentity,
     Task,
-    TaskLabel,
 )
 
 
@@ -35,22 +33,6 @@ def _task(db, project_id, title="t"):
     db.add(t)
     db.flush()
     return t
-
-
-def test_task_label_mirrored(db):
-    p = _project(db)
-    t = _task(db, p.id)
-    label = Label(project_id=p.id, name="bug")
-    db.add(label)
-    db.flush()
-
-    db.add(TaskLabel(task_id=t.id, label_id=label.id))
-    db.commit()
-    assert _edge(db, t.id, label.id, "labeled") is not None
-
-    db.delete(db.query(TaskLabel).first())
-    db.commit()
-    assert _edge(db, t.id, label.id, "labeled") is None
 
 
 def test_cycle_task_mirrored(db):
@@ -87,20 +69,20 @@ def test_goal_project_mirrored(db):
     assert _edge(db, p.id, goal.id, "part_of") is not None
 
 
-def test_nodes_lazily_created_for_association(db):
+def test_nodes_created_for_cycle_association(db):
     from app.models import Node
 
     p = _project(db)
     t = _task(db, p.id)
-    label = Label(project_id=p.id, name="x")
-    db.add(label)
+    cycle = Cycle(project_id=p.id, name="sprint")
+    db.add(cycle)
     db.flush()
-    db.add(TaskLabel(task_id=t.id, label_id=label.id))
+    db.add(CycleTask(cycle_id=cycle.id, task_id=t.id))
     db.commit()
 
-    # Both endpoints now exist as nodes with the correct type.
+    # Both endpoints exist as nodes with the correct type.
     assert db.get(Node, t.id).type == "task"
-    assert db.get(Node, label.id).type == "label"
+    assert db.get(Node, cycle.id).type == "cycle"
 
 
 def test_task_create_mirrors_node_and_contains_edge(db):

@@ -19,7 +19,6 @@ from app.models import (
     Project,
     ProjectIdentity,
     Task,
-    TaskLabel,
 )
 from app.services import graph
 from app.services.activity import log_activity
@@ -101,11 +100,6 @@ def _load_identity(db: Session, token: str) -> Identity | None:
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
             .selectinload(Project.tasks)
-            .selectinload(Task.task_labels)
-            .selectinload(TaskLabel.label),
-            selectinload(Identity.project_identities)
-            .selectinload(ProjectIdentity.project)
-            .selectinload(Project.tasks)
             .selectinload(Task.subtasks),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
@@ -126,7 +120,6 @@ def _load_identity(db: Session, token: str) -> Identity | None:
 
 def _project_eager_options():
     return [
-        selectinload(Project.tasks).selectinload(Task.task_labels).selectinload(TaskLabel.label),
         selectinload(Project.tasks).selectinload(Task.subtasks),
         selectinload(Project.tasks).selectinload(Task.comments),
         selectinload(Project.labels),
@@ -180,13 +173,15 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
     comment_count = sum(len(t.comments) for t in tasks)
 
     task_map = {t.id: t.title for t in tasks}
-    blocked_by_map, blocking_map = graph.dependency_maps(db, list(task_map.keys()))
+    _ids = list(task_map.keys())
+    blocked_by_map, blocking_map = graph.dependency_maps(db, _ids)
+    labels_by_task = graph.labels_map(db, _ids)
 
     task_list = []
     for t in tasks:
         if t.parent_id is not None:
             continue
-        t_labels = [{"name": tl.label.name, "color": tl.label.color} for tl in t.task_labels if tl.label]
+        t_labels = [{"name": lb.name, "color": lb.color} for lb in labels_by_task.get(t.id, [])]
         subtask_details = [
             {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority} for s in t.subtasks
         ]

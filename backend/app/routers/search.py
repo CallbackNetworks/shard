@@ -82,9 +82,11 @@ def search(
                 }
             )
 
-    dep_maps = graph.dependency_maps(db, [t.id for t in tasks])
+    task_ids = [t.id for t in tasks]
+    dep_maps = graph.dependency_maps(db, task_ids)
+    labels_by_task = graph.labels_map(db, task_ids)
     return {
         "query": q,
-        "tasks": [enrich_task_as_dict(t, db, dep_maps) for t in tasks],
+        "tasks": [enrich_task_as_dict(t, db, dep_maps, labels_by_task) for t in tasks],
         "projects": projects,
     }
