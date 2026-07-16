@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Project, Task
+from app.services import graph
 from app.services.enrichment import enrich_task_as_dict
 from app.services.search_backend import get_search_backend
 
@@ -81,8 +82,9 @@ def search(
                 }
             )
 
+    dep_maps = graph.dependency_maps(db, [t.id for t in tasks])
     return {
         "query": q,
-        "tasks": [enrich_task_as_dict(t) for t in tasks],
+        "tasks": [enrich_task_as_dict(t, db, dep_maps) for t in tasks],
         "projects": projects,
     }

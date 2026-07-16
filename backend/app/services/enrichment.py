@@ -13,13 +13,25 @@ def _membership_project_ids(task, db) -> list[str]:
     return ids
 
 
-def enrich_task(task, db=None) -> TaskOut:
+def _dependency_lists(task, db, dep_maps) -> tuple[list[str], list[str]]:
+    """Resolve (blocked_by, blocking) from depends_on edges (ADR-0032).
+
+    ``dep_maps`` is an optional prefetched ``(blocked_by, blocking)`` pair from
+    ``graph.dependency_maps`` used to batch a whole list of tasks (avoids N+1).
+    """
+    if dep_maps is not None:
+        return dep_maps[0].get(task.id, []), dep_maps[1].get(task.id, [])
+    if db is not None:
+        return graph.prerequisite_ids(db, task.id), graph.dependent_ids(db, task.id)
+    return [], []
+
+
+def enrich_task(task, db=None, dep_maps=None) -> TaskOut:
     out = TaskOut.model_validate(task)
     out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
     out.subtask_count = len(task.subtasks)
     out.comment_count = len(task.comments)
-    out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
-    out.blocking = [d.task_id for d in task.blocking_deps]
+    out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
     out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
     out.project_ids = _membership_project_ids(task, db)
     if task.assigned_agent is not None:
@@ -30,13 +42,12 @@ def enrich_task(task, db=None) -> TaskOut:
     return out
 
 
-def enrich_task_as_dict(task) -> dict:
+def enrich_task_as_dict(task, db=None, dep_maps=None) -> dict:
     out = TaskOut.model_validate(task)
     out.labels = [LabelOut.model_validate(tl.label) for tl in task.task_labels if tl.label is not None]
     out.subtask_count = len(task.subtasks)
     out.comment_count = len(task.comments)
-    out.blocked_by = [d.depends_on_id for d in task.blocked_by_deps]
-    out.blocking = [d.task_id for d in task.blocking_deps]
+    out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
     out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
     if task.assigned_agent is not None:
         out.assigned_agent_name = task.assigned_agent.name
@@ -52,16 +63,19 @@ def enrich_project(project, db=None) -> ProjectOut:
     out.total_tasks = total
     out.done_tasks = done
     out.progress = progress
-    out.tasks = [enrich_task(t, db) for t in project.tasks]
+    tasks = list(project.tasks)
 
     # Tasks linked into this project via graph contains edges but whose primary
     # project_id is elsewhere — cross-project membership (ADR-0032).
     if db is not None:
-        own_ids = {t.id for t in project.tasks}
+        own_ids = {t.id for t in tasks}
         extra_ids = [tid for tid in graph.contained_task_ids(db, project.id) if tid not in own_ids]
         if extra_ids:
-            extra_tasks = db.query(Task).filter(Task.id.in_(extra_ids)).all()
-            out.tasks += [enrich_task(t, db) for t in extra_tasks]
+            tasks += db.query(Task).filter(Task.id.in_(extra_ids)).all()
+
+    # Batch-load dependency edges once for all tasks in the project.
+    dep_maps = graph.dependency_maps(db, [t.id for t in tasks]) if db is not None else None
+    out.tasks = [enrich_task(t, db, dep_maps) for t in tasks]
 
     out.labels = [LabelOut.model_validate(lb) for lb in project.labels]
 

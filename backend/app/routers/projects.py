@@ -21,8 +21,6 @@ def _project_eager_options():
         selectinload(Project.tasks).selectinload(Task.task_labels).selectinload(TaskLabel.label),
         selectinload(Project.tasks).selectinload(Task.subtasks),
         selectinload(Project.tasks).selectinload(Task.comments),
-        selectinload(Project.tasks).selectinload(Task.blocked_by_deps),
-        selectinload(Project.tasks).selectinload(Task.blocking_deps),
         selectinload(Project.tasks).selectinload(Task.assigned_agent),
         selectinload(Project.labels),
         selectinload(Project.cycles).selectinload(Cycle.cycle_tasks),

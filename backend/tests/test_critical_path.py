@@ -1,6 +1,7 @@
 """Tests for critical path analysis service."""
 
-from app.models import Project, Task, TaskDependency
+from app.models import Project, Task
+from app.services import graph
 from app.services.critical_path import compute_critical_path
 
 
@@ -18,10 +19,8 @@ class TestCriticalPath:
         return t
 
     def _add_dep(self, db, task_id, depends_on_id):
-        dep = TaskDependency(task_id=task_id, depends_on_id=depends_on_id)
-        db.add(dep)
+        graph.add_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON)
         db.flush()
-        return dep
 
     def test_linear_chain(self, db):
         """A -> B -> C: critical path should be [A, B, C]."""

@@ -11,7 +11,6 @@ from app.models import (
     Project,
     ProjectIdentity,
     Task,
-    TaskDependency,
     TaskLabel,
 )
 
@@ -52,20 +51,6 @@ def test_task_label_mirrored(db):
     db.delete(db.query(TaskLabel).first())
     db.commit()
     assert _edge(db, t.id, label.id, "labeled") is None
-
-
-def test_task_dependency_mirrored(db):
-    p = _project(db)
-    a = _task(db, p.id, "a")
-    b = _task(db, p.id, "b")
-
-    db.add(TaskDependency(task_id=a.id, depends_on_id=b.id))
-    db.commit()
-    assert _edge(db, a.id, b.id, "depends_on") is not None
-
-    db.delete(db.query(TaskDependency).first())
-    db.commit()
-    assert _edge(db, a.id, b.id, "depends_on") is None
 
 
 def test_cycle_task_mirrored(db):

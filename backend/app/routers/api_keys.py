@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models import ApiKey, Task, TaskLabel
 from app.schemas import AgentTaskSummary, ApiKeyCreate, ApiKeyCreateOut, ApiKeyOut, ApiKeyUpdate, LabelOut, TaskOut
+from app.services import graph
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -83,11 +84,12 @@ def get_agent_summary(db: Session = Depends(get_db)):
             joinedload(Task.task_labels).joinedload(TaskLabel.label),
             joinedload(Task.subtasks),
             joinedload(Task.comments),
-            joinedload(Task.blocked_by_deps),
-            joinedload(Task.blocking_deps),
         )
         .all()
     )
+
+    # Batch-load dependency edges for every agent task in one query (ADR-0032).
+    blocked_by_map, blocking_map = graph.dependency_maps(db, [t.id for t in all_tasks])
 
     # Group tasks by agent key in Python — no further DB round-trips.
     tasks_by_key: dict[str, list[Task]] = defaultdict(list)
@@ -105,8 +107,8 @@ def get_agent_summary(db: Session = Depends(get_db)):
             out.labels = [LabelOut.model_validate(tl.label) for tl in t.task_labels if tl.label is not None]
             out.subtask_count = len(t.subtasks)
             out.comment_count = len(t.comments)
-            out.blocked_by = [d.depends_on_id for d in t.blocked_by_deps]
-            out.blocking = [d.task_id for d in t.blocking_deps]
+            out.blocked_by = blocked_by_map.get(t.id, [])
+            out.blocking = blocking_map.get(t.id, [])
             out.assigned_agent_name = key.name
             enriched_tasks.append(out)
         result.append(

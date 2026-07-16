@@ -60,9 +60,17 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [x] `tests/test_graph_bulk_sync.py`(2 項,API 層)SQLite + PostgreSQL 皆綠。
 - 已查核:其餘 bulk 寫入(`notifications` 標記已讀、`tasks` position 更新)不是圖關係,無需處理。
 
+**第一個關係完成 read-cutover 並 drop 舊表 — dependencies:**
+- [x] 寫入:`add/remove_dependency`(內部 + external API)直接建/刪 `depends_on` 邊,不再寫 `task_dependencies`。
+- [x] 讀取全部改由邊推導,並批次載入避 N+1:`enrichment`(`graph.dependency_maps` 一次查整個專案)、`api_keys`、`share`、`external_api` GET、`critical_path`;移除各處 `selectinload(blocked_by_deps/blocking_deps)`。
+- [x] 移除 `TaskDependency` model + `Task.blocked_by_deps/blocking_deps` relationship;從 `graph_sync` 拿掉(改直接寫邊)。
+- [x] migration `e3f5a7b9c1d3` drop `task_dependencies`(回填已保 11 筆為邊,零資料損失);dev DB 已套用驗證。
+- [x] 684 tests SQLite 綠、PG 子集綠。**第一張舊關聯表正式移除。**
+
 **尚未做(下一步):**
-- [ ] 把 `project_id` / `parent_id` / `labels` / `blocked_by` 等**讀取**改由邊推導(需批次載入避免 N+1)。這是讓邊成為唯一權威、進而 drop 欄位的前置。
-- [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;讀取切換時處理)。
+- [ ] 同法逐一切 `labels` / `in_cycle` / `member_of` / `part_of`,再 drop 各關聯表。
+- [ ] 最後才是 `contains`(取代 `project_id`/`parent_id`)的讀取切換 + drop 欄位 — 涉及最多讀取點,留到關聯表都清乾淨後再動。
+- [ ] 實體欄位更新(title/status)與 task re-parent 尚未回同步(node 熱欄位目前不被讀,故無害;`contains` 讀取切換時處理)。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 

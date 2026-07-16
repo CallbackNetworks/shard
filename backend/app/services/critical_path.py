@@ -10,7 +10,8 @@ from collections import defaultdict, deque
 
 from sqlalchemy.orm import Session
 
-from app.models import Task, TaskDependency
+from app.models import Task
+from app.services import graph
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +44,8 @@ def compute_critical_path(db: Session, project_id: str) -> dict:
     task_map = {t.id: t for t in tasks}
     task_ids = set(task_map.keys())
 
-    # Query dependencies only among our active tasks
-    deps = (
-        db.query(TaskDependency)
-        .filter(
-            TaskDependency.task_id.in_(task_ids),
-            TaskDependency.depends_on_id.in_(task_ids),
-        )
-        .all()
-    )
+    # Dependency edges only among our active tasks (ADR-0032).
+    blocked_by_map, _ = graph.dependency_maps(db, task_ids)
 
     # Build adjacency: predecessors[task_id] = set of tasks it depends on
     # successors[task_id] = set of tasks that depend on it
@@ -59,11 +53,14 @@ def compute_critical_path(db: Session, project_id: str) -> dict:
     successors: dict[str, set[str]] = defaultdict(set)
     in_degree: dict[str, int] = {tid: 0 for tid in task_ids}
 
-    for dep in deps:
-        # dep.task_id is blocked by dep.depends_on_id
-        predecessors[dep.task_id].add(dep.depends_on_id)
-        successors[dep.depends_on_id].add(dep.task_id)
-        in_degree[dep.task_id] = in_degree.get(dep.task_id, 0) + 1
+    for tid in task_ids:
+        # tid is blocked by each prerequisite; keep only edges inside the active set
+        for prereq in blocked_by_map.get(tid, []):
+            if prereq not in task_ids:
+                continue
+            predecessors[tid].add(prereq)
+            successors[prereq].add(tid)
+            in_degree[tid] += 1
 
     # Topological sort (Kahn's algorithm) — also detects cycles
     queue = deque([tid for tid in task_ids if in_degree[tid] == 0])

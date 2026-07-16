@@ -91,18 +91,6 @@ class Task(Base):
         "CycleTask", back_populates="task", cascade="all, delete-orphan"
     )
     comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
-    blocked_by_deps: Mapped[list["TaskDependency"]] = relationship(
-        "TaskDependency",
-        back_populates="task",
-        cascade="all, delete-orphan",
-        foreign_keys="TaskDependency.task_id",
-    )
-    blocking_deps: Mapped[list["TaskDependency"]] = relationship(
-        "TaskDependency",
-        back_populates="depends_on",
-        cascade="all, delete-orphan",
-        foreign_keys="TaskDependency.depends_on_id",
-    )
     assigned_agent: Mapped["ApiKey | None"] = relationship("ApiKey", foreign_keys=[assigned_agent_key_id])
     pull_requests: Mapped[list["TaskPullRequest"]] = relationship(
         "TaskPullRequest", back_populates="task", cascade="all, delete-orphan"
@@ -308,19 +296,6 @@ class Comment(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
     task: Mapped["Task"] = relationship("Task", back_populates="comments")
-
-
-class TaskDependency(Base):
-    """task_id is BLOCKED BY depends_on_id (depends_on must be done first)."""
-
-    __tablename__ = "task_dependencies"
-
-    task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
-    depends_on_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-
-    task: Mapped["Task"] = relationship("Task", back_populates="blocked_by_deps", foreign_keys=[task_id])
-    depends_on: Mapped["Task"] = relationship("Task", back_populates="blocking_deps", foreign_keys=[depends_on_id])
 
 
 class RecurrenceRule(Base):

@@ -21,6 +21,7 @@ from app.models import (
     Task,
     TaskLabel,
 )
+from app.services import graph
 from app.services.activity import log_activity
 from app.services.pin_utils import check_pin
 from app.services.rate_limiter import share_rate_limit
@@ -112,14 +113,6 @@ def _load_identity(db: Session, token: str) -> Identity | None:
             .selectinload(Task.comments),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
-            .selectinload(Project.tasks)
-            .selectinload(Task.blocked_by_deps),
-            selectinload(Identity.project_identities)
-            .selectinload(ProjectIdentity.project)
-            .selectinload(Project.tasks)
-            .selectinload(Task.blocking_deps),
-            selectinload(Identity.project_identities)
-            .selectinload(ProjectIdentity.project)
             .selectinload(Project.labels),
             selectinload(Identity.project_identities)
             .selectinload(ProjectIdentity.project)
@@ -136,8 +129,6 @@ def _project_eager_options():
         selectinload(Project.tasks).selectinload(Task.task_labels).selectinload(TaskLabel.label),
         selectinload(Project.tasks).selectinload(Task.subtasks),
         selectinload(Project.tasks).selectinload(Task.comments),
-        selectinload(Project.tasks).selectinload(Task.blocked_by_deps),
-        selectinload(Project.tasks).selectinload(Task.blocking_deps),
         selectinload(Project.labels),
         selectinload(Project.cycles).selectinload(Cycle.cycle_tasks).selectinload(CycleTask.task),
         selectinload(Project.project_identities).selectinload(ProjectIdentity.identity),
@@ -189,6 +180,7 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
     comment_count = sum(len(t.comments) for t in tasks)
 
     task_map = {t.id: t.title for t in tasks}
+    blocked_by_map, blocking_map = graph.dependency_maps(db, list(task_map.keys()))
 
     task_list = []
     for t in tasks:
@@ -198,10 +190,8 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
         subtask_details = [
             {"id": s.id, "title": s.title, "status": s.status, "priority": s.priority} for s in t.subtasks
         ]
-        blocked_by = [
-            {"id": d.depends_on_id, "title": task_map.get(d.depends_on_id, "Unknown")} for d in t.blocked_by_deps
-        ]
-        blocking = [{"id": d.task_id, "title": task_map.get(d.task_id, "Unknown")} for d in t.blocking_deps]
+        blocked_by = [{"id": bid, "title": task_map.get(bid, "Unknown")} for bid in blocked_by_map.get(t.id, [])]
+        blocking = [{"id": bid, "title": task_map.get(bid, "Unknown")} for bid in blocking_map.get(t.id, [])]
         task_list.append(
             {
                 "id": t.id,

@@ -5,9 +5,9 @@ these helpers rather than querying ``Node`` / ``Edge`` directly so that cycle
 prevention and the "nearest ancestor" rules stay consistent.
 """
 
-from collections import deque
+from collections import defaultdict, deque
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Edge, Node
@@ -219,6 +219,47 @@ def descendants_of(db: Session, node_id: str) -> set[str]:
                 seen.add(child.id)
                 queue.append(child.id)
     return seen
+
+
+def prerequisite_ids(db: Session, task_id: str) -> list[str]:
+    """Tasks that block ``task_id`` (blocked_by) — targets of its depends_on edges."""
+    rows = db.execute(
+        select(Edge.target_id).where(Edge.source_id == task_id, Edge.rel_type == REL_DEPENDS_ON)
+    ).scalars()
+    return list(rows)
+
+
+def dependent_ids(db: Session, task_id: str) -> list[str]:
+    """Tasks that ``task_id`` blocks (blocking) — sources of depends_on edges pointing at it."""
+    rows = db.execute(
+        select(Edge.source_id).where(Edge.target_id == task_id, Edge.rel_type == REL_DEPENDS_ON)
+    ).scalars()
+    return list(rows)
+
+
+def dependency_maps(db: Session, task_ids) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Batch-load dependency edges for many tasks in one query (avoids N+1).
+
+    Returns ``(blocked_by, blocking)`` where ``blocked_by[t]`` are the tasks that
+    must complete before ``t``, and ``blocking[t]`` are the tasks waiting on ``t``.
+    """
+    ids = set(task_ids)
+    blocked_by: dict[str, list[str]] = defaultdict(list)
+    blocking: dict[str, list[str]] = defaultdict(list)
+    if not ids:
+        return blocked_by, blocking
+    edges = db.execute(
+        select(Edge.source_id, Edge.target_id).where(
+            Edge.rel_type == REL_DEPENDS_ON,
+            or_(Edge.source_id.in_(ids), Edge.target_id.in_(ids)),
+        )
+    ).all()
+    for source_id, target_id in edges:
+        if source_id in ids:
+            blocked_by[source_id].append(target_id)
+        if target_id in ids:
+            blocking[target_id].append(source_id)
+    return blocked_by, blocking
 
 
 def member_project_ids(db: Session, task_id: str) -> list[str]:

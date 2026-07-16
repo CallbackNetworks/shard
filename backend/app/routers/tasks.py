@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Task, TaskDependency
+from app.models import ApiKey, Task
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import (
     create_external_issue_from_task,
@@ -239,18 +239,10 @@ def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Sessio
         raise HTTPException(status_code=404, detail="Blocker task not found")
     if task_id == depends_on_id:
         raise HTTPException(status_code=400, detail="A task cannot depend on itself")
-    existing = (
-        db.query(TaskDependency)
-        .filter(
-            TaskDependency.task_id == task_id,
-            TaskDependency.depends_on_id == depends_on_id,
-        )
-        .first()
-    )
-    if existing:
-        return {"task_id": task_id, "depends_on_id": depends_on_id}
-    dep = TaskDependency(task_id=task_id, depends_on_id=depends_on_id)
-    db.add(dep)  # depends_on edge mirrored by graph_sync before_flush listener
+    # Dependencies are stored purely as depends_on edges (ADR-0032).
+    graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
+    graph.ensure_node(db, depends_on_id, graph.NODE_TASK, title=blocker.title)
+    graph.add_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON)
     db.commit()
     return {"task_id": task_id, "depends_on_id": depends_on_id}
 
@@ -259,17 +251,8 @@ def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Sessio
 def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
     """Remove the blocked-by dependency between task_id and depends_on_id."""
     _get_project_or_404(project_id, db)
-    dep = (
-        db.query(TaskDependency)
-        .filter(
-            TaskDependency.task_id == task_id,
-            TaskDependency.depends_on_id == depends_on_id,
-        )
-        .first()
-    )
-    if not dep:
+    if not graph.remove_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON):
         raise HTTPException(status_code=404, detail="Dependency not found")
-    db.delete(dep)  # depends_on edge removed by graph_sync before_flush listener
     db.commit()
 
 
