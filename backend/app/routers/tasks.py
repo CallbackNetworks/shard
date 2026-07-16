@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey, Task
+from app.routers.deps import get_parent_task_or_error
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import (
     create_external_issue_from_task,
@@ -73,6 +74,8 @@ def list_tasks(
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(get_db)):
     project = _get_project_or_404(project_id, db)
+    if body.parent_id is not None:
+        get_parent_task_or_error(db, project_id, body.parent_id)
     task = graph.create_task(db, project_id=project_id, **body.model_dump())
     log_activity(
         db,
@@ -106,10 +109,8 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     # incoming task->task contains edge.
     new_parent_id = changes.pop("parent_id", None)
     if new_parent_id is not None:
-        for old_parent in graph.parents_of(db, task_id):
-            if old_parent.type == graph.NODE_TASK:
-                graph.remove_edge(db, old_parent.id, task_id, graph.REL_CONTAINS)
-        graph.add_edge(db, new_parent_id, task_id, graph.REL_CONTAINS)
+        get_parent_task_or_error(db, project_id, new_parent_id, child_id=task_id)
+        graph.set_parent_task(db, task_id, new_parent_id)
 
     _validated_agent: ApiKey | None = None
     if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] is not None:
@@ -346,10 +347,10 @@ async def remove_membership(project_id: str, task_id: str, target_project_id: st
 async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Depends(get_db)):
     """Set the position of each task according to the given ordered list of IDs."""
     _get_project_or_404(project_id, db)
+    contained = set(graph.contained_task_ids(db, project_id))
     for idx, task_id in enumerate(body.task_ids):
-        db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).update(
-            {"position": idx}
-        )
+        if task_id in contained:
+            db.query(Task).filter(Task.id == task_id).update({"position": idx})
     db.commit()
     await ws_manager.broadcast("task.reordered", {"project_id": project_id})
 

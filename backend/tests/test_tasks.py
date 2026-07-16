@@ -124,6 +124,50 @@ def test_create_subtask(client, sample_project):
     assert resp.json()["parent_id"] == parent_id
 
 
+def test_create_subtask_with_unknown_parent_rejected(client, sample_project):
+    resp = client.post(_url(sample_project.id), json={"title": "Orphan", "parent_id": "no-such-task"})
+    assert resp.status_code == 404
+
+
+def test_reparent_task(client, sample_project):
+    pid = sample_project.id
+    a = client.post(_url(pid), json={"title": "A"}).json()["id"]
+    b = client.post(_url(pid), json={"title": "B"}).json()["id"]
+    resp = client.patch(_url(pid, f"/{b}"), json={"parent_id": a})
+    assert resp.status_code == 200
+    assert resp.json()["parent_id"] == a
+
+
+def test_reparent_to_unknown_parent_rejected(client, sample_project):
+    pid = sample_project.id
+    a = client.post(_url(pid), json={"title": "A"}).json()["id"]
+    resp = client.patch(_url(pid, f"/{a}"), json={"parent_id": "no-such-task"})
+    assert resp.status_code == 404
+    # No dangling containment was left behind: the task is still top-level.
+    listed = {t["id"]: t for t in client.get(_url(pid)).json()}
+    assert listed[a]["parent_id"] is None
+
+
+def test_reparent_cycle_rejected(client, sample_project):
+    pid = sample_project.id
+    a = client.post(_url(pid), json={"title": "A"}).json()["id"]
+    b = client.post(_url(pid), json={"title": "B", "parent_id": a}).json()["id"]
+    # A under its own subtask B would close a containment loop.
+    resp = client.patch(_url(pid, f"/{a}"), json={"parent_id": b})
+    assert resp.status_code == 400
+    # Self-parenting is a cycle too.
+    resp = client.patch(_url(pid, f"/{a}"), json={"parent_id": a})
+    assert resp.status_code == 400
+
+
+def test_reparent_to_parent_in_other_project_rejected(client, sample_project):
+    other = client.post("/projects", json={"name": "Other"}).json()["id"]
+    foreign_parent = client.post(_url(other), json={"title": "Foreign"}).json()["id"]
+    a = client.post(_url(sample_project.id), json={"title": "A"}).json()["id"]
+    resp = client.patch(_url(sample_project.id, f"/{a}"), json={"parent_id": foreign_parent})
+    assert resp.status_code == 404
+
+
 # --- 7. Dependencies ---
 
 

@@ -29,6 +29,21 @@ def get_task_or_404(task_id: str, db: Session, *, project_id: str | None = None)
     return task
 
 
+def get_parent_task_or_error(db: Session, project_id: str, parent_id: str, *, child_id: str | None = None) -> Task:
+    """Validate a ``parent_id`` containment hint (ADR-0032).
+
+    The parent must be an existing task contained in this project (404 otherwise;
+    a bogus id would mint a phantom node / dangling edge). When re-parenting an
+    existing task, the move must not create a containment cycle (400).
+    """
+    parent = db.query(Task).filter(Task.id == parent_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
+    if parent is None:
+        raise HTTPException(status_code=404, detail="Parent task not found")
+    if child_id is not None and graph.detect_cycle(db, parent_id, child_id):
+        raise HTTPException(status_code=400, detail="Re-parenting would create a containment cycle")
+    return parent
+
+
 def get_label_or_404(label_id: str, db: Session, *, project_id: str | None = None) -> Label:
     query = db.query(Label).filter(Label.id == label_id)
     if project_id:

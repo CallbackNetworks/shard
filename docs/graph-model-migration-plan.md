@@ -126,6 +126,12 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 - [ ] **切片 5(刪除語意):** 刪專案 → 刪其 `contains` 邊 + 刪孤兒任務(無其他專案容器才刪),取代 SQLite/PG 的 FK ondelete CASCADE。
 - [ ] **切片 6(drop 欄位):** migration drop `tasks.project_id`、`tasks.parent_id`;移除 model 欄位/relationship;`graph_sync` 不再讀欄位(改由邊事件驅動)。
 - [x] **切片 7(前端 / MCP):** 前端開放跨專案多重歸屬 UI —— `IssueRow` 新增 `Boxes` 動作鈕與「屬於 N 個專案」被動徽章(`project_ids.length > 1` 時顯示),展開 `MembershipPanel` 可檢視/解除/新增跨專案連結;API client 加 `addTaskMembership`/`removeTaskMembership`(打既有 `/memberships/{target}` 端點);i18n 補 `membership.*`(en + zh-TW)。MCP 無需改(proxy `/api/v1` 已原樣帶 `project_ids`)。`MembershipPanel.test.jsx` 4 項 + 全套 200 前端測試綠、eslint 0 error、vite build 成功。**🎉 ADR-0032 遷移全部完成(後端 + 前端)。**
+- [x] **切片 8(cutover 後 bug 修補,2026-07-16):** 審查發現四個 cutover 遺留缺口,已修:
+  1. **共享 subtask 資料遺失:** `delete_task_tree` 原本無條件刪整棵子樹;已連進其他專案的後代會被連帶刪除。改為「root 專案集合以外仍有歸屬的後代 → 連同其子樹存活,只解除 root 專案的 contains 邊」。專案刪除路徑(`delete_project_and_tasks`)自然繼承此語意。
+  2. **Re-parent 成環回 500:** PATCH `parent_id` 指向自己的子孫時 `add_edge` 拋 `ValueError` 未接 → 500。新增 `deps.get_parent_task_or_error`(parent 必須存在且在同專案,否則 404;成環回 400)+ `graph.set_parent_task` 集中搬邊。
+  3. **幽靈節點 / dangling edge:** 建立或 re-parent 帶不存在的 `parent_id` 時,`graph_sync._ensure_contains_edge` 會 mint 空 task node(或留下 dangling edge),task 從 UI 隱形。所有入口(human router create/update、external API create/update/bulk-create/bulk-update)現在都先驗證 parent。
+  4. **External API re-parent 靜默失效:** `parent_id` 已非欄位,`setattr` 只設了 stray attribute;改走圖搬邊。另修 `reorder_tasks` 的 N+1(每個 task 重查一次 contained ids)。
+  新增 10 項測試(delete 語意 ×2、human re-parent 驗證 ×5、external API ×3)。SQLite 701 綠 + PostgreSQL 700 綠。
 
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 

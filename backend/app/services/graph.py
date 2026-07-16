@@ -433,13 +433,29 @@ def create_task(db: Session, **fields) -> "Task":
 
 
 def delete_task_tree(db: Session, task_id: str) -> None:
-    """Delete a task and all its subtask descendants (replaces ORM delete-orphan).
+    """Delete a task and its subtask descendants (replaces ORM delete-orphan).
 
-    Peripheral rows (comments/attachments/pull requests) still cascade via their own
-    ``task_id`` FK; ``graph_sync`` drops each task's node and touching edges.
+    A descendant linked into a project outside the root's own projects survives
+    with its subtree (ADR-0032, no primary): it is unlinked from the root's
+    projects instead of deleted, and lives on under its other project(s).
+    Peripheral rows (comments/attachments/pull requests) still cascade via their
+    own ``task_id`` FK; ``graph_sync`` drops each deleted node's touching edges.
     """
-    ids = [task_id, *descendants_of(db, task_id)]
-    for tid in ids:
+    root_projects = set(member_project_ids(db, task_id))
+    doomed = [task_id, *descendants_of(db, task_id)]
+    keep: set[str] = set()
+    for tid in doomed[1:]:
+        if tid in keep:
+            continue
+        if set(member_project_ids(db, tid)) - root_projects:
+            keep.add(tid)
+            keep |= descendants_of(db, tid)
+    for tid in keep:
+        for pid in root_projects:
+            remove_edge(db, pid, tid, REL_CONTAINS)
+    for tid in doomed:
+        if tid in keep:
+            continue
         task = db.get(Task, tid)
         if task is not None:
             db.delete(task)
@@ -464,6 +480,21 @@ def delete_project_and_tasks(db: Session, project) -> None:
         else:
             delete_task_tree(db, tid)
     db.delete(project)
+
+
+def set_parent_task(db: Session, task_id: str, parent_id: str) -> None:
+    """Re-parent a task under another task: swap the incoming task->task ``contains`` edge.
+
+    Raises ValueError if the move would create a containment cycle; callers
+    should validate first (see ``get_parent_task_or_error``) to map this to a
+    client error instead of a 500.
+    """
+    if detect_cycle(db, parent_id, task_id):
+        raise ValueError(f"re-parenting {task_id} under {parent_id} would create a cycle")
+    for old_parent in parents_of(db, task_id):
+        if old_parent.type == NODE_TASK and old_parent.id != parent_id:
+            remove_edge(db, old_parent.id, task_id, REL_CONTAINS)
+    add_edge(db, parent_id, task_id, REL_CONTAINS)
 
 
 def project_id_of_task(db: Session, task_id: str) -> str | None:

@@ -293,6 +293,37 @@ class TestTasksCrud:
         r = client.delete(f"/api/v1/projects/{p.id}/tasks/{t1.id}", headers={"X-API-Key": raw_key})
         assert r.status_code == 204
 
+    def test_update_task_reparents_via_graph(self, client, api_key_write, project_with_tasks):
+        raw_key, _ = api_key_write
+        p, t1, t2 = project_with_tasks
+        r = client.patch(
+            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            json={"parent_id": t1.id},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 200
+        assert r.json()["parent_id"] == t1.id
+
+    def test_update_task_unknown_parent_rejected(self, client, api_key_write, project_with_tasks):
+        raw_key, _ = api_key_write
+        p, t1, _ = project_with_tasks
+        r = client.patch(
+            f"/api/v1/projects/{p.id}/tasks/{t1.id}",
+            json={"parent_id": "no-such-task"},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 404
+
+    def test_create_task_unknown_parent_rejected(self, client, api_key_write, project_with_tasks):
+        raw_key, _ = api_key_write
+        p, _, _ = project_with_tasks
+        r = client.post(
+            f"/api/v1/projects/{p.id}/tasks",
+            json={"title": "Orphan", "parent_id": "no-such-task"},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 404
+
 
 # ── Agent Context ────────────────────────────────────────────────────────
 

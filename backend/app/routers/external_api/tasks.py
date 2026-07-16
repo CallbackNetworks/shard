@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey, Project, Task
+from app.routers.deps import get_parent_task_or_error
 from app.routers.external_api.auth import (
     _auth_errors,
     _build_actor,
@@ -88,6 +89,8 @@ def api_create_task(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    if body.parent_id is not None:
+        get_parent_task_or_error(db, project_id, body.parent_id)
     task = graph.create_task(db, project_id=project_id, **body.model_dump())
     actor = _build_actor(api_key, x_agent_id)
     log_activity(
@@ -125,7 +128,13 @@ async def api_update_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     old_status = task.status
-    for field, value in body.model_dump(exclude_none=True).items():
+    changes = body.model_dump(exclude_none=True)
+    # Re-parenting is a graph move, not a column write (ADR-0032).
+    new_parent_id = changes.pop("parent_id", None)
+    if new_parent_id is not None:
+        get_parent_task_or_error(db, project_id, new_parent_id, child_id=task_id)
+        graph.set_parent_task(db, task_id, new_parent_id)
+    for field, value in changes.items():
         setattr(task, field, value)
 
     actor = _build_actor(api_key, x_agent_id)
@@ -200,6 +209,8 @@ async def api_bulk_create_tasks(
         raise HTTPException(status_code=404, detail="Project not found")
     created = []
     for body in tasks:
+        if body.parent_id is not None:
+            get_parent_task_or_error(db, project_id, body.parent_id)
         task = graph.create_task(db, project_id=project_id, **body.model_dump())
         created.append(task)
     db.commit()
@@ -249,6 +260,12 @@ async def api_bulk_update_tasks(
         old_status = task.status
         for field, value in update.items():
             if field not in _ALLOWED_FIELDS:
+                continue
+            if field == "parent_id":
+                # Re-parenting is a graph move, not a column write (ADR-0032).
+                if value is not None:
+                    get_parent_task_or_error(db, project_id, value, child_id=task_id)
+                    graph.set_parent_task(db, task_id, value)
                 continue
             if field == "title":
                 if not isinstance(value, str) or not value.strip():
