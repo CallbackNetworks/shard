@@ -369,9 +369,7 @@ def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depe
         raise HTTPException(status_code=404, detail="Calendar not found")
     project_ids = graph.project_ids_for_identity(db, identity.id)
     task_ids = {tid for pid in project_ids for tid in graph.contained_task_ids(db, pid)}
-    tasks = (
-        db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
-    )
+    tasks = db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
     return _render_calendar(identity.name, tasks, alarm)
 
 
@@ -382,7 +380,5 @@ def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depen
     if project is None:
         raise HTTPException(status_code=404, detail="Calendar not found")
     task_ids = graph.contained_task_ids(db, project.id)
-    tasks = (
-        db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
-    )
+    tasks = db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
     return _render_calendar(project.name, tasks, alarm)

@@ -68,7 +68,9 @@ def api_add_dependency(
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
     task = _get_task_or_404(project_id, task_id, db)
-    blocker = db.query(Task).filter(Task.id == depends_on_id, Task.project_id == project_id).first()
+    blocker = (
+        db.query(Task).filter(Task.id == depends_on_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
+    )
     if not blocker:
         raise HTTPException(status_code=404, detail="Blocker task not found")
     if task_id == depends_on_id:

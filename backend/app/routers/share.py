@@ -540,7 +540,8 @@ def create_guest_task_note(
 ):
     projects = _resolve_note_target(scope, token, request, db)
     project_ids = [p.id for p in projects]
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id.in_(project_ids)).first() if project_ids else None
+    task_ids = {tid for pid in project_ids for tid in graph.contained_task_ids(db, pid)}
+    task = db.query(Task).filter(Task.id == task_id).first() if task_id in task_ids else None
     if not task:
         raise HTTPException(status_code=404, detail="Task not found in this share")
     return _create_note(db, task.project_id, task.id, body, request)

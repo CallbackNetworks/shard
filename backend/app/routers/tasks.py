@@ -76,7 +76,7 @@ async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(g
 @router.patch("/{task_id}", response_model=TaskOut)
 async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -183,7 +183,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(project_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     log_activity(
@@ -218,7 +218,7 @@ async def create_external_issue(
     project's repo URL.
     """
     project = _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     provider = body.provider if body else None
@@ -231,10 +231,12 @@ async def create_external_issue(
 def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
     """Mark task_id as blocked by depends_on_id (depends_on must complete first)."""
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    blocker = db.query(Task).filter(Task.id == depends_on_id, Task.project_id == project_id).first()
+    blocker = (
+        db.query(Task).filter(Task.id == depends_on_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
+    )
     if not blocker:
         raise HTTPException(status_code=404, detail="Blocker task not found")
     if task_id == depends_on_id:
@@ -264,7 +266,7 @@ async def add_membership(project_id: str, task_id: str, target_project_id: str, 
     membership so the task also surfaces under target_project_id.
     """
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     if target_project_id == project_id:
@@ -292,7 +294,7 @@ async def add_membership(project_id: str, task_id: str, target_project_id: str, 
 async def remove_membership(project_id: str, task_id: str, target_project_id: str, db: Session = Depends(get_db)):
     """Unlink a task from an additional project. The home project cannot be removed."""
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     if target_project_id == project_id:
@@ -316,7 +318,9 @@ async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Dep
     """Set the position of each task according to the given ordered list of IDs."""
     _get_project_or_404(project_id, db)
     for idx, task_id in enumerate(body.task_ids):
-        db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).update({"position": idx})
+        db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).update(
+            {"position": idx}
+        )
     db.commit()
     await ws_manager.broadcast("task.reordered", {"project_id": project_id})
 
@@ -329,7 +333,7 @@ async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Dep
 )
 def regenerate_token(project_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     task.callback_token = str(uuid.uuid4())

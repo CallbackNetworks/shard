@@ -61,7 +61,7 @@ def api_get_task(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
@@ -122,7 +122,7 @@ async def api_update_task(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     old_status = task.status
@@ -171,7 +171,7 @@ def api_delete_task(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     db.delete(task)
@@ -245,7 +245,7 @@ async def api_bulk_update_tasks(
         task_id = update.pop("id", None)
         if not task_id:
             continue
-        task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+        task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
         if not task:
             continue
         old_status = task.status
