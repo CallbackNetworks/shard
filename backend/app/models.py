@@ -393,20 +393,11 @@ class SavedFilter(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
-class Goal(Base):
-    """High-level objective / OKR that groups multiple projects."""
-
-    __tablename__ = "goals"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(
-        SAEnum("active", "completed", "cancelled", name="goal_status"), default="active"
-    )
-    target_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+# ``Goal`` was collapsed to a node-only entity in ADR-0033 Phase B: a goal is a
+# ``Node(type="goal")`` (title in ``title``; status a real column; target_date ->
+# node ``due_date``; description in ``data``). Goals are top-level (not project-
+# scoped); projects link to a goal via ``part_of`` edges. The dedicated ``goals``
+# table was dropped; see the goal helpers in ``services/graph.py``.
 
 
 class UserPreference(Base):

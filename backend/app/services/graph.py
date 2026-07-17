@@ -26,8 +26,8 @@ NODE_LABEL = "label"
 # Nodes of these types are created/deleted through their own routers so the
 # table and its node mirror stay consistent; only node-only (custom) types flow
 # through the generic node API. This set shrinks as Phase B collapses entities.
-# ``label`` and ``cycle`` collapsed to node-only in ADR-0033 Phase B.
-ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT, NODE_TASK, NODE_IDENTITY, NODE_GOAL})
+# ``label``, ``cycle`` and ``goal`` collapsed to node-only in ADR-0033 Phase B.
+ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT, NODE_TASK, NODE_IDENTITY})
 
 # Edge relationship types (canonical direction: source -> target)
 REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id
@@ -805,6 +805,105 @@ def projects_for_goal(db: Session, goal_id: str) -> list[Project]:
         return []
     by_id = {p.id: p for p in db.query(Project).filter(Project.id.in_(ids)).all()}
     return [by_id[i] for i in ids if i in by_id]
+
+
+# --- Goals (node-only, ADR-0033 Phase B) -------------------------------------
+#
+# A goal is a ``Node(type="goal")``: ``title`` = title, ``status`` is a real hot
+# column, ``target_date`` maps to the node's ``due_date`` column, and
+# ``description`` lives in ``data``. Unlike labels/cycles a goal is NOT project-
+# scoped — projects link to it via ``part_of`` edges (project -> goal), so a goal
+# has no containing ``contains`` edge. ``GoalView`` exposes the historical
+# ``Goal`` attribute surface so ``GoalOut.model_validate`` keeps working.
+
+
+@dataclass
+class GoalView:
+    id: str
+    title: str
+    description: str | None
+    status: str
+    target_date: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+def _goal_view(node: Node) -> GoalView:
+    data = node.data or {}
+    return GoalView(
+        id=node.id,
+        title=node.title,
+        description=data.get("description"),
+        status=node.status or "active",
+        target_date=node.due_date,
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+    )
+
+
+def create_goal(
+    db: Session,
+    *,
+    title: str,
+    description: str | None = None,
+    target_date: datetime | None = None,
+    status: str = "active",
+    actor: str | None = None,
+) -> GoalView:
+    """Create a top-level goal node (no project containment; see ``part_of``)."""
+    node = create_node(
+        db,
+        NODE_GOAL,
+        title=title,
+        actor=actor,
+        status=status,
+        due_date=target_date,
+        description=description,
+    )
+    return _goal_view(node)
+
+
+def update_goal(db: Session, goal_id: str, **fields) -> GoalView | None:
+    """Update a goal node; ``title``->title, ``target_date``->due_date, rest to columns/data."""
+    node = db.get(Node, goal_id)
+    if node is None or node.type != NODE_GOAL:
+        return None
+    if "title" in fields:
+        node.title = fields.pop("title")
+    if "target_date" in fields:
+        node.due_date = fields.pop("target_date")
+    if "status" in fields:
+        node.status = fields.pop("status")
+    data = dict(node.data or {})
+    for key, value in fields.items():
+        data[key] = value
+    node.data = data or None
+    db.flush()
+    return _goal_view(node)
+
+
+def delete_goal(db: Session, goal_id: str, *, actor: str | None = None) -> bool:
+    """Delete a goal node and every edge touching it (part_of)."""
+    node = db.get(Node, goal_id)
+    if node is None or node.type != NODE_GOAL:
+        return False
+    return delete_node(db, goal_id, actor=actor)
+
+
+def get_goal(db: Session, goal_id: str) -> GoalView | None:
+    node = db.get(Node, goal_id)
+    if node is None or node.type != NODE_GOAL:
+        return None
+    return _goal_view(node)
+
+
+def all_goals(db: Session, *, status: str | None = None) -> list[GoalView]:
+    """All goal nodes, newest first, optionally filtered by status."""
+    query = db.query(Node).filter(Node.type == NODE_GOAL)
+    if status is not None:
+        query = query.filter(Node.status == status)
+    rows = query.order_by(Node.created_at.desc()).all()
+    return [_goal_view(node) for node in rows]
 
 
 def contained_task_ids(db: Session, project_id: str) -> list[str]:

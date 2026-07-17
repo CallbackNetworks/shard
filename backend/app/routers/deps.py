@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Comment,
-    Goal,
     Identity,
     Integration,
     Project,
@@ -63,8 +62,8 @@ def get_identity_or_404(identity_id: str, db: Session) -> Identity:
     return identity
 
 
-def get_goal_or_404(goal_id: str, db: Session) -> Goal:
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+def get_goal_or_404(goal_id: str, db: Session) -> graph.GoalView:
+    goal = graph.get_goal(db, goal_id)
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     return goal

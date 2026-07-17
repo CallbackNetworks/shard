@@ -2,9 +2,9 @@
 
 A single ``before_flush`` listener mirrors entities into the ``nodes`` table:
 
-* Entities (Project/Task/Identity/Goal) -> a ``nodes`` row of the matching
-  type, with the hot columns (title/status/priority/dates/position/is_pinned)
-  kept faithful to the entity. (``Label`` and ``Cycle`` are node-only, ADR-0033.)
+* Entities (Project/Task/Identity) -> a ``nodes`` row of the matching type,
+  with the hot columns (title/status/priority/dates/position/is_pinned) kept
+  faithful to the entity. (Label/Cycle/Goal are node-only, ADR-0033.)
 * Updating an entity re-syncs its node hot columns.
 * Deleting an entity drops its node and every touching edge.
 
@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Edge,
-    Goal,
     Identity,
     Node,
     Project,
@@ -29,13 +28,12 @@ from app.models import (
 )
 
 # entity class -> node type
-# ``label`` and ``cycle`` are intentionally absent: they collapsed to node-only
-# in ADR-0033 Phase B and now flow through the generic graph layer.
+# ``label``, ``cycle`` and ``goal`` are intentionally absent: they collapsed to
+# node-only in ADR-0033 Phase B and now flow through the generic graph layer.
 _ENTITY_TYPES = {
     Project: "project",
     Task: "task",
     Identity: "identity",
-    Goal: "goal",
 }
 
 
@@ -55,11 +53,8 @@ def _sync_hot_fields(node, obj) -> None:
         node.due_date = obj.due_date
         node.position = obj.position or 0
         node.is_pinned = bool(obj.is_pinned)
-    elif isinstance(obj, Goal):
-        node.status = obj.status
-        node.due_date = obj.target_date
     # Identity carries only a title in the hot columns.
-    # Label and Cycle are node-only (ADR-0033) and never reach this listener.
+    # Label, Cycle and Goal are node-only (ADR-0033) and never reach this listener.
 
 
 def _upsert_node(session, seen_nodes, obj, node_type):

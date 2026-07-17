@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Goal, Project, Task
+from app.models import Project, Task
 from app.routers.deps import get_goal_or_404
 from app.schemas import GoalCreate, GoalOut, GoalProjectOut, GoalUpdate
 from app.services import graph
@@ -24,7 +24,7 @@ def _project_progress(db: Session, project_id: str) -> float:
     return round(done / total * 100, 1)
 
 
-def _enrich_goal(goal: Goal, db: Session) -> GoalOut:
+def _enrich_goal(goal: graph.GoalView, db: Session) -> GoalOut:
     """Build GoalOut with computed progress from linked projects."""
     projects: list[GoalProjectOut] = []
     for proj in graph.projects_for_goal(db, goal.id):
@@ -44,10 +44,7 @@ def list_goals(
     status_filter: str | None = Query(None, alias="status"),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Goal)
-    if status_filter:
-        query = query.filter(Goal.status == status_filter)
-    goals = query.order_by(Goal.created_at.desc()).all()
+    goals = graph.all_goals(db, status=status_filter)
     return [_enrich_goal(g, db) for g in goals]
 
 
@@ -59,13 +56,12 @@ def get_goal(goal_id: str, db: Session = Depends(get_db)):
 
 @router.post("", response_model=GoalOut, status_code=status.HTTP_201_CREATED)
 async def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
-    goal = Goal(
+    goal = graph.create_goal(
+        db,
         title=body.title,
         description=body.description,
         target_date=body.target_date,
     )
-    db.add(goal)
-    db.flush()
 
     for pid in body.project_ids:
         project = db.query(Project).filter(Project.id == pid).first()
@@ -79,20 +75,18 @@ async def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
         detail=f'Goal "{goal.title}" created',
     )
     db.commit()
-    db.refresh(goal)
     await ws_manager.broadcast("goal.created", {"goal_id": goal.id})
     return _enrich_goal(goal, db)
 
 
 @router.patch("/{goal_id}", response_model=GoalOut)
 async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_db)):
-    goal = get_goal_or_404(goal_id, db)
+    get_goal_or_404(goal_id, db)
 
     changes = body.model_dump(exclude_none=True)
     project_ids = changes.pop("project_ids", None)
 
-    for field, value in changes.items():
-        setattr(goal, field, value)
+    goal = graph.update_goal(db, goal_id, **changes)
 
     if project_ids is not None:
         # Replace linked projects: clear all part_of edges for this goal, then re-add.
@@ -109,7 +103,6 @@ async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_
         detail=f'Goal "{goal.title}" updated',
     )
     db.commit()
-    db.refresh(goal)
     await ws_manager.broadcast("goal.updated", {"goal_id": goal_id})
     return _enrich_goal(goal, db)
 
@@ -122,6 +115,6 @@ async def delete_goal(goal_id: str, db: Session = Depends(get_db)):
         "goal.deleted",
         detail=f'Goal "{goal.title}" deleted',
     )
-    db.delete(goal)
+    graph.delete_goal(db, goal_id)
     db.commit()
     await ws_manager.broadcast("goal.deleted", {"goal_id": goal_id})
