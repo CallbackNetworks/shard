@@ -1059,6 +1059,108 @@ def unfiled_task_ids(db: Session) -> list[str]:
     return list(rows)
 
 
+# --- Tasks (node-backed reads, ADR-0033 Phase B, B5.2) -----------------------
+#
+# A task is a ``Node(type="task")`` whose hot columns are real (title/status/
+# priority/start_date/due_date/position/is_pinned/created_at/updated_at) and whose
+# non-hot fields live in ``data`` (kept a complete mirror by graph_sync since
+# B5.1). ``TaskView`` exposes the historical ``Task`` attribute surface — every
+# scalar plus the relationship-like ``comments``/``pull_requests``/
+# ``assigned_agent`` — so ``TaskOut.model_validate`` and ``enrich_task`` work
+# against it unchanged. Relationship-like attributes are lazy and need the ``db``
+# the view was built with. The ``tasks`` table is still authoritative for writes
+# until B5.3; these are read helpers.
+
+_TASK_DATA_SCALARS = (
+    "description",
+    "callback_token",
+    "webhook_secret",
+    "assignee",
+    "assigned_agent_key_id",
+    "time_estimate",
+    "time_spent",
+    "progress_pct",
+    "agent_notes",
+    "external_provider",
+    "external_id",
+    "external_url",
+    "external_repo",
+)
+
+
+class TaskView:
+    """Read-facing view of a task node mirroring the ``Task`` ORM surface."""
+
+    def __init__(self, node: Node, db: Session | None = None):
+        self._db = db
+        data = node.data or {}
+        self.id = node.id
+        self.title = node.title
+        self.status = node.status or "todo"
+        self.priority = node.priority or "medium"
+        self.start_date = node.start_date
+        self.due_date = node.due_date
+        self.position = node.position or 0
+        self.is_pinned = bool(node.is_pinned)
+        self.created_at = node.created_at
+        self.updated_at = node.updated_at
+        self.reminder_sent_at = _parse_dt(data.get("reminder_sent_at"))
+        for key in _TASK_DATA_SCALARS:
+            setattr(self, key, data.get(key))
+
+    @property
+    def comments(self):
+        from app.models import Comment
+
+        if self._db is None:
+            return []
+        return (
+            self._db.query(Comment).filter(Comment.task_id == self.id).order_by(Comment.created_at.asc()).all()
+        )
+
+    @property
+    def pull_requests(self):
+        from app.models import TaskPullRequest
+
+        if self._db is None:
+            return []
+        return self._db.query(TaskPullRequest).filter(TaskPullRequest.task_id == self.id).all()
+
+    @property
+    def assigned_agent(self):
+        from app.models import ApiKey
+
+        if self._db is None or not self.assigned_agent_key_id:
+            return None
+        return self._db.get(ApiKey, self.assigned_agent_key_id)
+
+
+def task_view(node: Node, db: Session | None = None) -> TaskView:
+    return TaskView(node, db)
+
+
+def get_task(db: Session, task_id: str) -> TaskView | None:
+    node = db.get(Node, task_id)
+    if node is None or node.type != NODE_TASK:
+        return None
+    return TaskView(node, db)
+
+
+def task_views_by_ids(db: Session, task_ids) -> dict[str, TaskView]:
+    """Batch-load ``{task_id: TaskView}`` for task-type nodes among ``task_ids``."""
+    ids = set(task_ids)
+    if not ids:
+        return {}
+    nodes = db.query(Node).filter(Node.id.in_(ids), Node.type == NODE_TASK).all()
+    return {n.id: TaskView(n, db) for n in nodes}
+
+
+def task_views_for_ids(db: Session, task_ids) -> list[TaskView]:
+    """TaskViews for ``task_ids`` preserving input order (missing ids dropped)."""
+    by_id = task_views_by_ids(db, task_ids)
+    return [by_id[i] for i in task_ids if i in by_id]
+
+
 def create_task(db: Session, **fields) -> "Task":
     """Single entry point for creating a task (ADR-0032, no columns).
 
