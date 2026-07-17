@@ -34,6 +34,7 @@ const StructureMap = lazy(() => import('./pages/StructureMap'))
 const Assistant = lazy(() => import('./pages/Assistant'))
 const Settings = lazy(() => import('./pages/Settings'))
 const GraphTypes = lazy(() => import('./pages/GraphTypes'))
+const NodeExplorer = lazy(() => import('./pages/NodeExplorer'))
 const ShareView = lazy(() => import('./pages/ShareView'))
 const Login = lazy(() => import('./pages/Login'))
 
@@ -164,6 +165,7 @@ function Layout() {
               <Route path="assistant" element={<Assistant />} />
               <Route path="settings" element={<Settings />} />
               <Route path="graph-types" element={<GraphTypes />} />
+              <Route path="explorer" element={<NodeExplorer />} />
             </Routes>
           </Suspense>
         </div>
