@@ -322,10 +322,10 @@ async def add_membership(project_id: str, task_id: str, target_project_id: str, 
 
 @router.delete("/{task_id}/memberships/{target_project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_membership(project_id: str, task_id: str, target_project_id: str, db: Session = Depends(get_db)):
-    """Unlink a task from a project (ADR-0032, no primary: any membership may go).
+    """Unlink a task from a project (ADR-0032/0033, no primary: any membership may go).
 
-    The only invariant is that a task keeps at least one project membership,
-    so removing the last one is rejected.
+    A task may legally reach zero project memberships — it becomes *unfiled* and
+    surfaces in the unfiled bucket (``GET /tasks/unfiled``) to be re-filed later.
     """
     _get_project_or_404(project_id, db)
     task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
@@ -334,8 +334,6 @@ async def remove_membership(project_id: str, task_id: str, target_project_id: st
     member_ids = graph.member_project_ids(db, task_id)
     if target_project_id not in member_ids:
         raise HTTPException(status_code=404, detail="Membership not found")
-    if len(member_ids) <= 1:
-        raise HTTPException(status_code=400, detail="Cannot remove the task's last project membership")
     graph.remove_edge(db, target_project_id, task_id, graph.REL_CONTAINS)
     log_activity(
         db,
@@ -383,5 +381,52 @@ def regenerate_token(project_id: str, task_id: str, db: Session = Depends(get_db
         meta={"title": task.title},
     )
     db.commit()
+    db.refresh(task)
+    return enrich_task(task, db)
+
+
+# Top-level task operations that are not scoped to a single project. Registered
+# separately in main.py. Handles the "unfiled" bucket: tasks with zero project
+# memberships (ADR-0032/0033), and filing an unfiled task into a project.
+task_ops_router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+@task_ops_router.get("/unfiled", response_model=list[TaskOut])
+def list_unfiled_tasks(db: Session = Depends(get_db)):
+    """List unfiled tasks — tasks that belong to no project (ADR-0032/0033)."""
+    ids = graph.unfiled_task_ids(db)
+    if not ids:
+        return []
+    tasks = db.query(Task).filter(Task.id.in_(ids)).all()
+    return [enrich_task(t, db) for t in tasks]
+
+
+@task_ops_router.post(
+    "/{task_id}/memberships/{project_id}", response_model=TaskOut, status_code=status.HTTP_201_CREATED
+)
+async def file_task_into_project(task_id: str, project_id: str, db: Session = Depends(get_db)):
+    """File a task into a project via a ``contains`` edge (unscoped; ADR-0032/0033).
+
+    Unlike the project-scoped membership endpoint this does not require the task
+    to already live under some source project, so it is how an *unfiled* task
+    gets its first project. Idempotent: adding an existing membership is a no-op.
+    """
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    _get_project_or_404(project_id, db)
+    graph.ensure_node(db, project_id, graph.NODE_PROJECT)
+    graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
+    graph.add_edge(db, project_id, task_id, graph.REL_CONTAINS)
+    log_activity(
+        db,
+        "task.membership_added",
+        project_id=project_id,
+        task_id=task_id,
+        actor="api",
+        detail=f"Task filed into project {project_id}",
+    )
+    db.commit()
+    await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": project_id})
     db.refresh(task)
     return enrich_task(task, db)

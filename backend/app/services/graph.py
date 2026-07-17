@@ -492,6 +492,23 @@ def contained_task_ids(db: Session, project_id: str) -> list[str]:
     return [n.id for n in children_of(db, project_id) if n.type in tasks]
 
 
+def unfiled_task_ids(db: Session) -> list[str]:
+    """Ids of unfiled tasks: task-role nodes with no incoming ``contains`` edge (ADR-0032/0033).
+
+    A task may legally belong to zero projects (the "unfiled" state is simply the
+    absence of any project -> task ``contains`` edge). These have no container
+    parent and no task parent — truly top-level tasks awaiting a home. Non-task
+    node ids are filtered out by the caller when it loads ``Task`` rows.
+    """
+    filed = select(Edge.target_id).where(Edge.rel_type == REL_CONTAINS)
+    rows = db.execute(
+        select(Node.id)
+        .join(NodeType, NodeType.key == Node.type)
+        .where(NodeType.is_task_like.is_(True), Node.id.notin_(filed))
+    ).scalars()
+    return list(rows)
+
+
 def create_task(db: Session, **fields) -> "Task":
     """Single entry point for creating a task (ADR-0032, no columns).
 

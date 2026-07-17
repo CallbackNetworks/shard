@@ -1,6 +1,6 @@
 import {
   Activity, BarChart2, FileText, GitFork, GitMerge, Key, LayoutGrid,
-  MessageCircle, Network, Settings2, Target, Users, Zap, ScrollText, Shapes, Boxes,
+  MessageCircle, Network, Settings2, Target, Users, Zap, ScrollText, Shapes, Boxes, Inbox,
 } from 'lucide-react'
 
 // Single source of truth for the sidebar rail modules. Consumed by the
@@ -11,6 +11,7 @@ export const NAV_GROUPS = [
     label: 'Operate',
     items: [
       { to: '/', icon: LayoutGrid, labelKey: 'nav.commandCenter', locked: true },
+      { to: '/unfiled', icon: Inbox, labelKey: 'nav.unfiled' },
       { to: '/structure', icon: Network, labelKey: 'nav.structureMap' },
       { to: '/activity', icon: Activity, labelKey: 'nav.activity' },
       { to: '/analytics', icon: BarChart2, labelKey: 'nav.analytics' },

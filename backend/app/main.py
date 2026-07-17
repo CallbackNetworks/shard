@@ -205,6 +205,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
+app.include_router(tasks.task_ops_router)
 app.include_router(webhooks.router)
 app.include_router(issue_sync.router)
 app.include_router(integrations.router)

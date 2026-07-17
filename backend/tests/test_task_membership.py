@@ -73,11 +73,45 @@ def test_remove_original_membership_from_other_project(client):
     assert task["project_id"] == b
 
 
-def test_remove_last_membership_rejected(client):
+def test_remove_last_membership_unfiles_task(client):
+    """A task may reach zero project memberships — it becomes unfiled (ADR-0032/0033)."""
     a = _make_project(client, "A")
     tid = _make_task(client, a, "t")
     resp = client.delete(f"/projects/{a}/tasks/{tid}/memberships/{a}")
-    assert resp.status_code == 400
+    assert resp.status_code == 204
+
+    # It no longer shows under project A, and appears in the unfiled bucket.
+    proj_a = client.get(f"/projects/{a}").json()
+    assert tid not in [t["id"] for t in proj_a["tasks"]]
+    unfiled = client.get("/tasks/unfiled").json()
+    ids = [t["id"] for t in unfiled]
+    assert tid in ids
+    task = next(t for t in unfiled if t["id"] == tid)
+    assert task["project_id"] is None
+    assert task["project_ids"] == []
+
+
+def test_file_unfiled_task_into_project(client):
+    a = _make_project(client, "A")
+    b = _make_project(client, "B")
+    tid = _make_task(client, a, "t")
+    client.delete(f"/projects/{a}/tasks/{tid}/memberships/{a}")  # unfile
+    assert tid in [t["id"] for t in client.get("/tasks/unfiled").json()]
+
+    resp = client.post(f"/tasks/{tid}/memberships/{b}")  # file into B
+    assert resp.status_code == 201
+    assert resp.json()["project_ids"] == [b]
+    # No longer unfiled.
+    assert tid not in [t["id"] for t in client.get("/tasks/unfiled").json()]
+    proj_b = client.get(f"/projects/{b}").json()
+    assert tid in [t["id"] for t in proj_b["tasks"]]
+
+
+def test_file_task_unknown_project_404(client):
+    a = _make_project(client, "A")
+    tid = _make_task(client, a, "t")
+    resp = client.post(f"/tasks/{tid}/memberships/does-not-exist")
+    assert resp.status_code == 404
 
 
 def test_compat_project_id_is_oldest_membership_everywhere(client):

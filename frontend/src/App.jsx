@@ -35,6 +35,7 @@ const Assistant = lazy(() => import('./pages/Assistant'))
 const Settings = lazy(() => import('./pages/Settings'))
 const GraphTypes = lazy(() => import('./pages/GraphTypes'))
 const NodeExplorer = lazy(() => import('./pages/NodeExplorer'))
+const Unfiled = lazy(() => import('./pages/Unfiled'))
 const ShareView = lazy(() => import('./pages/ShareView'))
 const Login = lazy(() => import('./pages/Login'))
 
@@ -166,6 +167,7 @@ function Layout() {
               <Route path="settings" element={<Settings />} />
               <Route path="graph-types" element={<GraphTypes />} />
               <Route path="explorer" element={<NodeExplorer />} />
+              <Route path="unfiled" element={<Unfiled />} />
             </Routes>
           </Suspense>
         </div>

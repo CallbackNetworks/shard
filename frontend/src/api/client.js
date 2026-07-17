@@ -323,3 +323,7 @@ export const getNodeEdges = (id) => api.get(`/nodes/${id}/edges`).then(r => r.da
 export const attachNodeEdge = (id, data) => api.post(`/nodes/${id}/edges`, data).then(r => r.data)
 export const detachNodeEdge = (id, targetId, relType) =>
   api.delete(`/nodes/${id}/edges`, { params: { target_id: targetId, rel_type: relType } })
+
+// Unfiled tasks (zero project membership; ADR-0032/0033)
+export const getUnfiledTasks = () => api.get('/tasks/unfiled').then(r => r.data)
+export const fileTaskIntoProject = (taskId, projectId) => api.post(`/tasks/${taskId}/memberships/${projectId}`).then(r => r.data)
