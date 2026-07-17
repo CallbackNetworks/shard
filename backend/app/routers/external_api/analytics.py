@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, ApiKey, Cycle, Project, Task
+from app.models import ActivityLog, ApiKey, Project, Task
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -163,15 +163,8 @@ def api_analytics_velocity(
     if not pid:
         raise HTTPException(status_code=400, detail="project_id is required")
     _check_project_access(api_key, pid)
-    cycles = (
-        db.query(Cycle)
-        .filter(
-            Cycle.project_id == pid,
-            Cycle.status == "completed",
-        )
-        .order_by(Cycle.start_date)
-        .all()
-    )
+    cycles = [c for c in graph.cycles_in_project(db, pid) if c.status == "completed"]
+    cycles.sort(key=lambda c: (c.start_date is None, c.start_date))
     result = []
     for cycle in cycles:
         c_tasks = graph.tasks_in_cycle(db, cycle.id)

@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Cycle, Project, Task
+from app.models import ActivityLog, Project, Task
 from app.services import graph
 from app.services.critical_path import compute_critical_path
 from app.services.usage_tracker import tracker
@@ -77,7 +77,7 @@ def get_heatmap(
 
 @router.get("/burndown")
 def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
-    cycle = db.query(Cycle).filter(Cycle.id == cycle_id).first()
+    cycle = graph.get_cycle(db, cycle_id)
     if not cycle:
         return []
 
@@ -118,15 +118,8 @@ def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
 
 @router.get("/velocity")
 def get_velocity(project_id: str, db: Session = Depends(get_db)):
-    cycles = (
-        db.query(Cycle)
-        .filter(
-            Cycle.project_id == project_id,
-            Cycle.status == "completed",
-        )
-        .order_by(Cycle.start_date)
-        .all()
-    )
+    cycles = [c for c in graph.cycles_in_project(db, project_id) if c.status == "completed"]
+    cycles.sort(key=lambda c: (c.start_date is None, c.start_date))
 
     result = []
     for cycle in cycles:
@@ -152,7 +145,7 @@ def get_cycle_burndown(
     db: Session = Depends(get_db),
 ):
     """Burn-down chart data for a cycle: daily remaining tasks."""
-    cycle = db.query(Cycle).filter(Cycle.id == cycle_id).first()
+    cycle = graph.get_cycle(db, cycle_id)
     if not cycle:
         return []
 

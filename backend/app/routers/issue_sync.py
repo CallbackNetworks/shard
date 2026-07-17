@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Comment,
-    Cycle,
     Integration,
     Notification,
     Project,
@@ -705,16 +704,14 @@ async def sync_labels_to_external(task: Task, db: Session) -> bool:
     return await replace_gitlab_issue_labels(task.external_repo, task.external_id, names, token, base)
 
 
-def _task_primary_cycle(task: Task, db: Session) -> Cycle | None:
+def _task_primary_cycle(task: Task, db: Session) -> graph.CycleView | None:
     """The cycle whose milestone an issue should mirror.
 
     An external issue has a single milestone slot but a Shard task may sit in
     several cycles; the earliest-created cycle wins, deterministically.
     """
-    cycle_ids = graph.cycle_ids_for_task(db, task.id)
-    if not cycle_ids:
-        return None
-    return db.query(Cycle).filter(Cycle.id.in_(cycle_ids)).order_by(Cycle.created_at.asc()).first()
+    cycles = graph.cycles_for_task(db, task.id)
+    return cycles[0] if cycles else None
 
 
 async def sync_task_milestone_to_external(task: Task, db: Session) -> bool:
@@ -759,11 +756,8 @@ def apply_inbound_milestone_cycle(task: Task, milestone_title: str | None, db: S
     """
     if not milestone_title:
         return
-    cycle = (
-        db.query(Cycle)
-        .filter(Cycle.project_id == graph.project_id_of_task(db, task.id), Cycle.name == milestone_title)
-        .first()
-    )
+    project_id = graph.project_id_of_task(db, task.id)
+    cycle = graph.find_cycle_by_name(db, project_id, milestone_title) if project_id else None
     if not cycle:
         return
     if task.id not in graph.task_ids_in_cycle(db, cycle.id):

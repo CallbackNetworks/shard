@@ -5,7 +5,8 @@ exclusively owns but keeps tasks also linked into another project. These replace
 old ``project_id``/``parent_id`` FK ``ondelete CASCADE`` + ORM ``delete-orphan``.
 """
 
-from app.models import Task
+from app.models import Node, Task
+from app.services import graph
 
 
 def _project(client, name):
@@ -78,6 +79,26 @@ def test_delete_project_keeps_subtask_shared_with_another(client, db):
     # Its old parent is gone, so it surfaces as a top-level task in B.
     by_id = {x["id"]: x for x in proj_b["tasks"]}
     assert by_id[sub]["parent_id"] is None
+
+
+def test_delete_project_deletes_its_labels_and_cycles(client, db):
+    # Labels and cycles are node-only (ADR-0033 Phase B) with no ORM cascade;
+    # deleting a project must delete the label/cycle nodes it contains.
+    p = _project(client, "P")
+    label = client.post(f"/projects/{p}/labels", json={"name": "bug"}).json()["id"]
+    cycle = client.post(f"/projects/{p}/cycles", json={"name": "Sprint 1"}).json()["id"]
+
+    assert db.get(Node, label) is not None
+    assert db.get(Node, cycle) is not None
+
+    assert client.delete(f"/projects/{p}").status_code == 204
+    db.expire_all()
+
+    assert db.get(Node, label) is None
+    assert db.get(Node, cycle) is None
+    # No dangling edges reference the deleted nodes either.
+    assert graph.labels_in_project(db, p) == []
+    assert graph.cycles_in_project(db, p) == []
 
 
 def test_delete_task_keeps_subtask_shared_with_another_project(client, db):

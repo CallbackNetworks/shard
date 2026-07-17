@@ -26,8 +26,8 @@ NODE_LABEL = "label"
 # Nodes of these types are created/deleted through their own routers so the
 # table and its node mirror stay consistent; only node-only (custom) types flow
 # through the generic node API. This set shrinks as Phase B collapses entities.
-# ``label`` collapsed to node-only in ADR-0033 Phase B — no longer entity-backed.
-ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT, NODE_TASK, NODE_IDENTITY, NODE_GOAL, NODE_CYCLE})
+# ``label`` and ``cycle`` collapsed to node-only in ADR-0033 Phase B.
+ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT, NODE_TASK, NODE_IDENTITY, NODE_GOAL})
 
 # Edge relationship types (canonical direction: source -> target)
 REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id
@@ -404,9 +404,13 @@ def _label_view(node: Node, project_id: str | None) -> LabelView:
     )
 
 
-def label_project_map(db: Session, label_ids) -> dict[str, str]:
-    """Batch-resolve each label's containing project id via ``contains`` edges."""
-    ids = set(label_ids)
+def project_container_map(db: Session, node_ids) -> dict[str, str]:
+    """Batch-resolve each node's containing project id via ``contains`` edges.
+
+    Shared by the node-only project-scoped entities (label, cycle, ...) whose
+    project membership is a ``contains`` edge from a container-role node.
+    """
+    ids = set(node_ids)
     result: dict[str, str] = {}
     if not ids:
         return result
@@ -419,6 +423,11 @@ def label_project_map(db: Session, label_ids) -> dict[str, str]:
     for target_id, source_id in rows:
         result.setdefault(target_id, source_id)
     return result
+
+
+def label_project_map(db: Session, label_ids) -> dict[str, str]:
+    """Batch-resolve each label's containing project id via ``contains`` edges."""
+    return project_container_map(db, label_ids)
 
 
 def create_label(
@@ -580,6 +589,151 @@ def cycle_ids_for_task(db: Session, task_id: str) -> list[str]:
     return list(rows)
 
 
+# --- Cycles (node-only, ADR-0033 Phase B) ------------------------------------
+#
+# A cycle is a ``Node(type="cycle")``: ``title`` = name, ``status``/``start_date``
+# are real hot columns, ``end_date`` maps to the node's ``due_date`` column, and
+# ``description`` lives in ``data``. Project scope is a ``contains`` edge
+# (project -> cycle). ``CycleView`` exposes the historical ``Cycle`` attribute
+# surface so ``CycleOut.model_validate`` and existing read sites keep working.
+
+
+@dataclass
+class CycleView:
+    id: str
+    project_id: str | None
+    name: str
+    description: str | None
+    start_date: datetime | None
+    end_date: datetime | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+def _cycle_view(node: Node, project_id: str | None) -> CycleView:
+    data = node.data or {}
+    return CycleView(
+        id=node.id,
+        project_id=project_id,
+        name=node.title,
+        description=data.get("description"),
+        start_date=node.start_date,
+        end_date=node.due_date,
+        status=node.status or "draft",
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+    )
+
+
+def cycle_project_map(db: Session, cycle_ids) -> dict[str, str]:
+    """Batch-resolve each cycle's containing project id via ``contains`` edges."""
+    return project_container_map(db, cycle_ids)
+
+
+def create_cycle(
+    db: Session,
+    project_id: str,
+    *,
+    name: str,
+    description: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    status: str = "draft",
+    id: str | None = None,
+    actor: str | None = None,
+) -> CycleView:
+    """Create a cycle node contained by ``project_id`` (project -> cycle edge)."""
+    node = create_node(
+        db,
+        NODE_CYCLE,
+        id=id,
+        title=name,
+        actor=actor,
+        status=status,
+        start_date=start_date,
+        due_date=end_date,
+        description=description,
+    )
+    if project_id:
+        add_edge(db, project_id, node.id, REL_CONTAINS)
+    return _cycle_view(node, project_id)
+
+
+def update_cycle(db: Session, cycle_id: str, **fields) -> CycleView | None:
+    """Update a cycle node; ``name``->title, ``end_date``->due_date, rest to columns/data."""
+    node = db.get(Node, cycle_id)
+    if node is None or node.type != NODE_CYCLE:
+        return None
+    if "name" in fields:
+        node.title = fields.pop("name")
+    if "start_date" in fields:
+        node.start_date = fields.pop("start_date")
+    if "end_date" in fields:
+        node.due_date = fields.pop("end_date")
+    if "status" in fields:
+        node.status = fields.pop("status")
+    data = dict(node.data or {})
+    for key, value in fields.items():
+        data[key] = value
+    node.data = data or None
+    db.flush()
+    project_id = cycle_project_map(db, [cycle_id]).get(cycle_id)
+    return _cycle_view(node, project_id)
+
+
+def delete_cycle(db: Session, cycle_id: str, *, actor: str | None = None) -> bool:
+    """Delete a cycle node and every edge touching it (in_cycle + contains)."""
+    node = db.get(Node, cycle_id)
+    if node is None or node.type != NODE_CYCLE:
+        return False
+    return delete_node(db, cycle_id, actor=actor)
+
+
+def get_cycle(db: Session, cycle_id: str, *, project_id: str | None = None) -> CycleView | None:
+    node = db.get(Node, cycle_id)
+    if node is None or node.type != NODE_CYCLE:
+        return None
+    pid = cycle_project_map(db, [cycle_id]).get(cycle_id)
+    if project_id is not None and pid != project_id:
+        return None
+    return _cycle_view(node, pid)
+
+
+def cycles_in_project(db: Session, project_id: str) -> list[CycleView]:
+    """All cycle nodes contained by a project, oldest first."""
+    rows = (
+        db.execute(
+            select(Node)
+            .join(Edge, Edge.target_id == Node.id)
+            .where(Edge.source_id == project_id, Edge.rel_type == REL_CONTAINS, Node.type == NODE_CYCLE)
+            .order_by(Node.created_at.asc())
+        )
+        .scalars()
+        .all()
+    )
+    return [_cycle_view(node, project_id) for node in rows]
+
+
+def cycles_for_task(db: Session, task_id: str) -> list[CycleView]:
+    """Cycles a task belongs to via ``in_cycle`` edges, oldest first."""
+    ids = cycle_ids_for_task(db, task_id)
+    if not ids:
+        return []
+    nodes = {n.id: n for n in db.query(Node).filter(Node.id.in_(ids), Node.type == NODE_CYCLE).all()}
+    pmap = cycle_project_map(db, ids)
+    views = [_cycle_view(nodes[i], pmap.get(i)) for i in ids if i in nodes]
+    views.sort(key=lambda c: c.created_at)
+    return views
+
+
+def find_cycle_by_name(db: Session, project_id: str, name: str) -> CycleView | None:
+    for view in cycles_in_project(db, project_id):
+        if view.name == name:
+            return view
+    return None
+
+
 def member_project_ids(db: Session, task_id: str) -> list[str]:
     """Ids of every project a task belongs to via incoming ``contains`` edges."""
     containers = container_type_keys(db)
@@ -736,6 +890,10 @@ def delete_project_and_tasks(db: Session, project) -> None:
             remove_edge(db, project.id, tid, REL_CONTAINS)
         else:
             delete_task_tree(db, tid)
+    # Node-only project-scoped entities (labels, cycles: ADR-0033 Phase B) have no
+    # ORM cascade; delete the nodes this project contains so they don't orphan.
+    for entity in labels_in_project(db, project.id) + cycles_in_project(db, project.id):
+        delete_node(db, entity.id)
     db.delete(project)
 
 

@@ -32,9 +32,9 @@ class Project(Base):
     # Task containment lives in graph ``contains`` edges now (ADR-0032); there is no
     # ``Project.tasks`` relationship. Deletion of contained tasks is handled by
     # ``graph.delete_project_and_tasks``.
-    # Labels are node-only (ADR-0033 Phase B): a label is a ``Node(type="label")``
-    # scoped to this project by a ``contains`` edge; use ``graph.labels_in_project``.
-    cycles: Mapped[list["Cycle"]] = relationship("Cycle", back_populates="project", cascade="all, delete-orphan")
+    # Labels and cycles are node-only (ADR-0033 Phase B): each is a ``Node`` scoped
+    # to this project by a ``contains`` edge; use ``graph.labels_in_project`` /
+    # ``graph.cycles_in_project``.
 
 
 class Task(Base):
@@ -121,22 +121,11 @@ class TaskPullRequest(Base):
 # ``labels`` table was dropped; see ``services/graph.py`` label helpers.
 
 
-class Cycle(Base):
-    __tablename__ = "cycles"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    status: Mapped[str] = mapped_column(SAEnum("draft", "active", "completed", name="cycle_status"), default="draft")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    project: Mapped["Project"] = relationship("Project", back_populates="cycles")
+# ``Cycle`` was collapsed to a node-only entity in ADR-0033 Phase B: a cycle is a
+# ``Node(type="cycle")`` (name in ``title``; status/start_date real columns;
+# end_date -> node ``due_date``; description in ``data``) scoped to its project by
+# a ``contains`` edge. The dedicated ``cycles`` table was dropped; see the cycle
+# helpers in ``services/graph.py``.
 
 
 class Integration(Base):

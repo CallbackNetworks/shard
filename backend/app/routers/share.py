@@ -93,16 +93,10 @@ def _load_identity(db: Session, token: str) -> Identity | None:
     return db.query(Identity).filter(Identity.share_token == token).first()
 
 
-def _project_eager_options():
-    # Tasks are loaded from graph contains edges in _serialize_project.
-    # Labels are node-only (ADR-0033) and loaded via graph.labels_in_project.
-    return [
-        selectinload(Project.cycles),
-    ]
-
-
 def _load_project(db: Session, token: str) -> Project | None:
-    return db.query(Project).filter(Project.share_token == token).options(*_project_eager_options()).first()
+    # Tasks/labels/cycles are all node-only graph reads in _serialize_project
+    # (ADR-0033); no ORM relationships to eager-load here.
+    return db.query(Project).filter(Project.share_token == token).first()
 
 
 def _serialize_comment(c: Comment):
@@ -130,7 +124,7 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
             project_labels.append({"name": lbl.name, "color": lbl.color})
 
     active_cycle = None
-    for c in p.cycles:
+    for c in graph.cycles_in_project(db, p.id):
         if c.status == "active":
             c_tasks = graph.tasks_in_cycle(db, c.id)
             ct_total = len(c_tasks)

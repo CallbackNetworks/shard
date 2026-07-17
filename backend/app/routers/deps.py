@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Comment,
-    Cycle,
     Goal,
     Identity,
     Integration,
@@ -50,11 +49,8 @@ def get_label_or_404(label_id: str, db: Session, *, project_id: str | None = Non
     return label
 
 
-def get_cycle_or_404(cycle_id: str, db: Session, *, project_id: str | None = None) -> Cycle:
-    query = db.query(Cycle).filter(Cycle.id == cycle_id)
-    if project_id:
-        query = query.filter(Cycle.project_id == project_id)
-    cycle = query.first()
+def get_cycle_or_404(cycle_id: str, db: Session, *, project_id: str | None = None) -> graph.CycleView:
+    cycle = graph.get_cycle(db, cycle_id, project_id=project_id)
     if not cycle:
         raise HTTPException(status_code=404, detail="Cycle not found")
     return cycle

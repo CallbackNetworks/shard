@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog, Project
@@ -17,11 +17,9 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 def _project_eager_options():
     # Tasks are loaded from graph contains edges inside enrich_project (with their
-    # own eager options), so only the project's own relationships are pre-loaded here.
-    # Labels are node-only (ADR-0033) and loaded via graph.labels_in_project.
-    return [
-        selectinload(Project.cycles),
-    ]
+    # own eager options). Labels and cycles are node-only (ADR-0033), loaded via
+    # graph.labels_in_project / graph.cycles_in_project — nothing to pre-load here.
+    return []
 
 
 @router.get("", response_model=list[ProjectOut])

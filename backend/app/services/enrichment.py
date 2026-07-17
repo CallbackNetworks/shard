@@ -171,7 +171,8 @@ def enrich_project(project, db=None) -> ProjectOut:
     out.labels = [LabelOut.model_validate(lb) for lb in project_labels]
 
     enriched_cycles = []
-    for cycle in project.cycles:
+    project_cycles = graph.cycles_in_project(db, project.id) if db is not None else []
+    for cycle in project_cycles:
         tasks = graph.tasks_in_cycle(db, cycle.id) if db is not None else []
         task_ids = [t.id for t in tasks]
         c_total = len(tasks)

@@ -745,11 +745,10 @@ class TestMilestoneCycle:
     async def test_outbound_add_to_cycle_sets_milestone(self, mock_find, mock_set, client, db, sample_project):
         from datetime import UTC, datetime
 
-        from app.models import Cycle
+        from app.services import graph
 
         self._integration(db, sample_project.id)
-        cycle = Cycle(project_id=sample_project.id, name="Sprint 12", end_date=datetime(2026, 8, 1, tzinfo=UTC))
-        db.add(cycle)
+        cycle = graph.create_cycle(db, sample_project.id, name="Sprint 12", end_date=datetime(2026, 8, 1, tzinfo=UTC))
         task = Task(
             project_id=sample_project.id,
             title="t",
@@ -772,12 +771,10 @@ class TestMilestoneCycle:
     @pytest.mark.asyncio
     @patch("app.routers.issue_sync.set_github_issue_milestone", new_callable=AsyncMock, return_value=True)
     async def test_outbound_remove_from_cycle_clears_milestone(self, mock_set, client, db, sample_project):
-        from app.models import Cycle
         from app.services import graph
 
         self._integration(db, sample_project.id)
-        cycle = Cycle(project_id=sample_project.id, name="Sprint 12")
-        db.add(cycle)
+        cycle = graph.create_cycle(db, sample_project.id, name="Sprint 12")
         task = Task(
             project_id=sample_project.id,
             title="t",
@@ -797,11 +794,9 @@ class TestMilestoneCycle:
         mock_set.assert_called_once_with("o/r", "10", None, "ghp", "https://api.github.com")
 
     def test_inbound_milestone_maps_to_existing_cycle(self, client, db, sample_project):
-        from app.models import Cycle
         from app.services import graph
 
-        cycle = Cycle(project_id=sample_project.id, name="Sprint 9")
-        db.add(cycle)
+        cycle = graph.create_cycle(db, sample_project.id, name="Sprint 9")
         db.commit()
         body = {
             "action": "opened",

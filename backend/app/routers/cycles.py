@@ -1,10 +1,10 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session, object_session
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Cycle, Task
+from app.models import Task
 from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import sync_task_milestone_to_external
@@ -14,8 +14,8 @@ from app.services import graph
 router = APIRouter(prefix="/projects/{project_id}/cycles", tags=["cycles"])
 
 
-def _enrich_cycle(cycle: Cycle) -> CycleOut:
-    tasks = graph.tasks_in_cycle(object_session(cycle), cycle.id)
+def _enrich_cycle(cycle: graph.CycleView, db: Session) -> CycleOut:
+    tasks = graph.tasks_in_cycle(db, cycle.id)
     task_ids = [t.id for t in tasks]
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
@@ -29,43 +29,38 @@ def _enrich_cycle(cycle: Cycle) -> CycleOut:
 @router.get("", response_model=list[CycleOut])
 def list_cycles(project_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycles = db.query(Cycle).filter(Cycle.project_id == project_id).order_by(Cycle.created_at.asc()).all()
-    return [_enrich_cycle(c) for c in cycles]
+    return [_enrich_cycle(c, db) for c in graph.cycles_in_project(db, project_id)]
 
 
 @router.post("", response_model=CycleOut, status_code=status.HTTP_201_CREATED)
 def create_cycle(project_id: str, body: CycleCreate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycle = Cycle(project_id=project_id, **body.model_dump())
-    db.add(cycle)
+    cycle = graph.create_cycle(db, project_id, **body.model_dump())
     db.commit()
-    db.refresh(cycle)
-    return _enrich_cycle(cycle)
+    return _enrich_cycle(cycle, db)
 
 
 @router.get("/{cycle_id}", response_model=CycleOut)
 def get_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
     cycle = get_cycle_or_404(cycle_id, db, project_id=project_id)
-    return _enrich_cycle(cycle)
+    return _enrich_cycle(cycle, db)
 
 
 @router.patch("/{cycle_id}", response_model=CycleOut)
 def update_cycle(project_id: str, cycle_id: str, body: CycleUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycle = get_cycle_or_404(cycle_id, db, project_id=project_id)
-    for field, value in body.model_dump(exclude_none=True).items():
-        setattr(cycle, field, value)
+    get_cycle_or_404(cycle_id, db, project_id=project_id)
+    cycle = graph.update_cycle(db, cycle_id, **body.model_dump(exclude_none=True))
     db.commit()
-    db.refresh(cycle)
-    return _enrich_cycle(cycle)
+    return _enrich_cycle(cycle, db)
 
 
 @router.delete("/{cycle_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    cycle = get_cycle_or_404(cycle_id, db, project_id=project_id)
-    db.delete(cycle)
+    get_cycle_or_404(cycle_id, db, project_id=project_id)
+    graph.delete_cycle(db, cycle_id)
     db.commit()
 
 
@@ -99,15 +94,14 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
     _get_project_or_404(project_id, db)
     source = get_cycle_or_404(cycle_id, db, project_id=project_id)
 
-    new_cycle = Cycle(
+    new_cycle = graph.create_cycle(
+        db,
+        project_id,
         id=str(uuid.uuid4()),
-        project_id=project_id,
         name=f"{source.name} (copy)",
         description=source.description,
         status="draft",
     )
-    db.add(new_cycle)
-    db.flush()
 
     # Clone tasks as new todo tasks and link to new cycle
     for src_task in graph.tasks_in_cycle(db, source.id):
@@ -126,8 +120,7 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
         graph.add_to_cycle(db, new_cycle.id, new_task.id)
 
     db.commit()
-    db.refresh(new_cycle)
-    return _enrich_cycle(new_cycle)
+    return _enrich_cycle(new_cycle, db)
 
 
 @router.get("/{cycle_id}/compare")
@@ -141,7 +134,7 @@ def compare_cycles(
     _get_project_or_404(project_id, db)
 
     def _stats(cid):
-        cycle = db.query(Cycle).filter(Cycle.id == cid, Cycle.project_id == project_id).first()
+        cycle = graph.get_cycle(db, cid, project_id=project_id)
         if not cycle:
             return None
         tasks = graph.tasks_in_cycle(db, cycle.id)
