@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, GraphEvent, Identity, Label, Node, Project, Task
+from app.models import Edge, GraphEvent, Identity, Label, Node, NodeType, Project, Task
 
 # Node types
 NODE_PROJECT = "project"
@@ -34,6 +34,26 @@ REL_DEPENDS_ON = "depends_on"  # blocked task -> prerequisite task
 REL_LABELED = "labeled"  # task -> label
 REL_IN_CYCLE = "in_cycle"  # task -> cycle
 REL_PART_OF = "part_of"  # project -> goal
+
+
+# --- Traversal roles (registry-driven; ADR-0033 A5) --------------------------
+
+
+def container_type_keys(db: Session) -> set[str]:
+    """Node-type keys that play the container role (seeded: ``project``).
+
+    Data-driven replacement for the hardcoded ``n.type == NODE_PROJECT`` checks;
+    a task's "projects" are its container-role ``contains`` parents.
+    """
+    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_container.is_(True)).all()}
+
+
+def task_type_keys(db: Session) -> set[str]:
+    """Node-type keys that play the task/item role (seeded: ``task``).
+
+    Data-driven replacement for the hardcoded ``n.type == NODE_TASK`` checks.
+    """
+    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_task_like.is_(True)).all()}
 
 
 # --- Provenance (audit trail) ------------------------------------------------
@@ -395,7 +415,8 @@ def cycle_ids_for_task(db: Session, task_id: str) -> list[str]:
 
 def member_project_ids(db: Session, task_id: str) -> list[str]:
     """Ids of every project a task belongs to via incoming ``contains`` edges."""
-    return [n.id for n in parents_of(db, task_id) if n.type == NODE_PROJECT]
+    containers = container_type_keys(db)
+    return [n.id for n in parents_of(db, task_id) if n.type in containers]
 
 
 # --- Identity ↔ Project membership (member_of edges) ---
@@ -467,7 +488,8 @@ def projects_for_goal(db: Session, goal_id: str) -> list[Project]:
 
 def contained_task_ids(db: Session, project_id: str) -> list[str]:
     """Ids of tasks contained by a project via outgoing ``contains`` edges."""
-    return [n.id for n in children_of(db, project_id) if n.type == NODE_TASK]
+    tasks = task_type_keys(db)
+    return [n.id for n in children_of(db, project_id) if n.type in tasks]
 
 
 def create_task(db: Session, **fields) -> "Task":
@@ -569,7 +591,8 @@ def parent_task_map(db: Session, task_ids) -> dict[str, str]:
     rows = db.execute(
         select(Edge.target_id, Edge.source_id)
         .join(Node, Node.id == Edge.source_id)
-        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_TASK, Edge.target_id.in_(ids))
+        .join(NodeType, NodeType.key == Node.type)
+        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_task_like.is_(True), Edge.target_id.in_(ids))
         .order_by(Edge.position, Edge.created_at)
     ).all()
     for target_id, source_id in rows:
@@ -591,7 +614,8 @@ def project_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
     rows = db.execute(
         select(Edge.target_id, Edge.source_id)
         .join(Node, Node.id == Edge.source_id)
-        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_PROJECT, Edge.target_id.in_(ids))
+        .join(NodeType, NodeType.key == Node.type)
+        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_container.is_(True), Edge.target_id.in_(ids))
         .order_by(Edge.position, Edge.created_at)
     ).all()
     for target_id, source_id in rows:
@@ -655,7 +679,8 @@ def subtask_ids_among(db: Session, task_ids) -> set[str]:
     rows = db.execute(
         select(Edge.target_id)
         .join(Node, Node.id == Edge.source_id)
-        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_TASK, Edge.target_id.in_(ids))
+        .join(NodeType, NodeType.key == Node.type)
+        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_task_like.is_(True), Edge.target_id.in_(ids))
     ).scalars()
     return set(rows)
 
@@ -669,7 +694,8 @@ def top_level_task_filter():
     subquery = (
         select(Edge.target_id)
         .join(Node, Node.id == Edge.source_id)
-        .where(Edge.rel_type == REL_CONTAINS, Node.type == NODE_TASK)
+        .join(NodeType, NodeType.key == Node.type)
+        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_task_like.is_(True))
     )
     return Task.id.notin_(subquery)
 

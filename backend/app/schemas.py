@@ -984,6 +984,8 @@ class NodeTypeOut(BaseModel):
     icon: str | None = None
     color: str | None = None
     is_builtin: bool
+    is_container: bool = False
+    is_task_like: bool = False
     data: dict | None = None
 
 

@@ -510,6 +510,13 @@ class NodeType(Base):
     icon: Mapped[str | None] = mapped_column(String(40), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Traversal roles (ADR-0033 A5): data-drives the leaf helpers in graph.py that
+    # previously hardcoded ``n.type == NODE_TASK/PROJECT``. ``is_container`` = plays
+    # the project role (its ``contains`` children that are task-like are "its tasks");
+    # ``is_task_like`` = plays the task/subtask role. Seeded: project=container,
+    # task=task_like. See ADR-0033.
+    is_container: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_task_like: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # e.g. default hot-field hints
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
