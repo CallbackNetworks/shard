@@ -34,6 +34,7 @@ from app.routers import (
     integrations,
     issue_sync,
     labels,
+    nodes,
     notifications,
     projects,
     recurring,
@@ -230,6 +231,7 @@ app.include_router(notifications.router)
 app.include_router(cicd.router)
 app.include_router(goals.router)
 app.include_router(graph_types.router)
+app.include_router(nodes.router)
 app.include_router(bulk.router)
 app.include_router(imports.router)
 app.include_router(settings.router)

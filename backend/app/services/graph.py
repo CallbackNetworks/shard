@@ -20,6 +20,12 @@ NODE_GOAL = "goal"
 NODE_CYCLE = "cycle"
 NODE_LABEL = "label"
 
+# Built-in types that still have a dedicated backing entity table (ADR-0033).
+# Nodes of these types are created/deleted through their own routers so the
+# table and its node mirror stay consistent; only node-only (custom) types flow
+# through the generic node API. This set shrinks as Phase B collapses entities.
+ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT, NODE_TASK, NODE_IDENTITY, NODE_GOAL, NODE_CYCLE, NODE_LABEL})
+
 # Edge relationship types (canonical direction: source -> target)
 REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id
 REL_MEMBER_OF = "member_of"  # identity -> project

@@ -1016,3 +1016,65 @@ class EdgeTypeOut(BaseModel):
     is_containment: bool
     is_symmetric: bool
     data: dict | None = None
+
+
+# --- Generic graph nodes / edges (ADR-0033) ---
+
+
+class NodeCreate(BaseModel):
+    type: str
+    title: str = ""
+    status: str | None = None
+    priority: str | None = None
+    start_date: datetime | None = None
+    due_date: datetime | None = None
+    position: int = 0
+    is_pinned: bool = False
+    data: dict | None = None
+
+
+class NodeUpdate(BaseModel):
+    title: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    start_date: datetime | None = None
+    due_date: datetime | None = None
+    position: int | None = None
+    is_pinned: bool | None = None
+    data: dict | None = None
+
+
+class NodeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    type: str
+    title: str
+    status: str | None = None
+    priority: str | None = None
+    start_date: datetime | None = None
+    due_date: datetime | None = None
+    position: int = 0
+    is_pinned: bool = False
+    data: dict | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class EdgeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source_id: str
+    target_id: str
+    rel_type: str
+    position: int = 0
+    data: dict | None = None
+    created_at: datetime
+
+
+class EdgeCreate(BaseModel):
+    target_id: str
+    rel_type: str
+    position: int = 0
+    data: dict | None = None

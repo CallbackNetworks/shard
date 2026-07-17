@@ -1,0 +1,120 @@
+"""Tests for the generic node/edge API (ADR-0033 Phase A)."""
+
+import pytest
+
+from app.services import graph
+
+
+@pytest.fixture()
+def topic_type(client):
+    client.post("/graph-types/nodes", json={"key": "topic", "label": "Topic"})
+    return "topic"
+
+
+def test_create_custom_node(client, topic_type):
+    r = client.post("/nodes", json={"type": "topic", "title": "Roadmap", "data": {"owner": "me"}})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["type"] == "topic"
+    assert body["title"] == "Roadmap"
+    assert body["data"] == {"owner": "me"}
+    assert body["id"]
+
+
+def test_create_node_unknown_type(client):
+    r = client.post("/nodes", json={"type": "nope", "title": "x"})
+    assert r.status_code == 422
+
+
+def test_create_node_rejects_entity_backed_type(client):
+    r = client.post("/nodes", json={"type": graph.NODE_TASK, "title": "x"})
+    assert r.status_code == 400
+
+
+def test_get_and_list_nodes(client, topic_type):
+    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
+    client.post("/nodes", json={"type": "topic", "title": "B"})
+
+    got = client.get(f"/nodes/{a['id']}")
+    assert got.status_code == 200
+    assert got.json()["title"] == "A"
+
+    listed = client.get("/nodes", params={"type": "topic"})
+    assert {n["title"] for n in listed.json()} == {"A", "B"}
+
+
+def test_update_node(client, topic_type):
+    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
+    r = client.patch(f"/nodes/{a['id']}", json={"title": "A2", "data": {"k": 1}})
+    assert r.status_code == 200
+    assert r.json()["title"] == "A2"
+    assert r.json()["data"] == {"k": 1}
+
+
+def test_update_rejects_entity_backed(client, sample_project):
+    r = client.patch(f"/nodes/{sample_project.id}", json={"title": "x"})
+    assert r.status_code == 400
+
+
+def test_delete_node_clears_edges(client, topic_type, db):
+    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
+    b = client.post("/nodes", json={"type": "topic", "title": "B"}).json()
+    client.post(f"/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "contains"})
+
+    assert client.delete(f"/nodes/{a['id']}").status_code == 204
+    # No dangling edge left touching the deleted node.
+    from app.models import Edge
+
+    assert db.query(Edge).filter((Edge.source_id == a["id"]) | (Edge.target_id == a["id"])).count() == 0
+
+
+def test_delete_rejects_entity_backed(client, sample_project):
+    r = client.delete(f"/nodes/{sample_project.id}")
+    assert r.status_code == 400
+
+
+def test_attach_and_list_edges(client, topic_type):
+    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
+    b = client.post("/nodes", json={"type": "topic", "title": "B"}).json()
+    r = client.post(f"/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "contains"})
+    assert r.status_code == 201
+    assert r.json()["rel_type"] == "contains"
+
+    edges = client.get(f"/nodes/{a['id']}/edges").json()
+    assert len(edges) == 1
+    assert edges[0]["target_id"] == b["id"]
+
+
+def test_attach_custom_node_contains_project(client, topic_type, sample_project):
+    """Free-form containment: a custom topic node may contain a built-in project."""
+    topic = client.post("/nodes", json={"type": "topic", "title": "Q3"}).json()
+    r = client.post(
+        f"/nodes/{topic['id']}/edges",
+        json={"target_id": sample_project.id, "rel_type": "contains"},
+    )
+    assert r.status_code == 201
+
+
+def test_attach_edge_unknown_rel_type(client, topic_type):
+    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
+    b = client.post("/nodes", json={"type": "topic", "title": "B"}).json()
+    r = client.post(f"/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "bogus"})
+    assert r.status_code == 422
+
+
+def test_attach_contains_cycle_rejected(client, topic_type):
+    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
+    b = client.post("/nodes", json={"type": "topic", "title": "B"}).json()
+    client.post(f"/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "contains"})
+    # b contains a would close a loop.
+    r = client.post(f"/nodes/{b['id']}/edges", json={"target_id": a["id"], "rel_type": "contains"})
+    assert r.status_code == 400
+
+
+def test_detach_edge(client, topic_type):
+    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
+    b = client.post("/nodes", json={"type": "topic", "title": "B"}).json()
+    client.post(f"/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "contains"})
+    r = client.delete(f"/nodes/{a['id']}/edges", params={"target_id": b["id"], "rel_type": "contains"})
+    assert r.status_code == 204
+    assert client.get(f"/nodes/{a['id']}/edges").json() == []

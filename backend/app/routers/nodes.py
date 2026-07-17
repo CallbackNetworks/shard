@@ -1,0 +1,133 @@
+"""Generic graph node/edge API for user-defined layers (ADR-0033 Phase A).
+
+Create, read, update, and delete nodes of any *node-only* type (a user-defined
+type with no backing entity table), and attach/detach edges between any two
+nodes. Built-in entity-backed types (task/project/identity/goal/cycle/label)
+must still be mutated through their dedicated routers so their table and node
+mirror stay consistent — this API rejects writes to them (reads are allowed).
+Free-form containment is the point: a custom node may contain a project/task via
+a ``contains`` edge; only ``detect_cycle`` guards the structure.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import Edge, EdgeType, Node, NodeType
+from app.schemas import EdgeCreate, EdgeOut, NodeCreate, NodeOut, NodeUpdate
+from app.services import graph
+
+router = APIRouter(prefix="/nodes", tags=["nodes"])
+
+
+def _reject_entity_backed(node_type: str) -> None:
+    if node_type in graph.ENTITY_BACKED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{node_type}' is an entity-backed type; use its dedicated endpoint",
+        )
+
+
+@router.get("", response_model=list[NodeOut])
+def list_nodes(
+    type: str | None = Query(default=None),
+    limit: int = Query(default=100, le=500),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Node)
+    if type is not None:
+        q = q.filter(Node.type == type)
+    return q.order_by(Node.position, Node.created_at).limit(limit).all()
+
+
+@router.post("", response_model=NodeOut, status_code=status.HTTP_201_CREATED)
+def create_node(body: NodeCreate, db: Session = Depends(get_db)):
+    if db.get(NodeType, body.type) is None:
+        raise HTTPException(status_code=422, detail=f"unknown node type '{body.type}'")
+    _reject_entity_backed(body.type)
+    fields = body.model_dump(exclude={"type", "title", "data"}, exclude_none=True)
+    if body.data:
+        fields.update(body.data)
+    node = graph.create_node(db, body.type, title=body.title, **fields)
+    db.commit()
+    db.refresh(node)
+    return node
+
+
+@router.get("/{node_id}", response_model=NodeOut)
+def get_node(node_id: str, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    return node
+
+
+@router.patch("/{node_id}", response_model=NodeOut)
+def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    _reject_entity_backed(node.type)
+    fields = body.model_dump(exclude_unset=True)
+    data = fields.pop("data", None)
+    if data is not None:
+        fields.update(data)
+    graph.update_node(db, node_id, **fields)
+    db.commit()
+    db.refresh(node)
+    return node
+
+
+@router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_node(node_id: str, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    _reject_entity_backed(node.type)
+    graph.delete_node(db, node_id)
+    db.commit()
+
+
+# --- Edges -------------------------------------------------------------------
+
+
+@router.get("/{node_id}/edges", response_model=list[EdgeOut])
+def list_node_edges(node_id: str, db: Session = Depends(get_db)):
+    if db.get(Node, node_id) is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    return (
+        db.query(Edge)
+        .filter((Edge.source_id == node_id) | (Edge.target_id == node_id))
+        .order_by(Edge.rel_type, Edge.position, Edge.created_at)
+        .all()
+    )
+
+
+@router.post("/{node_id}/edges", response_model=EdgeOut, status_code=status.HTTP_201_CREATED)
+def attach_edge(node_id: str, body: EdgeCreate, db: Session = Depends(get_db)):
+    if db.get(Node, node_id) is None:
+        raise HTTPException(status_code=404, detail="source node not found")
+    if db.get(Node, body.target_id) is None:
+        raise HTTPException(status_code=404, detail="target node not found")
+    if db.get(EdgeType, body.rel_type) is None:
+        raise HTTPException(status_code=422, detail=f"unknown edge type '{body.rel_type}'")
+    try:
+        edge = graph.add_edge(db, node_id, body.target_id, body.rel_type, position=body.position, data=body.data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(edge)
+    return edge
+
+
+@router.delete("/{node_id}/edges", status_code=status.HTTP_204_NO_CONTENT)
+def detach_edge(
+    node_id: str,
+    target_id: str = Query(...),
+    rel_type: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    removed = graph.remove_edge(db, node_id, target_id, rel_type)
+    if not removed:
+        raise HTTPException(status_code=404, detail="edge not found")
+    db.commit()
