@@ -303,3 +303,13 @@ export const setShareExpiry = (identityId, expiresAt) => api.post(`/identities/$
 export const getShareViewCount = (identityId) => api.get(`/identities/${identityId}/share-views`).then(r => r.data)
 export const setProjectShareExpiry = (projectId, expiresAt) => api.post(`/projects/${projectId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
 export const getProjectShareViewCount = (projectId) => api.get(`/projects/${projectId}/share-views`).then(r => r.data)
+
+// Graph type registries (ADR-0033)
+export const getNodeTypes = () => api.get('/graph-types/nodes').then(r => r.data)
+export const createNodeType = (data) => api.post('/graph-types/nodes', data).then(r => r.data)
+export const updateNodeType = (key, data) => api.patch(`/graph-types/nodes/${key}`, data).then(r => r.data)
+export const deleteNodeType = (key) => api.delete(`/graph-types/nodes/${key}`)
+export const getEdgeTypes = () => api.get('/graph-types/edges').then(r => r.data)
+export const createEdgeType = (data) => api.post('/graph-types/edges', data).then(r => r.data)
+export const updateEdgeType = (key, data) => api.patch(`/graph-types/edges/${key}`, data).then(r => r.data)
+export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)
