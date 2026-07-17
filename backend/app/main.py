@@ -81,6 +81,16 @@ async def lifespan(app: FastAPI):
             _stamp_alembic_head()
         except Exception as exc:
             logger.warning("Could not stamp alembic head on fresh database: %s", exc)
+    # Seed built-in node/edge type vocabulary (idempotent; ADR-0033).
+    from app.database import SessionLocal
+    from app.services.graph_registry import seed_builtin_types
+
+    with SessionLocal() as _seed_db:
+        try:
+            seed_builtin_types(_seed_db)
+        except Exception as exc:
+            logger.warning("Could not seed built-in graph types: %s", exc)
+
     search_backend = get_search_backend()
     search_backend.ensure_index(engine)
     app.state.search_backend = search_backend

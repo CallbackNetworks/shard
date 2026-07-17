@@ -495,6 +495,48 @@ class Edge(Base):
     target: Mapped["Node"] = relationship("Node", foreign_keys=[target_id])
 
 
+class NodeType(Base):
+    """Registry of node-type vocabulary, data-driven rather than hardcoded (see ADR-0033).
+
+    Built-in types (task/project/identity/goal/cycle/label) are seeded with
+    ``is_builtin=True``; users may define their own types (stored node-only,
+    pure ``Node`` + ``data``). ``key`` is the string written into ``nodes.type``.
+    """
+
+    __tablename__ = "node_types"
+
+    key: Mapped[str] = mapped_column(String(30), primary_key=True)
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    icon: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # e.g. default hot-field hints
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+
+class EdgeType(Base):
+    """Registry of relationship (edge) vocabulary, data-driven (see ADR-0033).
+
+    Built-in relations (contains/member_of/assigned_to/depends_on/labeled/
+    in_cycle/part_of) are seeded with ``is_builtin=True``; users may invent their
+    own (e.g. ``blocks``, ``relates_to``). ``is_containment`` marks the relations
+    that participate in ``contains``-style traversal; ``is_symmetric`` marks
+    undirected relations. ``key`` is the string written into ``edges.rel_type``.
+    """
+
+    __tablename__ = "edge_types"
+
+    key: Mapped[str] = mapped_column(String(30), primary_key=True)
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_containment: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_symmetric: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+
 class WorkflowRule(Base):
     """User-defined if-this-then-that automation rule."""
 
