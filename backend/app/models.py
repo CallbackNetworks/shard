@@ -537,6 +537,30 @@ class EdgeType(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
 
+class GraphEvent(Base):
+    """Append-only audit trail of graph mutations (see ADR-0033, provenance).
+
+    Records who added/removed a node or edge and when. This is the deliberate
+    audit-trail form of provenance (not bitemporal edges): live edges stay
+    hard-deletable, while the event log allows reconstructing past state by
+    replay if ever needed. Never updated in place; only inserted and read.
+    """
+
+    __tablename__ = "graph_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    event: Mapped[str] = mapped_column(
+        String(30), nullable=False, index=True
+    )  # node_created/deleted, edge_added/removed
+    node_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    source_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    target_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    rel_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    actor: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
+
+
 class WorkflowRule(Base):
     """User-defined if-this-then-that automation rule."""
 

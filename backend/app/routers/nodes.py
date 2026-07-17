@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Edge, EdgeType, Node, NodeType
-from app.schemas import EdgeCreate, EdgeOut, NodeCreate, NodeOut, NodeUpdate
+from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
+from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate
 from app.services import graph
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
@@ -118,6 +118,18 @@ def attach_edge(node_id: str, body: EdgeCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(edge)
     return edge
+
+
+@router.get("/{node_id}/events", response_model=list[GraphEventOut])
+def list_node_events(node_id: str, limit: int = Query(default=100, le=500), db: Session = Depends(get_db)):
+    """Provenance (audit trail) for a node: every event touching it, newest first."""
+    return (
+        db.query(GraphEvent)
+        .filter((GraphEvent.node_id == node_id) | (GraphEvent.source_id == node_id) | (GraphEvent.target_id == node_id))
+        .order_by(GraphEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 @router.delete("/{node_id}/edges", status_code=status.HTTP_204_NO_CONTENT)

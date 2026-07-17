@@ -1078,3 +1078,17 @@ class EdgeCreate(BaseModel):
     rel_type: str
     position: int = 0
     data: dict | None = None
+
+
+class GraphEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    event: str
+    node_id: str | None = None
+    source_id: str | None = None
+    target_id: str | None = None
+    rel_type: str | None = None
+    actor: str | None = None
+    data: dict | None = None
+    created_at: datetime

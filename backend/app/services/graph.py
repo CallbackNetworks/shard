@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, Identity, Label, Node, Project, Task
+from app.models import Edge, GraphEvent, Identity, Label, Node, Project, Task
 
 # Node types
 NODE_PROJECT = "project"
@@ -36,10 +36,40 @@ REL_IN_CYCLE = "in_cycle"  # task -> cycle
 REL_PART_OF = "part_of"  # project -> goal
 
 
+# --- Provenance (audit trail) ------------------------------------------------
+
+
+def _log_event(
+    db: Session,
+    event: str,
+    *,
+    node_id: str | None = None,
+    source_id: str | None = None,
+    target_id: str | None = None,
+    rel_type: str | None = None,
+    actor: str | None = None,
+    data: dict | None = None,
+) -> None:
+    """Append a provenance event (ADR-0033). Append-only; never updated."""
+    db.add(
+        GraphEvent(
+            event=event,
+            node_id=node_id,
+            source_id=source_id,
+            target_id=target_id,
+            rel_type=rel_type,
+            actor=actor,
+            data=data,
+        )
+    )
+
+
 # --- Node CRUD ---------------------------------------------------------------
 
 
-def create_node(db: Session, node_type: str, *, id: str | None = None, title: str = "", **fields) -> Node:
+def create_node(
+    db: Session, node_type: str, *, id: str | None = None, title: str = "", actor: str | None = None, **fields
+) -> Node:
     """Create a node. Unknown keyword fields are folded into ``data``."""
     columns = {"status", "priority", "start_date", "due_date", "position", "is_pinned"}
     col_values = {k: fields.pop(k) for k in list(fields) if k in columns}
@@ -48,6 +78,7 @@ def create_node(db: Session, node_type: str, *, id: str | None = None, title: st
         node.id = id
     db.add(node)
     db.flush()
+    _log_event(db, "node_created", node_id=node.id, actor=actor, data={"type": node_type})
     return node
 
 
@@ -84,14 +115,16 @@ def update_node(db: Session, node_id: str, **fields) -> Node | None:
     return node
 
 
-def delete_node(db: Session, node_id: str) -> bool:
+def delete_node(db: Session, node_id: str, *, actor: str | None = None) -> bool:
     """Delete a node and every edge touching it."""
     node = db.get(Node, node_id)
     if node is None:
         return False
+    node_type = node.type
     db.query(Edge).filter((Edge.source_id == node_id) | (Edge.target_id == node_id)).delete(synchronize_session=False)
     db.delete(node)
     db.flush()
+    _log_event(db, "node_deleted", node_id=node_id, actor=actor, data={"type": node_type})
     return True
 
 
@@ -99,7 +132,14 @@ def delete_node(db: Session, node_id: str) -> bool:
 
 
 def add_edge(
-    db: Session, source_id: str, target_id: str, rel_type: str, *, position: int = 0, data: dict | None = None
+    db: Session,
+    source_id: str,
+    target_id: str,
+    rel_type: str,
+    *,
+    position: int = 0,
+    data: dict | None = None,
+    actor: str | None = None,
 ) -> Edge:
     """Create an edge if it does not already exist; otherwise return the existing one.
 
@@ -115,6 +155,7 @@ def add_edge(
     edge = Edge(source_id=source_id, target_id=target_id, rel_type=rel_type, position=position, data=data)
     db.add(edge)
     db.flush()
+    _log_event(db, "edge_added", source_id=source_id, target_id=target_id, rel_type=rel_type, actor=actor)
     return edge
 
 
@@ -134,13 +175,15 @@ def remove_edges(db: Session, *, source_id: str | None = None, target_id: str | 
     return deleted
 
 
-def remove_edge(db: Session, source_id: str, target_id: str, rel_type: str) -> bool:
+def remove_edge(db: Session, source_id: str, target_id: str, rel_type: str, *, actor: str | None = None) -> bool:
     deleted = (
         db.query(Edge)
         .filter(Edge.source_id == source_id, Edge.target_id == target_id, Edge.rel_type == rel_type)
         .delete(synchronize_session=False)
     )
     db.flush()
+    if deleted:
+        _log_event(db, "edge_removed", source_id=source_id, target_id=target_id, rel_type=rel_type, actor=actor)
     return bool(deleted)
 
 

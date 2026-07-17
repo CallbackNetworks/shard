@@ -162,8 +162,14 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 
 **為何可行:** `nodes.type` 是純字串欄(無 enum/check),`contains` 遍歷 type-agnostic,DB 今天就接受任意 type 與任意層深。把 type 寫死的只有三處 Python:固定常數集、`graph_sync._ENTITY_TYPES`、幾支 hardcode `n.type == NODE_TASK/PROJECT` 的 leaf helper(graph.py:349/421/523/545/609/623)。所以這是「把 type 詞彙從程式碼搬到資料」的加法,不是重寫儲存。
 
-**分階段路徑(⏸️ 僅記錄,未實作):**
+**分階段路徑(Phase A 建置中 —— 見 [ADR-0033](adr/0033-graph-foundation-final-shape.md)):**
 - **Phase A — 地基(先交付用戶自訂層):** `node_types` 註冊表(type 資料化、seed 內建)+ 通用 Node CRUD API + **通用「刪 node → 清邊」路徑**(補 node-only 的 dangling-edge 陷阱,`graph_sync` 目前只對 `_ENTITY_TYPES` 觸發清邊)+ 通用 `NodeOut` 序列化。做完用戶即可自訂層(純 node),task/project 不動。
+  - [x] **A1 — 兩張註冊表 + seed:** `NodeType`/`EdgeType` model、migration `c3d5e7f9a1b2`(建表 + seed 內建 6 node 型 / 7 edge 型,idempotent)、`services/graph_registry.py`(內建定義 + `seed_builtin_types` 冪等 seed,startup lifespan 呼叫)。內建 = `is_builtin=True`;`edge_types` 帶 `is_containment`/`is_symmetric` 語意旗標。SQLite + PostgreSQL 綠。commit `0b45cd0`。
+  - [x] **A2 — 註冊表 REST API:** `/graph-types/{nodes,edges}` list/create/update/delete;內建型不可刪(key 不可變)、使用中的自訂型不可刪(有 node/edge 時 409)。conftest `db` fixture 加 seed 使 API 測試與 prod 一致。vite proxy 兩處補 `/graph-types`。commit `fa021eb`。
+  - [x] **A3 — 通用 node/edge API:** `/nodes` CRUD(僅 node-only 自訂型;實體型 task/project… 寫入回 400 導回專屬 endpoint,讀取放行)+ `/nodes/{id}/edges` attach/detach(任意兩 node,rel_type 須在註冊表,contains 擋環)+ `NodeOut`。自由包含成立(自訂 node 可含 project/task)。`graph.ENTITY_BACKED_TYPES` 標記仍有實體表的內建型。vite proxy 補 `/nodes`。commit `ff24ef8`。
+  - [x] **A4 — 溯源稽核軌跡:** append-only `graph_events` 表(migration `d4e6f8a0b2c3`)+ `graph.add_edge`/`remove_edge`/`create_node`/`delete_node` 附帶寫事件(`node_created`/`node_deleted`/`edge_added`/`edge_removed`,含選填 `actor`)+ `/nodes/{id}/events` 讀取。**已知缺口:** `graph_sync` 直接 `session.add(Edge)` 建的 contains 鏡射邊(task 建立)不經 `graph.add_edge`,故不記事件 —— 使用者動作經 `graph.*` helper 者皆有軌跡,實體鏡射邊的完整覆蓋待後續。SQLite 739 / PostgreSQL 738 綠。
+  - [ ] **A5 — 註冊表驅動角色判定:** 把 `graph.py` 幾支 hardcode `n.type == NODE_TASK/PROJECT` 的 leaf helper(`member_project_ids`/`contained_task_ids`/`parent_task_map`/`project_ids_map`/`subtask_ids_among`/`top_level_task_filter`)改由 `node_types` 的角色/旗標判定,讓自訂型不被硬過濾擋掉。
+  - [ ] **A6 — 前端:** 定義 node/edge 型的 UI + 通用 node 檢視 + 「未分類」bucket(接「未分類任務」線);放寬「最後一個歸屬」守衛使 task 可歸零。
 - **Phase B — 逐型收斂(一次一 type,兩套 DB 綠):** 內建實體逐一搬進 node(欄位→hot columns/`data`,endpoint 轉通用層,drop 表)。輕的先做(label/cycle/goal/identity),最後才碰 task/project(有 endpoint/MCP/前端/大量測試依賴)。
 - **Phase C — 清理:** 移除 `_ENTITY_TYPES`;hardcode type 過濾改由註冊表驅動;實體 ORM 類別消失。compat `project_id` 屆時轉為通用「父容器」概念(呼應「未分類任務」)。
 
