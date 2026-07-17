@@ -1,4 +1,18 @@
-from app.models import Label
+from app.services import graph
+
+
+def _make_decision(db, project_id, name, *, decision_status="proposed", description=None):
+    label = graph.create_label(
+        db,
+        project_id,
+        name=name,
+        color="#5e6ad2",
+        type="decision",
+        decision_status=decision_status,
+        description=description,
+    )
+    db.commit()
+    return label
 
 
 def test_list_decisions_empty(client):
@@ -8,17 +22,13 @@ def test_list_decisions_empty(client):
 
 
 def test_list_decisions(client, db, sample_project):
-    label = Label(
-        project_id=sample_project.id,
-        name="Use PostgreSQL",
-        color="#5e6ad2",
-        type="decision",
+    _make_decision(
+        db,
+        sample_project.id,
+        "Use PostgreSQL",
         decision_status="accepted",
         description="We chose PostgreSQL for reliability.",
     )
-    db.add(label)
-    db.commit()
-    db.refresh(label)
 
     r = client.get("/decisions")
     assert r.status_code == 200
@@ -37,25 +47,8 @@ def test_list_decisions_filter_project(client, db, sample_project):
     db.add(p2)
     db.flush()
 
-    db.add(
-        Label(
-            project_id=sample_project.id,
-            name="Decision A",
-            color="#5e6ad2",
-            type="decision",
-            decision_status="proposed",
-        )
-    )
-    db.add(
-        Label(
-            project_id=p2.id,
-            name="Decision B",
-            color="#5e6ad2",
-            type="decision",
-            decision_status="proposed",
-        )
-    )
-    db.commit()
+    _make_decision(db, sample_project.id, "Decision A")
+    _make_decision(db, p2.id, "Decision B")
 
     r = client.get("/decisions", params={"project_id": sample_project.id})
     assert r.status_code == 200
@@ -65,25 +58,8 @@ def test_list_decisions_filter_project(client, db, sample_project):
 
 
 def test_list_decisions_filter_status(client, db, sample_project):
-    db.add(
-        Label(
-            project_id=sample_project.id,
-            name="Accepted decision",
-            color="#5e6ad2",
-            type="decision",
-            decision_status="accepted",
-        )
-    )
-    db.add(
-        Label(
-            project_id=sample_project.id,
-            name="Proposed decision",
-            color="#5e6ad2",
-            type="decision",
-            decision_status="proposed",
-        )
-    )
-    db.commit()
+    _make_decision(db, sample_project.id, "Accepted decision", decision_status="accepted")
+    _make_decision(db, sample_project.id, "Proposed decision", decision_status="proposed")
 
     r = client.get("/decisions", params={"status": "accepted"})
     assert r.status_code == 200
@@ -93,17 +69,13 @@ def test_list_decisions_filter_status(client, db, sample_project):
 
 
 def test_get_decision(client, db, sample_project):
-    label = Label(
-        project_id=sample_project.id,
-        name="Use Redis",
-        color="#5e6ad2",
-        type="decision",
+    label = _make_decision(
+        db,
+        sample_project.id,
+        "Use Redis",
         decision_status="accepted",
         description="Chosen for caching layer.",
     )
-    db.add(label)
-    db.commit()
-    db.refresh(label)
 
     r = client.get(f"/decisions/{label.id}")
     assert r.status_code == 200
@@ -119,17 +91,13 @@ def test_get_decision_not_found(client):
 
 
 def test_export_decision(client, db, sample_project):
-    label = Label(
-        project_id=sample_project.id,
-        name="Use PostgreSQL",
-        color="#5e6ad2",
-        type="decision",
+    label = _make_decision(
+        db,
+        sample_project.id,
+        "Use PostgreSQL",
         decision_status="accepted",
         description="We chose PostgreSQL for reliability.",
     )
-    db.add(label)
-    db.commit()
-    db.refresh(label)
 
     r = client.get(f"/decisions/{label.id}/export")
     assert r.status_code == 200

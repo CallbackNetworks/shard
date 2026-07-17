@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import Comment, Integration, Label, Task
+from app.models import Comment, Integration, Task
 from app.services import graph
 
 
@@ -212,15 +212,13 @@ class TestInboundLabelMirror:
         db.expire_all()
         names = sorted(lb.name for lb in graph.labels_for_task(db, task.id))
         assert names == ["bug", "urgent"]
-        bug = db.query(Label).filter(Label.project_id == sample_project.id, Label.name == "bug").first()
+        bug = graph.find_label_by_name(db, sample_project.id, "bug")
         assert bug.source == "issue_sync"
 
     def test_removed_external_labels_detached(self, client, sample_project, db):
         task = _make_external_task(db, sample_project.id)
         for name in ("bug", "urgent"):
-            label = Label(project_id=sample_project.id, name=name)
-            db.add(label)
-            db.flush()
+            label = graph.create_label(db, sample_project.id, name=name)
             graph.set_label(db, task.id, label.id)
         db.commit()
 
@@ -236,9 +234,7 @@ class TestInboundLabelMirror:
 
     def test_decision_labels_untouched(self, client, sample_project, db):
         task = _make_external_task(db, sample_project.id)
-        decision = Label(project_id=sample_project.id, name="use-postgres", type="decision")
-        db.add(decision)
-        db.flush()
+        decision = graph.create_label(db, sample_project.id, name="use-postgres", type="decision")
         graph.set_label(db, task.id, decision.id)
         db.commit()
 
@@ -465,8 +461,7 @@ class TestOutboundLabels:
     def test_label_add_pushed(self, mock_replace, client, sample_project, db):
         _make_integration(db, sample_project.id)
         task = _make_external_task(db, sample_project.id)
-        label = Label(project_id=sample_project.id, name="bug")
-        db.add(label)
+        label = graph.create_label(db, sample_project.id, name="bug")
         db.commit()
 
         r = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")
@@ -477,9 +472,7 @@ class TestOutboundLabels:
     def test_label_remove_pushed(self, mock_replace, client, sample_project, db):
         _make_integration(db, sample_project.id)
         task = _make_external_task(db, sample_project.id)
-        label = Label(project_id=sample_project.id, name="bug")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, sample_project.id, name="bug")
         graph.set_label(db, task.id, label.id)
         db.commit()
 
@@ -492,8 +485,8 @@ class TestOutboundLabels:
         _make_integration(db, sample_project.id)
         task = Task(project_id=sample_project.id, title="Local task")
         db.add(task)
-        label = Label(project_id=sample_project.id, name="bug")
-        db.add(label)
+        db.flush()
+        label = graph.create_label(db, sample_project.id, name="bug")
         db.commit()
 
         r = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")

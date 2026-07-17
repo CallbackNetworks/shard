@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import ActivityLog, Comment, Label, Project, Task, WorkflowRule
+from app.models import ActivityLog, Comment, Project, Task, WorkflowRule
 from app.services import graph
 
 TOOLS = [
@@ -404,7 +404,7 @@ def _tool_manage_labels(
     if action == "list":
         if not project_id:
             return "project_id required for list action"
-        labels = db.query(Label).filter(Label.project_id == project_id).all()
+        labels = graph.labels_in_project(db, project_id)
         return json.dumps([{"id": lb.id, "name": lb.name, "color": lb.color} for lb in labels])
     elif action == "add":
         if not task_id or not label_id:
@@ -578,7 +578,7 @@ def _tool_analyze_decisions(db: Session, project_id: str) -> str:
     ]
 
     # Existing decisions (to avoid duplicates)
-    existing_decisions = db.query(Label).filter(Label.project_id == project_id, Label.type == "decision").all()
+    existing_decisions = graph.decisions(db, project_id=project_id)
     decisions_data = [
         {"id": d.id, "name": d.name, "status": d.decision_status, "description": (d.description or "")[:200]}
         for d in existing_decisions
@@ -598,15 +598,13 @@ def _tool_analyze_decisions(db: Session, project_id: str) -> str:
 
 
 def _tool_create_decision(db: Session, project_id: str, name: str, description: str) -> str:
-    import uuid
-
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         return f"Project {project_id} not found"
 
-    label = Label(
-        id=str(uuid.uuid4()),
-        project_id=project_id,
+    label = graph.create_label(
+        db,
+        project_id,
         name=name,
         color="#818cf8",
         type="decision",
@@ -614,7 +612,6 @@ def _tool_create_decision(db: Session, project_id: str, name: str, description: 
         decision_status="proposed",
         source="ai",
     )
-    db.add(label)
     db.commit()
     return json.dumps({"id": label.id, "name": label.name, "status": "proposed", "source": "ai"})
 
@@ -626,8 +623,8 @@ def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: s
     if not task:
         return f"Task {task_id} not found"
 
-    label = db.query(Label).filter(Label.id == decision_label_id, Label.type == "decision").first()
-    if not label:
+    label = graph.get_label(db, decision_label_id)
+    if not label or label.type != "decision":
         return f"Decision label {decision_label_id} not found"
 
     # Add label to task if not already attached (idempotent)

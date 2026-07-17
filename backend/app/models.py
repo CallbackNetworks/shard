@@ -32,7 +32,8 @@ class Project(Base):
     # Task containment lives in graph ``contains`` edges now (ADR-0032); there is no
     # ``Project.tasks`` relationship. Deletion of contained tasks is handled by
     # ``graph.delete_project_and_tasks``.
-    labels: Mapped[list["Label"]] = relationship("Label", back_populates="project", cascade="all, delete-orphan")
+    # Labels are node-only (ADR-0033 Phase B): a label is a ``Node(type="label")``
+    # scoped to this project by a ``contains`` edge; use ``graph.labels_in_project``.
     cycles: Mapped[list["Cycle"]] = relationship("Cycle", back_populates="project", cascade="all, delete-orphan")
 
 
@@ -114,22 +115,10 @@ class TaskPullRequest(Base):
     task: Mapped["Task"] = relationship("Task", back_populates="pull_requests")
 
 
-class Label(Base):
-    __tablename__ = "labels"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    color: Mapped[str] = mapped_column(String(20), nullable=False, default="#5e6ad2")
-    type: Mapped[str] = mapped_column(String(20), nullable=False, default="label")
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    decision_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    source: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-
-    project: Mapped["Project"] = relationship("Project", back_populates="labels")
+# ``Label`` was collapsed to a node-only entity in ADR-0033 Phase B: a label is a
+# ``Node(type="label")`` (name in ``title``; color/type/description/decision_status/
+# source in ``data``) scoped to its project by a ``contains`` edge. The dedicated
+# ``labels`` table was dropped; see ``services/graph.py`` label helpers.
 
 
 class Cycle(Base):

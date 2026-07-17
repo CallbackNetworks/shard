@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Label
 from app.routers.deps import get_label_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import sync_labels_to_external
@@ -15,35 +14,31 @@ router = APIRouter(prefix="/projects/{project_id}/labels", tags=["labels"])
 @router.get("", response_model=list[LabelOut])
 def list_labels(project_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    return db.query(Label).filter(Label.project_id == project_id).order_by(Label.created_at.asc()).all()
+    return graph.labels_in_project(db, project_id)
 
 
 @router.post("", response_model=LabelOut, status_code=status.HTTP_201_CREATED)
 def create_label(project_id: str, body: LabelCreate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    label = Label(project_id=project_id, **body.model_dump())
-    db.add(label)
+    label = graph.create_label(db, project_id, **body.model_dump())
     db.commit()
-    db.refresh(label)
     return label
 
 
 @router.patch("/{label_id}", response_model=LabelOut)
 def update_label(project_id: str, label_id: str, body: LabelUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    label = get_label_or_404(label_id, db, project_id=project_id)
-    for field, value in body.model_dump(exclude_none=True).items():
-        setattr(label, field, value)
+    get_label_or_404(label_id, db, project_id=project_id)
+    label = graph.update_label(db, label_id, **body.model_dump(exclude_none=True))
     db.commit()
-    db.refresh(label)
     return label
 
 
 @router.delete("/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_label(project_id: str, label_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    label = get_label_or_404(label_id, db, project_id=project_id)
-    db.delete(label)
+    get_label_or_404(label_id, db, project_id=project_id)
+    graph.delete_label(db, label_id)
     db.commit()
 
 

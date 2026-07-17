@@ -3,10 +3,17 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Label
 from app.schemas import LabelOut
+from app.services import graph
 
 router = APIRouter(prefix="/decisions", tags=["decisions"])
+
+
+def _get_decision_or_404(decision_id: str, db: Session) -> graph.LabelView:
+    decision = graph.get_label(db, decision_id)
+    if not decision or decision.type != "decision":
+        raise HTTPException(status_code=404, detail="Decision not found")
+    return decision
 
 
 @router.get("", response_model=list[LabelOut])
@@ -15,27 +22,17 @@ def list_decisions(
     status: str | None = None,
     db: Session = Depends(get_db),
 ):
-    q = db.query(Label).filter(Label.type == "decision")
-    if project_id:
-        q = q.filter(Label.project_id == project_id)
-    if status:
-        q = q.filter(Label.decision_status == status)
-    return q.order_by(Label.created_at.desc()).all()
+    return graph.decisions(db, project_id=project_id, status=status)
 
 
 @router.get("/{decision_id}", response_model=LabelOut)
 def get_decision(decision_id: str, db: Session = Depends(get_db)):
-    decision = db.query(Label).filter(Label.id == decision_id, Label.type == "decision").first()
-    if not decision:
-        raise HTTPException(status_code=404, detail="Decision not found")
-    return decision
+    return _get_decision_or_404(decision_id, db)
 
 
 @router.get("/{decision_id}/export", response_class=PlainTextResponse)
 def export_decision(decision_id: str, db: Session = Depends(get_db)):
-    decision = db.query(Label).filter(Label.id == decision_id, Label.type == "decision").first()
-    if not decision:
-        raise HTTPException(status_code=404, detail="Decision not found")
+    decision = _get_decision_or_404(decision_id, db)
 
     status_str = decision.decision_status or "proposed"
     date_str = decision.created_at.strftime("%Y-%m-%d") if decision.created_at else ""

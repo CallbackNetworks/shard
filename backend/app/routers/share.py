@@ -95,8 +95,8 @@ def _load_identity(db: Session, token: str) -> Identity | None:
 
 def _project_eager_options():
     # Tasks are loaded from graph contains edges in _serialize_project.
+    # Labels are node-only (ADR-0033) and loaded via graph.labels_in_project.
     return [
-        selectinload(Project.labels),
         selectinload(Project.cycles),
     ]
 
@@ -124,7 +124,7 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
 
     project_labels = []
     seen_labels = set()
-    for lbl in p.labels:
+    for lbl in graph.labels_in_project(db, p.id):
         if lbl.id not in seen_labels:
             seen_labels.add(lbl.id)
             project_labels.append({"name": lbl.name, "color": lbl.color})

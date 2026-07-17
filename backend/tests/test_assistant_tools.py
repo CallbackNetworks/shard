@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from app.models import ActivityLog, Label, Project, Task
+from app.models import ActivityLog, Project, Task
 from app.services import graph
 from app.services.assistant_tools import dispatch_tool
 
@@ -175,9 +175,7 @@ class TestManageLabels:
     @pytest.mark.asyncio
     async def test_list_labels(self, db, project_with_tasks):
         p, _, _ = project_with_tasks
-        label = Label(project_id=p.id, name="bug", color="#ff0000")
-        db.add(label)
-        db.flush()
+        graph.create_label(db, p.id, name="bug", color="#ff0000")
 
         result = await dispatch_tool("manage_labels", {"action": "list", "project_id": p.id}, db)
         data = json.loads(result)
@@ -187,9 +185,7 @@ class TestManageLabels:
     @pytest.mark.asyncio
     async def test_add_label_to_task(self, db, project_with_tasks):
         p, t1, _ = project_with_tasks
-        label = Label(project_id=p.id, name="urgent", color="#ff0000")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, p.id, name="urgent", color="#ff0000")
 
         result = await dispatch_tool("manage_labels", {"action": "add", "task_id": t1.id, "label_id": label.id}, db)
         data = json.loads(result)
@@ -198,9 +194,7 @@ class TestManageLabels:
     @pytest.mark.asyncio
     async def test_add_label_duplicate(self, db, project_with_tasks):
         p, t1, _ = project_with_tasks
-        label = Label(project_id=p.id, name="dup", color="#000")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, p.id, name="dup", color="#000")
         graph.set_label(db, t1.id, label.id)
         db.flush()
 
@@ -210,9 +204,7 @@ class TestManageLabels:
     @pytest.mark.asyncio
     async def test_remove_label(self, db, project_with_tasks):
         p, t1, _ = project_with_tasks
-        label = Label(project_id=p.id, name="old", color="#000")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, p.id, name="old", color="#000")
         graph.set_label(db, t1.id, label.id)
         db.flush()
 

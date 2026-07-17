@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, object_session
 
-from app.models import Comment, Label, Task, WorkflowRule
+from app.models import Comment, Task, WorkflowRule
 from app.services import graph
 from app.services.activity import log_activity
 
@@ -66,14 +66,7 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
     elif atype == "set_assignee":
         task.assignee = value or None
     elif atype == "add_label":
-        label = (
-            db.query(Label)
-            .filter(
-                Label.project_id == graph.project_id_of_task(db, task.id),
-                Label.id == value,
-            )
-            .first()
-        )
+        label = graph.get_label(db, value, project_id=graph.project_id_of_task(db, task.id))
         if label:
             graph.set_label(db, task.id, label.id)
     elif atype == "remove_label":

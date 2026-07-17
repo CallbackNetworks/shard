@@ -1,6 +1,7 @@
 """Tests for the imports router (Trello, Linear, GitHub Issues)."""
 
-from app.models import Label, Task
+from app.models import Task
+from app.services import graph
 
 
 class TestTrelloImport:
@@ -38,7 +39,7 @@ class TestTrelloImport:
         }
         client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
 
-        label = db.query(Label).filter(Label.project_id == sample_project.id, Label.name == "urgent").first()
+        label = graph.find_label_by_name(db, sample_project.id, "urgent")
         assert label is not None
         assert label.color == "#6366f1"
 
@@ -118,7 +119,7 @@ class TestLinearImport:
         }
         client.post(f"/projects/{sample_project.id}/import/linear", json=payload)
 
-        labels = db.query(Label).filter(Label.project_id == sample_project.id).all()
+        labels = graph.labels_in_project(db, sample_project.id)
         label_names = {lb.name for lb in labels}
         assert "enhancement" in label_names
         assert "p1" in label_names
@@ -179,7 +180,7 @@ class TestGitHubImport:
         }
         client.post(f"/projects/{sample_project.id}/import/github", json=payload)
 
-        labels = db.query(Label).filter(Label.project_id == sample_project.id).all()
+        labels = graph.labels_in_project(db, sample_project.id)
         label_names = {lb.name for lb in labels}
         assert "enhancement" in label_names
         assert "help wanted" in label_names

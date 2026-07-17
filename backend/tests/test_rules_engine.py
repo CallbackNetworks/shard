@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models import Comment, Label, Project, Task, WorkflowRule
+from app.models import Comment, Project, Task, WorkflowRule
 from app.services import graph
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
 
@@ -56,9 +56,7 @@ class TestEvalCondition:
         assert _eval_condition({"field": "title_contains", "op": "neq", "value": "login"}, task, {}) is False
 
     def test_has_label(self, db, task):
-        label = Label(project_id=graph.project_id_of_task(db, task.id), name="bug", color="#ff0000")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, graph.project_id_of_task(db, task.id), name="bug", color="#ff0000")
         graph.set_label(db, task.id, label.id)
         db.flush()
         db.refresh(task)
@@ -119,9 +117,7 @@ class TestExecAction:
 
     def test_add_label(self, db, project_and_task):
         project, task = project_and_task
-        label = Label(project_id=project.id, name="urgent", color="#ff0000")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, project.id, name="urgent", color="#ff0000")
 
         _exec_action(db, {"type": "add_label", "value": label.id}, task)
         db.flush()
@@ -130,9 +126,7 @@ class TestExecAction:
 
     def test_add_label_no_duplicate(self, db, project_and_task):
         project, task = project_and_task
-        label = Label(project_id=project.id, name="urgent", color="#ff0000")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, project.id, name="urgent", color="#ff0000")
         graph.set_label(db, task.id, label.id)
         db.flush()
 
@@ -143,9 +137,7 @@ class TestExecAction:
 
     def test_remove_label(self, db, project_and_task):
         project, task = project_and_task
-        label = Label(project_id=project.id, name="old", color="#aaa")
-        db.add(label)
-        db.flush()
+        label = graph.create_label(db, project.id, name="old", color="#aaa")
         graph.set_label(db, task.id, label.id)
         db.flush()
 

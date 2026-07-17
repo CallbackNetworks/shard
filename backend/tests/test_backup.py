@@ -34,8 +34,9 @@ def test_export_backup_contains_all_data(client, db, sample_project):
 
     assert {t["title"] for t in data["tasks"]} == {"Backed up task"}
     assert {p["name"] for p in data["projects"]} == {sample_project.name}
-    # Every ORM table is present in the dump, even when empty
-    assert "labels" in data
+    # Every ORM table is present in the dump, even when empty. Labels are
+    # node-only (ADR-0033) so they ride in the ``nodes`` table now.
+    assert "nodes" in data
     assert "webhook_deliveries" in data
 
 

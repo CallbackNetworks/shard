@@ -16,7 +16,6 @@ from app.models import (
     Comment,
     Cycle,
     Integration,
-    Label,
     Notification,
     Project,
     Task,
@@ -107,15 +106,9 @@ def _apply_external_labels(task: Task, label_names: list[str], db: Session) -> N
     task_project_id = graph.project_id_of_task(db, task.id)
 
     for name in wanted - set(current):
-        label = (
-            db.query(Label)
-            .filter(Label.project_id == task_project_id, Label.name == name, Label.type == "label")
-            .first()
-        )
+        label = graph.find_label_by_name(db, task_project_id, name, label_type="label")
         if not label:
-            label = Label(project_id=task_project_id, name=name, source="issue_sync")
-            db.add(label)
-            db.flush()
+            label = graph.create_label(db, task_project_id, name=name, source="issue_sync")
         graph.set_label(db, task.id, label.id)
 
     for name, lb in current.items():

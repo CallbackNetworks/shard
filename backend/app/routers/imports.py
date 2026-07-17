@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Label, Project
+from app.models import Project
 from app.services import graph
 from app.services.activity import log_activity
 
@@ -89,30 +89,15 @@ class ImportResult(BaseModel):
     errors: list[str]
 
 
-def _get_or_create_label(db: Session, project_id: str, label_name: str) -> Label:
+def _get_or_create_label(db: Session, project_id: str, label_name: str) -> graph.LabelView | None:
     """Find an existing label by name in the project, or create one."""
     label_name = label_name.strip()
     if not label_name:
         return None
-    existing = (
-        db.query(Label)
-        .filter(
-            Label.project_id == project_id,
-            Label.name == label_name,
-        )
-        .first()
-    )
+    existing = graph.find_label_by_name(db, project_id, label_name)
     if existing:
         return existing
-    label = Label(
-        id=str(uuid.uuid4()),
-        project_id=project_id,
-        name=label_name,
-        color=DEFAULT_LABEL_COLOR,
-    )
-    db.add(label)
-    db.flush()
-    return label
+    return graph.create_label(db, project_id, name=label_name, color=DEFAULT_LABEL_COLOR)
 
 
 def _validate_project(db: Session, project_id: str) -> Project:

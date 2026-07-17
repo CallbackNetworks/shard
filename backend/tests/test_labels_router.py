@@ -1,4 +1,4 @@
-from app.models import Label, Task
+from app.models import Task
 from app.services import graph
 
 
@@ -19,10 +19,8 @@ def _make_task(db, project_id):
 
 
 def _make_label(db, project_id, name="Bug", color="#e5484d"):
-    label = Label(project_id=project_id, name=name, color=color)
-    db.add(label)
+    label = graph.create_label(db, project_id, name=name, color=color)
     db.commit()
-    db.refresh(label)
     return label
 
 

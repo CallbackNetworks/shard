@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Label, Project
+from app.models import ApiKey, Project
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -39,7 +39,7 @@ def api_list_labels(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return db.query(Label).filter(Label.project_id == project_id).order_by(Label.created_at.asc()).all()
+    return graph.labels_in_project(db, project_id)
 
 
 @sub_router.post(
@@ -61,10 +61,8 @@ def api_create_label(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    label = Label(project_id=project_id, **body.model_dump())
-    db.add(label)
+    label = graph.create_label(db, project_id, **body.model_dump())
     db.commit()
-    db.refresh(label)
     return label
 
 
@@ -83,10 +81,10 @@ def api_delete_label(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    label = db.query(Label).filter(Label.id == label_id, Label.project_id == project_id).first()
+    label = graph.get_label(db, label_id, project_id=project_id)
     if not label:
         raise HTTPException(status_code=404, detail="Label not found")
-    db.delete(label)
+    graph.delete_label(db, label_id)
     db.commit()
 
 
@@ -108,7 +106,7 @@ async def api_add_label_to_task(
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
     task = _get_task_or_404(project_id, task_id, db)
-    label = db.query(Label).filter(Label.id == label_id, Label.project_id == project_id).first()
+    label = graph.get_label(db, label_id, project_id=project_id)
     if not label:
         raise HTTPException(status_code=404, detail="Label not found")
     if label_id not in graph.label_ids_for_task(db, task_id):

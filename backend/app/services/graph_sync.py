@@ -2,9 +2,9 @@
 
 A single ``before_flush`` listener mirrors entities into the ``nodes`` table:
 
-* Entities (Project/Task/Identity/Goal/Cycle/Label) -> a ``nodes`` row of the
+* Entities (Project/Task/Identity/Goal/Cycle) -> a ``nodes`` row of the
   matching type, with the hot columns (title/status/priority/dates/position/
-  is_pinned) kept faithful to the entity.
+  is_pinned) kept faithful to the entity. (``Label`` is node-only, ADR-0033.)
 * Updating an entity re-syncs its node hot columns.
 * Deleting an entity drops its node and every touching edge.
 
@@ -24,20 +24,20 @@ from app.models import (
     Edge,
     Goal,
     Identity,
-    Label,
     Node,
     Project,
     Task,
 )
 
 # entity class -> node type
+# ``label`` is intentionally absent: it collapsed to node-only in ADR-0033
+# Phase B and is now created/updated/deleted through the generic graph layer.
 _ENTITY_TYPES = {
     Project: "project",
     Task: "task",
     Identity: "identity",
     Goal: "goal",
     Cycle: "cycle",
-    Label: "label",
 }
 
 

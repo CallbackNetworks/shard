@@ -167,7 +167,8 @@ def enrich_project(project, db=None) -> ProjectOut:
         for t in tasks
     ]
 
-    out.labels = [LabelOut.model_validate(lb) for lb in project.labels]
+    project_labels = graph.labels_in_project(db, project.id) if db is not None else []
+    out.labels = [LabelOut.model_validate(lb) for lb in project_labels]
 
     enriched_cycles = []
     for cycle in project.cycles:

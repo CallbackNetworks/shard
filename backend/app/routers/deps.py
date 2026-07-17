@@ -7,7 +7,6 @@ from app.models import (
     Goal,
     Identity,
     Integration,
-    Label,
     Project,
     Task,
 )
@@ -44,11 +43,8 @@ def get_parent_task_or_error(db: Session, project_id: str, parent_id: str, *, ch
     return parent
 
 
-def get_label_or_404(label_id: str, db: Session, *, project_id: str | None = None) -> Label:
-    query = db.query(Label).filter(Label.id == label_id)
-    if project_id:
-        query = query.filter(Label.project_id == project_id)
-    label = query.first()
+def get_label_or_404(label_id: str, db: Session, *, project_id: str | None = None) -> graph.LabelView:
+    label = graph.get_label(db, label_id, project_id=project_id)
     if not label:
         raise HTTPException(status_code=404, detail="Label not found")
     return label
