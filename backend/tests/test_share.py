@@ -45,14 +45,15 @@ def test_get_share_invalid_token(client):
 
 
 def test_get_share_expired(client, db):
-    from app.models import Identity
+    from app.services import graph
 
-    identity = Identity(
-        name="Expired",
+    identity = graph.create_identity(db, name="Expired")
+    graph.update_identity(
+        db,
+        identity.id,
         share_token="expired-token",
         share_expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
-    db.add(identity)
     db.commit()
     resp = client.get("/share/identity/expired-token")
     assert resp.status_code == 410
@@ -209,7 +210,7 @@ def test_task_note_attributed_inside_share_scope(client, db, sample_project):
 
 
 def test_identity_note_requires_project_in_scope(client, db, sample_identity, sample_project):
-    sample_identity.allow_guest_notes = True
+    graph.update_identity(db, sample_identity.id, allow_guest_notes=True)
     other = Project(name="Not shared")
     db.add(other)
     db.commit()
@@ -244,7 +245,7 @@ def test_task_note_outside_scope_rejected(client, db, sample_project):
 
 
 def test_pinned_identity_note_requires_session(client, db, pinned_identity, sample_project):
-    pinned_identity.allow_guest_notes = True
+    graph.update_identity(db, pinned_identity.id, allow_guest_notes=True)
     graph.link_membership(db, pinned_identity.id, sample_project.id)
     db.commit()
     payload = {"guest_name": "Visitor", "body": "hello", "project_id": sample_project.id}

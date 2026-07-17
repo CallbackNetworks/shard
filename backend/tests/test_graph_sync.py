@@ -2,7 +2,6 @@
 
 from app.models import (
     Edge,
-    Identity,
     Project,
     Task,
 )
@@ -33,9 +32,7 @@ def _task(db, project_id, title="t"):
 
 def test_membership_edge_via_helper(db):
     p = _project(db)
-    ident = Identity(name="me")
-    db.add(ident)
-    db.flush()
+    ident = graph.create_identity(db, name="me")
 
     graph.link_membership(db, ident.id, p.id)
     db.commit()
@@ -49,13 +46,11 @@ def test_entity_delete_clears_membership_edge(db):
     from app.models import Node
 
     p = _project(db)
-    ident = Identity(name="me")
-    db.add(ident)
-    db.flush()
+    ident = graph.create_identity(db, name="me")
     graph.link_membership(db, ident.id, p.id)
     db.commit()
 
-    db.delete(ident)
+    graph.delete_identity(db, ident.id)
     db.commit()
     # Deleting the identity node drops the touching member_of edge.
     assert db.get(Node, ident.id) is None

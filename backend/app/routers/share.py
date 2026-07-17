@@ -13,7 +13,6 @@ from app.database import get_db
 from app.models import (
     ActivityLog,
     Comment,
-    Identity,
     Project,
     Task,
 )
@@ -88,9 +87,9 @@ def _as_utc(value: datetime | str | None) -> datetime | None:
     return value.astimezone(UTC)
 
 
-def _load_identity(db: Session, token: str) -> Identity | None:
+def _load_identity(db: Session, token: str) -> graph.IdentityView | None:
     # An identity's projects are resolved via member_of edges (see _build_response).
-    return db.query(Identity).filter(Identity.share_token == token).first()
+    return graph.find_identity_by_share_token(db, token)
 
 
 def _load_project(db: Session, token: str) -> Project | None:
@@ -280,7 +279,7 @@ def _build_payload(owner: dict, source_projects: list[Project], db: Session, sco
     }
 
 
-def _build_response(identity: Identity, db: Session):
+def _build_response(identity: graph.IdentityView, db: Session):
     projects = graph.projects_for_identity(db, identity.id)
     owner = {
         "id": identity.id,
@@ -305,7 +304,7 @@ def _build_project_response(project: Project, db: Session):
     return _build_payload(owner, [project], db, scope="project", include_notes=project.allow_guest_notes)
 
 
-def _maybe_log_view(db: Session, identity: Identity, ip_hash: str):
+def _maybe_log_view(db: Session, identity: graph.IdentityView, ip_hash: str):
     """Log at most one view per IP-hash per hour to avoid bloating activity_logs."""
     try:
         one_hour_ago = datetime.now(UTC).replace(microsecond=0)
@@ -453,7 +452,7 @@ class GuestNoteIn(BaseModel):
 def _resolve_note_target(scope: str, token: str, request: Request, db: Session) -> list[Project]:
     """Validate a guest-note write against a share token; return the projects it may write to."""
     if scope == "identity":
-        identity = db.query(Identity).filter(Identity.share_token == token).first()
+        identity = graph.find_identity_by_share_token(db, token)
         if not identity:
             raise HTTPException(status_code=404, detail="Share link not found")
         if identity.share_expires_at and datetime.now(UTC) > _as_utc(identity.share_expires_at):

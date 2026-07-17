@@ -152,19 +152,12 @@ class Integration(Base):
     template_id: Mapped[str | None] = mapped_column(String(50), nullable=True)  # integration template used
 
 
-class Identity(Base):
-    __tablename__ = "identities"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    color: Mapped[str] = mapped_column(String(20), nullable=False, default="#5e6ad2")
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    avatar: Mapped[str | None] = mapped_column(String(10), nullable=True)  # emoji or single char
-    share_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
-    share_pin_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    share_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    allow_guest_notes: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+# ``Identity`` was collapsed to a node-only entity in ADR-0033 Phase B: an identity
+# is a ``Node(type="identity")`` (name in ``title``; color/description/avatar/
+# share_token/share_pin_hash/share_expires_at/allow_guest_notes in ``data``).
+# Identities are top-level (not project-scoped); projects attach via ``member_of``
+# edges and tasks via ``assigned_to`` edges. The dedicated ``identities`` table was
+# dropped; see the identity helpers in ``services/graph.py``.
 
 
 class ActivityLog(Base):

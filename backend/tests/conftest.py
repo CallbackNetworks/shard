@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db, get_dialect
 from app.main import app
-from app.models import Identity, Project
+from app.models import Project
 from app.services import graph
 from app.services.graph_registry import seed_builtin_types
 from app.services.pin_utils import hash_pin
@@ -60,10 +60,9 @@ def client(db):
 
 @pytest.fixture()
 def sample_identity(db):
-    identity = Identity(name="Test User", color="#5e6ad2", share_token="test-share-token-123")
-    db.add(identity)
+    identity = graph.create_identity(db, name="Test User", color="#5e6ad2")
+    identity = graph.update_identity(db, identity.id, share_token="test-share-token-123")
     db.commit()
-    db.refresh(identity)
     return identity
 
 
@@ -80,13 +79,12 @@ def sample_project(db, sample_identity):
 
 @pytest.fixture()
 def pinned_identity(db):
-    identity = Identity(
-        name="Pinned User",
-        color="#818cf8",
+    identity = graph.create_identity(db, name="Pinned User", color="#818cf8")
+    identity = graph.update_identity(
+        db,
+        identity.id,
         share_token="pinned-token-456",
         share_pin_hash=hash_pin("1234"),
     )
-    db.add(identity)
     db.commit()
-    db.refresh(identity)
     return identity

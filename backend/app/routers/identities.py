@@ -4,10 +4,10 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.orm import Session, object_session
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Identity, Project
+from app.models import ActivityLog, Project
 from app.routers.deps import get_identity_or_404, get_project_or_404
 from app.schemas import IdentityCreate, IdentityHubOut, IdentityOut, IdentityUpdate
 from app.services import graph
@@ -15,9 +15,9 @@ from app.services import graph
 router = APIRouter(prefix="/identities", tags=["identities"])
 
 
-def _enrich(identity: Identity) -> IdentityOut:
+def _enrich(identity: graph.IdentityView, db: Session) -> IdentityOut:
     out = IdentityOut.model_validate(identity)
-    out.project_count = len(graph.project_ids_for_identity(object_session(identity), identity.id))
+    out.project_count = len(graph.project_ids_for_identity(db, identity.id))
     out.share_pin_set = identity.share_pin_hash is not None
     out.share_expires_at = identity.share_expires_at
     return out
@@ -25,8 +25,7 @@ def _enrich(identity: Identity) -> IdentityOut:
 
 @router.get("", response_model=list[IdentityOut])
 def list_identities(db: Session = Depends(get_db)):
-    identities = db.query(Identity).order_by(Identity.created_at.asc()).all()
-    return [_enrich(i) for i in identities]
+    return [_enrich(i, db) for i in graph.all_identities(db)]
 
 
 @router.get("/hub-stats", response_model=IdentityHubOut)
@@ -34,7 +33,7 @@ def get_hub_stats(db: Session = Depends(get_db)):
     now = datetime.now(UTC)
     year_ago = now - timedelta(days=365)
 
-    identities = db.query(Identity).order_by(Identity.created_at.asc()).all()
+    identities = graph.all_identities(db)
     totals = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
     result = []
 
@@ -96,36 +95,32 @@ def get_hub_stats(db: Session = Depends(get_db)):
 
 @router.post("", response_model=IdentityOut, status_code=status.HTTP_201_CREATED)
 def create_identity(body: IdentityCreate, db: Session = Depends(get_db)):
-    identity = Identity(**body.model_dump())
-    db.add(identity)
+    identity = graph.create_identity(db, **body.model_dump())
     db.commit()
-    db.refresh(identity)
-    return _enrich(identity)
+    return _enrich(identity, db)
 
 
 @router.patch("/{identity_id}", response_model=IdentityOut)
 def update_identity(identity_id: str, body: IdentityUpdate, db: Session = Depends(get_db)):
-    identity = get_identity_or_404(identity_id, db)
-    for field, value in body.model_dump(exclude_none=True).items():
-        setattr(identity, field, value)
+    get_identity_or_404(identity_id, db)
+    identity = graph.update_identity(db, identity_id, **body.model_dump(exclude_none=True))
     db.commit()
-    db.refresh(identity)
-    return _enrich(identity)
+    return _enrich(identity, db)
 
 
 @router.post("/{identity_id}/rotate-share-token")
 def rotate_share_token(identity_id: str, db: Session = Depends(get_db)):
-    identity = get_identity_or_404(identity_id, db)
-    identity.share_token = str(uuid.uuid4())
+    get_identity_or_404(identity_id, db)
+    token = str(uuid.uuid4())
+    graph.update_identity(db, identity_id, share_token=token)
     db.commit()
-    db.refresh(identity)
-    return {"share_token": identity.share_token}
+    return {"share_token": token}
 
 
 @router.delete("/{identity_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_identity(identity_id: str, db: Session = Depends(get_db)):
-    identity = get_identity_or_404(identity_id, db)
-    db.delete(identity)
+    get_identity_or_404(identity_id, db)
+    graph.delete_identity(db, identity_id)
     db.commit()
 
 
@@ -167,18 +162,18 @@ class SetPinBody(BaseModel):
 def set_identity_pin(identity_id: str, body: SetPinBody, db: Session = Depends(get_db)):
     from app.services.pin_utils import hash_pin
 
-    identity = get_identity_or_404(identity_id, db)
+    get_identity_or_404(identity_id, db)
     if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
         raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
-    identity.share_pin_hash = hash_pin(body.pin)
+    graph.update_identity(db, identity_id, share_pin_hash=hash_pin(body.pin))
     db.commit()
     return {"ok": True}
 
 
 @router.delete("/{identity_id}/pin")
 def clear_identity_pin(identity_id: str, db: Session = Depends(get_db)):
-    identity = get_identity_or_404(identity_id, db)
-    identity.share_pin_hash = None
+    get_identity_or_404(identity_id, db)
+    graph.update_identity(db, identity_id, share_pin_hash=None)
     db.commit()
     return {"ok": True}
 
@@ -192,8 +187,8 @@ class SetExpiryBody(BaseModel):
 
 @router.post("/{identity_id}/set-expiry")
 def set_identity_expiry(identity_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
-    identity = get_identity_or_404(identity_id, db)
-    identity.share_expires_at = body.expires_at
+    get_identity_or_404(identity_id, db)
+    graph.update_identity(db, identity_id, share_expires_at=body.expires_at)
     db.commit()
     return {"ok": True}
 

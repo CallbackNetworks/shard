@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, ApiKey, Identity, Project
+from app.models import ActivityLog, ApiKey, Project
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.schemas import SummaryOut
 from app.services import graph
@@ -177,7 +177,7 @@ def api_summary(
     ]
 
     # Identity grouping
-    all_identities = db.query(Identity).order_by(Identity.created_at.asc()).all()
+    all_identities = graph.all_identities(db)
     identity_summaries = []
     for ident in all_identities:
         ident_project_ids = set(graph.project_ids_for_identity(db, ident.id))

@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Comment,
-    Identity,
     Integration,
     Project,
     Task,
@@ -55,8 +54,8 @@ def get_cycle_or_404(cycle_id: str, db: Session, *, project_id: str | None = Non
     return cycle
 
 
-def get_identity_or_404(identity_id: str, db: Session) -> Identity:
-    identity = db.query(Identity).filter(Identity.id == identity_id).first()
+def get_identity_or_404(identity_id: str, db: Session) -> graph.IdentityView:
+    identity = graph.get_identity(db, identity_id)
     if not identity:
         raise HTTPException(status_code=404, detail="Identity not found")
     return identity
