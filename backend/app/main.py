@@ -28,6 +28,7 @@ from app.routers import (
     decisions,
     external_api,
     goals,
+    graph_types,
     identities,
     imports,
     integrations,
@@ -228,6 +229,7 @@ app.include_router(attachments.router)
 app.include_router(notifications.router)
 app.include_router(cicd.router)
 app.include_router(goals.router)
+app.include_router(graph_types.router)
 app.include_router(bulk.router)
 app.include_router(imports.router)
 app.include_router(settings.router)

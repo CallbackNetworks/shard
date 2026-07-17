@@ -13,6 +13,7 @@ from app.database import Base, get_db, get_dialect
 from app.main import app
 from app.models import Identity, Project
 from app.services import graph
+from app.services.graph_registry import seed_builtin_types
 from app.services.pin_utils import hash_pin
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
@@ -35,6 +36,7 @@ def db():
     Base.metadata.create_all(bind=_test_engine)
     TestSession = sessionmaker(bind=_test_engine)
     session = TestSession()
+    seed_builtin_types(session)  # built-in node/edge type vocabulary (ADR-0033)
     try:
         yield session
     finally:

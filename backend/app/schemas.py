@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -943,3 +944,75 @@ class IdentityHubTotals(BaseModel):
 class IdentityHubOut(BaseModel):
     identities: list[IdentityHubItem]
     totals: IdentityHubTotals
+
+
+# --- Graph type registries (ADR-0033) ---
+
+
+def _validate_type_key(value: str) -> str:
+    key = value.strip().lower()
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,29}", key):
+        raise ValueError("key must be 1-30 chars, lowercase letter first, then letters/digits/underscore")
+    return key
+
+
+class NodeTypeCreate(BaseModel):
+    key: str
+    label: str
+    icon: str | None = None
+    color: str | None = None
+    data: dict | None = None
+
+    @field_validator("key")
+    @classmethod
+    def _key(cls, v: str) -> str:
+        return _validate_type_key(v)
+
+
+class NodeTypeUpdate(BaseModel):
+    label: str | None = None
+    icon: str | None = None
+    color: str | None = None
+    data: dict | None = None
+
+
+class NodeTypeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key: str
+    label: str
+    icon: str | None = None
+    color: str | None = None
+    is_builtin: bool
+    data: dict | None = None
+
+
+class EdgeTypeCreate(BaseModel):
+    key: str
+    label: str
+    is_containment: bool = False
+    is_symmetric: bool = False
+    data: dict | None = None
+
+    @field_validator("key")
+    @classmethod
+    def _key(cls, v: str) -> str:
+        return _validate_type_key(v)
+
+
+class EdgeTypeUpdate(BaseModel):
+    label: str | None = None
+    is_containment: bool | None = None
+    is_symmetric: bool | None = None
+    data: dict | None = None
+
+
+class EdgeTypeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key: str
+    label: str
+    is_builtin: bool
+    is_containment: bool
+    is_symmetric: bool
+    data: dict | None = None
