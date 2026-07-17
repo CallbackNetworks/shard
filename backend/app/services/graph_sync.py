@@ -40,6 +40,32 @@ def _title_of(obj) -> str:
     return getattr(obj, "title", None) or getattr(obj, "name", None) or ""
 
 
+def _task_data(obj) -> dict:
+    """Task's non-hot fields, mirrored into ``node.data`` (ADR-0033 Phase B, B5.1).
+
+    Keeps the node a COMPLETE mirror of the task so the table can later be dropped
+    and reads served from the node. ``reminder_sent_at`` is a datetime stored as an
+    ISO string (JSON has no datetime type).
+    """
+    reminder = obj.reminder_sent_at
+    return {
+        "description": obj.description,
+        "callback_token": obj.callback_token,
+        "webhook_secret": obj.webhook_secret,
+        "assignee": obj.assignee,
+        "assigned_agent_key_id": obj.assigned_agent_key_id,
+        "reminder_sent_at": reminder.isoformat() if reminder is not None else None,
+        "time_estimate": obj.time_estimate,
+        "time_spent": obj.time_spent,
+        "progress_pct": obj.progress_pct,
+        "agent_notes": obj.agent_notes,
+        "external_provider": obj.external_provider,
+        "external_id": obj.external_id,
+        "external_url": obj.external_url,
+        "external_repo": obj.external_repo,
+    }
+
+
 def _sync_hot_fields(node, obj) -> None:
     """Copy an entity's hot columns onto its node (mirrors the backfill mapping)."""
     node.title = _title_of(obj)
@@ -52,6 +78,7 @@ def _sync_hot_fields(node, obj) -> None:
         node.due_date = obj.due_date
         node.position = obj.position or 0
         node.is_pinned = bool(obj.is_pinned)
+        node.data = _task_data(obj)
     # Label/Cycle/Goal/Identity are node-only (ADR-0033) and never reach here.
 
 
@@ -94,6 +121,10 @@ def _mirror(session, flush_context, instances):
             continue
         if obj.id is None:
             obj.id = str(uuid.uuid4())  # pin the pk now so edges can reference it
+        if isinstance(obj, Task) and not obj.callback_token:
+            # Python-side column defaults are applied at INSERT, after this listener
+            # runs, so pin callback_token now for a faithful node.data mirror (B5.1).
+            obj.callback_token = str(uuid.uuid4())
         _upsert_node(session, seen_nodes, obj, node_type)
         if isinstance(obj, Task):
             _ensure_contains_edge(session, getattr(obj, "_graph_project_id", None), "project", obj.id)

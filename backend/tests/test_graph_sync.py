@@ -68,6 +68,39 @@ def test_task_create_mirrors_node_and_contains_edge(db):
     assert _edge(db, p.id, t.id, "contains") is not None
 
 
+def test_task_node_is_complete_mirror(db):
+    """ADR-0033 B5.1: task node.data mirrors every non-hot Task field."""
+    from app.models import Node, Task
+
+    p = _project(db)
+    t = Task(
+        project_id=p.id,
+        title="T",
+        description="desc",
+        assignee="me",
+        time_estimate=30,
+        progress_pct=42,
+        external_provider="github",
+        external_id="99",
+    )
+    db.add(t)
+    db.commit()
+
+    data = db.get(Node, t.id).data or {}
+    assert data["description"] == "desc"
+    assert data["assignee"] == "me"
+    assert data["time_estimate"] == 30
+    assert data["progress_pct"] == 42
+    assert data["external_provider"] == "github"
+    assert data["external_id"] == "99"
+    assert data["callback_token"] == t.callback_token
+
+    # Updating a non-hot field re-syncs the node.
+    t.description = "changed"
+    db.commit()
+    assert (db.get(Node, t.id).data or {})["description"] == "changed"
+
+
 def test_subtask_create_mirrors_parent_containment(db):
     p = _project(db)
     parent = _task(db, p.id, "parent")
