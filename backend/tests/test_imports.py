@@ -1,7 +1,7 @@
 """Tests for the imports router (Trello, Linear, GitHub Issues)."""
 
-from app.models import Task
 from app.services import graph
+from tests.factories import find_task_by_title
 
 
 class TestTrelloImport:
@@ -47,7 +47,7 @@ class TestTrelloImport:
         payload = {"cards": [{"name": "Done card", "closed": True, "labels": []}]}
         client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
 
-        task = db.query(Task).filter(Task.title == "Done card").first()
+        task = find_task_by_title(db, "Done card")
         assert task is not None
         assert task.status == "done"
 
@@ -55,7 +55,7 @@ class TestTrelloImport:
         payload = {"cards": [{"name": "Todo card", "closed": False, "labels": []}]}
         client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
 
-        task = db.query(Task).filter(Task.title == "Todo card").first()
+        task = find_task_by_title(db, "Todo card")
         assert task is not None
         assert task.status == "todo"
 
@@ -63,7 +63,7 @@ class TestTrelloImport:
         payload = {"cards": [{"name": "Due card", "closed": False, "due": "2026-09-15T10:00:00Z", "labels": []}]}
         client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
 
-        task = db.query(Task).filter(Task.title == "Due card").first()
+        task = find_task_by_title(db, "Due card")
         assert task is not None
         assert task.due_date is not None
 
@@ -84,19 +84,19 @@ class TestLinearImport:
         assert data["imported"] == 4
         assert data["skipped"] == 0
 
-        done_task = db.query(Task).filter(Task.title == "Linear done").first()
+        done_task = find_task_by_title(db, "Linear done")
         assert done_task.status == "done"
         assert done_task.priority == "high"
 
-        completed_task = db.query(Task).filter(Task.title == "Linear completed").first()
+        completed_task = find_task_by_title(db, "Linear completed")
         assert completed_task.status == "done"
         assert completed_task.priority == "high"
 
-        ip_task = db.query(Task).filter(Task.title == "Linear in progress").first()
+        ip_task = find_task_by_title(db, "Linear in progress")
         assert ip_task.status == "in_progress"
         assert ip_task.priority == "medium"
 
-        backlog_task = db.query(Task).filter(Task.title == "Linear backlog").first()
+        backlog_task = find_task_by_title(db, "Linear backlog")
         assert backlog_task.status == "todo"
         assert backlog_task.priority == "low"
 
@@ -108,7 +108,7 @@ class TestLinearImport:
         }
         client.post(f"/projects/{sample_project.id}/import/linear", json=payload)
 
-        task = db.query(Task).filter(Task.title == "Assigned issue").first()
+        task = find_task_by_title(db, "Assigned issue")
         assert task.assignee == "alice"
 
     def test_linear_labels_created(self, client, sample_project, db):
@@ -155,14 +155,14 @@ class TestGitHubImport:
         assert data["imported"] == 2
         assert data["skipped"] == 0
 
-        open_task = db.query(Task).filter(Task.title == "Fix bug").first()
+        open_task = find_task_by_title(db, "Fix bug")
         assert open_task.status == "todo"
         assert open_task.external_provider == "github"
         assert open_task.external_id == "42"
         assert open_task.external_url == "https://github.com/org/repo/issues/42"
         assert open_task.assignee == "octocat"
 
-        closed_task = db.query(Task).filter(Task.title == "Closed issue").first()
+        closed_task = find_task_by_title(db, "Closed issue")
         assert closed_task.status == "done"
         assert closed_task.external_provider == "github"
         assert closed_task.external_id == "99"

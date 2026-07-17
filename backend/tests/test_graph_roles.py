@@ -5,7 +5,7 @@ they read the ``is_container`` / ``is_task_like`` roles from the node_types
 registry. Built-in roles are seeded to match the previous behavior exactly.
 """
 
-from app.models import NodeType
+from app.models import Node, NodeType
 from app.services import graph
 
 
@@ -66,8 +66,7 @@ def test_top_level_task_filter_uses_role(db, sample_project):
     root = graph.create_task(db, title="root", project_id=sample_project.id)
     sub = graph.create_task(db, title="sub", project_id=sample_project.id, parent_id=root.id)
     db.commit()
-    from app.models import Task
 
-    top_ids = {t.id for t in db.query(Task).filter(graph.top_level_task_filter()).all()}
+    top_ids = {t.id for t in db.query(Node).filter(Node.type == "task", graph.top_level_task_filter()).all()}
     assert root.id in top_ids
     assert sub.id not in top_ids

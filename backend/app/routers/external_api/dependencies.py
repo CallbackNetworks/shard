@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Task
+from app.models import ApiKey, Node
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -38,7 +38,7 @@ def api_get_dependencies(
     _get_task_or_404(project_id, task_id, db)
 
     def _summaries(ids):
-        rows = db.query(Task).filter(Task.id.in_(ids)).all() if ids else []
+        rows = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(ids)).all() if ids else []
         return [{"task_id": t.id, "title": t.title, "status": t.status} for t in rows]
 
     blocked_by = _summaries(graph.prerequisite_ids(db, task_id))
@@ -68,10 +68,8 @@ def api_add_dependency(
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
     task = _get_task_or_404(project_id, task_id, db)
-    blocker = (
-        db.query(Task).filter(Task.id == depends_on_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    )
-    if not blocker:
+    blocker = graph.get_task(db, depends_on_id)
+    if not blocker or depends_on_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Blocker task not found")
     if task_id == depends_on_id:
         raise HTTPException(status_code=400, detail="A task cannot depend on itself")

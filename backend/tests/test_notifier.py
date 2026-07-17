@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.models import Integration, Notification, Project, Task, WebhookDelivery
+from app.models import Integration, Notification, Project, WebhookDelivery
 from app.services.notifier import (
     MAX_ATTEMPTS,
     _build_headers,
@@ -17,6 +17,7 @@ from app.services.notifier import (
     fire_notifications,
     retry_delivery,
 )
+from tests.factories import make_task
 
 # ── _compute_progress ────────────────────────────────────────────────────
 
@@ -27,7 +28,7 @@ class TestComputeProgress:
         db.add(p)
         db.flush()
         for s in ("done", "done", "done"):
-            db.add(Task(project_id=p.id, title=f"T-{s}", status=s))
+            db.add(make_task(db, project_id=p.id, title=f"T-{s}", status=s))
         db.flush()
         db.refresh(p)
         total, done, progress = _compute_progress(p, db)
@@ -39,8 +40,8 @@ class TestComputeProgress:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        db.add(Task(project_id=p.id, title="T1", status="done"))
-        db.add(Task(project_id=p.id, title="T2", status="todo"))
+        db.add(make_task(db, project_id=p.id, title="T1", status="done"))
+        db.add(make_task(db, project_id=p.id, title="T2", status="todo"))
         db.flush()
         db.refresh(p)
         total, done, progress = _compute_progress(p, db)
@@ -238,7 +239,7 @@ class TestFireNotifications:
         p = Project(name="Proj")
         db.add(p)
         db.flush()
-        t = Task(project_id=p.id, title="Task1", status="done", priority="high")
+        t = make_task(db, project_id=p.id, title="Task1", status="done", priority="high")
         db.add(t)
         db.flush()
         db.refresh(p)
@@ -317,7 +318,7 @@ class TestCreateNotification:
         p = Project(name="Proj")
         db.add(p)
         db.flush()
-        t = Task(project_id=p.id, title="Deploy", status="done")
+        t = make_task(db, project_id=p.id, title="Deploy", status="done")
         db.add(t)
         db.flush()
 
@@ -332,7 +333,7 @@ class TestCreateNotification:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        t = Task(project_id=p.id, title="T", status="todo")
+        t = make_task(db, project_id=p.id, title="T", status="todo")
         db.add(t)
         db.flush()
 

@@ -16,6 +16,7 @@ from app.routers.external_api.auth import (
 from app.routers.external_api.helpers import _enrich_project
 from app.schemas import ProjectCreate, ProjectUpdate
 from app.services import graph
+from app.services.enrichment import enrich_task_as_dict
 
 sub_router = APIRouter()
 
@@ -55,9 +56,8 @@ def api_get_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     result = _enrich_project(project, db)
-    result["tasks"] = [
-        {c.name: getattr(t, c.name) for c in t.__table__.columns} for t in graph.tasks_in_project(db, project.id)
-    ]
+    # Tasks are node-only (ADR-0033): serialize each task view through enrichment.
+    result["tasks"] = [enrich_task_as_dict(t, db) for t in graph.tasks_in_project(db, project.id)]
     return result
 
 

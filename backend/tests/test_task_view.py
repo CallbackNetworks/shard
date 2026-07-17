@@ -3,12 +3,13 @@
 import hashlib
 from datetime import UTC, datetime
 
-from app.models import ApiKey, Comment, Node, Task, TaskPullRequest
+from app.models import ApiKey, Comment, Node, TaskPullRequest
 from app.services import graph
+from tests.factories import make_task
 
 
 def _task(db, project_id, **kw):
-    t = Task(project_id=project_id, title=kw.pop("title", "T"), **kw)
+    t = make_task(db, project_id=project_id, title=kw.pop("title", "T"), **kw)
     db.add(t)
     db.commit()
     return t
@@ -109,19 +110,21 @@ def test_task_views_by_ids_and_order(db, sample_project):
     assert [v.title for v in ordered] == ["B", "A"]
 
 
-def test_task_view_matches_task_out(db, sample_project):
-    """enrich_task works identically whether fed a Task or a TaskView."""
+def test_task_view_enriches_to_task_out(db, sample_project):
+    """enrich_task fed a TaskView produces a faithful TaskOut (ADR-0033, node-only)."""
     from app.services.enrichment import enrich_task
 
     t = _task(db, sample_project.id, title="Same", description="d", status="done")
     db.add(Comment(task_id=t.id, project_id=sample_project.id, body="c", author="a"))
     db.commit()
 
-    from_orm = enrich_task(db.get(Task, t.id), db)
-    from_view = enrich_task(graph.get_task(db, t.id), db)
-    # Core fields identical regardless of source object.
-    for field in ("id", "title", "description", "status", "comment_count", "project_id"):
-        assert getattr(from_orm, field) == getattr(from_view, field)
+    out = enrich_task(graph.get_task(db, t.id), db)
+    assert out.id == t.id
+    assert out.title == "Same"
+    assert out.description == "d"
+    assert out.status == "done"
+    assert out.comment_count == 1
+    assert out.project_id == sample_project.id
 
 
 def test_node_helper_ignores_task_view_for_project(db, sample_project):

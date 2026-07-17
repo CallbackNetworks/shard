@@ -1,5 +1,5 @@
-from app.models import Task
 from app.services import graph
+from tests.factories import make_task
 
 
 def _label_url(project_id, suffix=""):
@@ -11,7 +11,7 @@ def _task_label_url(project_id, task_id, label_id):
 
 
 def _make_task(db, project_id):
-    t = Task(project_id=project_id, title="Test task", status="todo")
+    t = make_task(db, project_id=project_id, title="Test task", status="todo")
     db.add(t)
     db.commit()
     db.refresh(t)

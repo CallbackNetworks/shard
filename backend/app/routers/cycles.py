@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task
 from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import sync_task_milestone_to_external
@@ -83,7 +82,7 @@ async def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, d
     if not graph.remove_from_cycle(db, cycle_id, task_id):
         raise HTTPException(status_code=404, detail="Task not in cycle")
     db.commit()
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = graph.get_task(db, task_id)
     if task and task.external_provider:
         await sync_task_milestone_to_external(task, db)
 

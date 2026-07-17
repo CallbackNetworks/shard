@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.cicd_trigger import (
@@ -66,7 +65,7 @@ async def trigger_github(body: GitHubTrigger, task_id: str | None = None, db: Se
     )
 
     if task_id:
-        task = db.query(Task).filter(Task.id == task_id).first()
+        task = graph.get_task(db, task_id)
         if task:
             log_activity(
                 db,
@@ -99,7 +98,7 @@ async def trigger_gitlab(body: GitLabTrigger, task_id: str | None = None, db: Se
     )
 
     if task_id:
-        task = db.query(Task).filter(Task.id == task_id).first()
+        task = graph.get_task(db, task_id)
         if task:
             log_activity(
                 db,
@@ -126,7 +125,7 @@ async def trigger_jenkins(body: JenkinsTrigger, task_id: str | None = None, db: 
     )
 
     if task_id:
-        task = db.query(Task).filter(Task.id == task_id).first()
+        task = graph.get_task(db, task_id)
         if task:
             log_activity(
                 db,
@@ -153,7 +152,7 @@ async def trigger_generic(body: GenericTrigger, task_id: str | None = None, db: 
     )
 
     if task_id:
-        task = db.query(Task).filter(Task.id == task_id).first()
+        task = graph.get_task(db, task_id)
         if task:
             log_activity(
                 db,

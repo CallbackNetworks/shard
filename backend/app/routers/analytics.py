@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Project, Task
+from app.models import ActivityLog, Node, Project
 from app.services import graph
 from app.services.critical_path import compute_critical_path
 from app.services.usage_tracker import tracker
@@ -18,12 +18,13 @@ def get_overview(db: Session = Depends(get_db)):
     now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
 
-    total_tasks = db.query(func.count(Task.id)).scalar() or 0
-    done_tasks = db.query(func.count(Task.id)).filter(Task.status == "done").scalar() or 0
-    in_progress = db.query(func.count(Task.id)).filter(Task.status == "in_progress").scalar() or 0
-    overdue = (
-        db.query(func.count(Task.id)).filter(Task.due_date < now, Task.status.notin_(["done", "failed"])).scalar() or 0
-    )
+    def _task_count():
+        return db.query(func.count(Node.id)).filter(Node.type == graph.NODE_TASK)
+
+    total_tasks = _task_count().scalar() or 0
+    done_tasks = _task_count().filter(Node.status == "done").scalar() or 0
+    in_progress = _task_count().filter(Node.status == "in_progress").scalar() or 0
+    overdue = _task_count().filter(Node.due_date < now, Node.status.notin_(["done", "failed"])).scalar() or 0
 
     # Most active project last 7 days
     activity_counts = (
@@ -97,8 +98,13 @@ def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
     while current <= end:
         day_end = current.replace(hour=23, minute=59, second=59)
         done_count = (
-            db.query(func.count(Task.id))
-            .filter(Task.id.in_(task_ids), Task.status == "done", Task.updated_at <= day_end)
+            db.query(func.count(Node.id))
+            .filter(
+                Node.type == graph.NODE_TASK,
+                Node.id.in_(task_ids),
+                Node.status == "done",
+                Node.updated_at <= day_end,
+            )
             .scalar()
             or 0
         )
@@ -153,7 +159,7 @@ def get_cycle_burndown(
     if not cycle_task_ids:
         return []
 
-    tasks = db.query(Task).filter(Task.id.in_(cycle_task_ids)).all()
+    tasks = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(cycle_task_ids)).all()
     total = len(tasks)
 
     start = cycle.start_date or min((t.created_at for t in tasks), default=datetime.now(UTC))
@@ -229,16 +235,16 @@ def get_estimation_calibration(
     Returns overall calibration (spent/estimate ratio) plus accuracy grouped
     by estimate size, so systematic under/over-estimation becomes visible.
     """
-    q = db.query(Task).filter(
-        Task.status == "done",
-        Task.time_estimate.isnot(None),
-        Task.time_estimate > 0,
-        Task.time_spent.isnot(None),
-        Task.time_spent > 0,
-    )
+    # time_estimate/time_spent live in node.data (JSON); filter them in Python
+    # after the hot-column query for dialect-safety (ADR-0033, node-only tasks).
+    q = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.status == "done")
     if project_id:
-        q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-    tasks = q.order_by(Task.updated_at.desc()).limit(limit).all()
+        q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
+    tasks = [
+        v
+        for v in (graph.task_view(n, db) for n in q.order_by(Node.updated_at.desc()).all())
+        if v.time_estimate and v.time_estimate > 0 and v.time_spent and v.time_spent > 0
+    ][:limit]
 
     if not tasks:
         return {
@@ -315,16 +321,14 @@ def get_estimate_suggestion(
     """
 
     def _completed(scoped_project: str | None):
-        q = db.query(Task).filter(
-            Task.status == "done",
-            Task.time_estimate.isnot(None),
-            Task.time_estimate > 0,
-            Task.time_spent.isnot(None),
-            Task.time_spent > 0,
-        )
+        q = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.status == "done")
         if scoped_project:
-            q = q.filter(Task.id.in_(graph.contained_task_ids(db, scoped_project)))
-        return q.order_by(Task.updated_at.desc()).limit(2000).all()
+            q = q.filter(Node.id.in_(graph.contained_task_ids(db, scoped_project)))
+        return [
+            v
+            for v in (graph.task_view(n, db) for n in q.order_by(Node.updated_at.desc()).all())
+            if v.time_estimate and v.time_estimate > 0 and v.time_spent and v.time_spent > 0
+        ][:2000]
 
     tasks = _completed(project_id)
     basis_scope = "project"
@@ -388,10 +392,10 @@ def get_status_trend(
     result = []
     for i in range(days - 1, -1, -1):
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
-        q = db.query(Task.status, func.count(Task.id)).filter(Task.created_at <= day)
+        q = db.query(Node.status, func.count(Node.id)).filter(Node.type == graph.NODE_TASK, Node.created_at <= day)
         if project_id:
-            q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-        rows = q.group_by(Task.status).all()
+            q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
+        rows = q.group_by(Node.status).all()
         entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
         for status, count in rows:
             if status in entry:

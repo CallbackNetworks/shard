@@ -2,9 +2,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.models import ActivityLog, Comment, Project, Task
+from app.models import ActivityLog, Comment, Project
 from app.services import graph
 from app.services.rate_limiter import _share_limiter
+from tests.factories import make_task
 
 
 @pytest.fixture(autouse=True)
@@ -84,7 +85,8 @@ def test_verify_pin_handles_naive_due_date(client, db, pinned_identity):
     db.flush()
     graph.link_membership(db, pinned_identity.id, project.id)
     db.add(
-        Task(
+        make_task(
+            db,
             project_id=project.id,
             title="Overdue naive task",
             status="todo",
@@ -131,7 +133,7 @@ def test_view_logging_throttle(client, db, sample_identity, sample_project):
 
 
 def test_guest_note_rejected_when_disabled(client, db, sample_project):
-    task = Task(project_id=sample_project.id, title="Hidden thread")
+    task = make_task(db, project_id=sample_project.id, title="Hidden thread")
     db.add(task)
     db.flush()
     db.add(Comment(task_id=task.id, project_id=sample_project.id, author="me", body="internal"))
@@ -173,7 +175,7 @@ def test_project_note_created_and_visible(client, db, sample_project):
 
 def test_task_note_created_and_visible(client, db, sample_project):
     sample_project.allow_guest_notes = True
-    task = Task(project_id=sample_project.id, title="Shared task")
+    task = make_task(db, project_id=sample_project.id, title="Shared task")
     db.add(task)
     db.commit()
 
@@ -233,7 +235,7 @@ def test_task_note_outside_scope_rejected(client, db, sample_project):
     other = Project(name="Other")
     db.add(other)
     db.flush()
-    foreign_task = Task(project_id=other.id, title="Foreign")
+    foreign_task = make_task(db, project_id=other.id, title="Foreign")
     db.add(foreign_task)
     db.commit()
 

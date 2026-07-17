@@ -9,7 +9,7 @@ from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project, Task
+from app.models import Node, Project
 from app.routers.deps import get_project_or_404
 from app.schemas import (
     BulkActionResult,
@@ -101,29 +101,26 @@ async def bulk_update_tasks(
 
     contained = set(graph.contained_task_ids(db, project_id))
     ids = [tid for tid in body.task_ids if tid in contained]
-    tasks = db.query(Task).filter(Task.id.in_(ids)).all() if ids else []
+
+    field_changes: dict = {}
+    if body.status is not None:
+        field_changes["status"] = body.status
+    if body.priority is not None:
+        field_changes["priority"] = body.priority
+    if body.assignee is not None:
+        field_changes["assignee"] = body.assignee
+    if body.is_pinned is not None:
+        field_changes["is_pinned"] = body.is_pinned
 
     updated_ids: list[str] = []
-
-    for task in tasks:
-        if body.status is not None:
-            task.status = body.status
-        if body.priority is not None:
-            task.priority = body.priority
-        if body.assignee is not None:
-            task.assignee = body.assignee
-        if body.is_pinned is not None:
-            task.is_pinned = body.is_pinned
-
-        # Add labels
+    for tid in ids:
+        if field_changes:
+            graph.update_task(db, tid, **field_changes)
         for label_id in body.add_label_ids:
-            graph.set_label(db, task.id, label_id)
-
-        # Remove labels
+            graph.set_label(db, tid, label_id)
         for label_id in body.remove_label_ids:
-            graph.unset_label(db, task.id, label_id)
-
-        updated_ids.append(task.id)
+            graph.unset_label(db, tid, label_id)
+        updated_ids.append(tid)
 
     changes: list[str] = []
     if body.status is not None:
@@ -176,11 +173,15 @@ def export_tasks(
     get_project_or_404(project_id, db)
 
     task_ids = graph.contained_task_ids(db, project_id)
-    tasks = (
-        db.query(Task).filter(Task.id.in_(task_ids)).order_by(Task.position.asc(), Task.created_at.asc()).all()
+    task_nodes = (
+        db.query(Node)
+        .filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids))
+        .order_by(Node.position.asc(), Node.created_at.asc())
+        .all()
         if task_ids
         else []
     )
+    tasks = [graph.task_view(n, db) for n in task_nodes]
 
     rows = []
     for t in tasks:
@@ -301,7 +302,7 @@ _ALARM_QUERY = Query(
 )
 
 
-def _render_calendar(calname: str, tasks: list[Task], alarm: int) -> PlainTextResponse:
+def _render_calendar(calname: str, tasks: list, alarm: int) -> PlainTextResponse:
     stamp = _ical_dt(datetime.now(UTC))
     lines = [
         "BEGIN:VCALENDAR",
@@ -356,8 +357,8 @@ def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(g
     """Personal feed: every due-dated task across all projects (global token)."""
     if not verify_global_ical_token(db, token):
         raise HTTPException(status_code=404, detail="Calendar not found")
-    tasks = db.query(Task).filter(Task.due_date.isnot(None)).all()
-    return _render_calendar("All tasks", tasks, alarm)
+    nodes = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.due_date.isnot(None)).all()
+    return _render_calendar("All tasks", [graph.task_view(n, db) for n in nodes], alarm)
 
 
 @router.get("/ical/identity/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
@@ -368,8 +369,12 @@ def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depe
         raise HTTPException(status_code=404, detail="Calendar not found")
     project_ids = graph.project_ids_for_identity(db, identity.id)
     task_ids = {tid for pid in project_ids for tid in graph.contained_task_ids(db, pid)}
-    tasks = db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
-    return _render_calendar(identity.name, tasks, alarm)
+    nodes = (
+        db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), Node.due_date.isnot(None)).all()
+        if task_ids
+        else []
+    )
+    return _render_calendar(identity.name, [graph.task_view(n, db) for n in nodes], alarm)
 
 
 @router.get("/ical/project/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
@@ -379,5 +384,9 @@ def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depen
     if project is None:
         raise HTTPException(status_code=404, detail="Calendar not found")
     task_ids = graph.contained_task_ids(db, project.id)
-    tasks = db.query(Task).filter(Task.id.in_(task_ids), Task.due_date.isnot(None)).all() if task_ids else []
-    return _render_calendar(project.name, tasks, alarm)
+    nodes = (
+        db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), Node.due_date.isnot(None)).all()
+        if task_ids
+        else []
+    )
+    return _render_calendar(project.name, [graph.task_view(n, db) for n in nodes], alarm)

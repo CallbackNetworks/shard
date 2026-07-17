@@ -5,7 +5,6 @@ from app.models import (
     Comment,
     Integration,
     Project,
-    Task,
 )
 from app.services import graph
 
@@ -17,23 +16,25 @@ def get_project_or_404(project_id: str, db: Session) -> Project:
     return project
 
 
-def get_task_or_404(task_id: str, db: Session, *, project_id: str | None = None) -> Task:
+def get_task_or_404(task_id: str, db: Session, *, project_id: str | None = None) -> graph.TaskView:
     # Project scoping is by graph ``contains`` membership (ADR-0032, no primary).
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = graph.get_task(db, task_id)
     if not task or (project_id and task_id not in graph.contained_task_ids(db, project_id)):
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
-def get_parent_task_or_error(db: Session, project_id: str, parent_id: str, *, child_id: str | None = None) -> Task:
+def get_parent_task_or_error(
+    db: Session, project_id: str, parent_id: str, *, child_id: str | None = None
+) -> graph.TaskView:
     """Validate a ``parent_id`` containment hint (ADR-0032).
 
     The parent must be an existing task contained in this project (404 otherwise;
     a bogus id would mint a phantom node / dangling edge). When re-parenting an
     existing task, the move must not create a containment cycle (400).
     """
-    parent = db.query(Task).filter(Task.id == parent_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if parent is None:
+    parent = graph.get_task(db, parent_id)
+    if parent is None or parent_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Parent task not found")
     if child_id is not None and graph.detect_cycle(db, parent_id, child_id):
         raise HTTPException(status_code=400, detail="Re-parenting would create a containment cycle")

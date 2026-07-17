@@ -4,7 +4,8 @@ import hashlib
 
 import pytest
 
-from app.models import ApiKey, Project, Task
+from app.models import ApiKey, Project
+from tests.factories import make_task
 
 
 @pytest.fixture()
@@ -60,8 +61,8 @@ def project_with_tasks(db):
     p = Project(name="Test Project")
     db.add(p)
     db.flush()
-    t1 = Task(project_id=p.id, title="Task A", status="done", priority="high")
-    t2 = Task(project_id=p.id, title="Task B", status="todo", priority="low")
+    t1 = make_task(db, project_id=p.id, title="Task A", status="done", priority="high")
+    t2 = make_task(db, project_id=p.id, title="Task B", status="todo", priority="low")
     db.add_all([t1, t2])
     db.commit()
     db.refresh(p)

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project, Task
+from app.models import ApiKey, Node, Project
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.routers.external_api.helpers import _enrich_task_for_search
 from app.services import graph
@@ -38,12 +38,18 @@ def api_search(
     if api_key.project_id:
         project_id = api_key.project_id
 
+    # title/description live on the task node (description in JSON data); scan in
+    # Python for dialect-safe substring matching (ADR-0033, node-only tasks).
+    ql = q.lower()
     pattern = f"%{q}%"
-
-    task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
-    if project_id:
-        task_query = task_query.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-    tasks = task_query.order_by(Task.updated_at.desc()).offset(offset).limit(limit).all()
+    scope = set(graph.contained_task_ids(db, project_id)) if project_id else None
+    matched = [
+        n
+        for n in db.query(Node).filter(Node.type == graph.NODE_TASK).order_by(Node.updated_at.desc()).all()
+        if (ql in (n.title or "").lower() or ql in ((n.data or {}).get("description") or "").lower())
+        and (scope is None or n.id in scope)
+    ][offset : offset + limit]
+    tasks = [graph.task_view(n, db) for n in matched]
 
     projects = []
     if not project_id:

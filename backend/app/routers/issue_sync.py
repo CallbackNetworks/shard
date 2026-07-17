@@ -15,13 +15,14 @@ from app.database import get_db
 from app.models import (
     Comment,
     Integration,
+    Node,
     Notification,
     Project,
-    Task,
     TaskPullRequest,
 )
 from app.services import graph
 from app.services.activity import log_activity
+from app.services.enrichment import enrich_task
 from app.services.issue_sync import (
     GITHUB_API_BASE,
     close_github_issue,
@@ -80,20 +81,25 @@ def _get_sync_integration(project_id: str, db: Session) -> Integration | None:
     )
 
 
-def _find_external_task(project_id: str, provider: str, external_id: str, repo: str, db: Session) -> Task | None:
-    return (
-        db.query(Task)
-        .filter(
-            Task.id.in_(graph.contained_task_ids(db, project_id)),
-            Task.external_provider == provider,
-            Task.external_id == external_id,
-            Task.external_repo == repo,
-        )
-        .first()
-    )
+def _find_external_task(
+    project_id: str, provider: str, external_id: str, repo: str, db: Session
+) -> "graph.TaskView | None":
+    # external_provider/id/repo live in node.data (JSON); scan the project's task
+    # nodes and match in Python (ADR-0033, node-only tasks).
+    for node in db.query(Node).filter(
+        Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id))
+    ):
+        data = node.data or {}
+        if (
+            data.get("external_provider") == provider
+            and data.get("external_id") == external_id
+            and data.get("external_repo") == repo
+        ):
+            return graph.task_view(node, db)
+    return None
 
 
-def _apply_external_labels(task: Task, label_names: list[str], db: Session) -> None:
+def _apply_external_labels(task: "graph.TaskView", label_names: list[str], db: Session) -> None:
     """Mirror the external issue's label set onto the task.
 
     Only plain labels (type == "label") are touched; decision labels and other
@@ -172,15 +178,18 @@ async def receive_issue_webhook(
     if existing:
         old_status = existing.status
         new_status = STATUS_MAP.get(normalized["status"], "todo")
-        existing.title = normalized["title"]
-        existing.description = normalized["description"]
-        existing.external_url = normalized["external_url"]
+        changes: dict = {
+            "title": normalized["title"],
+            "description": normalized["description"],
+            "external_url": normalized["external_url"],
+        }
         if new_status != old_status:
-            existing.status = new_status
+            changes["status"] = new_status
         if normalized.get("assignee"):
-            existing.assignee = normalized["assignee"]
+            changes["assignee"] = normalized["assignee"]
         if "due_date" in normalized:
-            existing.due_date = normalized["due_date"]
+            changes["due_date"] = normalized["due_date"]
+        existing = graph.update_task(db, existing.id, **changes)
         _apply_external_labels(existing, normalized.get("labels", []), db)
         apply_inbound_milestone_cycle(existing, normalized.get("milestone"), db)
 
@@ -194,7 +203,6 @@ async def receive_issue_webhook(
             meta={"external_url": normalized["external_url"]},
         )
         db.commit()
-        db.refresh(existing)
         await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": existing.id})
         return {"ok": True, "action": "updated", "task_id": existing.id}
 
@@ -224,7 +232,6 @@ async def receive_issue_webhook(
         meta={"external_url": normalized["external_url"]},
     )
     db.commit()
-    db.refresh(task)
     await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
     return {"ok": True, "action": "created", "task_id": task.id}
 
@@ -293,35 +300,36 @@ async def _handle_comment_event(data: dict, project_id: str, db: Session) -> dic
     return {"ok": True, "action": "comment_created", "comment_id": comment.id}
 
 
-def _find_pr_tasks(pr_data: dict, project_id: str, db: Session) -> list[Task]:
+def _find_pr_tasks(pr_data: dict, project_id: str, db: Session) -> list:
     """Tasks referenced via 'Fixes #N' in the PR body, plus tasks already linked to this PR."""
     repo = pr_data["repo"]
     pr_number = str(pr_data["pr_number"])
-    tasks: dict[str, Task] = {}
+    tasks: dict = {}
 
     for ref_num in pr_data.get("issue_refs", []):
         task = _find_external_task(project_id, "github", ref_num, repo, db)
         if task:
             tasks[task.id] = task
 
+    contained = set(graph.contained_task_ids(db, project_id))
     links = (
         db.query(TaskPullRequest)
-        .join(Task, Task.id == TaskPullRequest.task_id)
         .filter(
-            Task.id.in_(graph.contained_task_ids(db, project_id)),
+            TaskPullRequest.task_id.in_(contained),
             TaskPullRequest.repo == repo,
             TaskPullRequest.pr_number == pr_number,
         )
         .all()
     )
     for link in links:
-        if link.task is not None:
-            tasks[link.task_id] = link.task
+        task = graph.get_task(db, link.task_id)
+        if task is not None:
+            tasks[link.task_id] = task
 
     return list(tasks.values())
 
 
-def _upsert_pr_link(db: Session, task: Task, pr_data: dict, state: str | None) -> TaskPullRequest:
+def _upsert_pr_link(db: Session, task: "graph.TaskView", pr_data: dict, state: str | None) -> TaskPullRequest:
     """Create or refresh the structured PR link on a task. state=None keeps the current state."""
     pr_number = str(pr_data["pr_number"])
     link = (
@@ -390,6 +398,7 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         for task in tasks:
             _upsert_pr_link(db, task, pr_data, "open")
             if action in ("opened", "reopened") and task.status == "todo":
+                graph.update_task(db, task.id, status="in_progress")
                 task.status = "in_progress"
                 log_activity(
                     db,
@@ -440,6 +449,7 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         for task in tasks:
             _upsert_pr_link(db, task, pr_data, "merged")
             if task.status != "done":
+                graph.update_task(db, task.id, status="done")
                 task.status = "done"
                 log_activity(
                     db,
@@ -453,18 +463,20 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
             affected_task_ids.append(task.id)
 
         # Legacy fallback: tasks whose description contains this PR URL
-        # (from the pre-ADR-0016 description-append linking)
-        tasks_with_pr_url = (
-            db.query(Task)
-            .filter(
-                Task.id.in_(graph.contained_task_ids(db, project_id)),
-                Task.description.contains(pr_url),
-                Task.status != "done",
+        # (from the pre-ADR-0016 description-append linking). description lives in
+        # node.data (JSON), so scan the project's task nodes in Python.
+        tasks_with_pr_url = [
+            graph.task_view(n, db)
+            for n in db.query(Node).filter(
+                Node.type == graph.NODE_TASK,
+                Node.id.in_(graph.contained_task_ids(db, project_id)),
+                Node.status != "done",
             )
-            .all()
-        )
+            if pr_url in ((n.data or {}).get("description") or "")
+        ]
         for task in tasks_with_pr_url:
             if task.id not in affected_task_ids:
+                graph.update_task(db, task.id, status="done")
                 task.status = "done"
                 log_activity(
                     db,
@@ -551,7 +563,7 @@ async def _handle_pr_review_event(data: dict, project_id: str, db: Session) -> d
     return {"ok": True, "action": f"pr_review_{review_state}", "affected_tasks": affected_task_ids}
 
 
-def _external_sync_target(task: Task, db: Session) -> tuple[str, str] | None:
+def _external_sync_target(task: "graph.TaskView", db: Session) -> tuple[str, str] | None:
     """Return (token, api_base_or_gitlab_url) when the task is linked and sync is configured."""
     if not task.external_provider or not task.external_id or not task.external_repo:
         return None
@@ -565,7 +577,7 @@ def _external_sync_target(task: Task, db: Session) -> tuple[str, str] | None:
     return None
 
 
-async def sync_task_closure_to_external(task: Task, db: Session) -> bool:
+async def sync_task_closure_to_external(task: "graph.TaskView", db: Session) -> bool:
     """
     When a Shard task is marked done, close the corresponding external issue.
     Returns True if an external issue was closed.
@@ -579,7 +591,7 @@ async def sync_task_closure_to_external(task: Task, db: Session) -> bool:
     return await close_gitlab_issue(task.external_repo, task.external_id, token, base)
 
 
-async def sync_task_reopen_to_external(task: Task, db: Session) -> bool:
+async def sync_task_reopen_to_external(task: "graph.TaskView", db: Session) -> bool:
     """
     When a done Shard task is moved back to an open status, reopen the external issue.
     Returns True if an external issue was reopened.
@@ -593,7 +605,7 @@ async def sync_task_reopen_to_external(task: Task, db: Session) -> bool:
     return await reopen_gitlab_issue(task.external_repo, task.external_id, token, base)
 
 
-async def sync_task_fields_to_external(task: Task, db: Session, changed: set[str]) -> bool:
+async def sync_task_fields_to_external(task: "graph.TaskView", db: Session, changed: set[str]) -> bool:
     """
     Push changed task fields (title, description, assignee, due_date) to the linked issue.
 
@@ -644,7 +656,7 @@ async def sync_task_fields_to_external(task: Task, db: Session, changed: set[str
     return await update_gitlab_issue_fields(task.external_repo, task.external_id, payload, token, base)
 
 
-async def sync_comment_to_external(comment: Comment, task: Task, db: Session) -> bool:
+async def sync_comment_to_external(comment: Comment, task: "graph.TaskView", db: Session) -> bool:
     """
     Push a Shard-created comment to the linked external issue and store the
     returned external comment id (used to skip the webhook echo).
@@ -666,7 +678,7 @@ async def sync_comment_to_external(comment: Comment, task: Task, db: Session) ->
     return True
 
 
-async def sync_comment_update_to_external(comment: Comment, task: Task, db: Session) -> bool:
+async def sync_comment_update_to_external(comment: Comment, task: "graph.TaskView", db: Session) -> bool:
     """Push an edited Shard comment body to the linked external comment."""
     if not comment.external_id:
         return False
@@ -681,7 +693,7 @@ async def sync_comment_update_to_external(comment: Comment, task: Task, db: Sess
     )
 
 
-async def sync_comment_delete_to_external(external_comment_id: str, task: Task, db: Session) -> bool:
+async def sync_comment_delete_to_external(external_comment_id: str, task: "graph.TaskView", db: Session) -> bool:
     """Delete the linked external comment after a Shard comment is deleted."""
     target = _external_sync_target(task, db)
     if not target:
@@ -692,7 +704,7 @@ async def sync_comment_delete_to_external(external_comment_id: str, task: Task, 
     return await delete_gitlab_issue_note(task.external_repo, task.external_id, external_comment_id, token, base)
 
 
-async def sync_labels_to_external(task: Task, db: Session) -> bool:
+async def sync_labels_to_external(task: "graph.TaskView", db: Session) -> bool:
     """Replace the external issue's labels with the task's current plain-label set."""
     target = _external_sync_target(task, db)
     if not target:
@@ -704,7 +716,7 @@ async def sync_labels_to_external(task: Task, db: Session) -> bool:
     return await replace_gitlab_issue_labels(task.external_repo, task.external_id, names, token, base)
 
 
-def _task_primary_cycle(task: Task, db: Session) -> graph.CycleView | None:
+def _task_primary_cycle(task: "graph.TaskView", db: Session) -> graph.CycleView | None:
     """The cycle whose milestone an issue should mirror.
 
     An external issue has a single milestone slot but a Shard task may sit in
@@ -714,7 +726,7 @@ def _task_primary_cycle(task: Task, db: Session) -> graph.CycleView | None:
     return cycles[0] if cycles else None
 
 
-async def sync_task_milestone_to_external(task: Task, db: Session) -> bool:
+async def sync_task_milestone_to_external(task: "graph.TaskView", db: Session) -> bool:
     """Mirror the task's cycle membership onto the linked issue's milestone.
 
     Cycle name maps to milestone title, and the cycle's end_date to the milestone
@@ -747,7 +759,7 @@ async def sync_task_milestone_to_external(task: Task, db: Session) -> bool:
     return await set_gitlab_issue_milestone(task.external_repo, task.external_id, milestone_id, token, base)
 
 
-def apply_inbound_milestone_cycle(task: Task, milestone_title: str | None, db: Session) -> None:
+def apply_inbound_milestone_cycle(task: "graph.TaskView", milestone_title: str | None, db: Session) -> None:
     """Add the task to the same-named cycle when an issue carries a milestone.
 
     Maps to an existing cycle only (never auto-creates one, ADR-0029) and is
@@ -764,7 +776,9 @@ def apply_inbound_milestone_cycle(task: Task, milestone_title: str | None, db: S
         graph.add_to_cycle(db, cycle.id, task.id)
 
 
-async def create_external_issue_from_task(task: Task, project: Project, db: Session, provider: str | None = None):
+async def create_external_issue_from_task(
+    task: "graph.TaskView", project: Project, db: Session, provider: str | None = None
+):
     """Create a new external issue from a Shard-origin task and link it back.
 
     Explicit user action (last-write-wins does not apply — the task is the source
@@ -805,10 +819,14 @@ async def create_external_issue_from_task(task: Task, project: Project, db: Sess
     if not result:
         raise HTTPException(status_code=502, detail="External issue creation failed; check the token and repo URL")
 
-    task.external_provider = parsed["provider"]
-    task.external_id = result["number"]
-    task.external_url = result["url"]
-    task.external_repo = parsed["repo"]
+    task = graph.update_task(
+        db,
+        task.id,
+        external_provider=parsed["provider"],
+        external_id=result["number"],
+        external_url=result["url"],
+        external_repo=parsed["repo"],
+    )
 
     log_activity(
         db,
@@ -820,8 +838,8 @@ async def create_external_issue_from_task(task: Task, project: Project, db: Sess
         meta={"external_url": result["url"], "external_repo": parsed["repo"]},
     )
     db.commit()
-    db.refresh(task)
+    task = graph.get_task(db, task.id)
     await ws_manager.broadcast(
         "task.updated", {"project_id": graph.project_id_of_task(db, task.id), "task_id": task.id}
     )
-    return task
+    return enrich_task(task, db)

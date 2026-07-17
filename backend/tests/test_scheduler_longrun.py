@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 import app.services.scheduler as sched
-from app.models import Integration, Project, RecurrenceRule, Task
+from app.models import Integration, Node, Project, RecurrenceRule
 from app.services.scheduler import (
     _check_and_fire,
     _check_recurring,
@@ -21,6 +21,7 @@ from app.services.scheduler import (
     _send_weekly_digest,
     get_scheduler_health,
 )
+from tests.factories import make_task
 
 
 class FakeClock:
@@ -130,7 +131,7 @@ class TestReminderCadenceLongRun:
         db.add(p)
         db.flush()
         clock = FakeClock(MONDAY)
-        t = Task(project_id=p.id, title="Due later", status="todo", due_date=MONDAY + timedelta(hours=30))
+        t = make_task(db, project_id=p.id, title="Due later", status="todo", due_date=MONDAY + timedelta(hours=30))
         db.add(t)
         db.commit()
 
@@ -153,7 +154,7 @@ class TestRecurringLongRun:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        template = Task(project_id=p.id, title="Daily standup", status="todo")
+        template = make_task(db, project_id=p.id, title="Daily standup", status="todo")
         db.add(template)
         db.flush()
         rule = RecurrenceRule(template_task_id=template.id, frequency="daily", next_run_at=MONDAY, active=True)
@@ -166,7 +167,9 @@ class TestRecurringLongRun:
                 clock.advance(timedelta(hours=1))
                 await _check_recurring(db)
 
-        clones = db.query(Task).filter(Task.title == "Daily standup", Task.id != template.id).count()
+        clones = (
+            db.query(Node).filter(Node.type == "task", Node.title == "Daily standup", Node.id != template.id).count()
+        )
         assert clones == 3
 
 
@@ -177,7 +180,7 @@ class TestTickIsolation:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        template = Task(project_id=p.id, title="Survivor", status="todo")
+        template = make_task(db, project_id=p.id, title="Survivor", status="todo")
         db.add(template)
         db.flush()
         rule = RecurrenceRule(
@@ -193,7 +196,7 @@ class TestTickIsolation:
         with patch("app.services.scheduler.get_system_settings", return_value=_full_settings()):
             await _run_tick(db)
 
-        clones = db.query(Task).filter(Task.title == "Survivor", Task.id != template.id).count()
+        clones = db.query(Node).filter(Node.type == "task", Node.title == "Survivor", Node.id != template.id).count()
         assert clones == 1, "recurring check should still run after an earlier check crashed"
         assert get_scheduler_health()["alive"] is True
 

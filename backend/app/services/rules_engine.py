@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, object_session
 
-from app.models import Comment, Task, WorkflowRule
+from app.models import Comment, WorkflowRule
 from app.services import graph
 from app.services.activity import log_activity
 
@@ -22,7 +22,7 @@ SUPPORTED_TRIGGERS = {
 }
 
 
-def _eval_condition(cond: dict, task: Task, context: dict) -> bool:
+def _eval_condition(cond: dict, task: "graph.TaskView", context: dict) -> bool:
     field = cond.get("field", "")
     op = cond.get("op", "eq")
     value = cond.get("value", "")
@@ -53,17 +53,22 @@ def _eval_condition(cond: dict, task: Task, context: dict) -> bool:
     return False
 
 
-def _exec_action(db: Session, action: dict, task: Task) -> None:
+def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> None:
     atype = action.get("type", "")
     value = action.get("value", "")
 
+    # Task is node-only (ADR-0033): persist via graph.update_task and mirror onto
+    # the in-memory view so later conditions in this run see the new value.
     if atype == "set_status":
         if value in ("todo", "in_progress", "done", "failed"):
+            graph.update_task(db, task.id, status=value)
             task.status = value
     elif atype == "set_priority":
         if value in ("low", "medium", "high"):
+            graph.update_task(db, task.id, priority=value)
             task.priority = value
     elif atype == "set_assignee":
+        graph.update_task(db, task.id, assignee=value or None)
         task.assignee = value or None
     elif atype == "add_label":
         label = graph.get_label(db, value, project_id=graph.project_id_of_task(db, task.id))
@@ -96,7 +101,7 @@ def _exec_action(db: Session, action: dict, task: Task) -> None:
 async def run_rules(
     db: Session,
     trigger: str,
-    task: Task,
+    task: "graph.TaskView",
     context: dict,
 ) -> None:
     """

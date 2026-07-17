@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task, WorkflowRule
+from app.models import WorkflowRule
 from app.schemas import WorkflowRuleCreate, WorkflowRuleOut, WorkflowRuleUpdate
+from app.services import graph
 
 router = APIRouter(prefix="/workflow-rules", tags=["workflow-rules"])
 
@@ -74,7 +75,7 @@ async def test_rule(rule_id: str, task_id: str | None = Query(None), db: Session
         raise HTTPException(status_code=404, detail="Rule not found")
     if task_id is None:
         raise HTTPException(status_code=422, detail="Either task_id query parameter is required")
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = graph.get_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 

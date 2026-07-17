@@ -5,8 +5,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import ActivityLog, Project, Task
+from app.models import ActivityLog, Node, Project
 from app.services.scheduler import _check_sla_aging
+from tests.factories import make_task
 
 
 def _now():
@@ -23,12 +24,12 @@ def _make_project(db, name="SLA Project"):
 
 def _make_task(db, project_id, title, status="in_progress", priority="medium", days_ago=0):
     """Create a task with updated_at backdated by days_ago."""
-    t = Task(project_id=project_id, title=title, status=status, priority=priority)
+    t = make_task(db, project_id=project_id, title=title, status=status, priority=priority)
     db.add(t)
     db.flush()
     if days_ago > 0:
         backdated = _now() - timedelta(days=days_ago)
-        db.execute(Task.__table__.update().where(Task.__table__.c.id == t.id).values(updated_at=backdated))
+        db.execute(Node.__table__.update().where(Node.__table__.c.id == t.id).values(updated_at=backdated))
         db.commit()
         db.refresh(t)
     return t

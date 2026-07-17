@@ -7,14 +7,13 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import (
     ActivityLog,
     Comment,
     Project,
-    Task,
 )
 from app.services import graph
 from app.services.activity import log_activity
@@ -111,7 +110,7 @@ def _serialize_comment(c: Comment):
 
 def _serialize_project(p: Project, db: Session, include_notes: bool):
     task_ids = graph.contained_task_ids(db, p.id)
-    tasks = db.query(Task).options(selectinload(Task.comments)).filter(Task.id.in_(task_ids)).all() if task_ids else []
+    tasks = graph.task_views_for_ids(db, task_ids) if task_ids else []
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
 
@@ -531,7 +530,7 @@ def create_guest_task_note(
     projects = _resolve_note_target(scope, token, request, db)
     project_ids = [p.id for p in projects]
     task_ids = {tid for pid in project_ids for tid in graph.contained_task_ids(db, pid)}
-    task = db.query(Task).filter(Task.id == task_id).first() if task_id in task_ids else None
+    task = graph.get_task(db, task_id) if task_id in task_ids else None
     if not task:
         raise HTTPException(status_code=404, detail="Task not found in this share")
     # Attribute the note to a project inside the share scope — a cross-project

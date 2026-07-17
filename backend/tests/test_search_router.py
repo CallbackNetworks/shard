@@ -1,4 +1,5 @@
-from app.models import Project, Task
+from app.models import Project
+from tests.factories import make_task
 
 
 def test_search_empty(client, sample_project):
@@ -10,7 +11,7 @@ def test_search_empty(client, sample_project):
 
 
 def test_search_finds_task(client, db, sample_project):
-    t = Task(project_id=sample_project.id, title="Deploy to production", status="todo")
+    t = make_task(db, project_id=sample_project.id, title="Deploy to production", status="todo")
     db.add(t)
     db.commit()
 
@@ -31,7 +32,7 @@ def test_search_finds_project(client, sample_project):
 
 
 def test_search_case_insensitive(client, db, sample_project):
-    t = Task(project_id=sample_project.id, title="URGENT BUG FIX", status="todo")
+    t = make_task(db, project_id=sample_project.id, title="URGENT BUG FIX", status="todo")
     db.add(t)
     db.commit()
 
@@ -47,8 +48,8 @@ def test_search_filter_project(client, db, sample_project):
     db.add(other)
     db.flush()
 
-    t1 = Task(project_id=sample_project.id, title="Task in sample", status="todo")
-    t2 = Task(project_id=other.id, title="Task in other", status="todo")
+    t1 = make_task(db, project_id=sample_project.id, title="Task in sample", status="todo")
+    t2 = make_task(db, project_id=other.id, title="Task in other", status="todo")
     db.add_all([t1, t2])
     db.commit()
 
@@ -66,7 +67,7 @@ def test_search_filter_project(client, db, sample_project):
 
 def test_search_pagination(client, db, sample_project):
     for i in range(5):
-        db.add(Task(project_id=sample_project.id, title=f"Paginate task {i}", status="todo"))
+        db.add(make_task(db, project_id=sample_project.id, title=f"Paginate task {i}", status="todo"))
     db.commit()
 
     # Limit to 2

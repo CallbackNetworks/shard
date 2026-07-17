@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project, Task
+from app.models import ApiKey, Node, Project
 from app.routers.deps import get_parent_task_or_error
 from app.routers.external_api.auth import (
     _auth_errors,
@@ -40,12 +40,12 @@ def api_list_tasks(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    query = db.query(Task).filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
+    query = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status_filter:
-        query = query.filter(Task.status == status_filter)
+        query = query.filter(Node.status == status_filter)
     if priority:
-        query = query.filter(Task.priority == priority)
-    return [enrich_task(t, db) for t in query.order_by(Task.created_at.asc()).all()]
+        query = query.filter(Node.priority == priority)
+    return [enrich_task(graph.task_view(n, db), db) for n in query.order_by(Node.created_at.asc()).all()]
 
 
 @sub_router.get(
@@ -63,8 +63,8 @@ def api_get_task(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
+    task = graph.get_task(db, task_id)
+    if not task or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
     return enrich_task(task, db)
 
@@ -103,8 +103,7 @@ def api_create_task(
         meta={"title": task.title, "priority": task.priority, "api_key": api_key.name, "agent_id": x_agent_id},
     )
     db.commit()
-    db.refresh(task)
-    return enrich_task(task, db)
+    return enrich_task(graph.get_task(db, task.id), db)
 
 
 @sub_router.patch(
@@ -124,8 +123,8 @@ async def api_update_task(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
+    task = graph.get_task(db, task_id)
+    if not task or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
     old_status = task.status
     changes = body.model_dump(exclude_none=True)
@@ -134,8 +133,8 @@ async def api_update_task(
     if new_parent_id is not None:
         get_parent_task_or_error(db, project_id, new_parent_id, child_id=task_id)
         graph.set_parent_task(db, task_id, new_parent_id)
-    for field, value in changes.items():
-        setattr(task, field, value)
+    if changes:
+        task = graph.update_task(db, task_id, **changes)
 
     actor = _build_actor(api_key, x_agent_id)
     if body.status and body.status != old_status:
@@ -150,7 +149,7 @@ async def api_update_task(
         )
 
     db.commit()
-    db.refresh(task)
+    task = graph.get_task(db, task_id)
 
     # Fire notifications on status change
     if body.status and body.status != old_status:
@@ -179,8 +178,8 @@ def api_delete_task(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
+    task = graph.get_task(db, task_id)
+    if not task or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
     graph.delete_task_tree(db, task.id)
     db.commit()
@@ -212,11 +211,9 @@ async def api_bulk_create_tasks(
         if body.parent_id is not None:
             get_parent_task_or_error(db, project_id, body.parent_id)
         task = graph.create_task(db, project_id=project_id, **body.model_dump())
-        created.append(task)
+        created.append(task.id)
     db.commit()
-    for t in created:
-        db.refresh(t)
-    return [enrich_task(t, db) for t in created]
+    return [enrich_task(graph.get_task(db, tid), db) for tid in created]
 
 
 @sub_router.post(
@@ -254,10 +251,11 @@ async def api_bulk_update_tasks(
         task_id = update.pop("id", None)
         if not task_id:
             continue
-        task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-        if not task:
+        task = graph.get_task(db, task_id)
+        if not task or task_id not in graph.contained_task_ids(db, project_id):
             continue
         old_status = task.status
+        changes: dict = {}
         for field, value in update.items():
             if field not in _ALLOWED_FIELDS:
                 continue
@@ -273,14 +271,14 @@ async def api_bulk_update_tasks(
                 if len(value.strip()) > 500:
                     raise HTTPException(status_code=422, detail="Title must be 500 characters or fewer")
                 value = value.strip()
-            setattr(task, field, value)
-        results.append(task)
+            changes[field] = value
+        if changes:
+            task = graph.update_task(db, task_id, **changes)
+        results.append(task_id)
 
         if "status" in update and update["status"] != old_status:
             event = f"task.{update['status']}"
             await fire_notifications(db, task, event)
 
     db.commit()
-    for t in results:
-        db.refresh(t)
-    return results
+    return [enrich_task(graph.get_task(db, tid), db) for tid in results]

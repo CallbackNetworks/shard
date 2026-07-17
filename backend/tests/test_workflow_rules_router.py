@@ -1,10 +1,10 @@
-from app.models import Task
+from tests.factories import make_task
 
 
 def _make_task(db, project_id, **overrides):
     defaults = {"project_id": project_id, "title": "Test task", "status": "todo", "priority": "medium"}
     defaults.update(overrides)
-    t = Task(**defaults)
+    t = make_task(db, **defaults)
     db.add(t)
     db.commit()
     db.refresh(t)

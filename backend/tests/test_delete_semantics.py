@@ -5,7 +5,7 @@ exclusively owns but keeps tasks also linked into another project. These replace
 old ``project_id``/``parent_id`` FK ``ondelete CASCADE`` + ORM ``delete-orphan``.
 """
 
-from app.models import Node, Task
+from app.models import Node
 from app.services import graph
 
 
@@ -29,9 +29,9 @@ def test_delete_task_cascades_subtasks(client, db):
     assert client.delete(f"/projects/{p}/tasks/{parent}").status_code == 204
 
     # The whole subtree is gone.
-    assert db.get(Task, parent) is None
-    assert db.get(Task, sub) is None
-    assert db.get(Task, subsub) is None
+    assert db.get(Node, parent) is None
+    assert db.get(Node, sub) is None
+    assert db.get(Node, subsub) is None
 
 
 def test_delete_project_deletes_its_tasks(client, db):
@@ -41,8 +41,8 @@ def test_delete_project_deletes_its_tasks(client, db):
 
     assert client.delete(f"/projects/{p}").status_code == 204
 
-    assert db.get(Task, parent) is None
-    assert db.get(Task, sub) is None
+    assert db.get(Node, parent) is None
+    assert db.get(Node, sub) is None
 
 
 def test_delete_project_keeps_task_shared_with_another(client, db):
@@ -54,7 +54,7 @@ def test_delete_project_keeps_task_shared_with_another(client, db):
     assert client.delete(f"/projects/{a}").status_code == 204
 
     # The task survives because it is still linked into project B.
-    assert db.get(Task, t) is not None
+    assert db.get(Node, t) is not None
     proj_b = client.get(f"/projects/{b}").json()
     assert t in [x["id"] for x in proj_b["tasks"]]
 
@@ -70,9 +70,9 @@ def test_delete_project_keeps_subtask_shared_with_another(client, db):
     assert client.delete(f"/projects/{a}").status_code == 204
 
     # The exclusively-owned parent dies; the shared subtask survives with its own subtree.
-    assert db.get(Task, parent) is None
-    assert db.get(Task, sub) is not None
-    assert db.get(Task, subsub) is not None
+    assert db.get(Node, parent) is None
+    assert db.get(Node, sub) is not None
+    assert db.get(Node, subsub) is not None
     proj_b = client.get(f"/projects/{b}").json()
     ids = [x["id"] for x in proj_b["tasks"]]
     assert sub in ids
@@ -111,8 +111,8 @@ def test_delete_task_keeps_subtask_shared_with_another_project(client, db):
     assert client.delete(f"/projects/{a}/tasks/{parent}").status_code == 204
 
     # The shared subtask survives in B and fully leaves the deleted tree's project.
-    assert db.get(Task, parent) is None
-    assert db.get(Task, sub) is not None
+    assert db.get(Node, parent) is None
+    assert db.get(Node, sub) is not None
     proj_a = client.get(f"/projects/{a}").json()
     assert sub not in [x["id"] for x in proj_a["tasks"]]
     proj_b = client.get(f"/projects/{b}").json()

@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, ApiKey, Project, Task
+from app.models import ActivityLog, ApiKey, Node, Project
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -40,15 +40,15 @@ def api_analytics_overview(
     pid_task_ids = graph.contained_task_ids(db, pid) if pid else None
 
     def _task_count(*filters):
-        q = db.query(func.count(Task.id))
+        q = db.query(func.count(Node.id)).filter(Node.type == graph.NODE_TASK)
         if pid:
-            q = q.filter(Task.id.in_(pid_task_ids))
+            q = q.filter(Node.id.in_(pid_task_ids))
         return (q.filter(*filters).scalar() or 0) if filters else (q.scalar() or 0)
 
     total_tasks = _task_count()
-    done_tasks = _task_count(Task.status == "done")
-    in_progress = _task_count(Task.status == "in_progress")
-    overdue = _task_count(Task.due_date < now, Task.status.notin_(["done", "failed"]))
+    done_tasks = _task_count(Node.status == "done")
+    in_progress = _task_count(Node.status == "in_progress")
+    overdue = _task_count(Node.due_date < now, Node.status.notin_(["done", "failed"]))
 
     proj_q = db.query(func.count(Project.id))
     if pid:
@@ -133,10 +133,10 @@ def api_analytics_status_trend(
     result = []
     for i in range(days - 1, -1, -1):
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
-        q = db.query(Task.status, func.count(Task.id)).filter(Task.created_at <= day)
+        q = db.query(Node.status, func.count(Node.id)).filter(Node.type == graph.NODE_TASK, Node.created_at <= day)
         if project_id:
-            q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-        rows = q.group_by(Task.status).all()
+            q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
+        rows = q.group_by(Node.status).all()
         entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
         for s, count in rows:
             if s in entry:

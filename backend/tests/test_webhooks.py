@@ -1,8 +1,8 @@
-from app.models import Task
+from tests.factories import make_task
 
 
 def _make_task(db, project_id, title="Test Task", status="todo"):
-    task = Task(project_id=project_id, title=title, status=status)
+    task = make_task(db, project_id=project_id, title=title, status=status)
     db.add(task)
     db.commit()
     db.refresh(task)

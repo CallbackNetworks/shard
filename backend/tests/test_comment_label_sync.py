@@ -4,8 +4,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import Comment, Integration, Task
+from app.models import Comment, Integration
 from app.services import graph
+from tests.factories import find_task_by_external_id, make_task
 
 
 def _make_external_task(db, project_id, **overrides):
@@ -18,7 +19,7 @@ def _make_external_task(db, project_id, **overrides):
         external_url="https://github.com/owner/repo/issues/42",
     )
     defaults.update(overrides)
-    task = Task(**defaults)
+    task = make_task(db, **defaults)
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -255,7 +256,7 @@ class TestInboundLabelMirror:
             headers={"x-github-event": "issues"},
         )
         assert r.status_code == 200
-        task = db.query(Task).filter(Task.external_id == "77").first()
+        task = find_task_by_external_id(db, "77")
         assert task is not None
         assert [lb.name for lb in graph.labels_for_task(db, task.id)] == ["feature"]
 
@@ -341,7 +342,7 @@ class TestOutboundFieldSync:
     @patch("app.routers.issue_sync.update_github_issue_fields", new_callable=AsyncMock, return_value=True)
     def test_local_task_not_pushed(self, mock_update, client, sample_project, db):
         _make_integration(db, sample_project.id)
-        task = Task(project_id=sample_project.id, title="Local task")
+        task = make_task(db, project_id=sample_project.id, title="Local task")
         db.add(task)
         db.commit()
         db.refresh(task)
@@ -483,7 +484,7 @@ class TestOutboundLabels:
     @patch("app.routers.issue_sync.replace_github_issue_labels", new_callable=AsyncMock, return_value=True)
     def test_local_task_labels_not_pushed(self, mock_replace, client, sample_project, db):
         _make_integration(db, sample_project.id)
-        task = Task(project_id=sample_project.id, title="Local task")
+        task = make_task(db, project_id=sample_project.id, title="Local task")
         db.add(task)
         db.flush()
         label = graph.create_label(db, sample_project.id, name="bug")

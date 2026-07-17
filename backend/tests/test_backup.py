@@ -4,9 +4,10 @@ import zipfile
 
 import pytest
 
-from app.models import Comment, Task
+from app.models import Comment, Edge, Node
 from app.services import backup as backup_service
 from app.services import graph
+from tests.factories import make_task
 
 
 def _make_backup_file(tmp_path, name):
@@ -14,7 +15,7 @@ def _make_backup_file(tmp_path, name):
 
 
 def test_export_backup_contains_all_data(client, db, sample_project):
-    task = Task(project_id=sample_project.id, title="Backed up task", status="todo")
+    task = make_task(db, project_id=sample_project.id, title="Backed up task", status="todo")
     db.add(task)
     db.commit()
 
@@ -29,14 +30,13 @@ def test_export_backup_contains_all_data(client, db, sample_project):
         assert "data.json" in names
         meta = json.loads(zf.read("meta.json"))
         assert meta["format_version"] == 1
-        assert meta["table_counts"]["tasks"] == 1
         data = json.loads(zf.read("data.json"))
 
-    assert {t["title"] for t in data["tasks"]} == {"Backed up task"}
+    # Tasks are node-only now (ADR-0033 B5): there is no ``tasks`` table; they ride
+    # in the ``nodes`` table with type "task".
+    assert "tasks" not in data
+    assert {n["title"] for n in data["nodes"] if n["type"] == "task"} == {"Backed up task"}
     assert {p["name"] for p in data["projects"]} == {sample_project.name}
-    # Every ORM table is present in the dump, even when empty. Labels are
-    # node-only (ADR-0033) so they ride in the ``nodes`` table now.
-    assert "nodes" in data
     assert "webhook_deliveries" in data
 
 
@@ -97,10 +97,11 @@ def test_prune_backups_never_deletes_below_one(tmp_path):
 
 
 def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
-    parent = Task(project_id=sample_project.id, title="Parent task", status="todo")
+    parent = make_task(db, project_id=sample_project.id, title="Parent task", status="todo")
     db.add(parent)
     db.flush()
-    child = Task(
+    child = make_task(
+        db,
         project_id=sample_project.id,
         parent_id=parent.id,
         title="Child task",
@@ -114,11 +115,12 @@ def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
 
     archive = client.get("/backup/export").content
 
-    # Simulate operator error: wipe everything.
+    # Simulate operator error: wipe everything (tasks are node-only, ADR-0033).
     db.query(Comment).delete()
-    db.query(Task).delete()
+    db.query(Edge).delete()
+    db.query(Node).delete()
     db.commit()
-    assert db.query(Task).count() == 0
+    assert db.query(Node).filter(Node.type == "task").count() == 0
 
     resp = client.post(
         "/backup/restore",
@@ -127,14 +129,13 @@ def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["table_counts"]["tasks"] == 2
     assert body["table_counts"]["comments"] == 1
 
     db.expire_all()
-    titles = {t.title for t in db.query(Task).all()}
+    titles = {n.title for n in db.query(Node).filter(Node.type == "task").all()}
     assert titles == {"Parent task", "Child task"}
-    # Parent link (now a contains edge, ADR-0032) survives the restore.
-    restored_child = db.query(Task).filter_by(title="Child task").one()
+    # Parent link (a contains edge, ADR-0032) survives the restore.
+    restored_child = db.query(Node).filter(Node.type == "task", Node.title == "Child task").one()
     assert graph.parent_task_map(db, [restored_child.id]).get(restored_child.id) == parent_id
     assert db.query(Comment).count() == 1
 

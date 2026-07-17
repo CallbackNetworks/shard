@@ -1,4 +1,4 @@
-from app.models import Task
+from tests.factories import make_task
 
 
 def test_create_project(client):
@@ -100,10 +100,10 @@ def test_progress_no_tasks(client, sample_project):
 
 def test_progress_with_tasks(client, db, sample_project):
     tasks = [
-        Task(project_id=sample_project.id, title="Task 1", status="done"),
-        Task(project_id=sample_project.id, title="Task 2", status="done"),
-        Task(project_id=sample_project.id, title="Task 3", status="todo"),
-        Task(project_id=sample_project.id, title="Task 4", status="in_progress"),
+        make_task(db, project_id=sample_project.id, title="Task 1", status="done"),
+        make_task(db, project_id=sample_project.id, title="Task 2", status="done"),
+        make_task(db, project_id=sample_project.id, title="Task 3", status="todo"),
+        make_task(db, project_id=sample_project.id, title="Task 4", status="in_progress"),
     ]
     db.add_all(tasks)
     db.commit()
@@ -117,8 +117,8 @@ def test_progress_with_tasks(client, db, sample_project):
 
 def test_progress_all_done(client, db, sample_project):
     tasks = [
-        Task(project_id=sample_project.id, title="Task A", status="done"),
-        Task(project_id=sample_project.id, title="Task B", status="done"),
+        make_task(db, project_id=sample_project.id, title="Task A", status="done"),
+        make_task(db, project_id=sample_project.id, title="Task B", status="done"),
     ]
     db.add_all(tasks)
     db.commit()
@@ -131,11 +131,11 @@ def test_progress_all_done(client, db, sample_project):
 
 
 def test_progress_excludes_subtasks(client, db, sample_project):
-    parent = Task(project_id=sample_project.id, title="Parent", status="todo")
+    parent = make_task(db, project_id=sample_project.id, title="Parent", status="todo")
     db.add(parent)
     db.flush()
 
-    child = Task(project_id=sample_project.id, title="Child", status="done", parent_id=parent.id)
+    child = make_task(db, project_id=sample_project.id, title="Child", status="done", parent_id=parent.id)
     db.add(child)
     db.commit()
 

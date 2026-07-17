@@ -1,10 +1,10 @@
 from unittest.mock import patch
 
-from app.models import Task
+from tests.factories import make_task
 
 
 def _make_task(db, project_id):
-    t = Task(project_id=project_id, title="Attachment test task", status="todo")
+    t = make_task(db, project_id=project_id, title="Attachment test task", status="todo")
     db.add(t)
     db.commit()
     db.refresh(t)

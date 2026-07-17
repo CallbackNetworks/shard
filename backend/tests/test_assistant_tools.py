@@ -4,9 +4,10 @@ import json
 
 import pytest
 
-from app.models import ActivityLog, Project, Task
+from app.models import ActivityLog, Project
 from app.services import graph
 from app.services.assistant_tools import dispatch_tool
+from tests.factories import make_task
 
 
 @pytest.fixture()
@@ -14,8 +15,8 @@ def project_with_tasks(db):
     p = Project(name="Test Project", status="active")
     db.add(p)
     db.flush()
-    t1 = Task(project_id=p.id, title="Task Alpha", status="todo", priority="high", assignee="alice")
-    t2 = Task(project_id=p.id, title="Task Beta", status="done", priority="low")
+    t1 = make_task(db, project_id=p.id, title="Task Alpha", status="todo", priority="high", assignee="alice")
+    t2 = make_task(db, project_id=p.id, title="Task Beta", status="done", priority="low")
     db.add_all([t1, t2])
     db.flush()
     return p, t1, t2

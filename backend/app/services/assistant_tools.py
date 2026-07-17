@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import ActivityLog, Comment, Project, Task, WorkflowRule
+from app.models import ActivityLog, Comment, Node, Project, WorkflowRule
 from app.services import graph
 
 TOOLS = [
@@ -288,10 +288,10 @@ async def _tool_get_summary(db: Session) -> str:
 
 
 def _tool_list_tasks(db: Session, project_id: str, status: str | None = None) -> str:
-    q = db.query(Task).filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
+    q = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status:
-        q = q.filter(Task.status == status)
-    tasks = q.order_by(Task.created_at.desc()).limit(50).all()
+        q = q.filter(Node.status == status)
+    tasks = [graph.task_view(n, db) for n in q.order_by(Node.created_at.desc()).limit(50).all()]
     return json.dumps(
         [
             {
@@ -327,6 +327,7 @@ async def _tool_create_task(
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         return f"Project {project_id} not found"
+    due = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=UTC) if due_date else None
     task = graph.create_task(
         db,
         id=str(uuid.uuid4()),
@@ -335,33 +336,29 @@ async def _tool_create_task(
         priority=priority,
         description=description,
         assignee=assignee,
+        due_date=due,
         callback_token=str(uuid.uuid4()),
     )
-    if due_date:
-        task.due_date = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=UTC)
     db.commit()
     return json.dumps({"id": task.id, "title": task.title, "status": task.status})
 
 
 def _tool_update_task(db: Session, task_id: str, **kwargs) -> str:
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
+    if graph.get_task(db, task_id) is None:
         return f"Task {task_id} not found"
     updatable = ("status", "priority", "title", "description", "assignee", "time_estimate", "time_spent")
-    for field in updatable:
-        if field in kwargs and kwargs[field] is not None:
-            setattr(task, field, kwargs[field])
+    changes = {field: kwargs[field] for field in updatable if field in kwargs and kwargs[field] is not None}
     if "due_date" in kwargs:
         val = kwargs["due_date"]
         if val and val != "null":
-            task.due_date = (
+            changes["due_date"] = (
                 datetime.fromisoformat(val).replace(tzinfo=UTC)
                 if "T" in val
                 else datetime.strptime(val, "%Y-%m-%d").replace(tzinfo=UTC)
             )
         else:
-            task.due_date = None
-    task.updated_at = datetime.now(UTC)
+            changes["due_date"] = None
+    task = graph.update_task(db, task_id, **changes)
     db.commit()
     return json.dumps(
         {
@@ -382,7 +379,7 @@ async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, pri
         return "Title must not be blank"
     if len(title) > 500:
         return "Title must be 500 characters or fewer"
-    parent = db.query(Task).filter(Task.id == parent_task_id).first()
+    parent = graph.get_task(db, parent_task_id)
     if not parent:
         return f"Parent task {parent_task_id} not found"
     task = graph.create_task(
@@ -424,10 +421,10 @@ def _tool_manage_labels(
 
 
 def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
-    q = db.query(Task).filter(graph.top_level_task_filter())
+    q = db.query(Node).filter(Node.type == graph.NODE_TASK, graph.top_level_task_filter())
     if project_id:
-        q = q.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-    tasks = q.all()
+        q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
+    tasks = [graph.task_view(n, db) for n in q.all()]
 
     now = datetime.now(UTC)
     by_status = {}
@@ -472,7 +469,13 @@ def _tool_search(db: Session, query: str) -> str:
     from sqlalchemy import or_
 
     q = query.lower()
-    tasks = db.query(Task).filter(or_(Task.title.ilike(f"%{q}%"), Task.description.ilike(f"%{q}%"))).limit(20).all()
+    # title/description live on the task node (description in JSON data); scan in
+    # Python for dialect-safe substring matching (ADR-0033, node-only tasks).
+    tasks = [
+        graph.task_view(n, db)
+        for n in db.query(Node).filter(Node.type == graph.NODE_TASK).all()
+        if q in (n.title or "").lower() or q in ((n.data or {}).get("description") or "").lower()
+    ][:20]
     projects = (
         db.query(Project).filter(or_(Project.name.ilike(f"%{q}%"), Project.description.ilike(f"%{q}%"))).limit(10).all()
     )
@@ -515,13 +518,14 @@ def _tool_analyze_decisions(db: Session, project_id: str) -> str:
         return f"Project {project_id} not found"
 
     # Tasks with details
-    tasks = (
-        db.query(Task)
-        .filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-        .order_by(Task.created_at.desc())
+    task_nodes = (
+        db.query(Node)
+        .filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
+        .order_by(Node.created_at.desc())
         .limit(100)
         .all()
     )
+    tasks = [graph.task_view(n, db) for n in task_nodes]
     tasks_data = [
         {
             "id": t.id,
@@ -619,7 +623,7 @@ def _tool_create_decision(db: Session, project_id: str, name: str, description: 
 def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: str, reason: str) -> str:
     import uuid
 
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = graph.get_task(db, task_id)
     if not task:
         return f"Task {task_id} not found"
 
@@ -662,18 +666,20 @@ async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dic
         if len(title) > 500:
             title = title[:500]
 
+        due = None
+        if item.get("due_date"):
+            try:
+                due = datetime.fromisoformat(item["due_date"])
+            except (ValueError, TypeError):
+                due = None
         task = graph.create_task(
             db,
             project_id=project_id,
             title=title,
             priority=item.get("priority", "medium"),
             description=item.get("description"),
+            due_date=due,
         )
-        if item.get("due_date"):
-            try:
-                task.due_date = datetime.fromisoformat(item["due_date"])
-            except (ValueError, TypeError):
-                pass
         created_ids.append(task.id)
 
         for sub in item.get("subtasks") or []:

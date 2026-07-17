@@ -4,8 +4,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import Integration, Task
+from app.models import Integration, Node
 from app.routers.issue_sync import sync_task_closure_to_external
+from tests.factories import find_task_by_external_id, make_task
 
 
 class TestNormalization:
@@ -204,7 +205,8 @@ class TestInboundWebhook:
         assert data["task_id"] is not None
 
     def test_github_updates_existing_task(self, client, sample_project, db):
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Existing",
             external_provider="github",
@@ -239,7 +241,8 @@ class TestInboundWebhook:
         assert task.title == "Updated Title"
 
     def test_github_closes_task(self, client, sample_project, db):
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Open task",
             external_provider="github",
@@ -311,7 +314,8 @@ class TestInboundWebhook:
         assert r.status_code == 404
 
     def test_delete_action(self, client, sample_project, db):
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="To delete",
             external_provider="github",
@@ -342,7 +346,7 @@ class TestInboundWebhook:
         )
         assert r.status_code == 200
         assert r.json()["action"] == "deleted"
-        assert db.query(Task).filter(Task.id == task_id).first() is None
+        assert db.get(Node, task_id) is None
 
 
 class TestOutboundSync:
@@ -350,7 +354,7 @@ class TestOutboundSync:
 
     @pytest.mark.asyncio
     async def test_sync_closure_no_external(self, client, sample_project, db):
-        task = Task(project_id=sample_project.id, title="Normal task")
+        task = make_task(db, project_id=sample_project.id, title="Normal task")
         db.add(task)
         db.commit()
         db.refresh(task)
@@ -371,7 +375,8 @@ class TestOutboundSync:
         )
         db.add(integration)
 
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="External task",
             external_provider="github",
@@ -401,7 +406,8 @@ class TestOutboundSync:
         )
         db.add(integration)
 
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Gitea task",
             external_provider="github",
@@ -430,7 +436,8 @@ class TestOutboundSync:
         )
         db.add(integration)
 
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="GL task",
             external_provider="gitlab",
@@ -447,7 +454,8 @@ class TestOutboundSync:
 
     @pytest.mark.asyncio
     async def test_sync_closure_no_integration(self, client, sample_project, db):
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Orphan external",
             external_provider="github",
@@ -524,7 +532,7 @@ class TestCreateExternalIssue:
     def test_creates_github_issue_and_links_task(self, mock_create, client, db, sample_project):
         sample_project.repo_url = "https://github.com/owner/repo"
         self._integration(db, sample_project.id)
-        task = Task(project_id=sample_project.id, title="Ship it", description="body")
+        task = make_task(db, project_id=sample_project.id, title="Ship it", description="body")
         db.add(task)
         db.commit()
 
@@ -545,7 +553,7 @@ class TestCreateExternalIssue:
     def test_creates_gitlab_issue(self, mock_create, client, db, sample_project):
         sample_project.repo_url = "https://gitlab.com/group/app"
         self._integration(db, sample_project.id, url="https://gitlab.com", secret="glpat")
-        task = Task(project_id=sample_project.id, title="GL task")
+        task = make_task(db, project_id=sample_project.id, title="GL task")
         db.add(task)
         db.commit()
 
@@ -557,7 +565,8 @@ class TestCreateExternalIssue:
     def test_rejects_already_linked(self, client, db, sample_project):
         self._integration(db, sample_project.id)
         sample_project.repo_url = "https://github.com/owner/repo"
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Linked",
             external_provider="github",
@@ -572,7 +581,7 @@ class TestCreateExternalIssue:
     def test_rejects_without_integration(self, client, db, sample_project):
         sample_project.repo_url = "https://github.com/owner/repo"
         db.commit()
-        task = Task(project_id=sample_project.id, title="No integ")
+        task = make_task(db, project_id=sample_project.id, title="No integ")
         db.add(task)
         db.commit()
         resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
@@ -580,7 +589,7 @@ class TestCreateExternalIssue:
 
     def test_rejects_without_repo_url(self, client, db, sample_project):
         self._integration(db, sample_project.id)
-        task = Task(project_id=sample_project.id, title="No repo")
+        task = make_task(db, project_id=sample_project.id, title="No repo")
         db.add(task)
         db.commit()
         resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
@@ -590,7 +599,7 @@ class TestCreateExternalIssue:
     def test_upstream_failure_returns_502(self, mock_create, client, db, sample_project):
         sample_project.repo_url = "https://github.com/owner/repo"
         self._integration(db, sample_project.id)
-        task = Task(project_id=sample_project.id, title="Fails upstream")
+        task = make_task(db, project_id=sample_project.id, title="Fails upstream")
         db.add(task)
         db.commit()
         resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
@@ -651,7 +660,8 @@ class TestDueDateOutbound:
     def _task(self, db, project_id, provider, repo, url, due):
         from datetime import UTC, datetime
 
-        t = Task(
+        t = make_task(
+            db,
             project_id=project_id,
             title="t",
             external_provider=provider,
@@ -712,7 +722,7 @@ class TestDueDateInbound:
         }
         resp = client.post(f"/webhook/issues/{sample_project.id}", json=body, headers=headers)
         assert resp.status_code == 200
-        task = db.query(Task).filter(Task.external_id == "55").first()
+        task = find_task_by_external_id(db, "55")
         assert task is not None and task.due_date is not None and task.due_date.month == 10
 
 
@@ -749,7 +759,8 @@ class TestMilestoneCycle:
 
         self._integration(db, sample_project.id)
         cycle = graph.create_cycle(db, sample_project.id, name="Sprint 12", end_date=datetime(2026, 8, 1, tzinfo=UTC))
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="t",
             external_provider="github",
@@ -775,7 +786,8 @@ class TestMilestoneCycle:
 
         self._integration(db, sample_project.id)
         cycle = graph.create_cycle(db, sample_project.id, name="Sprint 12")
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="t",
             external_provider="github",
@@ -805,7 +817,7 @@ class TestMilestoneCycle:
         }
         resp = client.post(f"/webhook/issues/{sample_project.id}", json=body, headers={"X-GitHub-Event": "issues"})
         assert resp.status_code == 200
-        task = db.query(Task).filter(Task.external_id == "20").first()
+        task = find_task_by_external_id(db, "20")
         assert task is not None
         assert task.id in graph.task_ids_in_cycle(db, cycle.id)
 
@@ -819,6 +831,6 @@ class TestMilestoneCycle:
         }
         resp = client.post(f"/webhook/issues/{sample_project.id}", json=body, headers={"X-GitHub-Event": "issues"})
         assert resp.status_code == 200
-        task = db.query(Task).filter(Task.external_id == "21").first()
+        task = find_task_by_external_id(db, "21")
         # No cycle created, no membership added.
         assert graph.cycle_ids_for_task(db, task.id) == []

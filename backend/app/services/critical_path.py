@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 
 from sqlalchemy.orm import Session
 
-from app.models import Task
+from app.models import Node
 from app.services import graph
 
 logger = logging.getLogger(__name__)
@@ -29,17 +29,19 @@ def compute_critical_path(db: Session, project_id: str) -> dict:
     """
     # Query all non-done, non-failed top-level tasks in the project (via contains edges).
     task_ids = graph.contained_task_ids(db, project_id)
-    tasks = (
-        db.query(Task)
+    nodes = (
+        db.query(Node)
         .filter(
-            Task.id.in_(task_ids),
-            Task.status.notin_(["done", "failed"]),
+            Node.type == graph.NODE_TASK,
+            Node.id.in_(task_ids),
+            Node.status.notin_(["done", "failed"]),
             graph.top_level_task_filter(),
         )
         .all()
         if task_ids
         else []
     )
+    tasks = [graph.task_view(n, db) for n in nodes]
 
     if not tasks:
         return {"critical_path": [], "total_duration_minutes": 0, "tasks": {}}

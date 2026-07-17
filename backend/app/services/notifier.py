@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 from sqlalchemy.orm import Session
 
-from app.models import Integration, Notification, Project, Task, WebhookDelivery
+from app.models import Integration, Notification, Project, WebhookDelivery
 from app.services import graph
 from app.services.email_sender import build_notification_email, send_email
 from app.services.email_sender import is_configured as smtp_configured
@@ -223,7 +223,7 @@ async def _send_webhook_inline(
         return False
 
 
-async def fire_notifications(db: Session, task: Task, event: str) -> None:
+async def fire_notifications(db: Session, task: "graph.TaskView", event: str) -> None:
     project: Project | None = graph.project_of_task(db, task.id)
     if project is None:
         return
@@ -291,7 +291,7 @@ _EVENT_MESSAGES = {
 }
 
 
-def _create_notification(db: Session, event: str, task: Task, project: Project) -> None:
+def _create_notification(db: Session, event: str, task: "graph.TaskView", project: Project) -> None:
     factory = _EVENT_MESSAGES.get(event)
     if not factory:
         return

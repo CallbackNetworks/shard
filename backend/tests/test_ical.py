@@ -2,11 +2,11 @@
 
 from datetime import UTC, datetime, timedelta
 
-from app.models import Task
+from tests.factories import make_task
 
 
 def _add_task(db, project, **kwargs):
-    task = Task(project_id=project.id, title=kwargs.pop("title", "Task"), **kwargs)
+    task = make_task(db, project_id=project.id, title=kwargs.pop("title", "Task"), **kwargs)
     db.add(task)
     db.commit()
     db.refresh(task)

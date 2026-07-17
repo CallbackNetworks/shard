@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, GraphEvent, Node, NodeType, Project, Task
+from app.models import Edge, GraphEvent, Node, NodeType, Project
 
 # Node types
 NODE_PROJECT = "project"
@@ -29,7 +29,7 @@ NODE_LABEL = "label"
 # through the generic node API. This set shrinks as Phase B collapses entities.
 # ``label``/``cycle``/``goal``/``identity`` collapsed to node-only in ADR-0033
 # Phase B; only ``project`` and ``task`` remain entity-backed.
-ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT, NODE_TASK})
+ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT})
 
 # Edge relationship types (canonical direction: source -> target)
 REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id
@@ -576,13 +576,10 @@ def task_ids_in_cycle(db: Session, cycle_id: str) -> list[str]:
     return list(rows)
 
 
-def tasks_in_cycle(db: Session, cycle_id: str) -> list["Task"]:
-    """Task rows in a cycle via ``in_cycle`` edges."""
+def tasks_in_cycle(db: Session, cycle_id: str) -> list["TaskView"]:
+    """Task views in a cycle via ``in_cycle`` edges."""
     ids = task_ids_in_cycle(db, cycle_id)
-    if not ids:
-        return []
-    by_id = {t.id: t for t in db.query(Task).filter(Task.id.in_(ids)).all()}
-    return [by_id[i] for i in ids if i in by_id]
+    return task_views_for_ids(db, ids)
 
 
 def cycle_ids_for_task(db: Session, task_id: str) -> list[str]:
@@ -1114,9 +1111,7 @@ class TaskView:
 
         if self._db is None:
             return []
-        return (
-            self._db.query(Comment).filter(Comment.task_id == self.id).order_by(Comment.created_at.asc()).all()
-        )
+        return self._db.query(Comment).filter(Comment.task_id == self.id).order_by(Comment.created_at.asc()).all()
 
     @property
     def pull_requests(self):
@@ -1161,17 +1156,98 @@ def task_views_for_ids(db: Session, task_ids) -> list[TaskView]:
     return [by_id[i] for i in task_ids if i in by_id]
 
 
-def create_task(db: Session, **fields) -> "Task":
-    """Single entry point for creating a task (ADR-0032, no columns).
+_TASK_HOT_COLUMNS = ("title", "status", "priority", "start_date", "due_date", "position", "is_pinned")
 
-    ``project_id``/``parent_id`` are transient constructor hints (not columns);
-    ``graph_sync`` turns them into ``project -> task`` / ``parent-task -> task``
-    ``contains`` edges. Containment lives only in edges now.
+
+def _apply_task_fields(node: Node, fields: dict, *, creating: bool) -> None:
+    """Write task fields onto a task node: hot columns direct, the rest into ``data``.
+
+    ``reminder_sent_at`` is a datetime stored as an ISO string (JSON has no datetime
+    type); ``created_at``/``updated_at`` are real node columns.
     """
-    task = Task(**fields)
-    db.add(task)
-    db.flush()  # graph_sync mirrors the node and creates the contains edges
-    return task
+    f = dict(fields)
+    if creating:
+        node.status = "todo"
+        node.priority = "medium"
+        node.position = 0
+        node.is_pinned = False
+    if "created_at" in f:
+        node.created_at = f.pop("created_at")
+    if "updated_at" in f:
+        node.updated_at = f.pop("updated_at")
+    for col in _TASK_HOT_COLUMNS:
+        if col in f:
+            value = f.pop(col)
+            if col == "position":
+                value = value or 0
+            elif col == "is_pinned":
+                value = bool(value)
+            setattr(node, col, value)
+    data = dict(node.data or {})
+    if creating:
+        for key in _TASK_DATA_SCALARS:
+            data.setdefault(key, None)
+        if not data.get("callback_token"):
+            data["callback_token"] = str(uuid.uuid4())
+    for key, value in f.items():
+        data[key] = _iso(value) if key == "reminder_sent_at" else value
+    node.data = data or None
+
+
+def create_task(
+    db: Session, *, project_id: str | None = None, parent_id: str | None = None, id: str | None = None, **fields
+) -> TaskView:
+    """Single entry point for creating a task node (ADR-0032/0033, node-only).
+
+    ``project_id``/``parent_id`` become ``project -> task`` / ``parent-task -> task``
+    ``contains`` edges; containment lives only in edges now.
+    """
+    node = Node(id=id or str(uuid.uuid4()), type=NODE_TASK)
+    _apply_task_fields(node, fields, creating=True)
+    db.add(node)
+    db.flush()
+    if project_id:
+        ensure_node(db, project_id, NODE_PROJECT)
+        add_edge(db, project_id, node.id, REL_CONTAINS)
+    if parent_id:
+        ensure_node(db, parent_id, NODE_TASK)
+        add_edge(db, parent_id, node.id, REL_CONTAINS)
+    return TaskView(node, db)
+
+
+def update_task(db: Session, task_id: str, **fields) -> TaskView | None:
+    """Update a task node's hot columns / ``data`` fields (ADR-0033, node-only)."""
+    node = db.get(Node, task_id)
+    if node is None or node.type != NODE_TASK:
+        return None
+    _apply_task_fields(node, fields, creating=False)
+    db.flush()
+    return TaskView(node, db)
+
+
+def find_task_by_callback_token(db: Session, token: str) -> TaskView | None:
+    """Locate a task by its ``callback_token`` (stored in ``data``).
+
+    Scans task nodes and filters in Python: the token lives in the JSON ``data``
+    bag (no indexed column) — dialect-portable and fine at personal-tool scale.
+    """
+    for node in db.query(Node).filter(Node.type == NODE_TASK).all():
+        if (node.data or {}).get("callback_token") == token:
+            return TaskView(node, db)
+    return None
+
+
+def find_task_by_external(db: Session, provider: str, external_id: str, repo: str) -> TaskView | None:
+    """Locate a task by its external issue identity (provider/id/repo in ``data``)."""
+    for node in db.query(Node).filter(Node.type == NODE_TASK).all():
+        data = node.data or {}
+        if (
+            data.get("external_provider") == provider
+            and data.get("external_id") == external_id
+            and data.get("external_repo") == repo
+        ):
+            return TaskView(node, db)
+    return None
 
 
 def delete_task_tree(db: Session, task_id: str) -> None:
@@ -1198,9 +1274,25 @@ def delete_task_tree(db: Session, task_id: str) -> None:
     for tid in doomed:
         if tid in keep:
             continue
-        task = db.get(Task, tid)
-        if task is not None:
-            db.delete(task)
+        _delete_task_node(db, tid)
+
+
+def _delete_task_node(db: Session, task_id: str) -> None:
+    """Delete a task node plus its peripheral rows (comments/attachments/PRs/...).
+
+    Node-only tasks have no ORM delete-orphan cascade; the peripheral tables FK to
+    ``nodes.id`` with ``ondelete CASCADE`` but SQLite does not enforce that without
+    ``PRAGMA foreign_keys=ON``, so clean them explicitly for dialect-independence.
+    """
+    from app.models import Attachment, Comment, RecurrenceRule, TaskPullRequest, WebhookEvent
+
+    node = db.get(Node, task_id)
+    if node is None or node.type != NODE_TASK:
+        return
+    for model in (Comment, Attachment, TaskPullRequest, WebhookEvent):
+        db.query(model).filter(model.task_id == task_id).delete(synchronize_session=False)
+    db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task_id).delete(synchronize_session=False)
+    delete_node(db, task_id)
 
 
 def delete_project_and_tasks(db: Session, project) -> None:
@@ -1296,18 +1388,14 @@ def project_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
     return result
 
 
-def tasks_in_project(db: Session, project_id: str) -> list["Task"]:
-    """Task rows contained by a project via ``contains`` edges (ADR-0032, no primary).
+def tasks_in_project(db: Session, project_id: str) -> list["TaskView"]:
+    """Task views contained by a project via ``contains`` edges (ADR-0032, no primary).
 
     Replaces ``project.tasks`` / ``WHERE Task.project_id == pid`` reads: naturally
     includes cross-project members. Order is not guaranteed; callers that need a
     specific order should sort explicitly.
     """
-    ids = contained_task_ids(db, project_id)
-    if not ids:
-        return []
-    by_id = {t.id: t for t in db.query(Task).filter(Task.id.in_(ids)).all()}
-    return [by_id[i] for i in ids if i in by_id]
+    return task_views_for_ids(db, contained_task_ids(db, project_id))
 
 
 def child_task_ids_map(db: Session, parent_ids) -> dict[str, list[str]]:
@@ -1330,13 +1418,9 @@ def child_task_ids_map(db: Session, parent_ids) -> dict[str, list[str]]:
     return result
 
 
-def subtasks(db: Session, task_id: str) -> list["Task"]:
-    """Subtask rows of a task via task->task ``contains`` edges (replaces ``task.subtasks``)."""
-    ids = contained_task_ids(db, task_id)
-    if not ids:
-        return []
-    by_id = {t.id: t for t in db.query(Task).filter(Task.id.in_(ids)).all()}
-    return [by_id[i] for i in ids if i in by_id]
+def subtasks(db: Session, task_id: str) -> list["TaskView"]:
+    """Subtask views of a task via task->task ``contains`` edges (replaces ``task.subtasks``)."""
+    return task_views_for_ids(db, contained_task_ids(db, task_id))
 
 
 def subtask_ids_among(db: Session, task_ids) -> set[str]:
@@ -1370,7 +1454,7 @@ def top_level_task_filter():
         .join(NodeType, NodeType.key == Node.type)
         .where(Edge.rel_type == REL_CONTAINS, NodeType.is_task_like.is_(True))
     )
-    return Task.id.notin_(subquery)
+    return Node.id.notin_(subquery)
 
 
 def detect_cycle(db: Session, source_id: str, target_id: str) -> bool:

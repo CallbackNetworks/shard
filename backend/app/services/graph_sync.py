@@ -1,17 +1,15 @@
-"""Keep the graph mirror in sync with ORM mutations (ADR-0032).
+"""Keep the graph mirror in sync with ORM mutations (ADR-0032/0033).
 
-A single ``before_flush`` listener mirrors entities into the ``nodes`` table:
+A single ``before_flush`` listener mirrors the remaining entity-backed type
+(``Project``) into the ``nodes`` table:
 
-* Entities (Project/Task) -> a ``nodes`` row of the matching type, with the hot
-  columns (title/status/priority/dates/position/is_pinned) kept faithful to the
-  entity. (Label/Cycle/Goal/Identity are node-only, ADR-0033.)
-* Updating an entity re-syncs its node hot columns.
-* Deleting an entity drops its node and every touching edge.
+* A new/updated ``Project`` -> a ``nodes`` row of type ``project`` with its hot
+  columns (title/status) kept faithful to the entity.
+* Deleting a ``Project`` drops its node and every touching edge.
 
-Containment and every relationship live only in ``edges`` now; those are written
-directly by their endpoints via the ``graph`` service (``create_task`` for
-``contains``, ``set_label``/``add_to_cycle``/... for the rest), so this listener
-no longer touches edges except to clean them up on entity deletion.
+Every other type (Label/Cycle/Goal/Identity/Task) is node-only (ADR-0033) and
+flows through the generic ``graph`` service directly; containment and every
+relationship live only in ``edges``.
 """
 
 import uuid
@@ -23,16 +21,12 @@ from app.models import (
     Edge,
     Node,
     Project,
-    Task,
 )
 
-# entity class -> node type
-# Only ``project`` and ``task`` remain entity-backed; label/cycle/goal/identity
-# collapsed to node-only in ADR-0033 Phase B and flow through the generic graph
-# layer.
+# entity class -> node type. Only ``project`` remains entity-backed; task
+# collapsed to node-only in ADR-0033 Phase B (B5) and flows through the graph layer.
 _ENTITY_TYPES = {
     Project: "project",
-    Task: "task",
 }
 
 
@@ -40,46 +34,12 @@ def _title_of(obj) -> str:
     return getattr(obj, "title", None) or getattr(obj, "name", None) or ""
 
 
-def _task_data(obj) -> dict:
-    """Task's non-hot fields, mirrored into ``node.data`` (ADR-0033 Phase B, B5.1).
-
-    Keeps the node a COMPLETE mirror of the task so the table can later be dropped
-    and reads served from the node. ``reminder_sent_at`` is a datetime stored as an
-    ISO string (JSON has no datetime type).
-    """
-    reminder = obj.reminder_sent_at
-    return {
-        "description": obj.description,
-        "callback_token": obj.callback_token,
-        "webhook_secret": obj.webhook_secret,
-        "assignee": obj.assignee,
-        "assigned_agent_key_id": obj.assigned_agent_key_id,
-        "reminder_sent_at": reminder.isoformat() if reminder is not None else None,
-        "time_estimate": obj.time_estimate,
-        "time_spent": obj.time_spent,
-        "progress_pct": obj.progress_pct,
-        "agent_notes": obj.agent_notes,
-        "external_provider": obj.external_provider,
-        "external_id": obj.external_id,
-        "external_url": obj.external_url,
-        "external_repo": obj.external_repo,
-    }
-
-
 def _sync_hot_fields(node, obj) -> None:
     """Copy an entity's hot columns onto its node (mirrors the backfill mapping)."""
     node.title = _title_of(obj)
     if isinstance(obj, Project):
         node.status = obj.status
-    elif isinstance(obj, Task):
-        node.status = obj.status
-        node.priority = obj.priority
-        node.start_date = obj.start_date
-        node.due_date = obj.due_date
-        node.position = obj.position or 0
-        node.is_pinned = bool(obj.is_pinned)
-        node.data = _task_data(obj)
-    # Label/Cycle/Goal/Identity are node-only (ADR-0033) and never reach here.
+    # Label/Cycle/Goal/Identity/Task are node-only (ADR-0033) and never reach here.
 
 
 def _upsert_node(session, seen_nodes, obj, node_type):
@@ -94,41 +54,18 @@ def _upsert_node(session, seen_nodes, obj, node_type):
     _sync_hot_fields(node, obj)
 
 
-def _ensure_contains_edge(session, parent_id, parent_type, child_id):
-    """Create a ``contains`` edge parent -> child, minting the parent node if absent."""
-    if not parent_id:
-        return
-    if session.get(Node, parent_id) is None:
-        session.add(Node(id=parent_id, type=parent_type, title=""))
-    exists = (
-        session.query(Edge)
-        .filter(Edge.source_id == parent_id, Edge.target_id == child_id, Edge.rel_type == "contains")
-        .first()
-    )
-    if exists is None:
-        session.add(Edge(source_id=parent_id, target_id=child_id, rel_type="contains"))
-
-
 @event.listens_for(Session, "before_flush")
 def _mirror(session, flush_context, instances):
     seen_nodes: set[str] = set()
 
-    # 1. New entities -> nodes. Tasks also get their containment ``contains`` edges
-    #    from the transient project_id/parent_id constructor hints (ADR-0032).
+    # 1. New entities -> nodes.
     for obj in session.new:
         node_type = _ENTITY_TYPES.get(type(obj))
         if node_type is None:
             continue
         if obj.id is None:
             obj.id = str(uuid.uuid4())  # pin the pk now so edges can reference it
-        if isinstance(obj, Task) and not obj.callback_token:
-            # Python-side column defaults are applied at INSERT, after this listener
-            # runs, so pin callback_token now for a faithful node.data mirror (B5.1).
-            obj.callback_token = str(uuid.uuid4())
         _upsert_node(session, seen_nodes, obj, node_type)
-        if isinstance(obj, Task):
-            _ensure_contains_edge(session, getattr(obj, "_graph_project_id", None), "project", obj.id)
-            _ensure_contains_edge(session, getattr(obj, "_graph_parent_id", None), "task", obj.id)
 
     # 2. Updated entities -> re-sync node hot fields.
     for obj in session.dirty:

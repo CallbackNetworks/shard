@@ -1,6 +1,6 @@
 """Tests for GitHub PR linking (normalization, detection, webhook handling)."""
 
-from app.models import Notification, Task, TaskPullRequest
+from app.models import Notification, TaskPullRequest
 from app.services.issue_sync import (
     detect_pr_review_webhook,
     detect_pr_webhook,
@@ -8,6 +8,7 @@ from app.services.issue_sync import (
     normalize_github_pr_review,
     parse_issue_refs,
 )
+from tests.factories import make_task
 
 
 class TestParseIssueRefs:
@@ -161,7 +162,8 @@ class TestPrWebhookEndpoint:
 
     def test_pr_merge_closes_linked_tasks(self, client, sample_project, db):
         """When a merged PR references 'Fixes #N', matching tasks become done."""
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Linked issue",
             status="in_progress",
@@ -190,7 +192,8 @@ class TestPrWebhookEndpoint:
 
     def test_pr_merge_multiple_refs(self, client, sample_project, db):
         """A merged PR can close multiple tasks at once."""
-        task1 = Task(
+        task1 = make_task(
+            db,
             project_id=sample_project.id,
             title="Issue one",
             status="todo",
@@ -198,7 +201,8 @@ class TestPrWebhookEndpoint:
             external_id="10",
             external_repo="test/repo",
         )
-        task2 = Task(
+        task2 = make_task(
+            db,
             project_id=sample_project.id,
             title="Issue two",
             status="in_progress",
@@ -227,7 +231,8 @@ class TestPrWebhookEndpoint:
 
     def test_pr_opened_links_to_task(self, client, sample_project, db):
         """When a PR is opened with 'Fixes #N', a structured PR link is created and the task starts."""
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Link target",
             description="Original description",
@@ -263,7 +268,8 @@ class TestPrWebhookEndpoint:
 
     def test_pr_edited_upserts_link_once(self, client, sample_project, db):
         """Repeated PR events upsert the same structured link instead of duplicating."""
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Already linked",
             status="in_progress",
@@ -306,7 +312,8 @@ class TestPrWebhookEndpoint:
 
     def test_pr_closed_not_merged(self, client, sample_project, db):
         """A closed-but-not-merged PR keeps the task open, flags the link, and raises a notification."""
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Should stay open",
             status="in_progress",
@@ -339,7 +346,8 @@ class TestPrWebhookEndpoint:
     def test_pr_merge_closes_task_by_description_url(self, client, sample_project, db):
         """A merged PR also closes tasks whose description contains the PR URL."""
         pr_url = "https://github.com/test/repo/pull/50"
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Linked via description",
             description=f"See PR: {pr_url}",
@@ -378,7 +386,8 @@ class TestPrWebhookEndpoint:
 
     def test_pr_merge_already_done_task_not_duplicated(self, client, sample_project, db):
         """Tasks already marked done are not re-processed."""
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Already done",
             status="done",
@@ -406,7 +415,8 @@ class TestPrWebhookEndpoint:
 
     def test_pr_wrong_repo_no_match(self, client, sample_project, db):
         """Tasks from a different repo are not affected."""
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Different repo",
             status="todo",
@@ -428,7 +438,8 @@ class TestPrWebhookEndpoint:
         assert data["affected_tasks"] == []
 
     def test_review_requested_flags_link_and_notifies(self, client, sample_project, db):
-        task = Task(
+        task = make_task(
+            db,
             project_id=sample_project.id,
             title="Awaiting review",
             status="in_progress",
@@ -523,7 +534,7 @@ class TestPrReviewSignals:
             external_repo="test/repo",
         )
         defaults.update(overrides)
-        task = Task(**defaults)
+        task = make_task(db, **defaults)
         db.add(task)
         db.commit()
         db.refresh(task)

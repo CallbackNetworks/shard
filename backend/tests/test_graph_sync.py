@@ -2,10 +2,11 @@
 
 from app.models import (
     Edge,
+    Node,
     Project,
-    Task,
 )
 from app.services import graph
+from tests.factories import make_task
 
 
 def _edge(db, source_id, target_id, rel_type):
@@ -24,7 +25,7 @@ def _project(db):
 
 
 def _task(db, project_id, title="t"):
-    t = Task(project_id=project_id, title=title)
+    t = make_task(db, project_id=project_id, title=title)
     db.add(t)
     db.flush()
     return t
@@ -70,10 +71,11 @@ def test_task_create_mirrors_node_and_contains_edge(db):
 
 def test_task_node_is_complete_mirror(db):
     """ADR-0033 B5.1: task node.data mirrors every non-hot Task field."""
-    from app.models import Node, Task
+    from app.models import Node
 
     p = _project(db)
-    t = Task(
+    t = make_task(
+        db,
         project_id=p.id,
         title="T",
         description="desc",
@@ -95,8 +97,8 @@ def test_task_node_is_complete_mirror(db):
     assert data["external_id"] == "99"
     assert data["callback_token"] == t.callback_token
 
-    # Updating a non-hot field re-syncs the node.
-    t.description = "changed"
+    # Updating a non-hot field through the graph layer re-syncs the node (ADR-0033).
+    graph.update_task(db, t.id, description="changed")
     db.commit()
     assert (db.get(Node, t.id).data or {})["description"] == "changed"
 
@@ -104,7 +106,7 @@ def test_task_node_is_complete_mirror(db):
 def test_subtask_create_mirrors_parent_containment(db):
     p = _project(db)
     parent = _task(db, p.id, "parent")
-    child = Task(project_id=p.id, parent_id=parent.id, title="child")
+    child = make_task(db, project_id=p.id, parent_id=parent.id, title="child")
     db.add(child)
     db.commit()
 
@@ -115,13 +117,14 @@ def test_subtask_create_mirrors_parent_containment(db):
 def test_entity_delete_removes_node(db):
     from app.models import Node
 
+    # Deleting the (still entity-backed) project clears its node and touching edges.
     p = _project(db)
     t = _task(db, p.id)
     tid = t.id
-    db.delete(t)
+    db.delete(p)
     db.commit()
 
-    assert db.get(Node, tid) is None
+    assert db.get(Node, p.id) is None
     assert _edge(db, p.id, tid, "contains") is None
 
 
@@ -132,7 +135,7 @@ def test_task_create_syncs_node_hot_fields(db):
 
     p = _project(db)
     due = datetime(2026, 8, 1, 12, 0)
-    t = Task(project_id=p.id, title="t", status="in_progress", priority="high", due_date=due, is_pinned=True)
+    t = make_task(db, project_id=p.id, title="t", status="in_progress", priority="high", due_date=due, is_pinned=True)
     db.add(t)
     db.commit()
 
@@ -194,7 +197,7 @@ def test_task_reparent_parent_via_edges(db):
     p = _project(db)
     parent1 = _task(db, p.id, "parent1")
     parent2 = _task(db, p.id, "parent2")
-    child = Task(project_id=p.id, parent_id=parent1.id, title="child")
+    child = make_task(db, project_id=p.id, parent_id=parent1.id, title="child")
     db.add(child)
     db.commit()
     assert _edge(db, parent1.id, child.id, "contains") is not None
@@ -209,8 +212,8 @@ def test_task_reparent_parent_via_edges(db):
 def test_subtask_helpers_from_contains_edges(db):
     p = _project(db)
     parent = _task(db, p.id, "parent")
-    child1 = Task(project_id=p.id, parent_id=parent.id, title="child1")
-    child2 = Task(project_id=p.id, parent_id=parent.id, title="child2")
+    child1 = make_task(db, project_id=p.id, parent_id=parent.id, title="child1")
+    child2 = make_task(db, project_id=p.id, parent_id=parent.id, title="child2")
     db.add_all([child1, child2])
     db.commit()
 
@@ -231,10 +234,10 @@ def test_subtask_helpers_from_contains_edges(db):
 def test_top_level_task_filter_excludes_subtasks(db):
     p = _project(db)
     top = _task(db, p.id, "top")
-    child = Task(project_id=p.id, parent_id=top.id, title="child")
+    child = make_task(db, project_id=p.id, parent_id=top.id, title="child")
     db.add(child)
     db.commit()
 
-    top_ids = {t.id for t in db.query(Task).filter(graph.top_level_task_filter()).all()}
+    top_ids = {t.id for t in db.query(Node).filter(Node.type == "task", graph.top_level_task_filter()).all()}
     assert top.id in top_ids
     assert child.id not in top_ids

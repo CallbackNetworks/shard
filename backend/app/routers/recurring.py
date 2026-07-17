@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import RecurrenceRule, Task
+from app.models import RecurrenceRule
 from app.schemas import RecurrenceRuleCreate, RecurrenceRuleOut, RecurrenceRuleUpdate
 from app.services import graph
 
@@ -12,8 +12,8 @@ router = APIRouter(
 )
 
 
-def _get_task_or_404(project_id: str, task_id: str, db: Session) -> Task:
-    task = db.get(Task, task_id)
+def _get_task_or_404(project_id: str, task_id: str, db: Session) -> graph.TaskView:
+    task = graph.get_task(db, task_id)
     if not task or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
     return task

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import Integration, Project, RecurrenceRule, Task, WebhookDelivery
+from app.models import Integration, Node, Project, RecurrenceRule, WebhookDelivery
 from app.services.scheduler import (
     _check_and_fire,
     _check_recurring,
@@ -14,6 +14,7 @@ from app.services.scheduler import (
     _retry_failed_webhooks,
     _send_daily_summary,
 )
+from tests.factories import make_task
 
 
 def _settings(**overrides):
@@ -36,7 +37,7 @@ class TestComputeNextRun:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        t = Task(project_id=p.id, title="T", status="todo")
+        t = make_task(db, project_id=p.id, title="T", status="todo")
         db.add(t)
         db.flush()
         rule = RecurrenceRule(
@@ -106,7 +107,8 @@ class TestCheckAndFire:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        t = Task(
+        t = make_task(
+            db,
             project_id=p.id,
             title="Almost due",
             status="todo",
@@ -122,14 +124,15 @@ class TestCheckAndFire:
         args = mock_fire.call_args[0]
         assert args[2] == "task.due_soon"
         db.refresh(t)
-        assert t.reminder_sent_at is not None
+        assert (t.data or {}).get("reminder_sent_at") is not None
 
     @pytest.mark.asyncio
     async def test_fires_overdue_for_past_due_task(self, db):
         p = Project(name="P")
         db.add(p)
         db.flush()
-        t = Task(
+        t = make_task(
+            db,
             project_id=p.id,
             title="Overdue task",
             status="in_progress",
@@ -149,7 +152,8 @@ class TestCheckAndFire:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        t = Task(
+        t = make_task(
+            db,
             project_id=p.id,
             title="Done task",
             status="done",
@@ -168,7 +172,8 @@ class TestCheckAndFire:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        t = Task(
+        t = make_task(
+            db,
             project_id=p.id,
             title="Recently reminded",
             status="todo",
@@ -188,7 +193,8 @@ class TestCheckAndFire:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        t = Task(
+        t = make_task(
+            db,
             project_id=p.id,
             title="Old reminder",
             status="todo",
@@ -213,7 +219,7 @@ class TestCheckRecurring:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        template = Task(project_id=p.id, title="Weekly Report", status="todo", priority="medium")
+        template = make_task(db, project_id=p.id, title="Weekly Report", status="todo", priority="medium")
         db.add(template)
         db.flush()
 
@@ -228,7 +234,9 @@ class TestCheckRecurring:
 
         await _check_recurring(db)
 
-        new_tasks = db.query(Task).filter(Task.title == "Weekly Report", Task.id != template.id).all()
+        new_tasks = (
+            db.query(Node).filter(Node.type == "task", Node.title == "Weekly Report", Node.id != template.id).all()
+        )
         assert len(new_tasks) == 1
         assert new_tasks[0].status == "todo"
         assert new_tasks[0].priority == "medium"
@@ -242,7 +250,7 @@ class TestCheckRecurring:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        template = Task(project_id=p.id, title="Future", status="todo")
+        template = make_task(db, project_id=p.id, title="Future", status="todo")
         db.add(template)
         db.flush()
 
@@ -257,7 +265,7 @@ class TestCheckRecurring:
 
         await _check_recurring(db)
 
-        count = db.query(Task).filter(Task.title == "Future").count()
+        count = db.query(Node).filter(Node.type == "task", Node.title == "Future").count()
         assert count == 1  # only the template
 
     @pytest.mark.asyncio
@@ -265,7 +273,7 @@ class TestCheckRecurring:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        template = Task(project_id=p.id, title="Inactive", status="todo")
+        template = make_task(db, project_id=p.id, title="Inactive", status="todo")
         db.add(template)
         db.flush()
 
@@ -280,7 +288,7 @@ class TestCheckRecurring:
 
         await _check_recurring(db)
 
-        count = db.query(Task).filter(Task.title == "Inactive").count()
+        count = db.query(Node).filter(Node.type == "task", Node.title == "Inactive").count()
         assert count == 1
 
     @pytest.mark.asyncio
@@ -288,7 +296,7 @@ class TestCheckRecurring:
         p = Project(name="P")
         db.add(p)
         db.flush()
-        template = Task(project_id=p.id, title="Expired", status="todo")
+        template = make_task(db, project_id=p.id, title="Expired", status="todo")
         db.add(template)
         db.flush()
 
@@ -304,7 +312,7 @@ class TestCheckRecurring:
 
         await _check_recurring(db)
 
-        count = db.query(Task).filter(Task.title == "Expired").count()
+        count = db.query(Node).filter(Node.type == "task", Node.title == "Expired").count()
         assert count == 1
 
 

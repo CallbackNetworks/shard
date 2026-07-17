@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Task
-from app.routers.deps import get_parent_task_or_error
+from app.models import ApiKey, Node
+from app.routers.deps import get_parent_task_or_error, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import (
     create_external_issue_from_task,
@@ -35,11 +35,12 @@ def list_tasks(
     db: Session = Depends(get_db),
 ):
     _get_project_or_404(project_id, db)
-    q = db.query(Task).filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
+    q = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status_filter:
-        q = q.filter(Task.status == status_filter)
+        q = q.filter(Node.status == status_filter)
     want_subtasks = include and "subtasks" in include.split(",")
-    tasks = q.order_by(Task.position.asc(), Task.created_at.asc()).offset(offset).limit(limit).all()
+    nodes = q.order_by(Node.position.asc(), Node.created_at.asc()).offset(offset).limit(limit).all()
+    tasks = [graph.task_view(n, db) for n in nodes]
 
     def _to_out(t, proj_map, par_map):
         out = TaskOut.model_validate(t, from_attributes=True)
@@ -57,7 +58,7 @@ def list_tasks(
     # Nest subtasks from task->task contains edges (ADR-0032).
     children_map = graph.child_task_ids_map(db, [t.id for t in tasks])
     child_ids = {cid for lst in children_map.values() for cid in lst}
-    child_by_id = {c.id: c for c in db.query(Task).filter(Task.id.in_(child_ids)).all()} if child_ids else {}
+    child_by_id = graph.task_views_by_ids(db, child_ids) if child_ids else {}
     all_ids = [t.id for t in tasks] + list(child_ids)
     proj_map = graph.project_ids_map(db, all_ids)
     par_map = graph.parent_task_map(db, all_ids)
@@ -77,31 +78,30 @@ async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(g
     if body.parent_id is not None:
         get_parent_task_or_error(db, project_id, body.parent_id)
     task = graph.create_task(db, project_id=project_id, **body.model_dump())
+    task_id = task.id
     log_activity(
         db,
         "task.created",
         project_id=project_id,
-        task_id=task.id,
+        task_id=task_id,
         actor=body.assignee,
         detail=f'Task "{task.title}" created in {project.name}',
         meta={"title": task.title, "priority": task.priority},
     )
     db.commit()
-    db.refresh(task)
+    task = graph.get_task(db, task_id)
     await run_rules(db, "task.created", task, {})
     db.commit()
-    db.refresh(task)
+    task = graph.get_task(db, task_id)
     await fire_notifications(db, task, "task.created")
-    await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
+    await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task_id})
     return enrich_task(task, db)
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
 async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = get_task_or_404(task_id, db, project_id=project_id)
 
     changes = body.model_dump(exclude_none=True)
 
@@ -128,8 +128,8 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
     old_description = task.description
     old_due_date = task.due_date
 
-    for field, value in changes.items():
-        setattr(task, field, value)
+    if changes:
+        task = graph.update_task(db, task_id, **changes)
 
     triggered_rules = []
 
@@ -176,7 +176,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
         )
 
     db.commit()
-    db.refresh(task)
+    task = graph.get_task(db, task_id)
 
     if "status" in changes and changes["status"] != old_status:
         await fire_notifications(db, task, "task.status_changed")
@@ -204,7 +204,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
         await run_rules(db, trigger, task, {"_rule_depth": 1, **ctx})
     if triggered_rules:
         db.commit()
-        db.refresh(task)
+        task = graph.get_task(db, task_id)
 
     await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task_id})
     return enrich_task(task, db)
@@ -213,9 +213,7 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(project_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = get_task_or_404(task_id, db, project_id=project_id)
     log_activity(
         db,
         "task.deleted",
@@ -248,9 +246,7 @@ async def create_external_issue(
     project's repo URL.
     """
     project = _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = get_task_or_404(task_id, db, project_id=project_id)
     provider = body.provider if body else None
     if provider and provider not in ("github", "gitlab"):
         raise HTTPException(status_code=400, detail="provider must be 'github' or 'gitlab'")
@@ -261,13 +257,9 @@ async def create_external_issue(
 def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
     """Mark task_id as blocked by depends_on_id (depends_on must complete first)."""
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    blocker = (
-        db.query(Task).filter(Task.id == depends_on_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    )
-    if not blocker:
+    task = get_task_or_404(task_id, db, project_id=project_id)
+    blocker = graph.get_task(db, depends_on_id)
+    if not blocker or depends_on_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Blocker task not found")
     if task_id == depends_on_id:
         raise HTTPException(status_code=400, detail="A task cannot depend on itself")
@@ -296,9 +288,7 @@ async def add_membership(project_id: str, task_id: str, target_project_id: str, 
     project -> task edge so the task also surfaces under target_project_id.
     """
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = get_task_or_404(task_id, db, project_id=project_id)
     if target_project_id == project_id:
         raise HTTPException(status_code=400, detail="Task already belongs to this project")
     _get_project_or_404(target_project_id, db)
@@ -316,8 +306,7 @@ async def add_membership(project_id: str, task_id: str, target_project_id: str, 
     )
     db.commit()
     await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": target_project_id})
-    db.refresh(task)
-    return enrich_task(task, db)
+    return enrich_task(graph.get_task(db, task_id), db)
 
 
 @router.delete("/{task_id}/memberships/{target_project_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -328,9 +317,7 @@ async def remove_membership(project_id: str, task_id: str, target_project_id: st
     surfaces in the unfiled bucket (``GET /tasks/unfiled``) to be re-filed later.
     """
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    get_task_or_404(task_id, db, project_id=project_id)
     member_ids = graph.member_project_ids(db, task_id)
     if target_project_id not in member_ids:
         raise HTTPException(status_code=404, detail="Membership not found")
@@ -354,7 +341,7 @@ async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Dep
     contained = set(graph.contained_task_ids(db, project_id))
     for idx, task_id in enumerate(body.task_ids):
         if task_id in contained:
-            db.query(Task).filter(Task.id == task_id).update({"position": idx})
+            db.query(Node).filter(Node.id == task_id, Node.type == graph.NODE_TASK).update({"position": idx})
     db.commit()
     await ws_manager.broadcast("task.reordered", {"project_id": project_id})
 
@@ -367,10 +354,8 @@ async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Dep
 )
 def regenerate_token(project_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    task.callback_token = str(uuid.uuid4())
+    task = get_task_or_404(task_id, db, project_id=project_id)
+    task = graph.update_task(db, task_id, callback_token=str(uuid.uuid4()))
     log_activity(
         db,
         "task.token_regenerated",
@@ -381,8 +366,7 @@ def regenerate_token(project_id: str, task_id: str, db: Session = Depends(get_db
         meta={"title": task.title},
     )
     db.commit()
-    db.refresh(task)
-    return enrich_task(task, db)
+    return enrich_task(graph.get_task(db, task_id), db)
 
 
 # Top-level task operations that are not scoped to a single project. Registered
@@ -397,8 +381,7 @@ def list_unfiled_tasks(db: Session = Depends(get_db)):
     ids = graph.unfiled_task_ids(db)
     if not ids:
         return []
-    tasks = db.query(Task).filter(Task.id.in_(ids)).all()
-    return [enrich_task(t, db) for t in tasks]
+    return [enrich_task(t, db) for t in graph.task_views_for_ids(db, ids)]
 
 
 @task_ops_router.post(
@@ -411,7 +394,7 @@ async def file_task_into_project(task_id: str, project_id: str, db: Session = De
     to already live under some source project, so it is how an *unfiled* task
     gets its first project. Idempotent: adding an existing membership is a no-op.
     """
-    task = db.get(Task, task_id)
+    task = graph.get_task(db, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     _get_project_or_404(project_id, db)
@@ -428,5 +411,4 @@ async def file_task_into_project(task_id: str, project_id: str, db: Session = De
     )
     db.commit()
     await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": project_id})
-    db.refresh(task)
-    return enrich_task(task, db)
+    return enrich_task(graph.get_task(db, task_id), db)

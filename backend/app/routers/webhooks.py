@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Task, WebhookEvent
+from app.models import WebhookEvent
 from app.schemas import TaskOut, WebhookEventOut
 from app.services import graph
 from app.services.activity import log_activity
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/webhook", tags=["webhook"])
 MAX_TIMESTAMP_AGE_SECONDS = 300
 
 
-def _verify_signature(task: Task, request_body: bytes, headers: dict[str, str]) -> bool:
+def _verify_signature(task: "graph.TaskView", request_body: bytes, headers: dict[str, str]) -> bool:
     """
     Verify inbound webhook signature if task.webhook_secret is configured.
     Supports: GitHub HMAC-SHA256, GitLab token, generic HMAC.
@@ -90,7 +90,7 @@ async def webhook_callback(
     native payloads from GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket Pipelines.
     The provider is auto-detected from headers, or can be forced via ?provider= query param.
     """
-    task = db.query(Task).filter(Task.callback_token == callback_token).first()
+    task = graph.find_task_by_callback_token(db, callback_token)
     if not task:
         raise HTTPException(status_code=404, detail="Invalid callback token")
 
@@ -118,7 +118,7 @@ async def webhook_callback(
     normalized = normalize_webhook_payload(headers, body, provider_hint=provider)
 
     prev_status = task.status
-    task.status = normalized["status"]
+    task = graph.update_task(db, task.id, status=normalized["status"])
 
     # Build a human-readable detail message
     detail_msg = normalized.get("message") or f"Status changed to {normalized['status']} via webhook"
@@ -162,7 +162,7 @@ async def webhook_callback(
     db.add(webhook_event)
 
     db.commit()
-    db.refresh(task)
+    task = graph.get_task(db, task.id)
 
     event = f"task.{normalized['status']}"
     await fire_notifications(db, task, event)
@@ -191,8 +191,7 @@ def get_webhook_events(
     db: Session = Depends(get_db),
 ):
     """Get build history (webhook events) for a task."""
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
+    if graph.get_task(db, task_id) is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return (
         db.query(WebhookEvent)

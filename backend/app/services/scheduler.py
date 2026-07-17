@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import ActivityLog, Integration, Project, RecurrenceRule, Task, UserPreference, WebhookDelivery, now_utc
+from app.models import ActivityLog, Integration, Node, Project, RecurrenceRule, UserPreference, WebhookDelivery, now_utc
 from app.services import backup as backup_service
 from app.services import email_sender, graph
 from app.services.activity import log_activity
@@ -60,22 +60,30 @@ async def _check_and_fire(db: Session) -> None:
     due_soon_cutoff = now + timedelta(hours=settings["due_soon_window_hours"])
     cooldown_cutoff = now - timedelta(hours=settings["reminder_cooldown_hours"])
 
-    tasks = (
-        db.query(Task)
+    # reminder_sent_at lives in node.data (JSON, not indexable) so filter it in
+    # Python after the hot-column query (ADR-0033, node-only tasks).
+    candidate_nodes = (
+        db.query(Node)
         .filter(
-            Task.due_date != None,
-            Task.status.notin_(["done", "failed"]),
-            Task.due_date <= due_soon_cutoff,
-            (Task.reminder_sent_at == None) | (Task.reminder_sent_at < cooldown_cutoff),
+            Node.type == graph.NODE_TASK,
+            Node.due_date != None,
+            Node.status.notin_(["done", "failed"]),
+            Node.due_date <= due_soon_cutoff,
         )
         .all()
     )
+    tasks = []
+    for node in candidate_nodes:
+        view = graph.task_view(node, db)
+        reminder = view.reminder_sent_at
+        if reminder is None or _ensure_aware(reminder) < cooldown_cutoff:
+            tasks.append(view)
 
     for task in tasks:
         event = "task.overdue" if _ensure_aware(task.due_date) < now else "task.due_soon"
         try:
             await fire_notifications(db, task, event)
-            task.reminder_sent_at = now
+            graph.update_task(db, task.id, reminder_sent_at=now)
             db.commit()
             logger.info("Sent %s reminder for task '%s'", event, task.title)
         except Exception as exc:
@@ -121,7 +129,7 @@ async def _check_recurring(db: Session) -> None:
             logger.debug("Skipping expired recurrence rule %s", rule.id)
             continue
 
-        template = rule.template_task
+        template = graph.get_task(db, rule.template_task_id)
         if not template:
             continue
 
@@ -130,7 +138,6 @@ async def _check_recurring(db: Session) -> None:
             # Clone the template task
             new_task = graph.create_task(
                 db,
-                id=str(uuid.uuid4()),
                 project_id=template_project_id,
                 parent_id=None,
                 title=template.title,
@@ -216,34 +223,41 @@ async def _send_daily_summary(db: Session) -> None:
         return
 
     overdue_tasks = (
-        db.query(Task)
+        db.query(Node)
         .filter(
-            Task.due_date < now,
-            Task.status.notin_(["done", "failed"]),
+            Node.type == graph.NODE_TASK,
+            Node.due_date < now,
+            Node.status.notin_(["done", "failed"]),
         )
         .all()
     )
 
     due_today = (
-        db.query(Task)
+        db.query(Node)
         .filter(
-            Task.due_date >= now.replace(hour=0, minute=0, second=0),
-            Task.due_date <= now.replace(hour=23, minute=59, second=59),
-            Task.status.notin_(["done", "failed"]),
+            Node.type == graph.NODE_TASK,
+            Node.due_date >= now.replace(hour=0, minute=0, second=0),
+            Node.due_date <= now.replace(hour=23, minute=59, second=59),
+            Node.status.notin_(["done", "failed"]),
         )
         .all()
     )
 
-    in_progress = db.query(Task).filter(Task.status == "in_progress", graph.top_level_task_filter()).all()
+    in_progress = (
+        db.query(Node)
+        .filter(Node.type == graph.NODE_TASK, Node.status == "in_progress", graph.top_level_task_filter())
+        .all()
+    )
 
     # Yesterday's completions
     yesterday = now - timedelta(days=1)
     completed_yesterday = (
-        db.query(Task)
+        db.query(Node)
         .filter(
-            Task.status == "done",
-            Task.updated_at >= yesterday.replace(hour=0, minute=0, second=0),
-            Task.updated_at <= yesterday.replace(hour=23, minute=59, second=59),
+            Node.type == graph.NODE_TASK,
+            Node.status == "done",
+            Node.updated_at >= yesterday.replace(hour=0, minute=0, second=0),
+            Node.updated_at <= yesterday.replace(hour=23, minute=59, second=59),
         )
         .all()
     )
@@ -327,19 +341,21 @@ async def _send_weekly_digest(db: Session) -> None:
 
     # Tasks completed this week
     completed_this_week = (
-        db.query(Task)
+        db.query(Node)
         .filter(
-            Task.status == "done",
-            Task.updated_at >= week_ago,
+            Node.type == graph.NODE_TASK,
+            Node.status == "done",
+            Node.updated_at >= week_ago,
         )
         .all()
     )
 
     # Tasks created this week
     created_this_week = (
-        db.query(Task)
+        db.query(Node)
         .filter(
-            Task.created_at >= week_ago,
+            Node.type == graph.NODE_TASK,
+            Node.created_at >= week_ago,
             graph.top_level_task_filter(),
         )
         .all()
@@ -347,10 +363,11 @@ async def _send_weekly_digest(db: Session) -> None:
 
     # Overdue count
     overdue_tasks = (
-        db.query(Task)
+        db.query(Node)
         .filter(
-            Task.due_date < now,
-            Task.status.notin_(["done", "failed"]),
+            Node.type == graph.NODE_TASK,
+            Node.due_date < now,
+            Node.status.notin_(["done", "failed"]),
         )
         .all()
     )
@@ -459,10 +476,11 @@ async def _check_sla_aging(db: Session) -> None:
 
     # Find tasks stuck in_progress
     stuck_tasks = (
-        db.query(Task)
+        db.query(Node)
         .filter(
-            Task.status == "in_progress",
-            Task.updated_at <= escalation_cutoff,
+            Node.type == graph.NODE_TASK,
+            Node.status == "in_progress",
+            Node.updated_at <= escalation_cutoff,
         )
         .all()
     )
@@ -520,7 +538,7 @@ async def _check_sla_aging(db: Session) -> None:
             db.commit()
 
             try:
-                await fire_notifications(db, task, "task.overdue")
+                await fire_notifications(db, graph.task_view(task, db), "task.overdue")
                 logger.info("SLA overdue notification fired for task '%s' (%d days stuck)", task.title, days_stuck)
             except Exception as exc:
                 logger.warning("Failed to fire SLA notification for task %s: %s", task.id, exc)

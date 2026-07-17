@@ -2,9 +2,10 @@
 
 import pytest
 
-from app.models import Comment, Project, Task, WorkflowRule
+from app.models import Comment, Project, WorkflowRule
 from app.services import graph
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
+from tests.factories import make_task
 
 # ── _eval_condition ──────────────────────────────────────────────────────
 
@@ -15,7 +16,9 @@ class TestEvalCondition:
         project = Project(name="P")
         db.add(project)
         db.flush()
-        t = Task(project_id=project.id, title="Fix login bug", status="todo", priority="high", assignee="alice")
+        t = make_task(
+            db, project_id=project.id, title="Fix login bug", status="todo", priority="high", assignee="alice"
+        )
         db.add(t)
         db.flush()
         return t
@@ -79,7 +82,7 @@ class TestExecAction:
         project = Project(name="P")
         db.add(project)
         db.flush()
-        t = Task(project_id=project.id, title="Task A", status="todo", priority="low")
+        t = make_task(db, project_id=project.id, title="Task A", status="todo", priority="low")
         db.add(t)
         db.flush()
         return project, t
@@ -166,7 +169,7 @@ class TestRunRules:
         project = Project(name="P")
         db.add(project)
         db.flush()
-        task = Task(project_id=project.id, title="Deploy app", status="done", priority="high")
+        task = make_task(db, project_id=project.id, title="Deploy app", status="done", priority="high")
         db.add(task)
         db.flush()
         return project, task

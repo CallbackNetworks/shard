@@ -16,7 +16,9 @@ from app.routers.external_api.auth import (
 )
 from app.routers.external_api.helpers import _get_task_or_404
 from app.schemas import TaskOut, TaskProgressUpdate
+from app.services import graph
 from app.services.activity import log_activity
+from app.services.enrichment import enrich_task
 from app.services.ws_manager import ws_manager
 
 sub_router = APIRouter()
@@ -47,10 +49,13 @@ async def api_report_progress(
     _check_project_access(api_key, project_id)
     task = _get_task_or_404(project_id, task_id, db)
 
+    progress_changes: dict = {}
     if body.progress_pct is not None:
-        task.progress_pct = body.progress_pct
+        progress_changes["progress_pct"] = body.progress_pct
     if body.agent_notes is not None:
-        task.agent_notes = body.agent_notes
+        progress_changes["agent_notes"] = body.agent_notes
+    if progress_changes:
+        task = graph.update_task(db, task_id, **progress_changes)
 
     actor = _build_actor(api_key, x_agent_id)
     if body.comment:
@@ -79,6 +84,5 @@ async def api_report_progress(
     )
 
     db.commit()
-    db.refresh(task)
     await ws_manager.broadcast("task.updated", {"id": task_id, "project_id": project_id})
-    return task
+    return enrich_task(graph.get_task(db, task_id), db)

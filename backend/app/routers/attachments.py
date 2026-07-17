@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Attachment, Task
+from app.models import Attachment
 from app.schemas import AttachmentOut
 from app.services import graph
 
@@ -38,8 +38,7 @@ async def upload_attachment(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    task = db.query(Task).filter(Task.id == task_id, Task.id.in_(graph.contained_task_ids(db, project_id))).first()
-    if not task:
+    if not graph.get_task(db, task_id) or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
 
     file_id = str(uuid.uuid4())

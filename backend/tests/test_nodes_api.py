@@ -27,7 +27,8 @@ def test_create_node_unknown_type(client):
 
 
 def test_create_node_rejects_entity_backed_type(client):
-    r = client.post("/nodes", json={"type": graph.NODE_TASK, "title": "x"})
+    # ``project`` is the last entity-backed type (task collapsed to node-only, ADR-0033 B5).
+    r = client.post("/nodes", json={"type": graph.NODE_PROJECT, "title": "x"})
     assert r.status_code == 400
 
 

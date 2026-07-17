@@ -33,6 +33,8 @@ class SQLiteSearchBackend(SearchBackend):
     """SQLite FTS5 virtual table with triggers."""
 
     def ensure_index(self, engine) -> None:
+        # Tasks are node-only (ADR-0033): the FTS index tracks task nodes, with
+        # ``description`` read out of the node's JSON ``data`` bag.
         with engine.connect() as conn:
             existing_tables = set(inspect(engine).get_table_names())
             if "tasks_fts" not in existing_tables:
@@ -40,29 +42,30 @@ class SQLiteSearchBackend(SearchBackend):
                 conn.execute(
                     text(
                         "INSERT INTO tasks_fts(task_id, title, description) "
-                        "SELECT id, title, COALESCE(description, '') FROM tasks"
+                        "SELECT id, title, COALESCE(json_extract(data, '$.description'), '') "
+                        "FROM nodes WHERE type = 'task'"
                     )
                 )
             for trig in ("tasks_fts_insert", "tasks_fts_update", "tasks_fts_delete"):
                 conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
             conn.execute(
                 text(
-                    "CREATE TRIGGER tasks_fts_insert AFTER INSERT ON tasks BEGIN "
+                    "CREATE TRIGGER tasks_fts_insert AFTER INSERT ON nodes WHEN new.type = 'task' BEGIN "
                     "INSERT INTO tasks_fts(task_id, title, description) "
-                    "VALUES (new.id, new.title, COALESCE(new.description, '')); END"
+                    "VALUES (new.id, new.title, COALESCE(json_extract(new.data, '$.description'), '')); END"
                 )
             )
             conn.execute(
                 text(
-                    "CREATE TRIGGER tasks_fts_update AFTER UPDATE OF title, description ON tasks BEGIN "
+                    "CREATE TRIGGER tasks_fts_update AFTER UPDATE OF title, data ON nodes WHEN new.type = 'task' BEGIN "
                     "DELETE FROM tasks_fts WHERE task_id = old.id; "
                     "INSERT INTO tasks_fts(task_id, title, description) "
-                    "VALUES (new.id, new.title, COALESCE(new.description, '')); END"
+                    "VALUES (new.id, new.title, COALESCE(json_extract(new.data, '$.description'), '')); END"
                 )
             )
             conn.execute(
                 text(
-                    "CREATE TRIGGER tasks_fts_delete AFTER DELETE ON tasks BEGIN "
+                    "CREATE TRIGGER tasks_fts_delete AFTER DELETE ON nodes WHEN old.type = 'task' BEGIN "
                     "DELETE FROM tasks_fts WHERE task_id = old.id; END"
                 )
             )
@@ -90,13 +93,15 @@ class PostgresSearchBackend(SearchBackend):
     """PostgreSQL tsvector/tsquery with GIN index."""
 
     def ensure_index(self, engine) -> None:
+        # Tasks are node-only (ADR-0033): index task nodes, reading ``description``
+        # from the JSON ``data`` column (``data->>'description'``).
         with engine.connect() as conn:
             conn.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS idx_tasks_fts "
-                    "ON tasks USING gin("
-                    "to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, ''))"
-                    ")"
+                    "CREATE INDEX IF NOT EXISTS idx_nodes_task_fts "
+                    "ON nodes USING gin("
+                    "to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(data->>'description', ''))"
+                    ") WHERE type = 'task'"
                 )
             )
             conn.commit()
@@ -107,11 +112,11 @@ class PostgresSearchBackend(SearchBackend):
     ) -> tuple[list[str], bool]:
         try:
             fts_query = text(
-                "SELECT id FROM tasks "
-                "WHERE to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')) "
+                "SELECT id FROM nodes WHERE type = 'task' AND "
+                "to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(data->>'description', '')) "
                 "@@ plainto_tsquery('english', :q) "
                 "ORDER BY ts_rank("
-                "to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')), "
+                "to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(data->>'description', '')), "
                 "plainto_tsquery('english', :q)"
                 ") DESC "
                 "LIMIT :lim OFFSET :off"

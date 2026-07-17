@@ -37,53 +37,14 @@ class Project(Base):
     # ``graph.cycles_in_project``.
 
 
-class Task(Base):
-    __tablename__ = "tasks"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(
-        SAEnum("todo", "in_progress", "done", "failed", name="task_status"), default="todo", index=True
-    )
-    priority: Mapped[str] = mapped_column(SAEnum("low", "medium", "high", name="task_priority"), default="medium")
-    callback_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
-    webhook_secret: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    assignee: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    assigned_agent_key_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True
-    )
-    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    time_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)  # minutes
-    time_spent: Mapped[int | None] = mapped_column(Integer, nullable=True)  # minutes
-    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    progress_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    agent_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    external_provider: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    external_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    external_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
-    external_repo: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    # Containment (project and parent task) lives in graph ``contains`` edges now
-    # (ADR-0032); there are no project/parent/subtasks relationships.
-    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
-    assigned_agent: Mapped["ApiKey | None"] = relationship("ApiKey", foreign_keys=[assigned_agent_key_id])
-    pull_requests: Mapped[list["TaskPullRequest"]] = relationship(
-        "TaskPullRequest", back_populates="task", cascade="all, delete-orphan"
-    )
-
-    def __init__(self, **kw):
-        # ``project_id``/``parent_id`` are no longer columns (ADR-0032): accept them
-        # as transient constructor hints that graph_sync turns into ``contains`` edges,
-        # so callers can still write ``Task(project_id=..., parent_id=...)``.
-        self._graph_project_id = kw.pop("project_id", None)
-        self._graph_parent_id = kw.pop("parent_id", None)
-        super().__init__(**kw)
+# ``Task`` was collapsed to a node-only entity in ADR-0033 Phase B (B5): a task is a
+# ``Node(type="task")`` — hot columns (title/status/priority/start_date/due_date/
+# position/is_pinned/created_at/updated_at) are real node columns; everything else
+# (description/callback_token/webhook_secret/assignee/assigned_agent_key_id/
+# reminder_sent_at/time_estimate/time_spent/progress_pct/agent_notes/external_*)
+# lives in the node's JSON ``data`` bag. Containment (project/parent) is expressed
+# purely as ``contains`` edges. The dedicated ``tasks`` table was dropped; reads go
+# through ``graph.TaskView`` and writes through ``graph.create_task``/``update_task``.
 
 
 class TaskPullRequest(Base):
@@ -98,7 +59,7 @@ class TaskPullRequest(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     task_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
     )
     provider: Mapped[str] = mapped_column(String(20), nullable=False, default="github")
     repo: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -111,8 +72,6 @@ class TaskPullRequest(Base):
     review_state: Mapped[str | None] = mapped_column(String(30), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    task: Mapped["Task"] = relationship("Task", back_populates="pull_requests")
 
 
 # ``Label`` was collapsed to a node-only entity in ADR-0033 Phase B: a label is a
@@ -200,7 +159,7 @@ class Comment(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     # Nullable: a comment with task_id=None is a project-level guest note
     task_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True, index=True
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=True, index=True
     )
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     author: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -212,8 +171,6 @@ class Comment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
-    task: Mapped["Task"] = relationship("Task", back_populates="comments")
-
 
 class RecurrenceRule(Base):
     """Defines how a template task should be cloned periodically."""
@@ -222,7 +179,7 @@ class RecurrenceRule(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     template_task_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), unique=True, nullable=False
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), unique=True, nullable=False
     )
     frequency: Mapped[str] = mapped_column(
         SAEnum("daily", "weekly", "monthly", "interval", name="recurrence_frequency"), nullable=False
@@ -235,8 +192,6 @@ class RecurrenceRule(Base):
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-
-    template_task: Mapped["Task"] = relationship("Task", foreign_keys=[template_task_id])
 
 
 class WebhookDelivery(Base):
@@ -308,7 +263,7 @@ class Attachment(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     task_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
     )
     project_id: Mapped[str] = mapped_column(String(36), nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -316,8 +271,6 @@ class Attachment(Base):
     size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-
-    task: Mapped["Task"] = relationship("Task", foreign_keys=[task_id])
 
 
 class TaskTemplate(Base):
@@ -355,7 +308,7 @@ class WebhookEvent(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     task_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
     )
     provider: Mapped[str] = mapped_column(String(50), nullable=False, default="generic")
     event_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -370,8 +323,6 @@ class WebhookEvent(Base):
     test_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     raw_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-
-    task: Mapped["Task"] = relationship("Task", foreign_keys=[task_id])
 
 
 class SavedFilter(Base):

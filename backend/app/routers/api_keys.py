@@ -3,10 +3,10 @@ import secrets
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Task
+from app.models import ApiKey, Node
 from app.schemas import AgentTaskSummary, ApiKeyCreate, ApiKeyCreateOut, ApiKeyOut, ApiKeyUpdate, LabelOut, TaskOut
 from app.services import graph
 
@@ -75,16 +75,14 @@ def get_agent_summary(db: Session = Depends(get_db)):
 
     key_ids = [k.id for k in keys]
 
-    # Single query for all tasks across all agent keys, with all lazy relationships
-    # eager-loaded to avoid O(N*M*5) implicit SELECTs.
-    all_tasks = (
-        db.query(Task)
-        .filter(Task.assigned_agent_key_id.in_(key_ids))
-        .options(
-            joinedload(Task.comments),
-        )
-        .all()
-    )
+    # ``assigned_agent_key_id`` lives in node.data (JSON, not indexed) so scan task
+    # nodes and filter in Python (ADR-0033, node-only tasks).
+    key_id_set = set(key_ids)
+    all_tasks = [
+        graph.task_view(n, db)
+        for n in db.query(Node).filter(Node.type == graph.NODE_TASK).all()
+        if (n.data or {}).get("assigned_agent_key_id") in key_id_set
+    ]
 
     # Batch-load dependency, label, and subtask edges for every agent task (ADR-0032).
     _all_ids = [t.id for t in all_tasks]
@@ -93,7 +91,7 @@ def get_agent_summary(db: Session = Depends(get_db)):
     subtasks_by_task = graph.child_task_ids_map(db, _all_ids)
 
     # Group tasks by agent key in Python — no further DB round-trips.
-    tasks_by_key: dict[str, list[Task]] = defaultdict(list)
+    tasks_by_key: dict[str, list] = defaultdict(list)
     for t in all_tasks:
         tasks_by_key[t.assigned_agent_key_id].append(t)
 

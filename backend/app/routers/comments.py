@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Comment, Task
+from app.models import Comment
 from app.routers.deps import get_comment_or_404, get_project_or_404, get_task_or_404
 from app.routers.issue_sync import (
     sync_comment_delete_to_external,
@@ -10,11 +10,12 @@ from app.routers.issue_sync import (
     sync_comment_update_to_external,
 )
 from app.schemas import CommentCreate, CommentOut, CommentUpdate
+from app.services import graph
 
 router = APIRouter(prefix="/projects/{project_id}/tasks/{task_id}/comments", tags=["comments"])
 
 
-def _validate_project_and_task(project_id: str, task_id: str, db: Session) -> Task:
+def _validate_project_and_task(project_id: str, task_id: str, db: Session) -> graph.TaskView:
     get_project_or_404(project_id, db)
     return get_task_or_404(task_id, db, project_id=project_id)
 

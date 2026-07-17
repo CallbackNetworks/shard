@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Edge, Project, Task
+from app.models import Edge, Node, Project
 from app.services import graph
 from app.services.enrichment import enrich_task_as_dict
 from app.services.search_backend import get_search_backend
@@ -33,19 +33,24 @@ def search(
 
     tasks = []
     if used_fts and task_ids:
-        task_query = db.query(Task).filter(Task.id.in_(task_ids))
-        if project_id:
-            task_query = task_query.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-        tasks = task_query.all()
-        # Preserve FTS rank order
-        id_order = {tid: i for i, tid in enumerate(task_ids)}
-        tasks.sort(key=lambda t: id_order.get(t.id, 0))
+        # Preserve FTS rank order (task_views_for_ids keeps input order).
+        allowed = set(graph.contained_task_ids(db, project_id)) if project_id else None
+        ordered = [tid for tid in task_ids if allowed is None or tid in allowed]
+        tasks = graph.task_views_for_ids(db, ordered)
 
     if not used_fts:
-        task_query = db.query(Task).filter((Task.title.ilike(pattern)) | (Task.description.ilike(pattern)))
-        if project_id:
-            task_query = task_query.filter(Task.id.in_(graph.contained_task_ids(db, project_id)))
-        tasks = task_query.order_by(Task.updated_at.desc()).offset(offset).limit(limit).all()
+        # title/description live on the task node (description in JSON data); scan in
+        # Python for dialect-safe LIKE fallback (ADR-0033, node-only tasks).
+        ql = q.lower()
+        scope = set(graph.contained_task_ids(db, project_id)) if project_id else None
+        nodes = db.query(Node).filter(Node.type == graph.NODE_TASK).order_by(Node.updated_at.desc()).all()
+        matched = [
+            n
+            for n in nodes
+            if (ql in (n.title or "").lower() or ql in ((n.data or {}).get("description") or "").lower())
+            and (scope is None or n.id in scope)
+        ][offset : offset + limit]
+        tasks = [graph.task_view(n, db) for n in matched]
 
     # Search projects (only if no project_id filter)
     projects = []
@@ -59,10 +64,15 @@ def search(
             .label("total_tasks")
         )
         done_sq = (
-            select(func.count(Task.id))
+            select(func.count(Node.id))
             .select_from(Edge)
-            .join(Task, Task.id == Edge.target_id)
-            .where(Edge.source_id == Project.id, Edge.rel_type == graph.REL_CONTAINS, Task.status == "done")
+            .join(Node, Node.id == Edge.target_id)
+            .where(
+                Edge.source_id == Project.id,
+                Edge.rel_type == graph.REL_CONTAINS,
+                Node.type == graph.NODE_TASK,
+                Node.status == "done",
+            )
             .correlate(Project)
             .scalar_subquery()
             .label("done_tasks")

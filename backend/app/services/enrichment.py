@@ -1,6 +1,4 @@
-from sqlalchemy.orm import selectinload
-
-from app.models import RecurrenceRule, Task
+from app.models import RecurrenceRule
 from app.schemas import CycleOut, IdentityOut, LabelOut, ProjectOut, RecurrenceRuleOut, TaskOut, TaskPullRequestOut
 from app.services import graph
 
@@ -129,18 +127,7 @@ def enrich_project(project, db=None) -> ProjectOut:
     # no primary): this naturally includes cross-project members.
     if db is not None:
         task_ids = graph.contained_task_ids(db, project.id)
-        tasks = (
-            db.query(Task)
-            .options(
-                selectinload(Task.comments),
-                selectinload(Task.pull_requests),
-                selectinload(Task.assigned_agent),
-            )
-            .filter(Task.id.in_(task_ids))
-            .all()
-            if task_ids
-            else []
-        )
+        tasks = graph.task_views_for_ids(db, task_ids) if task_ids else []
     else:
         tasks = []
 

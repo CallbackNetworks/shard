@@ -6,7 +6,7 @@ Provides project enrichment and lookup utilities.
 
 from sqlalchemy.orm import Session
 
-from app.models import Project, Task
+from app.models import Project
 from app.routers.deps import get_task_or_404 as _deps_get_task_or_404
 from app.services import graph
 from app.services.enrichment import enrich_task_as_dict
@@ -27,11 +27,11 @@ def _enrich_project(project: Project, db: Session) -> dict:
     }
 
 
-def _get_task_or_404(project_id: str, task_id: str, db: Session) -> Task:
+def _get_task_or_404(project_id: str, task_id: str, db: Session) -> graph.TaskView:
     """Shared helper: validate task exists within the given project."""
     return _deps_get_task_or_404(task_id, db, project_id=project_id)
 
 
-def _enrich_task_for_search(task: Task, db: Session) -> dict:
+def _enrich_task_for_search(task: "graph.TaskView", db: Session) -> dict:
     """Attach labels, counts, and dependency IDs to a TaskOut dict."""
     return enrich_task_as_dict(task, db)
