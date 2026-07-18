@@ -179,6 +179,7 @@ class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    type: str = "task"  # "task" or a user-defined task-like node type (ADR-0035)
     project_id: str | None = None  # compat: first/nearest project via contains edges (ADR-0032)
     project_ids: list[str] = []  # every literal project this task belongs to (ADR-0032)
     container_ids: list[str] = []  # every container (incl. custom types) via contains edges (ADR-0034)
@@ -190,7 +191,7 @@ class TaskOut(BaseModel):
     assignee: str | None = None
     assigned_agent_key_id: str | None = None
     assigned_agent_name: str | None = None
-    callback_token: str
+    callback_token: str | None = None  # ADR-0035: task-like custom nodes may lack one
     webhook_secret: str | None = None
     start_date: datetime | None
     due_date: datetime | None
@@ -963,6 +964,7 @@ class NodeTypeCreate(BaseModel):
     icon: str | None = None
     color: str | None = None
     is_container: bool = False  # ADR-0034: user-definable container layer
+    is_task_like: bool = False  # ADR-0035: user-definable first-class task type
     data: dict | None = None
 
     @field_validator("key")
@@ -976,6 +978,7 @@ class NodeTypeUpdate(BaseModel):
     icon: str | None = None
     color: str | None = None
     is_container: bool | None = None  # ADR-0034: only settable on custom types
+    is_task_like: bool | None = None  # ADR-0035: only settable on custom types
     data: dict | None = None
 
 

@@ -72,9 +72,9 @@ describe('GraphTypes', () => {
 
   it('shows role badges from the registry', () => {
     setup()
-    // roleContainer appears as the Project badge and as the node create-form checkbox label.
+    // roleContainer/roleTask each appear as a badge and as a node create-form checkbox label.
     expect(screen.getAllByText('graphTypes.roleContainer').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText('graphTypes.roleTask')).toBeTruthy()
+    expect(screen.getAllByText('graphTypes.roleTask').length).toBeGreaterThanOrEqual(2)
     // Appears as a badge on the "contains" edge and as the edge create-form checkbox label.
     expect(screen.getAllByText('graphTypes.roleContainment').length).toBeGreaterThanOrEqual(1)
   })
@@ -111,5 +111,17 @@ describe('GraphTypes', () => {
     const addButtons = screen.getAllByText('graphTypes.add')
     fireEvent.click(addButtons[0].closest('button'))
     expect(lastMutations.arg).toMatchObject({ key: 'area', label: 'Area' })
+  })
+
+  it('creates a custom task-like type when the checkbox is ticked (ADR-0035)', () => {
+    setup()
+    fireEvent.change(screen.getAllByPlaceholderText('graphTypes.keyPlaceholder')[0], { target: { value: 'ticket' } })
+    fireEvent.change(screen.getAllByPlaceholderText('graphTypes.labelPlaceholder')[0], { target: { value: 'Ticket' } })
+    const taskCheckboxes = screen.getAllByText('graphTypes.roleTask')
+      .map(el => el.closest('label')?.querySelector('input[type=checkbox]'))
+      .filter(Boolean)
+    fireEvent.click(taskCheckboxes[0])
+    fireEvent.click(screen.getAllByText('graphTypes.add')[0].closest('button'))
+    expect(lastMutations.arg).toMatchObject({ key: 'ticket', label: 'Ticket', is_task_like: true })
   })
 })

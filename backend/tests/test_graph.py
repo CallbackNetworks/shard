@@ -31,7 +31,9 @@ def test_create_node_with_explicit_id(db):
 
 
 def test_update_node_splits_columns_and_data(db):
-    node = graph.create_node(db, graph.NODE_TASK, title="t", status="todo")
+    # Use a plain non-task type: a task-like type would seed task-data defaults
+    # (callback_token, scalar slots) into ``data`` on create (ADR-0035).
+    node = graph.create_node(db, graph.NODE_LABEL, title="t", status="todo")
     db.commit()
 
     graph.update_node(db, node.id, status="done", note="finished")

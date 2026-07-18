@@ -112,6 +112,30 @@ def test_custom_container_surfaces_in_container_ids_not_project_ids(client, db, 
     assert set(enriched["container_ids"]) == {sample_project.id, ws.id}
 
 
+def test_create_custom_task_like_type(client):
+    # ADR-0035: is_task_like is now user-settable on custom types.
+    r = client.post("/graph-types/nodes", json={"key": "ticket", "label": "Ticket", "is_task_like": True})
+    assert r.status_code == 201
+    assert r.json()["is_task_like"] is True
+    listed = next(t for t in client.get("/graph-types/nodes").json() if t["key"] == "ticket")
+    assert listed["is_task_like"] is True
+
+
+def test_toggle_task_like_role_on_custom_type(client):
+    client.post("/graph-types/nodes", json={"key": "ticket", "label": "Ticket"})
+    r = client.patch("/graph-types/nodes/ticket", json={"is_task_like": True})
+    assert r.status_code == 200
+    assert r.json()["is_task_like"] is True
+
+
+def test_cannot_change_task_like_of_builtin_task(client):
+    # Flipping the built-in task's role would break the enrichment pipeline (ADR-0035).
+    r = client.patch(f"/graph-types/nodes/{graph.NODE_TASK}", json={"is_task_like": False})
+    assert r.status_code == 400
+    task = next(t for t in client.get("/graph-types/nodes").json() if t["key"] == graph.NODE_TASK)
+    assert task["is_task_like"] is True
+
+
 def test_create_and_delete_custom_edge_type(client):
     r = client.post("/graph-types/edges", json={"key": "blocks", "label": "Blocks"})
     assert r.status_code == 201

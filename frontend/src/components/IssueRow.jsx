@@ -4,7 +4,7 @@ import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, File
 import { useTranslation } from 'react-i18next'
 import { regenerateToken, createExternalIssue } from '../api/client'
 import { PRIORITY, DARK } from '../constants/theme'
-import { PriorityIcon, StatusIcon, LabelChip, PrBadge } from './TaskIcons'
+import { PriorityIcon, StatusIcon, LabelChip, PrBadge, TypeBadge } from './TaskIcons'
 import TaskEditForm from './TaskEditForm'
 import CommentsPanel from './CommentsPanel'
 import DependenciesPanel from './DependenciesPanel'
@@ -128,6 +128,9 @@ export default memo(function IssueRow({
             </span>
           )}
         </span>
+
+        {/* Custom task-like type badge (ADR-0035) */}
+        <TypeBadge type={task.type} />
 
         {/* Label chips */}
         {labels.length > 0 && (

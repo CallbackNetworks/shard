@@ -35,7 +35,8 @@ def list_tasks(
     db: Session = Depends(get_db),
 ):
     _get_project_or_404(project_id, db)
-    q = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
+    # contained_task_ids already role-filters (built-in task + user-defined task-like, ADR-0035).
+    q = db.query(Node).filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status_filter:
         q = q.filter(Node.status == status_filter)
     want_subtasks = include and "subtasks" in include.split(",")
@@ -344,9 +345,10 @@ async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Dep
     """Set the position of each task according to the given ordered list of IDs."""
     _get_project_or_404(project_id, db)
     contained = set(graph.contained_task_ids(db, project_id))
+    task_types = graph.task_type_keys(db)
     for idx, task_id in enumerate(body.task_ids):
         if task_id in contained:
-            db.query(Node).filter(Node.id == task_id, Node.type == graph.NODE_TASK).update({"position": idx})
+            db.query(Node).filter(Node.id == task_id, Node.type.in_(task_types)).update({"position": idx})
     db.commit()
     await ws_manager.broadcast("task.reordered", {"project_id": project_id})
 

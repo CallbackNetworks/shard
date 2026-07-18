@@ -123,6 +123,65 @@ def test_delete_project_keeps_task_alive_under_custom_container(db, sample_proje
     assert graph.member_container_ids(db, task.id) == [ws.id]
 
 
+def _custom_task_node(db, sample_project):
+    """A node of a user-defined task-like type, filed under a project (ADR-0035)."""
+    db.add(NodeType(key="ticket", label="Ticket", is_task_like=True))
+    db.commit()
+    node = graph.create_node(db, "ticket", title="A ticket")
+    graph.add_edge(db, sample_project.id, node.id, graph.REL_CONTAINS)
+    db.commit()
+    return node
+
+
+def test_task_like_node_gets_callback_token_on_create(db):
+    db.add(NodeType(key="ticket", label="Ticket", is_task_like=True))
+    db.commit()
+    node = graph.create_node(db, "ticket", title="T")
+    db.commit()
+    # A first-class task type's nodes get the full task data surface (ADR-0035).
+    assert (node.data or {}).get("callback_token")
+
+
+def test_task_like_node_loads_as_taskview(db, sample_project):
+    node = _custom_task_node(db, sample_project)
+    view = graph.get_task(db, node.id)
+    assert view is not None
+    assert view.type == "ticket"
+    assert view.status == "todo"  # default applied like a real task
+    assert view.callback_token
+
+
+def test_task_like_node_enriches_in_project(db, sample_project):
+    from app.services.enrichment import enrich_project
+
+    node = _custom_task_node(db, sample_project)
+    out = enrich_project(graph.get_project(db, sample_project.id), db)
+    row = next((t for t in out.tasks if t.id == node.id), None)
+    assert row is not None
+    assert row.type == "ticket"
+    assert row.callback_token
+    assert row.project_ids == [sample_project.id]
+
+
+def test_task_like_node_in_project_task_list_endpoint(client, db, sample_project):
+    node = _custom_task_node(db, sample_project)
+    r = client.get(f"/projects/{sample_project.id}/tasks")
+    assert r.status_code == 200
+    row = next((t for t in r.json() if t["id"] == node.id), None)
+    assert row is not None
+    assert row["type"] == "ticket"
+
+
+def test_task_like_node_deleted_with_project(db, sample_project):
+    from app.models import Node
+
+    node = _custom_task_node(db, sample_project)
+    graph.delete_project_and_tasks(db, graph.get_project(db, sample_project.id))
+    db.commit()
+    assert graph.get_task(db, node.id) is None
+    assert db.get(Node, node.id) is None
+
+
 def test_node_type_out_exposes_roles(client):
     types = {t["key"]: t for t in client.get("/graph-types/nodes").json()}
     assert types[graph.NODE_PROJECT]["is_container"] is True

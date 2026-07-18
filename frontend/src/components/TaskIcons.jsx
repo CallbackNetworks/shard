@@ -1,5 +1,28 @@
 import { memo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { PRIORITY, STATUS_COLOR } from '../constants/theme'
+import { getNodeTypes } from '../api/client'
+
+// Badge for a user-defined task-like type (ADR-0035). Built-in "task" nodes show
+// nothing; a custom type renders its registry label/color (falls back to the key).
+export const TypeBadge = memo(function TypeBadge({ type }) {
+  const { data: nodeTypes = [] } = useQuery({
+    queryKey: ['node-types'], queryFn: getNodeTypes,
+    enabled: !!type && type !== 'task', staleTime: 300000,
+  })
+  if (!type || type === 'task') return null
+  const nt = nodeTypes.find(t => t.key === type)
+  const color = nt?.color || '#818cf8'
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, flexShrink: 0,
+      textTransform: 'uppercase', letterSpacing: 0.4,
+      color, background: `${color}22`, border: `1px solid ${color}44`,
+    }}>
+      {nt?.label || type}
+    </span>
+  )
+})
 
 export const PriorityIcon = memo(function PriorityIcon({ priority }) {
   const icons = { high: '\u25B2', medium: '\u25A0', low: '\u25BC' }

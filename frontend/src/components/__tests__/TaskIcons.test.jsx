@@ -1,7 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { PriorityIcon, StatusIcon, LabelChip } from '../TaskIcons'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { PriorityIcon, StatusIcon, LabelChip, TypeBadge } from '../TaskIcons'
 import { STATUS_COLOR } from '../../constants/theme'
+
+function withClient(ui, seed) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  if (seed) qc.setQueryData(['node-types'], seed)
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
+}
 
 describe('PriorityIcon', () => {
   it('renders high priority triangle', () => {
@@ -93,5 +100,27 @@ describe('LabelChip', () => {
     )
     expect(container.querySelector('svg')).toBeTruthy()
     expect(screen.getByText('Maybe')).toBeTruthy()
+  })
+})
+
+describe('TypeBadge', () => {
+  it('renders nothing for a built-in task', () => {
+    const { container } = withClient(<TypeBadge type="task" />)
+    expect(container.textContent).toBe('')
+  })
+
+  it('renders nothing when type is missing', () => {
+    const { container } = withClient(<TypeBadge type={undefined} />)
+    expect(container.textContent).toBe('')
+  })
+
+  it('renders the registry label for a custom task-like type', () => {
+    withClient(<TypeBadge type="ticket" />, [{ key: 'ticket', label: 'Ticket', color: '#abcdef' }])
+    expect(screen.getByText('Ticket')).toBeTruthy()
+  })
+
+  it('falls back to the raw type key when not in the registry', () => {
+    withClient(<TypeBadge type="ticket" />, [])
+    expect(screen.getByText('ticket')).toBeTruthy()
   })
 })

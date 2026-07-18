@@ -94,6 +94,11 @@ def create_node(
     node = Node(type=node_type, title=title, data=fields or None, **col_values)
     if id is not None:
         node.id = id
+    # A user-defined task-like type is a first-class task (ADR-0035): give its nodes
+    # the full task ``data`` surface (callback_token + scalar slots) so they load as
+    # TaskViews and enrich exactly like built-in tasks.
+    if node_type in task_type_keys(db):
+        node.data = _apply_task_data_defaults(dict(node.data or {}))
     db.add(node)
     db.flush()
     _log_event(db, "node_created", node_id=node.id, actor=actor, data={"type": node_type})
@@ -1252,6 +1257,7 @@ class TaskView:
         self._db = db
         data = node.data or {}
         self.id = node.id
+        self.type = node.type  # "task" or a user-defined task-like type (ADR-0035)
         self.title = node.title
         self.status = node.status or "todo"
         self.priority = node.priority or "medium"
@@ -1296,17 +1302,18 @@ def task_view(node: Node, db: Session | None = None) -> TaskView:
 
 def get_task(db: Session, task_id: str) -> TaskView | None:
     node = db.get(Node, task_id)
-    if node is None or node.type != NODE_TASK:
+    # Role-based: built-in ``task`` plus any user-defined task-like type (ADR-0035).
+    if node is None or node.type not in task_type_keys(db):
         return None
     return TaskView(node, db)
 
 
 def task_views_by_ids(db: Session, task_ids) -> dict[str, TaskView]:
-    """Batch-load ``{task_id: TaskView}`` for task-type nodes among ``task_ids``."""
+    """Batch-load ``{task_id: TaskView}`` for task-role nodes among ``task_ids`` (ADR-0035)."""
     ids = set(task_ids)
     if not ids:
         return {}
-    nodes = db.query(Node).filter(Node.id.in_(ids), Node.type == NODE_TASK).all()
+    nodes = db.query(Node).filter(Node.id.in_(ids), Node.type.in_(task_type_keys(db))).all()
     return {n.id: TaskView(n, db) for n in nodes}
 
 
@@ -1345,13 +1352,23 @@ def _apply_task_fields(node: Node, fields: dict, *, creating: bool) -> None:
             setattr(node, col, value)
     data = dict(node.data or {})
     if creating:
-        for key in _TASK_DATA_SCALARS:
-            data.setdefault(key, None)
-        if not data.get("callback_token"):
-            data["callback_token"] = str(uuid.uuid4())
+        _apply_task_data_defaults(data)
     for key, value in f.items():
         data[key] = _iso(value) if key == "reminder_sent_at" else value
     node.data = data or None
+
+
+def _apply_task_data_defaults(data: dict) -> dict:
+    """Seed a task node's ``data`` with the full scalar surface + a callback token.
+
+    Shared by ``create_task`` (built-in tasks) and ``create_node`` (user-defined
+    task-like types, ADR-0035) so both produce nodes that satisfy ``TaskOut``.
+    """
+    for key in _TASK_DATA_SCALARS:
+        data.setdefault(key, None)
+    if not data.get("callback_token"):
+        data["callback_token"] = str(uuid.uuid4())
+    return data
 
 
 def create_task(
@@ -1378,7 +1395,7 @@ def create_task(
 def update_task(db: Session, task_id: str, **fields) -> TaskView | None:
     """Update a task node's hot columns / ``data`` fields (ADR-0033, node-only)."""
     node = db.get(Node, task_id)
-    if node is None or node.type != NODE_TASK:
+    if node is None or node.type not in task_type_keys(db):
         return None
     _apply_task_fields(node, fields, creating=False)
     db.flush()
@@ -1391,7 +1408,7 @@ def find_task_by_callback_token(db: Session, token: str) -> TaskView | None:
     Scans task nodes and filters in Python: the token lives in the JSON ``data``
     bag (no indexed column) — dialect-portable and fine at personal-tool scale.
     """
-    for node in db.query(Node).filter(Node.type == NODE_TASK).all():
+    for node in db.query(Node).filter(Node.type.in_(task_type_keys(db))).all():
         if (node.data or {}).get("callback_token") == token:
             return TaskView(node, db)
     return None
@@ -1399,7 +1416,7 @@ def find_task_by_callback_token(db: Session, token: str) -> TaskView | None:
 
 def find_task_by_external(db: Session, provider: str, external_id: str, repo: str) -> TaskView | None:
     """Locate a task by its external issue identity (provider/id/repo in ``data``)."""
-    for node in db.query(Node).filter(Node.type == NODE_TASK).all():
+    for node in db.query(Node).filter(Node.type.in_(task_type_keys(db))).all():
         data = node.data or {}
         if (
             data.get("external_provider") == provider
@@ -1449,7 +1466,7 @@ def _delete_task_node(db: Session, task_id: str) -> None:
     from app.models import Attachment, Comment, RecurrenceRule, TaskPullRequest, WebhookEvent
 
     node = db.get(Node, task_id)
-    if node is None or node.type != NODE_TASK:
+    if node is None or node.type not in task_type_keys(db):
         return
     for model in (Comment, Attachment, TaskPullRequest, WebhookEvent):
         db.query(model).filter(model.task_id == task_id).delete(synchronize_session=False)
@@ -1493,8 +1510,9 @@ def set_parent_task(db: Session, task_id: str, parent_id: str) -> None:
     """
     if detect_cycle(db, parent_id, task_id):
         raise ValueError(f"re-parenting {task_id} under {parent_id} would create a cycle")
+    tasks = task_type_keys(db)
     for old_parent in parents_of(db, task_id):
-        if old_parent.type == NODE_TASK and old_parent.id != parent_id:
+        if old_parent.type in tasks and old_parent.id != parent_id:
             remove_edge(db, old_parent.id, task_id, REL_CONTAINS)
     add_edge(db, parent_id, task_id, REL_CONTAINS)
 
