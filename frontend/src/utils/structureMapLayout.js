@@ -407,6 +407,7 @@ const NETWORK_SIZE = {
   task: { w: 150, h: 44 },
   goal: { w: 138, h: 44 },
   decision: { w: 138, h: 44 },
+  custom: { w: 138, h: 44 },
 }
 
 // Sector-orbit layout (radial tidy tree): every identity owns an angular
@@ -416,7 +417,7 @@ const NETWORK_SIZE = {
 // the mean angle of what they link to. Angles are allocated by need, so the
 // picture is deterministic and collision-free by construction; rings are
 // staggered into two sub-orbits to halve the required radius.
-export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
+export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode, customNodes = [], customLinks = [] }) {
   const nodes = []
   const links = []
 
@@ -438,6 +439,9 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
     if (node.lane === 'goal') pushNode(`goal:${node.id}`, 'goal', node.name, node.color, node)
     else pushNode(`decision:${node.id}`, 'decision', node.name, node.color, node)
   })
+  customNodes.forEach(node =>
+    pushNode(`custom:${node.id}`, 'custom', node.name, node.typeColor, node)
+  )
 
   const identityColorById = new Map(visibleIdentityNodes.map(identity => [identity.id, identity.color]))
   visibleProjects.forEach(project => {
@@ -458,6 +462,21 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
   if (viewMode === 'dependencies') {
     dependencyLinks.forEach(link => links.push({ from: link.from, to: link.to, color: STATUS_COLOR.failed, type: 'dependency' }))
   }
+  // Graph-native extensions (ADR-0037): nested containment between containers,
+  // custom plain nodes hanging off their container, and custom relation edges.
+  visibleProjects.forEach(project => {
+    if (project.parentContainerId) {
+      links.push({ from: `project:${project.parentContainerId}`, to: `project:${project.id}`, color: '#64748b', type: 'contains' })
+    }
+  })
+  customNodes.forEach(node => {
+    if (node.parentProjectId) {
+      links.push({ from: `project:${node.parentProjectId}`, to: `custom:${node.id}`, color: node.typeColor || '#64748b', type: 'contains' })
+    }
+  })
+  customLinks.forEach(link => {
+    links.push({ from: link.from, to: link.to, color: '#64748b', type: 'custom', label: link.label })
+  })
 
   const nodeById = new Map(nodes.map(n => [n.id, n]))
   const validLinks = links.filter(l => nodeById.has(l.from) && nodeById.has(l.to))
@@ -504,7 +523,7 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
   const r2b = r2 + 96
   const r3 = Math.max(r2b + 140, TASK_ARC / Math.max(unitAngle, 0.0001) / 2)
   const r3b = r3 + 84
-  const laneCount = laneNodes.length
+  const laneCount = laneNodes.length + customNodes.length
   const r4 = Math.max(r3b + 150, (laneCount * LANE_ARC) / TAU)
   const r1 = Math.max(130, r2 * 0.42)
 
@@ -546,29 +565,46 @@ export function buildNetworkLayout({ visibleProjects, visibleIdentityNodes, visi
     cursor += span + gapAngle
   })
 
-  // --- Outer ring: goals and decisions aim at the circular mean of their
-  // linked projects, then get nudged apart to a minimum angular distance ---
-  const laneEntries = laneNodes.map(node => {
-    const linkedIds = (node.projectIds || (node.projectId ? [node.projectId] : []))
-      .filter(id => projectAngleById.has(id))
+  // --- Outer ring: goals, decisions, and custom plain nodes aim at the
+  // circular mean of what they link to, then get nudged apart ---
+  const customProjectIds = new Map(customNodes.map(node => {
+    const key = `custom:${node.id}`
+    const linked = new Set(node.parentProjectId ? [node.parentProjectId] : [])
+    for (const link of customLinks) {
+      const other = link.from === key ? link.to : link.to === key ? link.from : null
+      if (other?.startsWith('project:')) linked.add(other.slice('project:'.length))
+    }
+    return [node.id, [...linked]]
+  }))
+  const outerEntries = [
+    ...laneNodes.map(node => ({
+      key: `${node.lane === 'goal' ? 'goal' : 'decision'}:${node.id}`,
+      linkedIds: (node.projectIds || (node.projectId ? [node.projectId] : [])),
+    })),
+    ...customNodes.map(node => ({
+      key: `custom:${node.id}`,
+      linkedIds: customProjectIds.get(node.id) || [],
+    })),
+  ].map(entry => {
+    const linkedIds = entry.linkedIds.filter(id => projectAngleById.has(id))
     let angle = -Math.PI / 2
     if (linkedIds.length > 0) {
       const sumX = linkedIds.reduce((sum, id) => sum + Math.cos(projectAngleById.get(id)), 0)
       const sumY = linkedIds.reduce((sum, id) => sum + Math.sin(projectAngleById.get(id)), 0)
       angle = Math.atan2(sumY, sumX)
     }
-    return { node, angle }
+    return { key: entry.key, angle }
   }).sort((a, b) => a.angle - b.angle)
 
   const minLaneGap = LANE_ARC / Math.max(r4, 1)
-  for (let i = 1; i < laneEntries.length; i++) {
-    if (laneEntries[i].angle < laneEntries[i - 1].angle + minLaneGap) {
-      laneEntries[i].angle = laneEntries[i - 1].angle + minLaneGap
+  for (let i = 1; i < outerEntries.length; i++) {
+    if (outerEntries[i].angle < outerEntries[i - 1].angle + minLaneGap) {
+      outerEntries[i].angle = outerEntries[i - 1].angle + minLaneGap
     }
   }
-  laneEntries.forEach(({ node, angle }) => {
-    const laneNode = nodeById.get(`${node.lane === 'goal' ? 'goal' : 'decision'}:${node.id}`)
-    if (laneNode) place(laneNode, angle, r4)
+  outerEntries.forEach(({ key, angle }) => {
+    const outerNode = nodeById.get(key)
+    if (outerNode) place(outerNode, angle, r4)
   })
 
   separateRects(nodes)

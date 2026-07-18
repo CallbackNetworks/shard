@@ -21,7 +21,7 @@ export default function MapInspector({ selected, taskById, projectById, onSelect
 
   return (
     <aside className="kt-map-inspector">
-      <span>{selected.type || selected.lane}</span>
+      <span>{selected.typeLabel || selected.type || selected.lane}</span>
       <h2>{selected.name}</h2>
       <p>{selected.status || selected.risk || t('active')}</p>
       {hasInspectorMetrics(selected) && (

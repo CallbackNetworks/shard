@@ -156,6 +156,17 @@ export default function TerritoryCanvas({
           title={`${project.name} — ${t('structure.doubleClickOpen')}`}
         >
           <strong>{project.name}</strong>
+          {project.isCustomType && project.typeLabel && (
+            <b style={{
+              fontSize: 9, fontWeight: 700, padding: '0 5px', borderRadius: 3, flexShrink: 0,
+              textTransform: 'uppercase', letterSpacing: 0.4,
+              color: project.typeColor || '#818cf8',
+              background: `${project.typeColor || '#818cf8'}22`,
+              border: `1px solid ${project.typeColor || '#818cf8'}44`,
+            }}>
+              {project.typeLabel}
+            </b>
+          )}
           {riskCount > 0 && <b className={s.riskBadge}><AlertTriangle size={10} /> {riskCount}</b>}
           {pendingDecisions > 0 && <b className={s.pendingBadge}><GitFork size={10} /> {pendingDecisions}</b>}
         </button>

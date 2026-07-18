@@ -28,13 +28,17 @@ graph_router = APIRouter(prefix="/graph", tags=["nodes"])
 @graph_router.get("/map")
 def graph_map(
     types: str | None = Query(default=None, description="comma-separated node type keys to include"),
+    include: str | None = Query(default=None, description="'data' to include each node's data payload"),
     limit: int = Query(default=2000, le=5000),
     db: Session = Depends(get_db),
 ):
     """One-shot ``{nodes, edges}`` slice of the graph (ADR-0037).
 
-    Nodes carry hot columns only (no ``data``) to stay light; edges are those
-    with both endpoints in the returned node set.
+    Nodes carry hot columns by default; pass ``include=data`` for the full
+    payload (needed by clients that derive enrichment — e.g. the structure map
+    computes progress/risk/decision status from it). Edges are those with both
+    endpoints in the returned node set, ordered by ``(position, created_at)`` so
+    "first container" picks are deterministic and match compat ``project_id``.
     """
     q = db.query(Node)
     if types:
@@ -42,7 +46,15 @@ def graph_map(
         q = q.filter(Node.type.in_(keys))
     nodes = q.order_by(Node.created_at).limit(limit).all()
     ids = {n.id for n in nodes}
-    edges = db.query(Edge).filter(Edge.source_id.in_(ids), Edge.target_id.in_(ids)).all() if ids else []
+    edges = (
+        db.query(Edge)
+        .filter(Edge.source_id.in_(ids), Edge.target_id.in_(ids))
+        .order_by(Edge.position, Edge.created_at)
+        .all()
+        if ids
+        else []
+    )
+    with_data = include == "data"
     return {
         "nodes": [
             {
@@ -53,6 +65,7 @@ def graph_map(
                 "priority": n.priority,
                 "due_date": n.due_date,
                 "is_pinned": n.is_pinned,
+                **({"data": n.data} if with_data else {}),
             }
             for n in nodes
         ],

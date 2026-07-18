@@ -156,6 +156,11 @@ def test_graph_map_slice(client, topic_type, sample_project, db):
     assert {n["id"] for n in body["nodes"]} == {topic["id"]}
     assert body["edges"] == []
 
+    # include=data exposes the payload (needed for client-side enrichment).
+    r = client.get("/api/graph/map", params={"include": "data"})
+    task_node = next(n for n in r.json()["nodes"] if n["id"] == task.id)
+    assert "data" in task_node
+
 
 def test_list_nodes_title_query(client, topic_type):
     client.post("/api/nodes", json={"type": "topic", "title": "Research Alpha"})

@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Maximize2, Minus, Plus, Search } from 'lucide-react'
-import { getDecisions, getGoals, getIdentities, getProjects } from '../api/client'
+import { getGraphMap, getNodeTypes, getEdgeTypes } from '../api/client'
 import { STATUS_COLOR } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
-import { dependencyNeighborhood, deriveStructureMap } from '../utils/structureMap'
+import { dependencyNeighborhood } from '../utils/structureMap'
+import { deriveGraphStructure, focusGraph } from '../utils/graphStructure'
 import { buildMindMapLayout, buildNetworkLayout, taskWeight } from '../utils/structureMapLayout'
 import { buildTerritoryModel } from '../utils/territoryModel'
 import useMapViewport from '../hooks/useMapViewport'
@@ -43,19 +44,23 @@ export default function StructureMap() {
   const [selected, setSelected] = useState(null)
   const isTerritory = layoutStyle === 'territory'
 
-  const { filterProjects, focusId } = useIdentityFocus()
-  const { data: allProjects = [], isLoading } = useQuery({ queryKey: ['projects', 'structure-map'], queryFn: getProjects })
-  const { data: allIdentities = [] } = useQuery({ queryKey: ['identities', 'structure-map'], queryFn: getIdentities })
-  const { data: goals = [] } = useQuery({ queryKey: ['goals', 'structure-map'], queryFn: getGoals })
-  const { data: decisions = [] } = useQuery({ queryKey: ['decisions', 'structure-map'], queryFn: getDecisions })
-  const projects = filterProjects(allProjects)
-  const identities = focusId ? allIdentities.filter(identity => identity.id === focusId) : allIdentities
+  const { focusId } = useIdentityFocus()
+  // Real graph slice (ADR-0037): the map derives everything — containers,
+  // task roles, ownership, dependencies, custom types — from nodes + edges
+  // plus the type registries. Roles come from the registry, not entity kinds.
+  const { data: slice, isLoading } = useQuery({
+    queryKey: ['graph-map', 'structure'],
+    queryFn: () => getGraphMap({ includeData: true }),
+  })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes, staleTime: 300000 })
 
-  const graph = useMemo(
-    () => deriveStructureMap(projects, identities, goals, decisions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allProjects, allIdentities, goals, decisions, focusId]
+  const fullGraph = useMemo(
+    () => deriveGraphStructure(slice, nodeTypes, edgeTypes),
+    [slice, nodeTypes, edgeTypes]
   )
+  const graph = useMemo(() => focusGraph(fullGraph, focusId), [fullGraph, focusId])
+  const projects = graph.projectNodes
 
   const search = query.trim().toLowerCase()
   const taskById = useMemo(() => {
@@ -69,15 +74,19 @@ export default function StructureMap() {
 
   const projectSearchIndex = useMemo(() => {
     const identityById = new Map(graph.identityNodes.map(identity => [identity.id, identity.name]))
-    const rawProjectById = new Map(projects.map(project => [project.id, project]))
+    const tasksByContainer = new Map()
+    for (const task of graph.allTaskNodes || []) {
+      if (!tasksByContainer.has(task.projectId)) tasksByContainer.set(task.projectId, [])
+      tasksByContainer.get(task.projectId).push(task.name)
+    }
     return new Map(graph.projectNodes.map(project => {
       const identityText = project.identityIds.map(id => identityById.get(id)).filter(Boolean)
-      const taskText = (rawProjectById.get(project.id)?.tasks || []).map(task => task.title).filter(Boolean)
+      const taskText = (tasksByContainer.get(project.id) || []).filter(Boolean)
       const goalText = graph.goalNodes.filter(goal => goal.projectIds?.includes(project.id)).map(goal => goal.name)
       const decisionText = graph.decisionNodes.filter(decision => decision.projectId === project.id).map(decision => decision.name)
-      return [project.id, [project.name, ...identityText, ...taskText, ...goalText, ...decisionText].join(' ').toLowerCase()]
+      return [project.id, [project.name, project.typeLabel, ...identityText, ...taskText, ...goalText, ...decisionText].join(' ').toLowerCase()]
     }))
-  }, [graph, projects])
+  }, [graph])
 
   const visibleProjects = graph.projectNodes.filter(project => {
     const matchesSearch = !search || projectSearchIndex.get(project.id)?.includes(search)
@@ -156,15 +165,28 @@ export default function StructureMap() {
     return node.name.toLowerCase().includes(search) || linkedVisible
   }).slice(0, layoutStyle === 'network' ? 18 : 12)
 
+  // Custom plain nodes and custom-relation edges surface in the network view
+  // (ADR-0037); they follow their container's visibility and match search.
+  const visibleCustomNodes = (graph.customNodes || []).filter(node => {
+    if (search && !(`${node.name} ${node.typeLabel}`.toLowerCase().includes(search))) {
+      return node.parentProjectId && visibleProjectIds.has(node.parentProjectId)
+    }
+    if (!node.parentProjectId) return true
+    return visibleProjectIds.has(node.parentProjectId)
+  })
+  const visibleCustomLinks = graph.customLinks || []
+
   // Stable structural signature so the (potentially expensive force) layout
   // only rebuilds when the graph actually changes, not on pan/zoom/select.
   const layoutSignature = [
     layoutStyle,
     viewMode,
     visibleIdentityNodes.map(n => `${n.id}:${n.color}`).join(','),
-    visibleProjects.map(n => `${n.id}:${n.risk}:${n.progress}:${n.identityIds.join('+')}`).join(','),
+    visibleProjects.map(n => `${n.id}:${n.risk}:${n.progress}:${n.identityIds.join('+')}:${n.parentContainerId || ''}`).join(','),
     visibleTaskNodes.map(n => `${n.id}:${n.status}:${n.projectId}`).join(','),
     laneNodes.map(n => `${n.lane}:${n.id}:${(n.projectIds || n.projectId || '')}`).join(','),
+    visibleCustomNodes.map(n => `${n.id}:${n.parentProjectId || ''}`).join(','),
+    visibleCustomLinks.map(l => `${l.from}>${l.to}:${l.relType}`).join(','),
     visibleDependencyLinks.map(l => `${l.from}>${l.to}`).join(','),
   ].join('|')
 
@@ -174,7 +196,10 @@ export default function StructureMap() {
         return { nodes: [], links: [], nodeById: new Map(), width: 960, height: 600, columns: null }
       }
       const params = { visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks: visibleDependencyLinks, viewMode }
-      return layoutStyle === 'network' ? buildNetworkLayout(params) : buildMindMapLayout(params)
+      if (layoutStyle === 'network') {
+        return buildNetworkLayout({ ...params, customNodes: visibleCustomNodes, customLinks: visibleCustomLinks })
+      }
+      return buildMindMapLayout(params)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [layoutSignature]
@@ -281,15 +306,25 @@ export default function StructureMap() {
     return !relatedNodeKeys.has(link.from) || !relatedNodeKeys.has(link.to)
   }
 
+  const containerHref = (containerId) => {
+    const container = projectById.get(containerId)
+    if (!container) return null
+    return container.isCustomType ? `/c/${container.id}` : `/projects/${container.id}`
+  }
+
   const jumpTo = (node) => {
     if (!node) return
     switch (node.type) {
-      case 'project':
-        navigate(`/projects/${node.id}`)
+      case 'project': {
+        const href = containerHref(node.id)
+        if (href) navigate(href)
         break
-      case 'task':
-        if (node.projectId) navigate(`/projects/${node.projectId}`)
+      }
+      case 'task': {
+        const href = node.projectId && containerHref(node.projectId)
+        if (href) navigate(href)
         break
+      }
       case 'identity':
         navigate('/identities')
         break
@@ -298,6 +333,9 @@ export default function StructureMap() {
         break
       case 'decision':
         navigate('/decisions')
+        break
+      case 'custom':
+        navigate(`/n/${node.id}`)
         break
       default:
         break
@@ -309,7 +347,9 @@ export default function StructureMap() {
     setMode('all')
   }
 
-  if (isLoading) return <p className="kt-muted" style={{ padding: 24 }}>{t('loading')}</p>
+  if (isLoading || nodeTypes.length === 0 || edgeTypes.length === 0) {
+    return <p className="kt-muted" style={{ padding: 24 }}>{t('loading')}</p>
+  }
 
   return (
     <div className="kt-page kt-map-page">
@@ -368,6 +408,9 @@ export default function StructureMap() {
         <Stat label={t('structure.risk')} value={graph.stats.failedProjects + graph.stats.overdueProjects} color={STATUS_COLOR.failed} />
         <Stat label={t('structure.unowned')} value={graph.stats.unownedProjects} color={STATUS_COLOR.todo} />
         <Stat label={t('structure.dependencies')} value={graph.stats.dependencies || 0} color={STATUS_COLOR.failed} />
+        {graph.stats.customNodes > 0 && (
+          <Stat label={t('structure.customNodes')} value={graph.stats.customNodes} color="#818cf8" />
+        )}
       </div>
 
       {!isTerritory && (

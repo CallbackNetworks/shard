@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, GitFork, Network, Target, UserRound } from 'lucide-react'
+import { AlertTriangle, Boxes, GitFork, Network, Target, UserRound } from 'lucide-react'
 import { computePath, networkPath, ribbonPath } from '../../utils/structureMapLayout'
 
 function GraphNode({ children, active, muted, color, label, onClick, onDoubleClick, className = '', style }) {
@@ -140,7 +140,11 @@ export default function MapCanvas({
           {node.type === 'decision' && <GitFork size={13} />}
           {node.type === 'project' && <Network size={13} />}
           {node.type === 'task' && <AlertTriangle size={13} />}
+          {node.type === 'custom' && <Boxes size={13} />}
           <strong>{node.name}</strong>
+          {(node.data.isCustomType || node.type === 'custom') && node.data.typeLabel && (
+            <em style={{ color: node.data.typeColor || undefined }}>{node.data.typeLabel}</em>
+          )}
           {node.type === 'identity' && <em>{node.data.projectCount} {t('structure.projects')}</em>}
           {node.type === 'project' && (
             <>
