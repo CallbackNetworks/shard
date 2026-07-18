@@ -317,8 +317,14 @@ export const updateEdgeType = (key, data) => api.patch(`/graph-types/edges/${key
 export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)
 
 // Generic graph nodes (ADR-0033)
-export const getNodes = (type) => api.get('/nodes', { params: type ? { type } : {} }).then(r => r.data)
+export const getNodes = (type, query) => {
+  const params = {}
+  if (type) params.type = type
+  if (query) params.query = query
+  return api.get('/nodes', { params }).then(r => r.data)
+}
 export const getNode = (id) => api.get(`/nodes/${id}`).then(r => r.data)
+export const getNodeEvents = (id) => api.get(`/nodes/${id}/events`).then(r => r.data)
 export const createNode = (data) => api.post('/nodes', data).then(r => r.data)
 export const deleteNode = (id) => api.delete(`/nodes/${id}`)
 export const getNodeEdges = (id) => api.get(`/nodes/${id}/edges`).then(r => r.data)
