@@ -879,5 +879,8 @@
   "membership.link": "Link",
   "membership.thisProject": "this project",
   "membership.containers": "Containers",
-  "membership.linkContainer": "Link to a container…"
+  "membership.linkContainer": "Link to a container…",
+  "membership.otherRelations": "Other relations",
+  "membership.pickRelation": "— relation type —",
+  "membership.linkRelation": "Link to a node…"
 }

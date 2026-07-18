@@ -1,12 +1,17 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   getProjects, addTaskMembership, removeTaskMembership,
-  getNodeTypes, getNode, attachNodeEdge, detachNodeEdge,
+  getNodeTypes, getNode, getNodeEdges, getEdgeTypes, attachNodeEdge, detachNodeEdge,
 } from '../api/client'
 import NodeCombobox from './shared/NodeCombobox'
+
+// Relations managed by dedicated panels/UI; everything else (custom edge
+// types) surfaces in the "other relations" section below (ADR-0037).
+const CORE_RELS = new Set(['contains', 'depends_on', 'labeled', 'in_cycle', 'assigned_to', 'member_of', 'part_of'])
 
 // Cross-project membership management (ADR-0032): a task can belong to multiple
 // projects via graph contains edges. ``projectId`` is the project this row is
@@ -43,6 +48,25 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
     await detachNodeEdge(cid, task.id, 'contains')
     invalidate()
     qc.invalidateQueries({ queryKey: ['contained-tasks', cid] })
+  }
+
+  // Other relations: custom edge types on this task (ADR-0037 proposal 5).
+  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes, staleTime: 300000 })
+  const { data: taskEdges = [] } = useQuery({ queryKey: ['node-edges', task.id], queryFn: () => getNodeEdges(task.id) })
+  const customEdgeTypes = edgeTypes.filter(et => !et.is_builtin)
+  const otherEdges = taskEdges.filter(e => !CORE_RELS.has(e.rel_type))
+  const [relPick, setRelPick] = useState('')
+  const relLabel = (key) => edgeTypes.find(et => et.key === key)?.label || key
+
+  const invalidateEdges = () => qc.invalidateQueries({ queryKey: ['node-edges', task.id] })
+  const handleLinkRelation = async (node) => {
+    await attachNodeEdge(task.id, { target_id: node.id, rel_type: relPick })
+    invalidateEdges()
+  }
+  const handleUnlinkRelation = async (edge) => {
+    if (edge.source_id === task.id) await detachNodeEdge(task.id, edge.target_id, edge.rel_type)
+    else await detachNodeEdge(edge.source_id, task.id, edge.rel_type)
+    invalidateEdges()
   }
 
   const handleAdd = async () => {
@@ -135,6 +159,53 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
               excludeIds={[task.id, ...extraContainers]}
               onSelect={handleLinkContainer}
             />
+          )}
+        </div>
+      )}
+
+      {(customEdgeTypes.length > 0 || otherEdges.length > 0) && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {t('membership.otherRelations')}
+          </div>
+          {otherEdges.map(e => {
+            const outgoing = e.source_id === task.id
+            const other = outgoing ? e.target : e.source
+            const label = other?.title || (outgoing ? e.target_id : e.source_id).slice(-8)
+            return (
+              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '3px 0', color: 'var(--kt-ink)' }}>
+                <span style={{ color: '#818cf8', fontWeight: 600 }}>{relLabel(e.rel_type)}</span>
+                <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.35)' }}>{outgoing ? '→' : '←'}</span>
+                <Link to={`/n/${other?.id || (outgoing ? e.target_id : e.source_id)}`} style={{ flex: 1, color: 'inherit', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {label}
+                </Link>
+                <button aria-label={`unlink relation ${label}`} onClick={() => handleUnlinkRelation(e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.4)', padding: 0, display: 'flex' }}>
+                  <X size={10} />
+                </button>
+              </div>
+            )
+          })}
+          {customEdgeTypes.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+              <select
+                value={relPick}
+                onChange={e => setRelPick(e.target.value)}
+                aria-label={t('membership.pickRelation')}
+                style={{ padding: '4px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(var(--kt-ink-rgb), 0.05)', color: 'var(--kt-ink)', outline: 'none' }}
+              >
+                <option value="">{t('membership.pickRelation')}</option>
+                {customEdgeTypes.map(et => (
+                  <option key={et.key} value={et.key}>{et.label}</option>
+                ))}
+              </select>
+              {relPick && (
+                <NodeCombobox
+                  placeholder={t('membership.linkRelation')}
+                  excludeIds={[task.id]}
+                  onSelect={handleLinkRelation}
+                />
+              )}
+            </div>
           )}
         </div>
       )}

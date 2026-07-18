@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import MembershipPanel from '../MembershipPanel'
 
 const mocks = vi.hoisted(() => ({
@@ -10,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   getNodeTypes: vi.fn(),
   getNode: vi.fn(),
   getNodes: vi.fn(),
+  getNodeEdges: vi.fn(),
+  getEdgeTypes: vi.fn(),
   addTaskMembership: vi.fn(() => Promise.resolve()),
   removeTaskMembership: vi.fn(() => Promise.resolve()),
   attachNodeEdge: vi.fn(() => Promise.resolve()),
@@ -31,6 +34,8 @@ vi.mock('../../api/client', () => ({
   getNodeTypes: mocks.getNodeTypes,
   getNode: mocks.getNode,
   getNodes: mocks.getNodes,
+  getNodeEdges: mocks.getNodeEdges,
+  getEdgeTypes: mocks.getEdgeTypes,
   addTaskMembership: mocks.addTaskMembership,
   removeTaskMembership: mocks.removeTaskMembership,
   attachNodeEdge: mocks.attachNodeEdge,
@@ -43,12 +48,18 @@ const projects = [
   { id: 'pC', name: 'Gamma' },
 ]
 
-function mockQueries({ nodeTypes = [] } = {}) {
+function mockQueries({ nodeTypes = [], edgeTypes = [], taskEdges = [] } = {}) {
   mocks.useQuery.mockImplementation(({ queryKey }) => {
     if (queryKey[0] === 'node-types') return { data: nodeTypes }
+    if (queryKey[0] === 'edge-types') return { data: edgeTypes }
+    if (queryKey[0] === 'node-edges') return { data: taskEdges }
     if (queryKey[0] === 'node-search') return { data: [], isFetching: false }
     return { data: projects }
   })
+}
+
+function renderPanel(props) {
+  return render(<MemoryRouter><MembershipPanel {...props} /></MemoryRouter>)
 }
 
 beforeEach(() => {
@@ -61,7 +72,7 @@ const task = { id: 't1', project_ids: ['pA', 'pB'] }
 
 describe('MembershipPanel', () => {
   it('lists memberships and marks the current project', () => {
-    render(<MembershipPanel projectId="pA" task={task} />)
+    renderPanel({ projectId: "pA", task })
     expect(screen.getByText(/Alpha/)).toBeInTheDocument()
     expect(screen.getByText(/Beta/)).toBeInTheDocument()
     // The current project chip is annotated; Beta (secondary) is not.
@@ -69,7 +80,7 @@ describe('MembershipPanel', () => {
   })
 
   it('only offers projects that are not already linked and not the current one', () => {
-    render(<MembershipPanel projectId="pA" task={task} />)
+    renderPanel({ projectId: "pA", task })
     const options = Array.from(screen.getByRole('combobox').querySelectorAll('option')).map(o => o.textContent)
     expect(options).toContain('Gamma')
     expect(options).not.toContain('Alpha')
@@ -77,26 +88,26 @@ describe('MembershipPanel', () => {
   })
 
   it('unlinks a secondary membership', () => {
-    render(<MembershipPanel projectId="pA" task={task} />)
+    renderPanel({ projectId: "pA", task })
     fireEvent.click(screen.getByLabelText('unlink Beta'))
     expect(mocks.removeTaskMembership).toHaveBeenCalledWith('pA', 't1', 'pB')
   })
 
   it('can unlink the current project too (no primary, ADR-0032)', () => {
-    render(<MembershipPanel projectId="pA" task={task} />)
+    renderPanel({ projectId: "pA", task })
     fireEvent.click(screen.getByLabelText('unlink Alpha'))
     expect(mocks.removeTaskMembership).toHaveBeenCalledWith('pA', 't1', 'pA')
   })
 
   it('links the task into another project', () => {
-    render(<MembershipPanel projectId="pA" task={task} />)
+    renderPanel({ projectId: "pA", task })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'pC' } })
     fireEvent.click(screen.getByText('membership.link'))
     expect(mocks.addTaskMembership).toHaveBeenCalledWith('pA', 't1', 'pC')
   })
 
   it('hides the container section when no custom container types exist', () => {
-    render(<MembershipPanel projectId="pA" task={task} />)
+    renderPanel({ projectId: "pA", task })
     expect(screen.queryByText('membership.containers')).not.toBeInTheDocument()
   })
 
@@ -104,10 +115,55 @@ describe('MembershipPanel', () => {
     mockQueries({ nodeTypes: [{ key: 'topic', label: 'Topic', is_container: true, color: '#f59e0b' }] })
     mocks.useQueries.mockReturnValue([{ data: { id: 'c1', type: 'topic', title: 'Research' } }])
     const withContainer = { ...task, container_ids: ['pA', 'pB', 'c1'] }
-    render(<MembershipPanel projectId="pA" task={withContainer} />)
+    renderPanel({ projectId: "pA", task: withContainer })
     expect(screen.getByText('membership.containers')).toBeInTheDocument()
     expect(screen.getByText('Research')).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('unlink container Research'))
     expect(mocks.detachNodeEdge).toHaveBeenCalledWith('c1', 't1', 'contains')
+  })
+
+  it('hides the other-relations section without custom edge types or edges', () => {
+    renderPanel({ projectId: 'pA', task })
+    expect(screen.queryByText('membership.otherRelations')).not.toBeInTheDocument()
+  })
+
+  it('lists non-core edges with labels and unlinks respecting direction (ADR-0037)', () => {
+    mockQueries({
+      edgeTypes: [
+        { key: 'contains', label: 'Contains', is_builtin: true },
+        { key: 'references', label: 'References', is_builtin: false },
+      ],
+      taskEdges: [
+        // Core containment edge must not appear in the section.
+        { id: 'e0', source_id: 'pA', target_id: 't1', rel_type: 'contains' },
+        {
+          id: 'e1', source_id: 't1', target_id: 'nX', rel_type: 'references',
+          target: { id: 'nX', type: 'topic', title: 'Spec' },
+        },
+        {
+          id: 'e2', source_id: 'nY', target_id: 't1', rel_type: 'references',
+          source: { id: 'nY', type: 'topic', title: 'Design doc' },
+        },
+      ],
+    })
+    renderPanel({ projectId: 'pA', task })
+    expect(screen.getByText('membership.otherRelations')).toBeInTheDocument()
+    expect(screen.getByText('Spec')).toBeInTheDocument()
+    expect(screen.getByText('Design doc')).toBeInTheDocument()
+
+    // Outgoing edge: task is the source.
+    fireEvent.click(screen.getByLabelText('unlink relation Spec'))
+    expect(mocks.detachNodeEdge).toHaveBeenCalledWith('t1', 'nX', 'references')
+    // Incoming edge: neighbor is the source.
+    fireEvent.click(screen.getByLabelText('unlink relation Design doc'))
+    expect(mocks.detachNodeEdge).toHaveBeenCalledWith('nY', 't1', 'references')
+  })
+
+  it('attaches a custom relation from the task after picking the type', () => {
+    mockQueries({ edgeTypes: [{ key: 'references', label: 'References', is_builtin: false }] })
+    renderPanel({ projectId: 'pA', task })
+    // Pick the relation type; the node combobox then appears.
+    fireEvent.change(screen.getByLabelText('membership.pickRelation'), { target: { value: 'references' } })
+    expect(screen.getByPlaceholderText('membership.linkRelation')).toBeInTheDocument()
   })
 })

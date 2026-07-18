@@ -879,5 +879,8 @@
   "membership.link": "連結",
   "membership.thisProject": "此專案",
   "membership.containers": "容器",
-  "membership.linkContainer": "連結到容器…"
+  "membership.linkContainer": "連結到容器…",
+  "membership.otherRelations": "其他關聯",
+  "membership.pickRelation": "— 關係型別 —",
+  "membership.linkRelation": "連結到節點…"
 }
