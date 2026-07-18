@@ -798,6 +798,7 @@
   "structure.unowned": "Unowned",
   "structure.openProject": "Open Project",
   "structure.open.project": "Open Project",
+  "structure.openNode": "Open node page",
   "structure.open.task": "Open in Project",
   "structure.open.identity": "Open Personas",
   "structure.open.goal": "Open Goals",

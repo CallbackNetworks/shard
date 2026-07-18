@@ -20,6 +20,50 @@ from app.services.enrichment import enrich_task
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
+# Whole-graph slice for map/visualization clients (ADR-0037). Separate prefix so
+# it reads as "the graph", not "a node".
+graph_router = APIRouter(prefix="/graph", tags=["nodes"])
+
+
+@graph_router.get("/map")
+def graph_map(
+    types: str | None = Query(default=None, description="comma-separated node type keys to include"),
+    limit: int = Query(default=2000, le=5000),
+    db: Session = Depends(get_db),
+):
+    """One-shot ``{nodes, edges}`` slice of the graph (ADR-0037).
+
+    Nodes carry hot columns only (no ``data``) to stay light; edges are those
+    with both endpoints in the returned node set.
+    """
+    q = db.query(Node)
+    if types:
+        keys = [k.strip() for k in types.split(",") if k.strip()]
+        q = q.filter(Node.type.in_(keys))
+    nodes = q.order_by(Node.created_at).limit(limit).all()
+    ids = {n.id for n in nodes}
+    edges = (
+        db.query(Edge).filter(Edge.source_id.in_(ids), Edge.target_id.in_(ids)).all() if ids else []
+    )
+    return {
+        "nodes": [
+            {
+                "id": n.id,
+                "type": n.type,
+                "title": n.title,
+                "status": n.status,
+                "priority": n.priority,
+                "due_date": n.due_date,
+                "is_pinned": n.is_pinned,
+            }
+            for n in nodes
+        ],
+        "edges": [
+            {"id": e.id, "source_id": e.source_id, "target_id": e.target_id, "rel_type": e.rel_type}
+            for e in edges
+        ],
+    }
+
 
 @router.get("", response_model=list[NodeOut])
 def list_nodes(

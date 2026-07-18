@@ -798,6 +798,7 @@
   "structure.unowned": "無歸屬",
   "structure.openProject": "開啟專案",
   "structure.open.project": "開啟專案",
+  "structure.openNode": "開啟節點頁",
   "structure.open.task": "在專案中開啟",
   "structure.open.identity": "開啟角色頁",
   "structure.open.goal": "開啟目標頁",

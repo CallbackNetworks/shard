@@ -326,6 +326,8 @@ export const getNodes = (type, query) => {
 export const getNode = (id) => api.get(`/nodes/${id}`).then(r => r.data)
 export const getNodeEvents = (id) => api.get(`/nodes/${id}/events`).then(r => r.data)
 export const getContainedTasks = (id) => api.get(`/nodes/${id}/contained-tasks`).then(r => r.data)
+export const getGraphMap = (types) =>
+  api.get('/graph/map', { params: types?.length ? { types: types.join(',') } : {} }).then(r => r.data)
 export const createNode = (data) => api.post('/nodes', data).then(r => r.data)
 export const updateNode = (id, data) => api.patch(`/nodes/${id}`, data).then(r => r.data)
 export const deleteNode = (id) => api.delete(`/nodes/${id}`)

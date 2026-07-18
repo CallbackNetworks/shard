@@ -127,6 +127,12 @@ export default function MapInspector({ selected, taskById, projectById, onSelect
           {t(`structure.open.${selected.type}`)}
         </button>
       )}
+      {/* Every entity is a node (ADR-0032/0033): deep-link to its graph page. */}
+      {selected.type !== 'root' && selected.id && (
+        <button className="kt-map-open" onClick={() => navigate(`/n/${selected.id}`)}>
+          {t('structure.openNode')}
+        </button>
+      )}
       <button onClick={onClear}>{t('clear')}</button>
     </aside>
   )

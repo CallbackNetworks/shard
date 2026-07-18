@@ -130,6 +130,33 @@ def test_contained_tasks_unknown_node(client):
     assert r.status_code == 404
 
 
+def test_graph_map_slice(client, topic_type, sample_project, db):
+    """ADR-0037: /graph/map returns a light {nodes, edges} slice, filterable by type."""
+    from tests.factories import make_task
+
+    task = make_task(db, project_id=sample_project.id, title="Mapped")
+    db.commit()
+    topic = client.post("/api/nodes", json={"type": "topic", "title": "Q3"}).json()
+    client.post(f"/api/nodes/{topic['id']}/edges", json={"target_id": sample_project.id, "rel_type": "contains"})
+
+    r = client.get("/api/graph/map")
+    assert r.status_code == 200
+    body = r.json()
+    ids = {n["id"] for n in body["nodes"]}
+    assert {topic["id"], sample_project.id, task.id} <= ids
+    # Nodes are hot-columns only (no heavy data payload).
+    assert "data" not in body["nodes"][0]
+    rels = {(e["source_id"], e["target_id"], e["rel_type"]) for e in body["edges"]}
+    assert (topic["id"], sample_project.id, "contains") in rels
+    assert (sample_project.id, task.id, "contains") in rels
+
+    # Type filter narrows nodes and drops edges whose endpoints fall outside.
+    r = client.get("/api/graph/map", params={"types": "topic"})
+    body = r.json()
+    assert {n["id"] for n in body["nodes"]} == {topic["id"]}
+    assert body["edges"] == []
+
+
 def test_list_nodes_title_query(client, topic_type):
     client.post("/api/nodes", json={"type": "topic", "title": "Research Alpha"})
     client.post("/api/nodes", json={"type": "topic", "title": "Beta"})

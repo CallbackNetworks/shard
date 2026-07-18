@@ -200,6 +200,20 @@ edges(id, source_id, target_id, rel_type, position, data JSON, created_at)  UNIQ
 
 **風險提醒:** Phase B 碰 task/project 時牽動 enrichment、Pydantic typed schema、MCP 工具、前端 `IssueRow`/`ProjectDetail`、幾乎每個測試 —— 以季為單位的漸進工程,底層已備妥故非高風險重設計,但**嚴禁 big-bang**。
 
+---
+
+## 前端圖原生化(ADR-0037,2026-07-18)
+
+七個提案的落地狀態(詳見 [ADR-0037](adr/0037-graph-native-frontend.md)):
+
+- [x] **提案 1 地基:** `NodeCombobox`(防抖搜尋節點選擇器)+ `GET /nodes/{id}/edges` 內嵌兩端 `NodeRef` + `GET /nodes?query=` title 過濾。
+- [x] **提案 2 通用節點頁 `/n/:id`:** 邊按 rel_type 分組(containment 優先)、方向分開、鄰居可點導航(project→專屬頁、container→容器視圖)、attach/detach、inline 改名、自訂型可刪、`graph_events` 歷史。`NodeExplorer` 選中節點標題連到此頁。
+- [x] **提案 3 容器視圖 `/c/:id`:** `GET /nodes/{id}/contained-tasks`(enrich 過的 TaskOut)+ 復用 BoardView/TableView;task mutation 走 compat `project_id`(零專案的 task 唯讀);`MembershipPanel` 加「容器」段(chip 帶型別 badge,generic node-edge API 管理)。
+- [x] **提案 4 Sidebar 動態群組:** `is_container && !is_builtin` 的型各一入口 → `/t/:typeKey` 清單頁 → `/c/:id`;unfiled/graph-types/explorer 收進 Graph 群組。
+- [x] **提案 5 其他關聯:** `MembershipPanel` 加「其他關聯」段 —— 非核心 rel_type(contains/depends_on/labeled/in_cycle/assigned_to/member_of/part_of 以外)的邊列出 + 自訂 edge 型 attach/detach。
+- [x] **提案 6(部分)StructureMap:** 後端 `GET /graph/map`(輕量 {nodes, edges} 切片、`types` 過濾)已就緒 + inspector 加「開啟節點頁」深連結。**⏸️ 整頁換資料來源暫緩:** 檢視後發現視覺層(mindmap 欄位、goal/decision lane、territory 以 identity 所有權分組)深度綁定內建型別的 enrich 欄位(progress/decisionCount/share 旗標),raw graph 切片無法等價供給 —— 「替換資料來源不重寫視覺層」的前提不成立。完整泛化(任何 container 都是領土、自訂 edge 樣式)需要獨立設計回合,端點已備妥。
+- [ ] **提案 7 一致性收尾:** TypeBadge 全面化、GraphTypes inline 編輯 + 使用中計數、Unfiled 自訂 node tab、CommandPalette 節點搜尋。
+
 > **風險判斷:** primary `project_id` 仍是 685 處讀取點的權威來源。要讓邊成為唯一權威、進而 drop 欄位(階段 3、5),等於逐檔改寫這 685 處 + 122 處關聯引用,回歸風險高。建議此後**逐檔、帶測試**推進,不做一次性 big-bang,以免動到線上個人工具的資料。跨專案歸屬這個核心新能力已可用。
 
 ## 階段 3 — 寫入切換
