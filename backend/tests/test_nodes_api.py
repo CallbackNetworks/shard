@@ -105,6 +105,31 @@ def test_edge_listing_embeds_node_summaries(client, topic_type, sample_project):
     assert edges[0]["target"]["title"]
 
 
+def test_contained_tasks_for_custom_container(client, sample_project, db):
+    """ADR-0037: a custom container lists its contained tasks enriched like a project."""
+    from tests.factories import make_task
+
+    client.post("/api/graph-types/nodes", json={"key": "area", "label": "Area", "is_container": True})
+    task = make_task(db, project_id=sample_project.id, title="In area")
+    db.commit()
+    area = client.post("/api/nodes", json={"type": "area", "title": "Q3"}).json()
+    client.post(f"/api/nodes/{area['id']}/edges", json={"target_id": task.id, "rel_type": "contains"})
+
+    r = client.get(f"/api/nodes/{area['id']}/contained-tasks")
+    assert r.status_code == 200
+    body = r.json()
+    assert [t["title"] for t in body] == ["In area"]
+    # Enriched shape: compat project fields stay literal-project (ADR-0034);
+    # the custom container shows up only in container_ids.
+    assert body[0]["project_ids"] == [sample_project.id]
+    assert set(body[0]["container_ids"]) == {sample_project.id, area["id"]}
+
+
+def test_contained_tasks_unknown_node(client):
+    r = client.get("/api/nodes/nope/contained-tasks")
+    assert r.status_code == 404
+
+
 def test_list_nodes_title_query(client, topic_type):
     client.post("/api/nodes", json={"type": "topic", "title": "Research Alpha"})
     client.post("/api/nodes", json={"type": "topic", "title": "Beta"})

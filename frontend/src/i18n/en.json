@@ -615,6 +615,14 @@
   "nodePage.due": "Due",
   "nodePage.history": "History",
   "nodePage.noHistory": "No recorded events.",
+  "nodePage.openContainer": "View tasks",
+  "containerView.count": "{{n}} tasks",
+  "containerView.relations": "Relations & structure",
+  "containerView.searchPlaceholder": "Filter tasks…",
+  "containerView.view.table": "Table",
+  "containerView.view.board": "Board",
+  "containerView.empty": "No tasks in this container yet",
+  "containerView.emptyHint": "Link tasks to this node with a contains edge — from a task's membership panel or the node page.",
   "nodeCombobox.placeholder": "Search nodes…",
   "nodeCombobox.noResults": "No matching nodes.",
   "nodeCombobox.untitled": "(untitled)",
@@ -863,5 +871,7 @@
   "membership.onlyHere": "Only in this project.",
   "membership.pickProject": "— link to another project —",
   "membership.link": "Link",
-  "membership.thisProject": "this project"
+  "membership.thisProject": "this project",
+  "membership.containers": "Containers",
+  "membership.linkContainer": "Link to a container…"
 }

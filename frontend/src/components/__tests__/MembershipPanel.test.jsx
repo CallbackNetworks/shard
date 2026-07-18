@@ -5,9 +5,15 @@ import MembershipPanel from '../MembershipPanel'
 const mocks = vi.hoisted(() => ({
   invalidateQueries: vi.fn(),
   useQuery: vi.fn(),
+  useQueries: vi.fn(() => []),
   getProjects: vi.fn(),
+  getNodeTypes: vi.fn(),
+  getNode: vi.fn(),
+  getNodes: vi.fn(),
   addTaskMembership: vi.fn(() => Promise.resolve()),
   removeTaskMembership: vi.fn(() => Promise.resolve()),
+  attachNodeEdge: vi.fn(() => Promise.resolve()),
+  detachNodeEdge: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -16,13 +22,19 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (...args) => mocks.useQuery(...args),
+  useQueries: (...args) => mocks.useQueries(...args),
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
 }))
 
 vi.mock('../../api/client', () => ({
   getProjects: mocks.getProjects,
+  getNodeTypes: mocks.getNodeTypes,
+  getNode: mocks.getNode,
+  getNodes: mocks.getNodes,
   addTaskMembership: mocks.addTaskMembership,
   removeTaskMembership: mocks.removeTaskMembership,
+  attachNodeEdge: mocks.attachNodeEdge,
+  detachNodeEdge: mocks.detachNodeEdge,
 }))
 
 const projects = [
@@ -31,9 +43,18 @@ const projects = [
   { id: 'pC', name: 'Gamma' },
 ]
 
+function mockQueries({ nodeTypes = [] } = {}) {
+  mocks.useQuery.mockImplementation(({ queryKey }) => {
+    if (queryKey[0] === 'node-types') return { data: nodeTypes }
+    if (queryKey[0] === 'node-search') return { data: [], isFetching: false }
+    return { data: projects }
+  })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.useQuery.mockReturnValue({ data: projects })
+  mocks.useQueries.mockReturnValue([])
+  mockQueries()
 })
 
 const task = { id: 't1', project_ids: ['pA', 'pB'] }
@@ -72,5 +93,21 @@ describe('MembershipPanel', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'pC' } })
     fireEvent.click(screen.getByText('membership.link'))
     expect(mocks.addTaskMembership).toHaveBeenCalledWith('pA', 't1', 'pC')
+  })
+
+  it('hides the container section when no custom container types exist', () => {
+    render(<MembershipPanel projectId="pA" task={task} />)
+    expect(screen.queryByText('membership.containers')).not.toBeInTheDocument()
+  })
+
+  it('shows custom container chips and unlinks them via the node-edge API (ADR-0037)', () => {
+    mockQueries({ nodeTypes: [{ key: 'topic', label: 'Topic', is_container: true, color: '#f59e0b' }] })
+    mocks.useQueries.mockReturnValue([{ data: { id: 'c1', type: 'topic', title: 'Research' } }])
+    const withContainer = { ...task, container_ids: ['pA', 'pB', 'c1'] }
+    render(<MembershipPanel projectId="pA" task={withContainer} />)
+    expect(screen.getByText('membership.containers')).toBeInTheDocument()
+    expect(screen.getByText('Research')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('unlink container Research'))
+    expect(mocks.detachNodeEdge).toHaveBeenCalledWith('c1', 't1', 'contains')
   })
 })

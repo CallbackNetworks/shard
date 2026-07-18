@@ -615,6 +615,14 @@
   "nodePage.due": "到期",
   "nodePage.history": "歷史",
   "nodePage.noHistory": "沒有記錄的事件。",
+  "nodePage.openContainer": "檢視任務",
+  "containerView.count": "{{n}} 個任務",
+  "containerView.relations": "關聯與結構",
+  "containerView.searchPlaceholder": "過濾任務…",
+  "containerView.view.table": "表格",
+  "containerView.view.board": "看板",
+  "containerView.empty": "這個容器還沒有任務",
+  "containerView.emptyHint": "用 contains 邊把任務連進這個節點——可從任務的歸屬面板或節點頁操作。",
   "nodeCombobox.placeholder": "搜尋節點…",
   "nodeCombobox.noResults": "沒有符合的節點。",
   "nodeCombobox.untitled": "(未命名)",
@@ -863,5 +871,7 @@
   "membership.onlyHere": "僅在此專案。",
   "membership.pickProject": "— 連結到其他專案 —",
   "membership.link": "連結",
-  "membership.thisProject": "此專案"
+  "membership.thisProject": "此專案",
+  "membership.containers": "容器",
+  "membership.linkContainer": "連結到容器…"
 }

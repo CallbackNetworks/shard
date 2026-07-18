@@ -14,8 +14,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
-from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate
+from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
 from app.services import graph
+from app.services.enrichment import enrich_task
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -78,6 +79,21 @@ def delete_node(node_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="node not found")
     graph.delete_node(db, node_id)
     db.commit()
+
+
+@router.get("/{node_id}/contained-tasks", response_model=list[TaskOut])
+def list_contained_tasks(node_id: str, db: Session = Depends(get_db)):
+    """Enriched tasks contained by this node via ``contains`` edges (ADR-0037).
+
+    The container view for user-defined container types: any node works (the
+    helper simply follows outgoing containment to task-role children), so custom
+    containers get the same task listing shape as projects.
+    """
+    if db.get(Node, node_id) is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    views = graph.tasks_in_project(db, node_id)
+    views.sort(key=lambda v: (v.position, v.created_at))
+    return [enrich_task(v, db) for v in views]
 
 
 # --- Edges -------------------------------------------------------------------

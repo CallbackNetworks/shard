@@ -14,9 +14,11 @@ import EmptyState from '../components/shared/EmptyState'
 // Universal node page (ADR-0037): one URL per node, edges grouped by rel_type
 // and direction, neighbors navigable, provenance at the bottom.
 
-function nodeHref(ref) {
-  // Entity types with a richer dedicated page keep it; everything else lands here.
+function nodeHref(ref, typeByKey) {
+  // Entity types with a richer dedicated page keep it; custom containers get
+  // the container view; everything else lands on the node page.
   if (ref.type === 'project') return `/projects/${ref.id}`
+  if (typeByKey?.get(ref.type)?.is_container) return `/c/${ref.id}`
   return `/n/${ref.id}`
 }
 
@@ -104,6 +106,7 @@ export default function NodePage() {
   const [showEvents, setShowEvents] = useState(false)
 
   const typeMeta = nodeTypes.find(nt => nt.key === node?.type)
+  const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
   const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
   const invalidate = () => {
@@ -155,7 +158,7 @@ export default function NodePage() {
     )
   }
 
-  const openNeighbor = (ref) => navigate(nodeHref(ref))
+  const openNeighbor = (ref) => navigate(nodeHref(ref, typeByKey))
   const edgeIds = new Set([id, ...edges.flatMap(e => [e.source_id, e.target_id])])
 
   return (
@@ -203,6 +206,15 @@ export default function NodePage() {
                 <Pencil size={13} />
               </button>
             </>
+          )}
+          {typeMeta?.is_container && node.type !== 'project' && (
+            <button
+              className="kt-btn"
+              onClick={() => navigate(`/c/${id}`)}
+              style={{ marginLeft: 'auto' }}
+            >
+              {t('nodePage.openContainer')}
+            </button>
           )}
           {!typeMeta?.is_builtin && (
             <button
