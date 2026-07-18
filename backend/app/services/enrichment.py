@@ -11,9 +11,7 @@ def _membership_project_ids(task, db, project_ids_by_task) -> list[str]:
     """
     if project_ids_by_task is not None:
         return list(project_ids_by_task.get(task.id, []))
-    if db is not None:
-        return graph.member_project_ids(db, task.id)
-    return []
+    return graph.member_project_ids(db, task.id)
 
 
 def _parent_id(task, db, parent_by_task) -> str | None:
@@ -24,9 +22,7 @@ def _parent_id(task, db, parent_by_task) -> str | None:
     """
     if parent_by_task is not None:
         return parent_by_task.get(task.id)
-    if db is not None:
-        return graph.parent_task_map(db, [task.id]).get(task.id)
-    return None
+    return graph.parent_task_map(db, [task.id]).get(task.id)
 
 
 def _dependency_lists(task, db, dep_maps) -> tuple[list[str], list[str]]:
@@ -37,9 +33,7 @@ def _dependency_lists(task, db, dep_maps) -> tuple[list[str], list[str]]:
     """
     if dep_maps is not None:
         return dep_maps[0].get(task.id, []), dep_maps[1].get(task.id, [])
-    if db is not None:
-        return graph.prerequisite_ids(db, task.id), graph.dependent_ids(db, task.id)
-    return [], []
+    return graph.prerequisite_ids(db, task.id), graph.dependent_ids(db, task.id)
 
 
 def _task_labels(task, db, labels_by_task) -> list[LabelOut]:
@@ -50,10 +44,8 @@ def _task_labels(task, db, labels_by_task) -> list[LabelOut]:
     """
     if labels_by_task is not None:
         labels = labels_by_task.get(task.id, [])
-    elif db is not None:
-        labels = graph.labels_for_task(db, task.id)
     else:
-        labels = []
+        labels = graph.labels_for_task(db, task.id)
     return [LabelOut.model_validate(lb) for lb in labels]
 
 
@@ -65,9 +57,7 @@ def _subtask_count(task, db, subtasks_by_task) -> int:
     """
     if subtasks_by_task is not None:
         return len(subtasks_by_task.get(task.id, []))
-    if db is not None:
-        return len(graph.contained_task_ids(db, task.id))
-    return 0
+    return len(graph.contained_task_ids(db, task.id))
 
 
 def _apply_containment(out, task, db, project_ids_by_task, parent_by_task) -> None:
@@ -79,7 +69,7 @@ def _apply_containment(out, task, db, project_ids_by_task, parent_by_task) -> No
 
 def enrich_task(
     task,
-    db=None,
+    db,
     dep_maps=None,
     labels_by_task=None,
     subtasks_by_task=None,
@@ -95,15 +85,14 @@ def enrich_task(
     _apply_containment(out, task, db, project_ids_by_task, parent_by_task)
     if task.assigned_agent is not None:
         out.assigned_agent_name = task.assigned_agent.name
-    if db is not None:
-        rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task.id).first()
-        out.recurrence = RecurrenceRuleOut.model_validate(rule) if rule else None
+    rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task.id).first()
+    out.recurrence = RecurrenceRuleOut.model_validate(rule) if rule else None
     return out
 
 
 def enrich_task_as_dict(
     task,
-    db=None,
+    db,
     dep_maps=None,
     labels_by_task=None,
     subtasks_by_task=None,
@@ -122,17 +111,14 @@ def enrich_task_as_dict(
     return out.model_dump()
 
 
-def enrich_project(project, db=None) -> ProjectOut:
+def enrich_project(project, db) -> ProjectOut:
     # Tasks belonging to this project come from graph ``contains`` edges (ADR-0032,
     # no primary): this naturally includes cross-project members.
-    if db is not None:
-        task_ids = graph.contained_task_ids(db, project.id)
-        tasks = graph.task_views_for_ids(db, task_ids) if task_ids else []
-    else:
-        tasks = []
+    task_ids = graph.contained_task_ids(db, project.id)
+    tasks = graph.task_views_for_ids(db, task_ids) if task_ids else []
 
     # Top-level tasks = not a subtask of any task (no incoming task->task contains edge).
-    subtask_set = graph.subtask_ids_among(db, [t.id for t in tasks]) if db is not None else set()
+    subtask_set = graph.subtask_ids_among(db, [t.id for t in tasks])
     top_tasks = [t for t in tasks if t.id not in subtask_set]
     total = len(top_tasks)
     done = sum(1 for t in top_tasks if t.status == "done")
@@ -144,23 +130,21 @@ def enrich_project(project, db=None) -> ProjectOut:
 
     # Batch-load dependency, label, subtask and containment edges once for all tasks.
     task_ids = [t.id for t in tasks]
-    dep_maps = graph.dependency_maps(db, task_ids) if db is not None else None
-    labels_by_task = graph.labels_map(db, task_ids) if db is not None else None
-    subtasks_by_task = graph.child_task_ids_map(db, task_ids) if db is not None else None
-    project_ids_by_task = graph.project_ids_map(db, task_ids) if db is not None else None
-    parent_by_task = graph.parent_task_map(db, task_ids) if db is not None else None
+    dep_maps = graph.dependency_maps(db, task_ids)
+    labels_by_task = graph.labels_map(db, task_ids)
+    subtasks_by_task = graph.child_task_ids_map(db, task_ids)
+    project_ids_by_task = graph.project_ids_map(db, task_ids)
+    parent_by_task = graph.parent_task_map(db, task_ids)
     out.tasks = [
         enrich_task(t, db, dep_maps, labels_by_task, subtasks_by_task, project_ids_by_task, parent_by_task)
         for t in tasks
     ]
 
-    project_labels = graph.labels_in_project(db, project.id) if db is not None else []
-    out.labels = [LabelOut.model_validate(lb) for lb in project_labels]
+    out.labels = [LabelOut.model_validate(lb) for lb in graph.labels_in_project(db, project.id)]
 
     enriched_cycles = []
-    project_cycles = graph.cycles_in_project(db, project.id) if db is not None else []
-    for cycle in project_cycles:
-        tasks = graph.tasks_in_cycle(db, cycle.id) if db is not None else []
+    for cycle in graph.cycles_in_project(db, project.id):
+        tasks = graph.tasks_in_cycle(db, cycle.id)
         task_ids = [t.id for t in tasks]
         c_total = len(tasks)
         c_done = sum(1 for t in tasks if t.status == "done")
@@ -171,21 +155,17 @@ def enrich_project(project, db=None) -> ProjectOut:
         enriched_cycles.append(cout)
     out.cycles = enriched_cycles
 
-    out.identities = (
-        [
-            IdentityOut(
-                id=i.id,
-                name=i.name,
-                color=i.color,
-                description=i.description,
-                avatar=i.avatar,
-                created_at=i.created_at,
-                project_count=len(graph.project_ids_for_identity(db, i.id)),
-            )
-            for i in graph.identities_for_project(db, project.id)
-        ]
-        if db is not None
-        else []
-    )
+    out.identities = [
+        IdentityOut(
+            id=i.id,
+            name=i.name,
+            color=i.color,
+            description=i.description,
+            avatar=i.avatar,
+            created_at=i.created_at,
+            project_count=len(graph.project_ids_for_identity(db, i.id)),
+        )
+        for i in graph.identities_for_project(db, project.id)
+    ]
 
     return out

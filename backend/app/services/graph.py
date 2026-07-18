@@ -15,20 +15,14 @@ from sqlalchemy.orm import Session
 
 from app.models import Edge, GraphEvent, Node, NodeType
 
-# Node types
+# Node types. Every first-class entity is node-only (ADR-0033 Phase B complete):
+# these are the built-in ``node_types`` seed keys, not backing-table markers.
 NODE_PROJECT = "project"
 NODE_TASK = "task"
 NODE_IDENTITY = "identity"
 NODE_GOAL = "goal"
 NODE_CYCLE = "cycle"
 NODE_LABEL = "label"
-
-# Built-in types that still have a dedicated backing entity table (ADR-0033).
-# ADR-0033 Phase B collapsed every first-class entity to node-only, one slice per
-# type (label/cycle/goal/identity/task/project); with ``project`` collapsed in B6
-# no type is entity-backed any more. The set is kept (now empty) so the generic
-# ``/nodes`` guard degrades to a no-op; removing the guard is Phase C cleanup.
-ENTITY_BACKED_TYPES = frozenset()
 
 # Edge relationship types (canonical direction: source -> target)
 REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id

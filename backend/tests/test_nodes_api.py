@@ -26,11 +26,10 @@ def test_create_node_unknown_type(client):
     assert r.status_code == 422
 
 
-def test_no_entity_backed_types_remain(client):
-    # ADR-0033 Phase B is complete (B6): every built-in type is node-only, so the
-    # generic /nodes API no longer rejects any of them. ``project`` — the last
-    # entity-backed type — is now creatable through the generic endpoint.
-    assert graph.ENTITY_BACKED_TYPES == frozenset()
+def test_builtin_type_creatable_via_generic_api(client):
+    # ADR-0033 Phase B is complete and Phase C removed the entity-backed guard:
+    # every built-in type is node-only, so the generic /nodes API accepts them.
+    # ``project`` — the last former entity-backed type — is creatable here.
     r = client.post("/nodes", json={"type": graph.NODE_PROJECT, "title": "x"})
     assert r.status_code == 201
     assert r.json()["type"] == graph.NODE_PROJECT

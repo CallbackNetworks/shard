@@ -20,14 +20,6 @@ from app.services import graph
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
 
-def _reject_entity_backed(node_type: str) -> None:
-    if node_type in graph.ENTITY_BACKED_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"'{node_type}' is an entity-backed type; use its dedicated endpoint",
-        )
-
-
 @router.get("", response_model=list[NodeOut])
 def list_nodes(
     type: str | None = Query(default=None),
@@ -44,7 +36,6 @@ def list_nodes(
 def create_node(body: NodeCreate, db: Session = Depends(get_db)):
     if db.get(NodeType, body.type) is None:
         raise HTTPException(status_code=422, detail=f"unknown node type '{body.type}'")
-    _reject_entity_backed(body.type)
     fields = body.model_dump(exclude={"type", "title", "data"}, exclude_none=True)
     if body.data:
         fields.update(body.data)
@@ -67,7 +58,6 @@ def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_db)):
     node = db.get(Node, node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="node not found")
-    _reject_entity_backed(node.type)
     fields = body.model_dump(exclude_unset=True)
     data = fields.pop("data", None)
     if data is not None:
@@ -83,7 +73,6 @@ def delete_node(node_id: str, db: Session = Depends(get_db)):
     node = db.get(Node, node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="node not found")
-    _reject_entity_backed(node.type)
     graph.delete_node(db, node_id)
     db.commit()
 
