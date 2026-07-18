@@ -67,9 +67,9 @@ def test_rotate_share_token(client, sample_identity):
 
 
 def test_link_project(client, sample_identity, db):
-    from app.models import Project
+    from tests.factories import make_project
 
-    project = Project(name="Link Test")
+    project = make_project(db, name="Link Test")
     db.add(project)
     db.commit()
     db.refresh(project)

@@ -4,13 +4,12 @@ from sqlalchemy.orm import Session
 from app.models import (
     Comment,
     Integration,
-    Project,
 )
 from app.services import graph
 
 
-def get_project_or_404(project_id: str, db: Session) -> Project:
-    project = db.query(Project).filter(Project.id == project_id).first()
+def get_project_or_404(project_id: str, db: Session) -> graph.ProjectView:
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project

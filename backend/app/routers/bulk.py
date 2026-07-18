@@ -9,7 +9,7 @@ from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Node, Project
+from app.models import Node
 from app.routers.deps import get_project_or_404
 from app.schemas import (
     BulkActionResult,
@@ -380,7 +380,7 @@ def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depe
 @router.get("/ical/project/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
 def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
     """Shared feed: a single project's due-dated tasks (same token as its share page)."""
-    project = db.query(Project).filter(Project.share_token == token).first()
+    project = graph.find_project_by_share_token(db, token)
     if project is None:
         raise HTTPException(status_code=404, detail="Calendar not found")
     task_ids = graph.contained_task_ids(db, project.id)

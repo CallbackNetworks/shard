@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project
+from app.models import ApiKey
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -35,7 +35,7 @@ def api_project_stats(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 

@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, GraphEvent, Node, NodeType, Project
+from app.models import Edge, GraphEvent, Node, NodeType
 
 # Node types
 NODE_PROJECT = "project"
@@ -24,12 +24,11 @@ NODE_CYCLE = "cycle"
 NODE_LABEL = "label"
 
 # Built-in types that still have a dedicated backing entity table (ADR-0033).
-# Nodes of these types are created/deleted through their own routers so the
-# table and its node mirror stay consistent; only node-only (custom) types flow
-# through the generic node API. This set shrinks as Phase B collapses entities.
-# ``label``/``cycle``/``goal``/``identity`` collapsed to node-only in ADR-0033
-# Phase B; only ``project`` and ``task`` remain entity-backed.
-ENTITY_BACKED_TYPES = frozenset({NODE_PROJECT})
+# ADR-0033 Phase B collapsed every first-class entity to node-only, one slice per
+# type (label/cycle/goal/identity/task/project); with ``project`` collapsed in B6
+# no type is entity-backed any more. The set is kept (now empty) so the generic
+# ``/nodes`` guard degrades to a no-op; removing the guard is Phase C cleanup.
+ENTITY_BACKED_TYPES = frozenset()
 
 # Edge relationship types (canonical direction: source -> target)
 REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id
@@ -187,8 +186,8 @@ def add_edge(
 def remove_edges(db: Session, *, source_id: str | None = None, target_id: str | None = None, rel_type: str) -> int:
     """Delete every edge of ``rel_type`` matching the given endpoint(s).
 
-    Used to keep the mirror consistent after bulk association deletes that
-    bypass the ORM unit of work (and thus the graph_sync listener).
+    Used to clear all relationships of a kind for an endpoint in one shot (e.g.
+    replacing a goal's linked projects).
     """
     q = db.query(Edge).filter(Edge.rel_type == rel_type)
     if source_id is not None:
@@ -767,11 +766,11 @@ def identity_ids_for_project(db: Session, project_id: str) -> list[str]:
     return list(rows)
 
 
-def projects_for_identity(db: Session, identity_id: str) -> list[Project]:
+def projects_for_identity(db: Session, identity_id: str) -> list["ProjectView"]:
     ids = project_ids_for_identity(db, identity_id)
     if not ids:
         return []
-    by_id = {p.id: p for p in db.query(Project).filter(Project.id.in_(ids)).all()}
+    by_id = projects_by_ids(db, ids)
     return [by_id[i] for i in ids if i in by_id]
 
 
@@ -926,11 +925,11 @@ def project_ids_for_goal(db: Session, goal_id: str) -> list[str]:
     return list(rows)
 
 
-def projects_for_goal(db: Session, goal_id: str) -> list[Project]:
+def projects_for_goal(db: Session, goal_id: str) -> list["ProjectView"]:
     ids = project_ids_for_goal(db, goal_id)
     if not ids:
         return []
-    by_id = {p.id: p for p in db.query(Project).filter(Project.id.in_(ids)).all()}
+    by_id = projects_by_ids(db, ids)
     return [by_id[i] for i in ids if i in by_id]
 
 
@@ -1033,6 +1032,156 @@ def all_goals(db: Session, *, status: str | None = None) -> list[GoalView]:
     return [_goal_view(node) for node in rows]
 
 
+# --- Projects (node-only, ADR-0033 Phase B, B6) ------------------------------
+#
+# A project is a ``Node(type="project")``: ``title`` = name and ``status`` is a
+# real hot column; every other field (description/share_token/share_expires_at/
+# allow_guest_notes/agent_instructions/repo_url/wip_limits) lives in ``data``.
+# ``share_expires_at`` is a datetime stored as an ISO string in JSON. Projects are
+# top-level containers — tasks/labels/cycles attach to them via ``contains`` edges
+# and identities via ``member_of`` — so a project has no incoming containment edge
+# of its own. ``ProjectView`` exposes the historical ``Project`` attribute surface
+# so ``ProjectOut.model_validate`` keeps working. This was the last entity-backed
+# type; after B6 the ``projects`` table is dropped and ``graph_sync`` is retired.
+
+
+@dataclass
+class ProjectView:
+    id: str
+    name: str
+    description: str | None
+    status: str
+    share_token: str | None
+    share_expires_at: datetime | None
+    allow_guest_notes: bool
+    agent_instructions: str | None
+    repo_url: str | None
+    wip_limits: dict | None
+    created_at: datetime
+    updated_at: datetime
+
+
+def _project_view(node: Node) -> ProjectView:
+    data = node.data or {}
+    return ProjectView(
+        id=node.id,
+        name=node.title,
+        description=data.get("description"),
+        status=node.status or "active",
+        share_token=data.get("share_token"),
+        share_expires_at=_parse_dt(data.get("share_expires_at")),
+        allow_guest_notes=bool(data.get("allow_guest_notes", False)),
+        agent_instructions=data.get("agent_instructions"),
+        repo_url=data.get("repo_url"),
+        wip_limits=data.get("wip_limits"),
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+    )
+
+
+def create_project(
+    db: Session,
+    *,
+    name: str,
+    description: str | None = None,
+    agent_instructions: str | None = None,
+    repo_url: str | None = None,
+    wip_limits: dict | None = None,
+    status: str = "active",
+    id: str | None = None,
+    actor: str | None = None,
+) -> ProjectView:
+    """Create a top-level project node (the container for tasks/labels/cycles)."""
+    node = create_node(
+        db,
+        NODE_PROJECT,
+        id=id,
+        title=name,
+        actor=actor,
+        status=status,
+        description=description,
+        share_token=str(uuid.uuid4()),
+        share_expires_at=None,
+        allow_guest_notes=False,
+        agent_instructions=agent_instructions,
+        repo_url=repo_url,
+        wip_limits=wip_limits,
+    )
+    return _project_view(node)
+
+
+def update_project(db: Session, project_id: str, **fields) -> ProjectView | None:
+    """Update a project node; ``name``->title, ``status`` hot, everything else into ``data``."""
+    node = db.get(Node, project_id)
+    if node is None or node.type != NODE_PROJECT:
+        return None
+    if "name" in fields:
+        node.title = fields.pop("name")
+    if "status" in fields:
+        node.status = fields.pop("status")
+    data = dict(node.data or {})
+    for key, value in fields.items():
+        data[key] = _iso(value)
+    node.data = data or None
+    db.flush()
+    return _project_view(node)
+
+
+def get_project(db: Session, project_id: str) -> ProjectView | None:
+    node = db.get(Node, project_id)
+    if node is None or node.type != NODE_PROJECT:
+        return None
+    return _project_view(node)
+
+
+def all_projects(db: Session, *, status: str | None = None) -> list[ProjectView]:
+    """All project nodes, newest first, optionally filtered by status."""
+    query = db.query(Node).filter(Node.type == NODE_PROJECT)
+    if status is not None:
+        query = query.filter(Node.status == status)
+    rows = query.order_by(Node.created_at.desc()).all()
+    return [_project_view(node) for node in rows]
+
+
+def projects_by_ids(db: Session, project_ids) -> dict[str, ProjectView]:
+    """Batch-load ``{project_id: ProjectView}`` for project-type nodes among ``project_ids``."""
+    ids = set(project_ids)
+    if not ids:
+        return {}
+    nodes = db.query(Node).filter(Node.id.in_(ids), Node.type == NODE_PROJECT).all()
+    return {n.id: _project_view(n) for n in nodes}
+
+
+def find_project_by_share_token(db: Session, token: str) -> ProjectView | None:
+    """Locate a project by its ``share_token`` (stored in ``data``).
+
+    Scans project nodes and filters in Python: the token lives in the JSON ``data``
+    bag (no indexed column) and project counts are small at personal-tool scale.
+    """
+    for node in db.query(Node).filter(Node.type == NODE_PROJECT).all():
+        if (node.data or {}).get("share_token") == token:
+            return _project_view(node)
+    return None
+
+
+def search_projects(db: Session, term: str, *, limit: int | None = None) -> list[ProjectView]:
+    """Project nodes whose name (title) or description matches ``term`` (case-insensitive).
+
+    ``name`` is the hot ``title`` column; ``description`` lives in JSON ``data`` and
+    is matched in Python for dialect portability.
+    """
+    needle = term.lower()
+    results: list[ProjectView] = []
+    for node in db.query(Node).filter(Node.type == NODE_PROJECT).order_by(Node.created_at.desc()).all():
+        title = (node.title or "").lower()
+        description = ((node.data or {}).get("description") or "").lower()
+        if needle in title or needle in description:
+            results.append(_project_view(node))
+            if limit is not None and len(results) >= limit:
+                break
+    return results
+
+
 def contained_task_ids(db: Session, project_id: str) -> list[str]:
     """Ids of tasks contained by a project via outgoing ``contains`` edges."""
     tasks = task_type_keys(db)
@@ -1060,8 +1209,8 @@ def unfiled_task_ids(db: Session) -> list[str]:
 #
 # A task is a ``Node(type="task")`` whose hot columns are real (title/status/
 # priority/start_date/due_date/position/is_pinned/created_at/updated_at) and whose
-# non-hot fields live in ``data`` (kept a complete mirror by graph_sync since
-# B5.1). ``TaskView`` exposes the historical ``Task`` attribute surface — every
+# non-hot fields live in ``data`` (written by ``create_task``/``update_task``).
+# ``TaskView`` exposes the historical ``Task`` attribute surface — every
 # scalar plus the relationship-like ``comments``/``pull_requests``/
 # ``assigned_agent`` — so ``TaskOut.model_validate`` and ``enrich_task`` work
 # against it unchanged. Relationship-like attributes are lazy and need the ``db``
@@ -1256,8 +1405,8 @@ def delete_task_tree(db: Session, task_id: str) -> None:
     A descendant linked into a project outside the root's own projects survives
     with its subtree (ADR-0032, no primary): it is unlinked from the root's
     projects instead of deleted, and lives on under its other project(s).
-    Peripheral rows (comments/attachments/pull requests) still cascade via their
-    own ``task_id`` FK; ``graph_sync`` drops each deleted node's touching edges.
+    Peripheral rows (comments/attachments/pull requests) and the node's touching
+    edges are cleaned up by ``_delete_task_node`` -> ``delete_node``.
     """
     root_projects = set(member_project_ids(db, task_id))
     doomed = [task_id, *descendants_of(db, task_id)]
@@ -1301,7 +1450,7 @@ def delete_project_and_tasks(db: Session, project) -> None:
     Replaces the ``project_id`` FK ``ondelete CASCADE`` (ADR-0032, no primary): a
     top-level task belonging only to this project is deleted with its subtask tree;
     a task also linked into another project is merely unlinked from this one. The
-    project node's own edges are cleaned up by ``graph_sync`` on delete.
+    project node itself and its touching edges are dropped by ``delete_node``.
     """
     contained = contained_task_ids(db, project.id)
     subtasks_set = subtask_ids_among(db, contained)
@@ -1317,7 +1466,9 @@ def delete_project_and_tasks(db: Session, project) -> None:
     # ORM cascade; delete the nodes this project contains so they don't orphan.
     for entity in labels_in_project(db, project.id) + cycles_in_project(db, project.id):
         delete_node(db, entity.id)
-    db.delete(project)
+    # The project itself is node-only (ADR-0033 Phase B, B6): delete_node drops the
+    # node and every touching edge (contains/member_of/part_of).
+    delete_node(db, project.id)
 
 
 def set_parent_task(db: Session, task_id: str, parent_id: str) -> None:
@@ -1341,10 +1492,10 @@ def project_id_of_task(db: Session, task_id: str) -> str | None:
     return node.id if node is not None else None
 
 
-def project_of_task(db: Session, task_id: str) -> Project | None:
+def project_of_task(db: Session, task_id: str) -> ProjectView | None:
     """The task's project: nearest ``project``-type ``contains`` ancestor (ADR-0032)."""
     node = nearest_ancestor_of_type(db, task_id, NODE_PROJECT)
-    return db.get(Project, node.id) if node is not None else None
+    return _project_view(node) if node is not None else None
 
 
 def parent_task_map(db: Session, task_ids) -> dict[str, str]:

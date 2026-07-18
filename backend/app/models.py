@@ -12,29 +12,15 @@ def now_utc():
     return datetime.now(UTC)
 
 
-class Project(Base):
-    __tablename__ = "projects"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(SAEnum("active", "archived", name="project_status"), default="active")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-    share_token: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
-    share_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    allow_guest_notes: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    agent_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
-    repo_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
-    wip_limits: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {"todo": N, "in_progress": N, ...}
-
-    # Task containment lives in graph ``contains`` edges now (ADR-0032); there is no
-    # ``Project.tasks`` relationship. Deletion of contained tasks is handled by
-    # ``graph.delete_project_and_tasks``.
-    # Labels and cycles are node-only (ADR-0033 Phase B): each is a ``Node`` scoped
-    # to this project by a ``contains`` edge; use ``graph.labels_in_project`` /
-    # ``graph.cycles_in_project``.
+# ``Project`` was collapsed to a node-only entity in ADR-0033 Phase B (B6) — the last
+# entity-backed type. A project is a ``Node(type="project")``: ``title`` = name and
+# ``status`` are real hot columns; description/share_token/share_expires_at/
+# allow_guest_notes/agent_instructions/repo_url/wip_limits live in the node's JSON
+# ``data`` bag. Containment (tasks/labels/cycles) is expressed as ``contains`` edges
+# and identity membership as ``member_of`` edges. The dedicated ``projects`` table
+# was dropped; reads go through ``graph.ProjectView`` and writes through
+# ``graph.create_project``/``update_project``. With B6 done the graph mirror
+# (``graph_sync``) was retired — every first-class entity is now node-only.
 
 
 # ``Task`` was collapsed to a node-only entity in ADR-0033 Phase B (B5): a task is a
@@ -403,7 +389,7 @@ class Edge(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     # Relationships declared so the unit-of-work inserts referenced nodes before edges
-    # (PostgreSQL enforces the FK within the flush; see graph_sync).
+    # (PostgreSQL enforces the FK within the flush).
     source: Mapped["Node"] = relationship("Node", foreign_keys=[source_id])
     target: Mapped["Node"] = relationship("Node", foreign_keys=[target_id])
 

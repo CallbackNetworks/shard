@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Node, Project
+from app.models import ApiKey, Node
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.routers.external_api.helpers import _enrich_task_for_search
 from app.services import graph
@@ -41,7 +41,6 @@ def api_search(
     # title/description live on the task node (description in JSON data); scan in
     # Python for dialect-safe substring matching (ADR-0033, node-only tasks).
     ql = q.lower()
-    pattern = f"%{q}%"
     scope = set(graph.contained_task_ids(db, project_id)) if project_id else None
     matched = [
         n
@@ -53,8 +52,7 @@ def api_search(
 
     projects = []
     if not project_id:
-        proj_query = db.query(Project).filter((Project.name.ilike(pattern)) | (Project.description.ilike(pattern)))
-        for p in proj_query.limit(20).all():
+        for p in graph.search_projects(db, q, limit=20):
             p_tasks = graph.tasks_in_project(db, p.id)
             total = len(p_tasks)
             done = sum(1 for t in p_tasks if t.status == "done")

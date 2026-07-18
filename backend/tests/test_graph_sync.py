@@ -1,12 +1,16 @@
-"""The before_flush listener mirrors entities/containment into the graph (ADR-0032)."""
+"""Containment/membership edges and node lifecycle in the node-only graph (ADR-0032/0033).
+
+Every first-class entity is node-only now (Phase B complete): there is no ORM
+mirror listener. Projects/tasks flow through the ``graph`` service, and mutations
+go through ``graph.create_*``/``update_*``/``delete_*`` — not ORM column writes.
+"""
 
 from app.models import (
     Edge,
     Node,
-    Project,
 )
 from app.services import graph
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 
 def _edge(db, source_id, target_id, rel_type):
@@ -18,7 +22,7 @@ def _edge(db, source_id, target_id, rel_type):
 
 
 def _project(db):
-    p = Project(name="p")
+    p = make_project(db, name="p")
     db.add(p)
     db.flush()
     return p
@@ -117,11 +121,11 @@ def test_subtask_create_mirrors_parent_containment(db):
 def test_entity_delete_removes_node(db):
     from app.models import Node
 
-    # Deleting the (still entity-backed) project clears its node and touching edges.
+    # Deleting a node-only project clears its node and every touching edge (ADR-0033).
     p = _project(db)
     t = _task(db, p.id)
     tid = t.id
-    db.delete(p)
+    graph.delete_project_and_tasks(db, p)
     db.commit()
 
     assert db.get(Node, p.id) is None
@@ -169,8 +173,7 @@ def test_project_update_resyncs_node(db):
     from app.models import Node
 
     p = _project(db)
-    p.name = "renamed"
-    p.status = "archived"
+    graph.update_project(db, p.id, name="renamed", status="archived")
     db.commit()
 
     node = db.get(Node, p.id)

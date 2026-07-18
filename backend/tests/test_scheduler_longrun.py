@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 import app.services.scheduler as sched
-from app.models import Integration, Node, Project, RecurrenceRule
+from app.models import Integration, Node, RecurrenceRule
 from app.services.scheduler import (
     _check_and_fire,
     _check_recurring,
@@ -21,7 +21,7 @@ from app.services.scheduler import (
     _send_weekly_digest,
     get_scheduler_health,
 )
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 
 class FakeClock:
@@ -49,7 +49,7 @@ def _full_settings(**overrides):
 
 
 def _email_setup(db):
-    p = Project(name="P", status="active")
+    p = make_project(db, name="P", status="active")
     db.add(p)
     db.flush()
     integ = Integration(name="Email", type="email", url="", email_to="me@example.com", events=[], active=True)
@@ -127,7 +127,7 @@ class TestReminderCadenceLongRun:
     async def test_cooldown_produces_expected_resend_cadence(self, db):
         """Over 48 hourly ticks: first reminder when the task enters the
         due-soon window, one resend after the cooldown, nothing else."""
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         clock = FakeClock(MONDAY)
@@ -151,7 +151,7 @@ class TestReminderCadenceLongRun:
 class TestRecurringLongRun:
     @pytest.mark.asyncio
     async def test_daily_rule_creates_one_task_per_day(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         template = make_task(db, project_id=p.id, title="Daily standup", status="todo")
@@ -177,7 +177,7 @@ class TestTickIsolation:
     @pytest.mark.asyncio
     async def test_failing_check_does_not_starve_the_rest(self, db, monkeypatch):
         """A persistently crashing check must not silently disable the others."""
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         template = make_task(db, project_id=p.id, title="Survivor", status="todo")

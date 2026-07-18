@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project
+from app.models import ApiKey
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -36,7 +36,7 @@ def api_list_labels(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return graph.labels_in_project(db, project_id)
@@ -58,7 +58,7 @@ def api_create_label(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     label = graph.create_label(db, project_id, **body.model_dump())

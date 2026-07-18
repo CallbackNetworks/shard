@@ -32,11 +32,12 @@ def test_export_backup_contains_all_data(client, db, sample_project):
         assert meta["format_version"] == 1
         data = json.loads(zf.read("data.json"))
 
-    # Tasks are node-only now (ADR-0033 B5): there is no ``tasks`` table; they ride
-    # in the ``nodes`` table with type "task".
+    # Tasks and projects are node-only now (ADR-0033 B5/B6): there is no ``tasks`` or
+    # ``projects`` table; both ride in the ``nodes`` table with their type.
     assert "tasks" not in data
+    assert "projects" not in data
     assert {n["title"] for n in data["nodes"] if n["type"] == "task"} == {"Backed up task"}
-    assert {p["name"] for p in data["projects"]} == {sample_project.name}
+    assert {n["title"] for n in data["nodes"] if n["type"] == "project"} == {sample_project.name}
     assert "webhook_deliveries" in data
 
 

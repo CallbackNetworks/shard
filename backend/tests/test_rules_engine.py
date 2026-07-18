@@ -2,10 +2,10 @@
 
 import pytest
 
-from app.models import Comment, Project, WorkflowRule
+from app.models import Comment, WorkflowRule
 from app.services import graph
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 # ── _eval_condition ──────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ from tests.factories import make_task
 class TestEvalCondition:
     @pytest.fixture()
     def task(self, db):
-        project = Project(name="P")
+        project = make_project(db, name="P")
         db.add(project)
         db.flush()
         t = make_task(
@@ -79,7 +79,7 @@ class TestEvalCondition:
 class TestExecAction:
     @pytest.fixture()
     def project_and_task(self, db):
-        project = Project(name="P")
+        project = make_project(db, name="P")
         db.add(project)
         db.flush()
         t = make_task(db, project_id=project.id, title="Task A", status="todo", priority="low")
@@ -166,7 +166,7 @@ class TestExecAction:
 class TestRunRules:
     @pytest.fixture()
     def setup(self, db):
-        project = Project(name="P")
+        project = make_project(db, name="P")
         db.add(project)
         db.flush()
         task = make_task(db, project_id=project.id, title="Deploy app", status="done", priority="high")
@@ -254,7 +254,7 @@ class TestRunRules:
     @pytest.mark.asyncio
     async def test_project_scoped_rule_skips_other_project(self, db, setup):
         project, task = setup
-        other = Project(name="Other")
+        other = make_project(db, name="Other")
         db.add(other)
         db.flush()
 

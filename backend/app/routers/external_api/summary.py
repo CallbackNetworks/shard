@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, ApiKey, Project
+from app.models import ActivityLog, ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.schemas import SummaryOut
 from app.services import graph
@@ -39,10 +39,11 @@ def api_summary(
 
     now = datetime.now(UTC)
 
-    query = db.query(Project)
     if api_key.project_id:
-        query = query.filter(Project.id == api_key.project_id)
-    projects = query.order_by(Project.created_at.desc()).all()
+        project = graph.get_project(db, api_key.project_id)
+        projects = [project] if project else []
+    else:
+        projects = graph.all_projects(db)
 
     total_projects = len(projects)
     active_projects = sum(1 for p in projects if p.status == "active")

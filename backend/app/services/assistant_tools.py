@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import ActivityLog, Comment, Node, Project, WorkflowRule
+from app.models import ActivityLog, Comment, Node, WorkflowRule
 from app.services import graph
 
 TOOLS = [
@@ -262,7 +262,7 @@ async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
 
 
 async def _tool_get_summary(db: Session) -> str:
-    projects = db.query(Project).filter(Project.status == "active").all()
+    projects = graph.all_projects(db, status="active")
     result = []
     for p in projects:
         p_tasks = graph.tasks_in_project(db, p.id)
@@ -324,7 +324,7 @@ async def _tool_create_task(
         return "Title must not be blank"
     if len(title) > 500:
         return "Title must be 500 characters or fewer"
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         return f"Project {project_id} not found"
     due = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=UTC) if due_date else None
@@ -466,8 +466,6 @@ def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
 
 
 def _tool_search(db: Session, query: str) -> str:
-    from sqlalchemy import or_
-
     q = query.lower()
     # title/description live on the task node (description in JSON data); scan in
     # Python for dialect-safe substring matching (ADR-0033, node-only tasks).
@@ -476,9 +474,7 @@ def _tool_search(db: Session, query: str) -> str:
         for n in db.query(Node).filter(Node.type == graph.NODE_TASK).all()
         if q in (n.title or "").lower() or q in ((n.data or {}).get("description") or "").lower()
     ][:20]
-    projects = (
-        db.query(Project).filter(or_(Project.name.ilike(f"%{q}%"), Project.description.ilike(f"%{q}%"))).limit(10).all()
-    )
+    projects = graph.search_projects(db, q, limit=10)
     task_projects = graph.project_ids_map(db, [t.id for t in tasks])
     return json.dumps(
         {
@@ -513,7 +509,7 @@ def _tool_get_activity(db: Session, limit: int = 20) -> str:
 
 
 def _tool_analyze_decisions(db: Session, project_id: str) -> str:
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         return f"Project {project_id} not found"
 
@@ -602,7 +598,7 @@ def _tool_analyze_decisions(db: Session, project_id: str) -> str:
 
 
 def _tool_create_decision(db: Session, project_id: str, name: str, description: str) -> str:
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         return f"Project {project_id} not found"
 
@@ -649,7 +645,7 @@ def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: s
 async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dict]) -> str:
     from app.services.ws_manager import ws_manager
 
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         return f"Project {project_id} not found"
 

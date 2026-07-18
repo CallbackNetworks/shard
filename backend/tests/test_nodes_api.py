@@ -26,10 +26,14 @@ def test_create_node_unknown_type(client):
     assert r.status_code == 422
 
 
-def test_create_node_rejects_entity_backed_type(client):
-    # ``project`` is the last entity-backed type (task collapsed to node-only, ADR-0033 B5).
+def test_no_entity_backed_types_remain(client):
+    # ADR-0033 Phase B is complete (B6): every built-in type is node-only, so the
+    # generic /nodes API no longer rejects any of them. ``project`` — the last
+    # entity-backed type — is now creatable through the generic endpoint.
+    assert graph.ENTITY_BACKED_TYPES == frozenset()
     r = client.post("/nodes", json={"type": graph.NODE_PROJECT, "title": "x"})
-    assert r.status_code == 400
+    assert r.status_code == 201
+    assert r.json()["type"] == graph.NODE_PROJECT
 
 
 def test_get_and_list_nodes(client, topic_type):
@@ -52,9 +56,11 @@ def test_update_node(client, topic_type):
     assert r.json()["data"] == {"k": 1}
 
 
-def test_update_rejects_entity_backed(client, sample_project):
+def test_update_node_allows_project(client, sample_project):
+    # Project is node-only (ADR-0033 B6): the generic update endpoint accepts it.
     r = client.patch(f"/nodes/{sample_project.id}", json={"title": "x"})
-    assert r.status_code == 400
+    assert r.status_code == 200
+    assert r.json()["title"] == "x"
 
 
 def test_delete_node_clears_edges(client, topic_type, db):
@@ -69,9 +75,10 @@ def test_delete_node_clears_edges(client, topic_type, db):
     assert db.query(Edge).filter((Edge.source_id == a["id"]) | (Edge.target_id == a["id"])).count() == 0
 
 
-def test_delete_rejects_entity_backed(client, sample_project):
+def test_delete_node_allows_project(client, sample_project):
+    # Project is node-only (ADR-0033 B6): the generic delete endpoint accepts it.
     r = client.delete(f"/nodes/{sample_project.id}")
-    assert r.status_code == 400
+    assert r.status_code == 204
 
 
 def test_attach_and_list_edges(client, topic_type):

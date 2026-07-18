@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.models import Integration, Notification, Project, WebhookDelivery
+from app.models import Integration, Notification, WebhookDelivery
 from app.services.notifier import (
     MAX_ATTEMPTS,
     _build_headers,
@@ -17,14 +17,14 @@ from app.services.notifier import (
     fire_notifications,
     retry_delivery,
 )
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 # ── _compute_progress ────────────────────────────────────────────────────
 
 
 class TestComputeProgress:
     def test_all_done(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         for s in ("done", "done", "done"):
@@ -37,7 +37,7 @@ class TestComputeProgress:
         assert progress == 100.0
 
     def test_partial(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         db.add(make_task(db, project_id=p.id, title="T1", status="done"))
@@ -50,7 +50,7 @@ class TestComputeProgress:
         assert progress == 50.0
 
     def test_empty_project(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         db.refresh(p)
@@ -64,7 +64,7 @@ class TestComputeProgress:
 
 class TestBuildHeaders:
     def test_webhook_hmac_signature(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(
@@ -81,7 +81,7 @@ class TestBuildHeaders:
         assert headers["X-Hub-Signature-256"] == f"sha256={expected_sig}"
 
     def test_webhook_no_secret_no_signature(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(
@@ -94,7 +94,7 @@ class TestBuildHeaders:
         assert "X-Signature" not in headers
 
     def test_bearer_auth_default(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(
@@ -107,7 +107,7 @@ class TestBuildHeaders:
         assert headers["Authorization"] == "Bearer tok123"
 
     def test_drone_type_headers(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(
@@ -121,7 +121,7 @@ class TestBuildHeaders:
         assert headers["X-Drone-Source"] == "shard"
 
     def test_custom_headers_merged(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(
@@ -135,7 +135,7 @@ class TestBuildHeaders:
         assert headers["X-Custom"] == "value1"
 
     def test_always_has_platform_event_header(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(name="I", type="generic", url="https://example.com", secret=None, events=[], active=True)
@@ -152,7 +152,7 @@ class TestBuildHeaders:
 class TestDispatchWebhook:
     @pytest.fixture()
     def integration(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(
@@ -236,7 +236,7 @@ class TestDispatchWebhook:
 class TestFireNotifications:
     @pytest.fixture()
     def setup(self, db):
-        p = Project(name="Proj")
+        p = make_project(db, name="Proj")
         db.add(p)
         db.flush()
         t = make_task(db, project_id=p.id, title="Task1", status="done", priority="high")
@@ -315,7 +315,7 @@ class TestFireNotifications:
 
 class TestCreateNotification:
     def test_known_event_creates_notification(self, db):
-        p = Project(name="Proj")
+        p = make_project(db, name="Proj")
         db.add(p)
         db.flush()
         t = make_task(db, project_id=p.id, title="Deploy", status="done")
@@ -330,7 +330,7 @@ class TestCreateNotification:
         assert notif.link == f"/projects/{p.id}"
 
     def test_unknown_event_skips(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         t = make_task(db, project_id=p.id, title="T", status="todo")
@@ -348,7 +348,7 @@ class TestCreateNotification:
 class TestRetryDelivery:
     @pytest.mark.asyncio
     async def test_retry_increments_attempt(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(name="I", type="webhook", url="https://example.com", events=["task.done"], active=True)

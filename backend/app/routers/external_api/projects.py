@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project
+from app.models import ApiKey
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -32,10 +32,11 @@ def api_list_projects(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    query = db.query(Project)
     if api_key.project_id:
-        query = query.filter(Project.id == api_key.project_id)
-    projects = query.order_by(Project.created_at.desc()).all()
+        project = graph.get_project(db, api_key.project_id)
+        projects = [project] if project else []
+    else:
+        projects = graph.all_projects(db)
     return [_enrich_project(p, db) for p in projects]
 
 
@@ -52,7 +53,7 @@ def api_get_project(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     result = _enrich_project(project, db)
@@ -74,10 +75,9 @@ def api_create_project(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    project = Project(**body.model_dump())
-    db.add(project)
+    project = graph.create_project(db, **body.model_dump())
     db.commit()
-    db.refresh(project)
+    project = graph.get_project(db, project.id)
     return _enrich_project(project, db)
 
 
@@ -95,13 +95,12 @@ def api_update_project(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    for field, value in body.model_dump(exclude_none=True).items():
-        setattr(project, field, value)
+    project = graph.update_project(db, project_id, **body.model_dump(exclude_none=True))
     db.commit()
-    db.refresh(project)
+    project = graph.get_project(db, project_id)
     return _enrich_project(project, db)
 
 
@@ -119,7 +118,7 @@ def api_delete_project(
 ):
     _require_scope(api_key, "admin")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     graph.delete_project_and_tasks(db, project)

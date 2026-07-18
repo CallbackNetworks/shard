@@ -6,18 +6,32 @@ Provides project enrichment and lookup utilities.
 
 from sqlalchemy.orm import Session
 
-from app.models import Project
 from app.routers.deps import get_task_or_404 as _deps_get_task_or_404
 from app.services import graph
 from app.services.enrichment import enrich_task_as_dict
 
+_PROJECT_FIELDS = (
+    "id",
+    "name",
+    "description",
+    "status",
+    "share_token",
+    "share_expires_at",
+    "allow_guest_notes",
+    "agent_instructions",
+    "repo_url",
+    "wip_limits",
+    "created_at",
+    "updated_at",
+)
 
-def _enrich_project(project: Project, db: Session) -> dict:
+
+def _enrich_project(project: "graph.ProjectView", db: Session) -> dict:
     tasks = graph.tasks_in_project(db, project.id)
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
     return {
-        **{c.name: getattr(project, c.name) for c in project.__table__.columns},
+        **{name: getattr(project, name) for name in _PROJECT_FIELDS},
         "progress": round(done / total * 100, 1) if total > 0 else 0.0,
         "total_tasks": total,
         "done_tasks": done,

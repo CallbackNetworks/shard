@@ -6,6 +6,7 @@ import pytest
 
 from app.models import Integration, Node
 from app.routers.issue_sync import sync_task_closure_to_external
+from app.services import graph
 from tests.factories import find_task_by_external_id, make_task
 
 
@@ -530,7 +531,7 @@ class TestCreateExternalIssue:
         return_value={"number": "101", "url": "https://github.com/owner/repo/issues/101"},
     )
     def test_creates_github_issue_and_links_task(self, mock_create, client, db, sample_project):
-        sample_project.repo_url = "https://github.com/owner/repo"
+        graph.update_project(db, sample_project.id, repo_url="https://github.com/owner/repo")
         self._integration(db, sample_project.id)
         task = make_task(db, project_id=sample_project.id, title="Ship it", description="body")
         db.add(task)
@@ -551,7 +552,7 @@ class TestCreateExternalIssue:
         return_value={"number": "7", "url": "https://gitlab.com/group/app/-/issues/7"},
     )
     def test_creates_gitlab_issue(self, mock_create, client, db, sample_project):
-        sample_project.repo_url = "https://gitlab.com/group/app"
+        graph.update_project(db, sample_project.id, repo_url="https://gitlab.com/group/app")
         self._integration(db, sample_project.id, url="https://gitlab.com", secret="glpat")
         task = make_task(db, project_id=sample_project.id, title="GL task")
         db.add(task)
@@ -564,7 +565,7 @@ class TestCreateExternalIssue:
 
     def test_rejects_already_linked(self, client, db, sample_project):
         self._integration(db, sample_project.id)
-        sample_project.repo_url = "https://github.com/owner/repo"
+        graph.update_project(db, sample_project.id, repo_url="https://github.com/owner/repo")
         task = make_task(
             db,
             project_id=sample_project.id,
@@ -579,7 +580,7 @@ class TestCreateExternalIssue:
         assert resp.status_code == 409
 
     def test_rejects_without_integration(self, client, db, sample_project):
-        sample_project.repo_url = "https://github.com/owner/repo"
+        graph.update_project(db, sample_project.id, repo_url="https://github.com/owner/repo")
         db.commit()
         task = make_task(db, project_id=sample_project.id, title="No integ")
         db.add(task)
@@ -597,7 +598,7 @@ class TestCreateExternalIssue:
 
     @patch("app.routers.issue_sync.create_github_issue", new_callable=AsyncMock, return_value=None)
     def test_upstream_failure_returns_502(self, mock_create, client, db, sample_project):
-        sample_project.repo_url = "https://github.com/owner/repo"
+        graph.update_project(db, sample_project.id, repo_url="https://github.com/owner/repo")
         self._integration(db, sample_project.id)
         task = make_task(db, project_id=sample_project.id, title="Fails upstream")
         db.add(task)
@@ -755,8 +756,6 @@ class TestMilestoneCycle:
     async def test_outbound_add_to_cycle_sets_milestone(self, mock_find, mock_set, client, db, sample_project):
         from datetime import UTC, datetime
 
-        from app.services import graph
-
         self._integration(db, sample_project.id)
         cycle = graph.create_cycle(db, sample_project.id, name="Sprint 12", end_date=datetime(2026, 8, 1, tzinfo=UTC))
         task = make_task(
@@ -782,8 +781,6 @@ class TestMilestoneCycle:
     @pytest.mark.asyncio
     @patch("app.routers.issue_sync.set_github_issue_milestone", new_callable=AsyncMock, return_value=True)
     async def test_outbound_remove_from_cycle_clears_milestone(self, mock_set, client, db, sample_project):
-        from app.services import graph
-
         self._integration(db, sample_project.id)
         cycle = graph.create_cycle(db, sample_project.id, name="Sprint 12")
         task = make_task(
@@ -806,8 +803,6 @@ class TestMilestoneCycle:
         mock_set.assert_called_once_with("o/r", "10", None, "ghp", "https://api.github.com")
 
     def test_inbound_milestone_maps_to_existing_cycle(self, client, db, sample_project):
-        from app.services import graph
-
         cycle = graph.create_cycle(db, sample_project.id, name="Sprint 9")
         db.commit()
         body = {
@@ -822,8 +817,6 @@ class TestMilestoneCycle:
         assert task.id in graph.task_ids_in_cycle(db, cycle.id)
 
     def test_inbound_milestone_no_matching_cycle_is_ignored(self, client, db, sample_project):
-        from app.services import graph
-
         body = {
             "action": "opened",
             "issue": {"number": 21, "title": "Task", "milestone": {"title": "Nonexistent"}},

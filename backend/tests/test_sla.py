@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import ActivityLog, Node, Project
+from app.models import ActivityLog, Node
 from app.services.scheduler import _check_sla_aging
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 
 def _now():
@@ -16,7 +16,7 @@ def _now():
 
 
 def _make_project(db, name="SLA Project"):
-    p = Project(name=name)
+    p = make_project(db, name=name)
     db.add(p)
     db.flush()
     return p

@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, ApiKey, Node, Project
+from app.models import ActivityLog, ApiKey, Node
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -50,11 +50,11 @@ def api_analytics_overview(
     in_progress = _task_count(Node.status == "in_progress")
     overdue = _task_count(Node.due_date < now, Node.status.notin_(["done", "failed"]))
 
-    proj_q = db.query(func.count(Project.id))
+    proj_q = db.query(func.count(Node.id)).filter(Node.type == graph.NODE_PROJECT)
     if pid:
-        proj_q = proj_q.filter(Project.id == pid)
+        proj_q = proj_q.filter(Node.id == pid)
     total_projects = proj_q.scalar() or 0
-    active_projects = proj_q.filter(Project.status == "active").scalar() or 0
+    active_projects = proj_q.filter(Node.status == "active").scalar() or 0
 
     act_q = db.query(ActivityLog.project_id, func.count(ActivityLog.id).label("cnt")).filter(
         ActivityLog.created_at >= week_ago, ActivityLog.project_id.isnot(None)
@@ -64,7 +64,7 @@ def api_analytics_overview(
     top_activity = act_q.group_by(ActivityLog.project_id).order_by(func.count(ActivityLog.id).desc()).first()
     most_active_project = None
     if top_activity:
-        p = db.query(Project).filter(Project.id == top_activity.project_id).first()
+        p = graph.get_project(db, top_activity.project_id)
         if p:
             most_active_project = {"id": p.id, "name": p.name, "activity_count": top_activity.cnt}
 

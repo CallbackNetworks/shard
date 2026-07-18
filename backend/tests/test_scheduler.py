@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import Integration, Node, Project, RecurrenceRule, WebhookDelivery
+from app.models import Integration, Node, RecurrenceRule, WebhookDelivery
 from app.services.scheduler import (
     _check_and_fire,
     _check_recurring,
@@ -14,7 +14,7 @@ from app.services.scheduler import (
     _retry_failed_webhooks,
     _send_daily_summary,
 )
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 
 def _settings(**overrides):
@@ -34,7 +34,7 @@ def _now():
 
 class TestComputeNextRun:
     def _make_rule(self, db, frequency, **kwargs):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         t = make_task(db, project_id=p.id, title="T", status="todo")
@@ -104,7 +104,7 @@ class TestComputeNextRun:
 class TestCheckAndFire:
     @pytest.mark.asyncio
     async def test_fires_due_soon_for_upcoming_task(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         t = make_task(
@@ -128,7 +128,7 @@ class TestCheckAndFire:
 
     @pytest.mark.asyncio
     async def test_fires_overdue_for_past_due_task(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         t = make_task(
@@ -149,7 +149,7 @@ class TestCheckAndFire:
 
     @pytest.mark.asyncio
     async def test_skips_done_tasks(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         t = make_task(
@@ -169,7 +169,7 @@ class TestCheckAndFire:
 
     @pytest.mark.asyncio
     async def test_skips_recently_reminded(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         t = make_task(
@@ -190,7 +190,7 @@ class TestCheckAndFire:
 
     @pytest.mark.asyncio
     async def test_re_sends_after_cooldown(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         t = make_task(
@@ -216,7 +216,7 @@ class TestCheckAndFire:
 class TestCheckRecurring:
     @pytest.mark.asyncio
     async def test_creates_task_from_template(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         template = make_task(db, project_id=p.id, title="Weekly Report", status="todo", priority="medium")
@@ -247,7 +247,7 @@ class TestCheckRecurring:
 
     @pytest.mark.asyncio
     async def test_skips_future_next_run(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         template = make_task(db, project_id=p.id, title="Future", status="todo")
@@ -270,7 +270,7 @@ class TestCheckRecurring:
 
     @pytest.mark.asyncio
     async def test_skips_inactive_rule(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         template = make_task(db, project_id=p.id, title="Inactive", status="todo")
@@ -293,7 +293,7 @@ class TestCheckRecurring:
 
     @pytest.mark.asyncio
     async def test_skips_expired_end_date(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         template = make_task(db, project_id=p.id, title="Expired", status="todo")
@@ -322,7 +322,7 @@ class TestCheckRecurring:
 class TestRetryFailedWebhooks:
     @pytest.mark.asyncio
     async def test_retries_due_deliveries(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(name="I", type="webhook", url="https://example.com", events=["task.done"], active=True)
@@ -350,7 +350,7 @@ class TestRetryFailedWebhooks:
 
     @pytest.mark.asyncio
     async def test_skips_future_retry(self, db):
-        p = Project(name="P")
+        p = make_project(db, name="P")
         db.add(p)
         db.flush()
         integ = Integration(name="I", type="webhook", url="https://example.com", events=["task.done"], active=True)
@@ -382,7 +382,7 @@ class TestRetryFailedWebhooks:
 class TestSendDailySummary:
     @pytest.mark.asyncio
     async def test_sends_once_per_day(self, db):
-        p = Project(name="P", status="active")
+        p = make_project(db, name="P", status="active")
         db.add(p)
         db.flush()
         integ = Integration(name="Email", type="email", url="", email_to="test@test.com", events=[], active=True)

@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 from sqlalchemy.orm import Session
 
-from app.models import Integration, Notification, Project, WebhookDelivery
+from app.models import Integration, Notification, WebhookDelivery
 from app.services import graph
 from app.services.email_sender import build_notification_email, send_email
 from app.services.email_sender import is_configured as smtp_configured
@@ -21,7 +21,7 @@ RETRY_BACKOFF_MINUTES = [1, 5, 30, 120, 360]
 MAX_ATTEMPTS = len(RETRY_BACKOFF_MINUTES)
 
 
-def _compute_progress(project: Project, db: Session) -> tuple[int, int, float]:
+def _compute_progress(project: "graph.ProjectView", db: Session) -> tuple[int, int, float]:
     tasks = graph.tasks_in_project(db, project.id)
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
@@ -224,7 +224,7 @@ async def _send_webhook_inline(
 
 
 async def fire_notifications(db: Session, task: "graph.TaskView", event: str) -> None:
-    project: Project | None = graph.project_of_task(db, task.id)
+    project: graph.ProjectView | None = graph.project_of_task(db, task.id)
     if project is None:
         return
     total, done, progress = _compute_progress(project, db)
@@ -291,7 +291,7 @@ _EVENT_MESSAGES = {
 }
 
 
-def _create_notification(db: Session, event: str, task: "graph.TaskView", project: Project) -> None:
+def _create_notification(db: Session, event: str, task: "graph.TaskView", project: "graph.ProjectView") -> None:
     factory = _EVENT_MESSAGES.get(event)
     if not factory:
         return

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Project
+from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.schemas import AgentContextOut, AgentProjectInfo, AgentProjectTaskInfo
 from app.services import graph
@@ -30,10 +30,11 @@ def api_agent_context(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    query = db.query(Project).filter(Project.status == "active")
     if api_key.project_id:
-        query = query.filter(Project.id == api_key.project_id)
-    projects = query.order_by(Project.created_at.desc()).all()
+        project = graph.get_project(db, api_key.project_id)
+        projects = [project] if project and project.status == "active" else []
+    else:
+        projects = graph.all_projects(db, status="active")
 
     priority_order = {"high": 0, "medium": 1, "low": 2}
 

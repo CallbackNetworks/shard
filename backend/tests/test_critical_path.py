@@ -1,14 +1,13 @@
 """Tests for critical path analysis service."""
 
-from app.models import Project
 from app.services import graph
 from app.services.critical_path import compute_critical_path
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 
 class TestCriticalPath:
     def _make_project(self, db):
-        p = Project(name="CP Project")
+        p = make_project(db, name="CP Project")
         db.add(p)
         db.flush()
         return p
@@ -161,7 +160,7 @@ class TestCriticalPath:
 
 class TestCriticalPathEndpoint:
     def test_endpoint_returns_result(self, client, db):
-        p = Project(name="EP Test")
+        p = make_project(db, name="EP Test")
         db.add(p)
         db.flush()
         t = make_task(db, project_id=p.id, title="Task", status="todo", time_estimate=30)

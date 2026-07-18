@@ -13,7 +13,6 @@ from app.database import get_db
 from app.models import (
     ActivityLog,
     Comment,
-    Project,
 )
 from app.services import graph
 from app.services.activity import log_activity
@@ -91,10 +90,10 @@ def _load_identity(db: Session, token: str) -> graph.IdentityView | None:
     return graph.find_identity_by_share_token(db, token)
 
 
-def _load_project(db: Session, token: str) -> Project | None:
+def _load_project(db: Session, token: str) -> graph.ProjectView | None:
     # Tasks/labels/cycles are all node-only graph reads in _serialize_project
     # (ADR-0033); no ORM relationships to eager-load here.
-    return db.query(Project).filter(Project.share_token == token).first()
+    return graph.find_project_by_share_token(db, token)
 
 
 def _serialize_comment(c: Comment):
@@ -108,7 +107,7 @@ def _serialize_comment(c: Comment):
     }
 
 
-def _serialize_project(p: Project, db: Session, include_notes: bool):
+def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
     task_ids = graph.contained_task_ids(db, p.id)
     tasks = graph.task_views_for_ids(db, task_ids) if task_ids else []
     total = len(tasks)
@@ -212,7 +211,9 @@ def _serialize_project(p: Project, db: Session, include_notes: bool):
     }
 
 
-def _build_payload(owner: dict, source_projects: list[Project], db: Session, scope: str, include_notes: bool = False):
+def _build_payload(
+    owner: dict, source_projects: list[graph.ProjectView], db: Session, scope: str, include_notes: bool = False
+):
     projects = []
     project_ids = []
 
@@ -290,7 +291,7 @@ def _build_response(identity: graph.IdentityView, db: Session):
     return _build_payload(owner, projects, db, scope="identity", include_notes=identity.allow_guest_notes)
 
 
-def _build_project_response(project: Project, db: Session):
+def _build_project_response(project: graph.ProjectView, db: Session):
     idents = graph.identities_for_project(db, project.id)
     identity = idents[0] if idents else None
     owner = {
@@ -332,7 +333,7 @@ def _maybe_log_view(db: Session, identity: graph.IdentityView, ip_hash: str):
         db.rollback()
 
 
-def _maybe_log_project_view(db: Session, project: Project, ip_hash: str):
+def _maybe_log_project_view(db: Session, project: graph.ProjectView, ip_hash: str):
     """Log at most one project-share view per IP-hash per hour (mirrors identity)."""
     try:
         hour_start = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
@@ -448,7 +449,7 @@ class GuestNoteIn(BaseModel):
         return v
 
 
-def _resolve_note_target(scope: str, token: str, request: Request, db: Session) -> list[Project]:
+def _resolve_note_target(scope: str, token: str, request: Request, db: Session) -> list[graph.ProjectView]:
     """Validate a guest-note write against a share token; return the projects it may write to."""
     if scope == "identity":
         identity = graph.find_identity_by_share_token(db, token)
@@ -464,7 +465,7 @@ def _resolve_note_target(scope: str, token: str, request: Request, db: Session) 
                 raise HTTPException(status_code=403, detail="PIN verification required")
         return [p for p in graph.projects_for_identity(db, identity.id) if p.status == "active"]
     if scope == "project":
-        project = db.query(Project).filter(Project.share_token == token).first()
+        project = graph.find_project_by_share_token(db, token)
         if not project or project.status != "active":
             raise HTTPException(status_code=404, detail="Share link not found")
         if project.share_expires_at and datetime.now(UTC) > _as_utc(project.share_expires_at):

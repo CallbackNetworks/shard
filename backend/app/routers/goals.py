@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Node, Project
+from app.models import Node
 from app.routers.deps import get_goal_or_404
 from app.schemas import GoalCreate, GoalOut, GoalProjectOut, GoalUpdate
 from app.services import graph
@@ -65,8 +65,7 @@ async def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
     )
 
     for pid in body.project_ids:
-        project = db.query(Project).filter(Project.id == pid).first()
-        if not project:
+        if not graph.get_project(db, pid):
             raise HTTPException(status_code=404, detail=f"Project {pid} not found")
         graph.link_goal_project(db, goal.id, pid)
 
@@ -93,8 +92,7 @@ async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_
         # Replace linked projects: clear all part_of edges for this goal, then re-add.
         graph.remove_edges(db, target_id=goal_id, rel_type=graph.REL_PART_OF)
         for pid in project_ids:
-            project = db.query(Project).filter(Project.id == pid).first()
-            if not project:
+            if not graph.get_project(db, pid):
                 raise HTTPException(status_code=404, detail=f"Project {pid} not found")
             graph.link_goal_project(db, goal_id, pid)
 

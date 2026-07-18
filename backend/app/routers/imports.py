@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Project
 from app.services import graph
 from app.services.activity import log_activity
 
@@ -100,9 +99,9 @@ def _get_or_create_label(db: Session, project_id: str, label_name: str) -> graph
     return graph.create_label(db, project_id, name=label_name, color=DEFAULT_LABEL_COLOR)
 
 
-def _validate_project(db: Session, project_id: str) -> Project:
+def _validate_project(db: Session, project_id: str) -> graph.ProjectView:
     """Return the project or raise 404."""
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project

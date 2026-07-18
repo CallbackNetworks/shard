@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Node, Project
+from app.models import ActivityLog, Node
 from app.services import graph
 from app.services.critical_path import compute_critical_path
 from app.services.usage_tracker import tracker
@@ -36,12 +36,15 @@ def get_overview(db: Session = Depends(get_db)):
     )
     most_active_project = None
     if activity_counts:
-        p = db.query(Project).filter(Project.id == activity_counts.project_id).first()
+        p = graph.get_project(db, activity_counts.project_id)
         if p:
             most_active_project = {"id": p.id, "name": p.name, "activity_count": activity_counts.cnt}
 
-    total_projects = db.query(func.count(Project.id)).scalar() or 0
-    active_projects = db.query(func.count(Project.id)).filter(Project.status == "active").scalar() or 0
+    def _project_count():
+        return db.query(func.count(Node.id)).filter(Node.type == graph.NODE_PROJECT)
+
+    total_projects = _project_count().scalar() or 0
+    active_projects = _project_count().filter(Node.status == "active").scalar() or 0
 
     return {
         "total_projects": total_projects,

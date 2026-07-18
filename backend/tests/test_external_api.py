@@ -4,8 +4,8 @@ import hashlib
 
 import pytest
 
-from app.models import ApiKey, Project
-from tests.factories import make_task
+from app.models import ApiKey
+from tests.factories import make_project, make_task
 
 
 @pytest.fixture()
@@ -58,7 +58,7 @@ def api_key_admin(db):
 
 @pytest.fixture()
 def project_with_tasks(db):
-    p = Project(name="Test Project")
+    p = make_project(db, name="Test Project")
     db.add(p)
     db.flush()
     t1 = make_task(db, project_id=p.id, title="Task A", status="done", priority="high")
@@ -159,7 +159,7 @@ class TestScopeEnforcement:
 class TestProjectScoping:
     def test_scoped_key_only_sees_its_project(self, client, db, project_with_tasks):
         p, _, _ = project_with_tasks
-        other = Project(name="Other")
+        other = make_project(db, name="Other")
         db.add(other)
         db.flush()
 
@@ -184,7 +184,7 @@ class TestProjectScoping:
 
     def test_scoped_key_denied_other_project(self, client, db, project_with_tasks):
         p, _, _ = project_with_tasks
-        other = Project(name="Other")
+        other = make_project(db, name="Other")
         db.add(other)
         db.commit()
 
@@ -438,7 +438,7 @@ class TestAgentContext:
 
     def test_agent_context_lists_active_projects(self, client, db, api_key_read):
         raw_key, _ = api_key_read
-        p = Project(name="Active Proj", status="active")
+        p = make_project(db, name="Active Proj", status="active")
         db.add(p)
         db.commit()
 

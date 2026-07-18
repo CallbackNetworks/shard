@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Project
+from app.models import ActivityLog
 from app.routers.deps import get_identity_or_404, get_project_or_404
 from app.schemas import IdentityCreate, IdentityHubOut, IdentityOut, IdentityUpdate
 from app.services import graph
@@ -43,7 +43,7 @@ def get_hub_stats(db: Session = Depends(get_db)):
         ident_stats = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
 
         if ident_project_ids:
-            projects = db.query(Project).filter(Project.id.in_(ident_project_ids)).all()
+            projects = graph.projects_by_ids(db, ident_project_ids).values()
             for p in projects:
                 p_stats = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
                 for t in graph.tasks_in_project(db, p.id):

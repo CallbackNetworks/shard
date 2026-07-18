@@ -1,5 +1,4 @@
-from app.models import Project
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 
 def test_search_empty(client, sample_project):
@@ -44,7 +43,7 @@ def test_search_case_insensitive(client, db, sample_project):
 
 
 def test_search_filter_project(client, db, sample_project):
-    other = Project(name="Other Project")
+    other = make_project(db, name="Other Project")
     db.add(other)
     db.flush()
 

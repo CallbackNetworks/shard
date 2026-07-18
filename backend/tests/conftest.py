@@ -11,10 +11,10 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db, get_dialect
 from app.main import app
-from app.models import Project
 from app.services import graph
 from app.services.graph_registry import seed_builtin_types
 from app.services.pin_utils import hash_pin
+from tests.factories import make_project
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
 _dialect = get_dialect(TEST_DATABASE_URL)
@@ -68,12 +68,9 @@ def sample_identity(db):
 
 @pytest.fixture()
 def sample_project(db, sample_identity):
-    project = Project(name="Test Project")
-    db.add(project)
-    db.flush()
+    project = make_project(db, name="Test Project")
     graph.link_membership(db, sample_identity.id, project.id)
     db.commit()
-    db.refresh(project)
     return project
 
 

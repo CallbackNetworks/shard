@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Project
+from app.models import ActivityLog
 from app.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 from app.services import graph
 from app.services.activity import log_activity
@@ -15,24 +15,15 @@ from app.services.ws_manager import ws_manager
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-def _project_eager_options():
-    # Tasks are loaded from graph contains edges inside enrich_project (with their
-    # own eager options). Labels and cycles are node-only (ADR-0033), loaded via
-    # graph.labels_in_project / graph.cycles_in_project — nothing to pre-load here.
-    return []
-
-
 @router.get("", response_model=list[ProjectOut])
 def list_projects(db: Session = Depends(get_db)):
-    projects = db.query(Project).options(*_project_eager_options()).order_by(Project.created_at.desc()).all()
+    projects = graph.all_projects(db)
     return [enrich_project(p, db) for p in projects]
 
 
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
 async def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
-    project = Project(**body.model_dump())
-    db.add(project)
-    db.flush()
+    project = graph.create_project(db, **body.model_dump())
     log_activity(
         db,
         "project.created",
@@ -40,14 +31,14 @@ async def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
         detail=f'Project "{project.name}" created',
     )
     db.commit()
-    db.refresh(project)
+    project = graph.get_project(db, project.id)
     await ws_manager.broadcast("project.created", {"project_id": project.id})
     return enrich_project(project, db)
 
 
 @router.get("/{project_id}", response_model=ProjectOut)
 def get_project(project_id: str, db: Session = Depends(get_db)):
-    project = db.query(Project).options(*_project_eager_options()).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return enrich_project(project, db)
@@ -55,13 +46,12 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 
 @router.patch("/{project_id}", response_model=ProjectOut)
 async def update_project(project_id: str, body: ProjectUpdate, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     changes = body.model_dump(exclude_none=True)
     old_status = project.status
-    for field, value in changes.items():
-        setattr(project, field, value)
+    project = graph.update_project(db, project_id, **changes)
     if "status" in changes and changes["status"] != old_status:
         log_activity(
             db,
@@ -71,14 +61,14 @@ async def update_project(project_id: str, body: ProjectUpdate, db: Session = Dep
             meta={"old_status": old_status, "new_status": changes["status"]},
         )
     db.commit()
-    db.refresh(project)
+    project = graph.get_project(db, project_id)
     await ws_manager.broadcast("project.updated", {"project_id": project_id})
     return enrich_project(project, db)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(project_id: str, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     log_activity(
@@ -103,17 +93,17 @@ class SetExpiryBody(BaseModel):
 
 @router.post("/{project_id}/set-expiry")
 def set_project_share_expiry(project_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    project.share_expires_at = body.expires_at
+    graph.update_project(db, project_id, share_expires_at=body.expires_at)
     db.commit()
     return {"ok": True}
 
 
 @router.get("/{project_id}/share-views")
 def get_project_share_view_count(project_id: str, db: Session = Depends(get_db)):
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     count = (

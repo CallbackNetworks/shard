@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Node, Project
+from app.models import ApiKey, Node
 from app.routers.deps import get_parent_task_or_error
 from app.routers.external_api.auth import (
     _auth_errors,
@@ -86,7 +86,7 @@ def api_create_task(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     if body.parent_id is not None:
@@ -203,7 +203,7 @@ async def api_bulk_create_tasks(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     created = []

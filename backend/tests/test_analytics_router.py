@@ -1,7 +1,7 @@
 import pytest
 
-from app.models import ActivityLog, Project
-from tests.factories import make_task
+from app.models import ActivityLog
+from tests.factories import make_project, make_task
 
 
 def test_overview_empty(client):
@@ -152,7 +152,7 @@ def test_status_trend(client, db, sample_project):
 
 
 def test_status_trend_filter_project(client, db, sample_project):
-    other_project = Project(name="Other")
+    other_project = make_project(db, name="Other")
     db.add(other_project)
     db.flush()
 
@@ -237,7 +237,7 @@ def test_estimation_calibration_with_data(client, db, sample_project):
 
 
 def test_estimation_calibration_project_filter(client, db, sample_project):
-    other = Project(name="Other project")
+    other = make_project(db, name="Other project")
     db.add(other)
     db.flush()
     db.add_all(
@@ -305,7 +305,7 @@ def test_estimate_suggestion_prefers_bucket(client, db, sample_project):
 
 
 def test_estimate_suggestion_falls_back_to_global(client, db, sample_project):
-    other = Project(name="Other")
+    other = make_project(db, name="Other")
     db.add(other)
     db.flush()
     # Global history lives in another project; the target project has too few.

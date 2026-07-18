@@ -41,9 +41,9 @@ def test_list_decisions(client, db, sample_project):
 
 def test_list_decisions_filter_project(client, db, sample_project):
     # Create a second project
-    from app.models import Project
+    from tests.factories import make_project
 
-    p2 = Project(name="Other Project")
+    p2 = make_project(db, name="Other Project")
     db.add(p2)
     db.flush()
 

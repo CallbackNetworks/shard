@@ -1,11 +1,11 @@
 import logging
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Edge, Node, Project
+from app.models import Node
 from app.services import graph
 from app.services.enrichment import enrich_task_as_dict
 from app.services.search_backend import get_search_backend
@@ -29,7 +29,6 @@ def search(
     # DATABASE_URL, so an overridden session (e.g. in tests) picks the right FTS.
     search_backend = get_search_backend(db.get_bind().dialect.name)
     task_ids, used_fts = search_backend.search_tasks(db, q, project_id, limit, offset)
-    pattern = f"%{q}%"
 
     tasks = []
     if used_fts and task_ids:
@@ -55,32 +54,19 @@ def search(
     # Search projects (only if no project_id filter)
     projects = []
     if not project_id:
-        # Task membership is via graph contains edges (ADR-0032, no primary).
-        total_sq = (
-            select(func.count(Edge.target_id))
-            .where(Edge.source_id == Project.id, Edge.rel_type == graph.REL_CONTAINS)
-            .correlate(Project)
-            .scalar_subquery()
-            .label("total_tasks")
-        )
-        done_sq = (
-            select(func.count(Node.id))
-            .select_from(Edge)
-            .join(Node, Node.id == Edge.target_id)
-            .where(
-                Edge.source_id == Project.id,
-                Edge.rel_type == graph.REL_CONTAINS,
-                Node.type == graph.NODE_TASK,
-                Node.status == "done",
+        # Projects are node-only (ADR-0033); name (title) / description matched in
+        # Python by graph.search_projects. Task membership is via contains edges.
+        for p in graph.search_projects(db, q, limit=20):
+            p_task_ids = graph.contained_task_ids(db, p.id)
+            total = len(p_task_ids)
+            done = (
+                db.query(func.count(Node.id))
+                .filter(Node.id.in_(p_task_ids), Node.type == graph.NODE_TASK, Node.status == "done")
+                .scalar()
+                or 0
+                if p_task_ids
+                else 0
             )
-            .correlate(Project)
-            .scalar_subquery()
-            .label("done_tasks")
-        )
-        proj_query = db.query(Project, total_sq, done_sq).filter(
-            (Project.name.ilike(pattern)) | (Project.description.ilike(pattern))
-        )
-        for p, total, done in proj_query.limit(20).all():
             projects.append(
                 {
                     "id": p.id,

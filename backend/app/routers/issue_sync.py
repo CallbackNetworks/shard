@@ -17,7 +17,6 @@ from app.models import (
     Integration,
     Node,
     Notification,
-    Project,
     TaskPullRequest,
 )
 from app.services import graph
@@ -133,7 +132,7 @@ async def receive_issue_webhook(
     Auto-detects the provider from request headers. Creates a new task if the
     external issue doesn't exist yet, or updates the existing task's status.
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -777,7 +776,7 @@ def apply_inbound_milestone_cycle(task: "graph.TaskView", milestone_title: str |
 
 
 async def create_external_issue_from_task(
-    task: "graph.TaskView", project: Project, db: Session, provider: str | None = None
+    task: "graph.TaskView", project: "graph.ProjectView", db: Session, provider: str | None = None
 ):
     """Create a new external issue from a Shard-origin task and link it back.
 

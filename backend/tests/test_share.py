@@ -2,10 +2,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.models import ActivityLog, Comment, Project
+from app.models import ActivityLog, Comment
 from app.services import graph
 from app.services.rate_limiter import _share_limiter
-from tests.factories import make_task
+from tests.factories import make_project, make_task
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +24,7 @@ def test_get_share_valid_token(client, sample_identity, sample_project):
 
 
 def test_get_project_share_only_returns_that_project(client, db, sample_identity, sample_project):
-    other = Project(name="Other Project")
+    other = make_project(db, name="Other Project")
     db.add(other)
     db.flush()
     graph.link_membership(db, sample_identity.id, other.id)
@@ -80,7 +80,7 @@ def test_verify_pin_correct(client, pinned_identity):
 
 
 def test_verify_pin_handles_naive_due_date(client, db, pinned_identity):
-    project = Project(name="Pinned Project")
+    project = make_project(db, name="Pinned Project")
     db.add(project)
     db.flush()
     graph.link_membership(db, pinned_identity.id, project.id)
@@ -153,7 +153,7 @@ def test_guest_note_rejected_when_disabled(client, db, sample_project):
 
 
 def test_project_note_created_and_visible(client, db, sample_project):
-    sample_project.allow_guest_notes = True
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
     db.commit()
 
     resp = client.post(
@@ -174,7 +174,7 @@ def test_project_note_created_and_visible(client, db, sample_project):
 
 
 def test_task_note_created_and_visible(client, db, sample_project):
-    sample_project.allow_guest_notes = True
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
     task = make_task(db, project_id=sample_project.id, title="Shared task")
     db.add(task)
     db.commit()
@@ -194,8 +194,8 @@ def test_task_note_created_and_visible(client, db, sample_project):
 
 def test_task_note_attributed_inside_share_scope(client, db, sample_project):
     """A cross-project task's note lands in a shared project, not its outside origin (ADR-0032)."""
-    sample_project.allow_guest_notes = True
-    other = Project(name="Private origin")
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
+    other = make_project(db, name="Private origin")
     db.add(other)
     db.commit()
     # The task originates in the unshared project, then is linked into the shared one.
@@ -213,7 +213,7 @@ def test_task_note_attributed_inside_share_scope(client, db, sample_project):
 
 def test_identity_note_requires_project_in_scope(client, db, sample_identity, sample_project):
     graph.update_identity(db, sample_identity.id, allow_guest_notes=True)
-    other = Project(name="Not shared")
+    other = make_project(db, name="Not shared")
     db.add(other)
     db.commit()
 
@@ -231,8 +231,8 @@ def test_identity_note_requires_project_in_scope(client, db, sample_identity, sa
 
 
 def test_task_note_outside_scope_rejected(client, db, sample_project):
-    sample_project.allow_guest_notes = True
-    other = Project(name="Other")
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
+    other = make_project(db, name="Other")
     db.add(other)
     db.flush()
     foreign_task = make_task(db, project_id=other.id, title="Foreign")
@@ -261,7 +261,7 @@ def test_pinned_identity_note_requires_session(client, db, pinned_identity, samp
 
 
 def test_guest_note_blank_body_rejected(client, db, sample_project):
-    sample_project.allow_guest_notes = True
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
     db.commit()
 
     resp = client.post(
@@ -272,7 +272,7 @@ def test_guest_note_blank_body_rejected(client, db, sample_project):
 
 
 def test_guest_note_daily_limit(client, db, sample_project):
-    sample_project.allow_guest_notes = True
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
     db.commit()
 
     for i in range(20):
@@ -290,22 +290,22 @@ def test_guest_note_daily_limit(client, db, sample_project):
 
 
 def test_project_share_expired_returns_410(client, db, sample_project):
-    sample_project.share_expires_at = datetime.now(UTC) - timedelta(hours=1)
+    graph.update_project(db, sample_project.id, share_expires_at=datetime.now(UTC) - timedelta(hours=1))
     db.commit()
     resp = client.get(f"/share/project/{sample_project.share_token}")
     assert resp.status_code == 410
 
 
 def test_project_share_future_expiry_still_works(client, db, sample_project):
-    sample_project.share_expires_at = datetime.now(UTC) + timedelta(days=1)
+    graph.update_project(db, sample_project.id, share_expires_at=datetime.now(UTC) + timedelta(days=1))
     db.commit()
     resp = client.get(f"/share/project/{sample_project.share_token}")
     assert resp.status_code == 200
 
 
 def test_project_guest_note_blocked_after_expiry(client, db, sample_project):
-    sample_project.allow_guest_notes = True
-    sample_project.share_expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
+    graph.update_project(db, sample_project.id, share_expires_at=datetime.now(UTC) - timedelta(minutes=1))
     db.commit()
     resp = client.post(
         f"/share/project/{sample_project.share_token}/notes",
@@ -315,17 +315,17 @@ def test_project_guest_note_blocked_after_expiry(client, db, sample_project):
 
 
 def test_set_project_expiry_endpoint(client, db, sample_project):
+    # Project is node-only (ADR-0033 B6): share_expires_at lives in node.data, so
+    # read it back through the graph layer, not off the decorated node snapshot.
     when = (datetime.now(UTC) + timedelta(days=3)).isoformat()
     resp = client.post(f"/projects/{sample_project.id}/set-expiry", json={"expires_at": when})
     assert resp.status_code == 200
-    db.refresh(sample_project)
-    assert sample_project.share_expires_at is not None
+    assert graph.get_project(db, sample_project.id).share_expires_at is not None
 
     # Clearing sets it back to null.
     resp = client.post(f"/projects/{sample_project.id}/set-expiry", json={"expires_at": None})
     assert resp.status_code == 200
-    db.refresh(sample_project)
-    assert sample_project.share_expires_at is None
+    assert graph.get_project(db, sample_project.id).share_expires_at is None
 
 
 def test_project_share_view_count(client, db, sample_project):

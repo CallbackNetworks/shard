@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import ActivityLog, Integration, Node, Project, RecurrenceRule, UserPreference, WebhookDelivery, now_utc
+from app.models import ActivityLog, Integration, Node, RecurrenceRule, UserPreference, WebhookDelivery, now_utc
 from app.services import backup as backup_service
 from app.services import email_sender, graph
 from app.services.activity import log_activity
@@ -218,7 +218,7 @@ async def _send_daily_summary(db: Session) -> None:
     _set_state(db, "last_summary_date", today_str)
 
     # Gather data
-    projects = db.query(Project).filter(Project.status == "active").all()
+    projects = graph.all_projects(db, status="active")
     if not projects:
         return
 
@@ -335,7 +335,7 @@ async def _send_weekly_digest(db: Session) -> None:
     # Gather data for the past 7 days
     week_ago = now - timedelta(days=7)
 
-    projects = db.query(Project).filter(Project.status == "active").all()
+    projects = graph.all_projects(db, status="active")
     if not projects:
         return
 
