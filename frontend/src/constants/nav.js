@@ -11,7 +11,6 @@ export const NAV_GROUPS = [
     label: 'Operate',
     items: [
       { to: '/', icon: LayoutGrid, labelKey: 'nav.commandCenter', locked: true },
-      { to: '/unfiled', icon: Inbox, labelKey: 'nav.unfiled' },
       { to: '/structure', icon: Network, labelKey: 'nav.structureMap' },
       { to: '/activity', icon: Activity, labelKey: 'nav.activity' },
       { to: '/analytics', icon: BarChart2, labelKey: 'nav.analytics' },
@@ -36,11 +35,17 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Graph',
+    items: [
+      { to: '/unfiled', icon: Inbox, labelKey: 'nav.unfiled' },
+      { to: '/graph-types', icon: Shapes, labelKey: 'nav.graphTypes' },
+      { to: '/explorer', icon: Boxes, labelKey: 'nav.nodeExplorer' },
+    ],
+  },
+  {
     label: 'System',
     items: [
       { to: '/identities', icon: Users, labelKey: 'nav.identities' },
-      { to: '/graph-types', icon: Shapes, labelKey: 'nav.graphTypes' },
-      { to: '/explorer', icon: Boxes, labelKey: 'nav.nodeExplorer' },
       { to: '/settings', icon: Settings2, labelKey: 'nav.settings', locked: true },
     ],
   },

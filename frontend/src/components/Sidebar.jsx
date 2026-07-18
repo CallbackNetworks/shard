@@ -1,10 +1,42 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink, Search, Sun, Moon, CircleSlash } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { ExternalLink, Search, Sun, Moon, CircleSlash, Boxes } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
 import { useUiPrefs } from '../utils/uiPrefs'
+import { getNodeTypes } from '../api/client'
+
+// Registry-driven nav group (ADR-0037): one entry per user-defined container
+// type, landing on its node listing. Individual nodes never enter the rail.
+function ContainerTypesRail({ isActive }) {
+  const { t } = useTranslation()
+  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const containerTypes = nodeTypes.filter(nt => nt.is_container && !nt.is_builtin)
+  if (containerTypes.length === 0) return null
+
+  return (
+    <div className="kt-mini-group">
+      <div className="kt-rail-grouplabel" aria-hidden="true">{t('nav.containers')}</div>
+      {containerTypes.map(nt => {
+        const to = `/t/${nt.key}`
+        return (
+          <Link
+            key={nt.key}
+            to={to}
+            className={isActive(to) ? 'kt-mini-nav-button is-active' : 'kt-mini-nav-button'}
+            aria-label={nt.label}
+            title={nt.label}
+          >
+            <span className="kt-rail-ico"><Boxes size={16} color={nt.color || undefined} /></span>
+            <span className="kt-rail-label">{nt.label}</span>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
 
 function FocusRail() {
   const { t } = useTranslation()
@@ -87,6 +119,7 @@ export default function Sidebar({ onOpenPalette }) {
 
       <nav className="kt-mini-nav" aria-label="Rail module groups">
         <FocusRail />
+        <ContainerTypesRail isActive={isActive} />
         {groups.map(group => (
           <div key={group.label} className="kt-mini-group">
             <div className="kt-rail-grouplabel" aria-hidden="true">{group.label}</div>

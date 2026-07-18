@@ -10,6 +10,13 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+// Registry query for the dynamic container-types group (ADR-0037).
+const mockNodeTypes = vi.hoisted(() => ({ data: [] }))
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({ data: mockNodeTypes.data }),
+}))
+vi.mock('../../api/client', () => ({ getNodeTypes: vi.fn() }))
+
 import Sidebar from '../Sidebar'
 
 function setup(options = {}) {
@@ -65,5 +72,24 @@ describe('Sidebar', () => {
   it('renders the status page link', () => {
     setup()
     expect(screen.getByText('nav.statusPage')).toBeTruthy()
+  })
+
+  it('shows a dynamic group entry per custom container type (ADR-0037)', () => {
+    mockNodeTypes.data = [
+      { key: 'topic', label: 'Topics', is_container: true, is_builtin: false, color: '#f59e0b' },
+      { key: 'project', label: 'Project', is_container: true, is_builtin: true },
+      { key: 'note', label: 'Note', is_container: false, is_builtin: false },
+    ]
+    setup()
+    // Only the custom container type gets an entry — not built-ins, not plain types.
+    const link = screen.getByText('Topics').closest('a')
+    expect(link.getAttribute('href')).toBe('/t/topic')
+    expect(screen.queryByText('Note')).toBeNull()
+    mockNodeTypes.data = []
+  })
+
+  it('hides the dynamic container group when there are no custom container types', () => {
+    setup()
+    expect(screen.queryByText('nav.containers')).toBeNull()
   })
 })

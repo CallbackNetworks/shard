@@ -37,6 +37,7 @@ const GraphTypes = lazy(() => import('./pages/GraphTypes'))
 const NodeExplorer = lazy(() => import('./pages/NodeExplorer'))
 const NodePage = lazy(() => import('./pages/NodePage'))
 const ContainerView = lazy(() => import('./pages/ContainerView'))
+const TypeNodesPage = lazy(() => import('./pages/TypeNodesPage'))
 const Unfiled = lazy(() => import('./pages/Unfiled'))
 const ShareView = lazy(() => import('./pages/ShareView'))
 const Login = lazy(() => import('./pages/Login'))
@@ -171,6 +172,7 @@ function Layout() {
               <Route path="explorer" element={<NodeExplorer />} />
               <Route path="n/:id" element={<NodePage />} />
               <Route path="c/:id" element={<ContainerView />} />
+              <Route path="t/:typeKey" element={<TypeNodesPage />} />
               <Route path="unfiled" element={<Unfiled />} />
             </Routes>
           </Suspense>
