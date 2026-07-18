@@ -42,18 +42,20 @@ def list_tasks(
     nodes = q.order_by(Node.position.asc(), Node.created_at.asc()).offset(offset).limit(limit).all()
     tasks = [graph.task_view(n, db) for n in nodes]
 
-    def _to_out(t, proj_map, par_map):
+    def _to_out(t, proj_map, par_map, cont_map):
         out = TaskOut.model_validate(t, from_attributes=True)
         out.project_ids = proj_map.get(t.id, [])
         out.project_id = out.project_ids[0] if out.project_ids else None
+        out.container_ids = cont_map.get(t.id, [])
         out.parent_id = par_map.get(t.id)
         return out
 
     if not want_subtasks:
         ids = [t.id for t in tasks]
         proj_map = graph.project_ids_map(db, ids)
+        cont_map = graph.container_ids_map(db, ids)
         par_map = graph.parent_task_map(db, ids)
-        return [_to_out(t, proj_map, par_map).model_dump() for t in tasks]
+        return [_to_out(t, proj_map, par_map, cont_map).model_dump() for t in tasks]
 
     # Nest subtasks from task->task contains edges (ADR-0032).
     children_map = graph.child_task_ids_map(db, [t.id for t in tasks])
@@ -61,12 +63,15 @@ def list_tasks(
     child_by_id = graph.task_views_by_ids(db, child_ids) if child_ids else {}
     all_ids = [t.id for t in tasks] + list(child_ids)
     proj_map = graph.project_ids_map(db, all_ids)
+    cont_map = graph.container_ids_map(db, all_ids)
     par_map = graph.parent_task_map(db, all_ids)
     result = []
     for t in tasks:
-        out = TaskWithSubtasksOut(**_to_out(t, proj_map, par_map).model_dump())
+        out = TaskWithSubtasksOut(**_to_out(t, proj_map, par_map, cont_map).model_dump())
         out.subtasks = [
-            _to_out(child_by_id[cid], proj_map, par_map) for cid in children_map.get(t.id, []) if cid in child_by_id
+            _to_out(child_by_id[cid], proj_map, par_map, cont_map)
+            for cid in children_map.get(t.id, [])
+            if cid in child_by_id
         ]
         result.append(out.model_dump())
     return result

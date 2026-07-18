@@ -180,7 +180,8 @@ class TaskOut(BaseModel):
 
     id: str
     project_id: str | None = None  # compat: first/nearest project via contains edges (ADR-0032)
-    project_ids: list[str] = []  # every project this task belongs to, incl. graph edges (ADR-0032)
+    project_ids: list[str] = []  # every literal project this task belongs to (ADR-0032)
+    container_ids: list[str] = []  # every container (incl. custom types) via contains edges (ADR-0034)
     parent_id: str | None = None
     title: str
     description: str | None

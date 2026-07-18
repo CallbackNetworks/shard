@@ -727,7 +727,24 @@ def find_cycle_by_name(db: Session, project_id: str, name: str) -> CycleView | N
 
 
 def member_project_ids(db: Session, task_id: str) -> list[str]:
-    """Ids of every project a task belongs to via incoming ``contains`` edges."""
+    """Ids of every literal ``project`` a task belongs to via incoming ``contains`` edges.
+
+    Deliberately restricted to the built-in ``project`` type (not the generic
+    ``is_container`` role): this feeds the compat ``TaskOut.project_id``/``project_ids``
+    the frontend consumes as real projects (``/projects/{id}``). A custom container's
+    id must NOT leak here or the UI would 404 (ADR-0034). Use ``member_container_ids``
+    for the generic containment superset.
+    """
+    return [n.id for n in parents_of(db, task_id) if n.type == NODE_PROJECT]
+
+
+def member_container_ids(db: Session, task_id: str) -> list[str]:
+    """Ids of every container (``is_container`` role) a task belongs to via ``contains``.
+
+    The generic superset of ``member_project_ids`` — includes literal projects and
+    any user-defined container type (ADR-0034). Feeds the generic ``container_ids``
+    compat field and the delete-orphan "does another container keep this alive?" test.
+    """
     containers = container_type_keys(db)
     return [n.id for n in parents_of(db, task_id) if n.type in containers]
 
@@ -1402,17 +1419,19 @@ def delete_task_tree(db: Session, task_id: str) -> None:
     Peripheral rows (comments/attachments/pull requests) and the node's touching
     edges are cleaned up by ``_delete_task_node`` -> ``delete_node``.
     """
-    root_projects = set(member_project_ids(db, task_id))
+    # Use the generic container set (ADR-0034): a descendant kept alive by ANY other
+    # container — a literal project or a user-defined container type — survives.
+    root_containers = set(member_container_ids(db, task_id))
     doomed = [task_id, *descendants_of(db, task_id)]
     keep: set[str] = set()
     for tid in doomed[1:]:
         if tid in keep:
             continue
-        if set(member_project_ids(db, tid)) - root_projects:
+        if set(member_container_ids(db, tid)) - root_containers:
             keep.add(tid)
             keep |= descendants_of(db, tid)
     for tid in keep:
-        for pid in root_projects:
+        for pid in root_containers:
             remove_edge(db, pid, tid, REL_CONTAINS)
     for tid in doomed:
         if tid in keep:
@@ -1451,7 +1470,7 @@ def delete_project_and_tasks(db: Session, project) -> None:
     for tid in contained:
         if tid in subtasks_set:
             continue  # a subtask is removed together with its parent's tree
-        others = [pid for pid in member_project_ids(db, tid) if pid != project.id]
+        others = [pid for pid in member_container_ids(db, tid) if pid != project.id]
         if others:
             remove_edge(db, project.id, tid, REL_CONTAINS)
         else:
@@ -1513,9 +1532,33 @@ def parent_task_map(db: Session, task_ids) -> dict[str, str]:
 def project_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
     """Batch ``{task_id: [project_id, ...]}`` from incoming project->task contains edges.
 
+    Restricted to the literal ``project`` type (not the ``is_container`` role) so the
+    compat ``TaskOut.project_id``/``project_ids`` can never carry a custom container id
+    that the frontend would 404 on (ADR-0034). Use ``container_ids_map`` for the generic
+    containment superset.
+
     Ordered like ``parents_of`` (edge position, then created_at) so element 0 is the
     same deterministic "compat project" that ``nearest_ancestor_of_type`` would pick
     among direct parents.
+    """
+    return _containment_ids_map(db, task_ids, source_filter=Node.type == NODE_PROJECT)
+
+
+def container_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
+    """Batch ``{task_id: [container_id, ...]}`` from incoming container->task contains edges.
+
+    Generic superset of ``project_ids_map``: any ``is_container``-role parent (literal
+    projects plus user-defined container types). Feeds the generic ``TaskOut.container_ids``
+    (ADR-0034). Same deterministic ordering as ``project_ids_map``.
+    """
+    return _containment_ids_map(db, task_ids, source_filter=NodeType.is_container.is_(True))
+
+
+def _containment_ids_map(db: Session, task_ids, *, source_filter) -> dict[str, list[str]]:
+    """Shared batch ``{task_id: [parent_id, ...]}`` for incoming ``contains`` edges.
+
+    ``source_filter`` narrows the parent (source) node — a literal type check for the
+    compat project map, or the ``is_container`` role for the generic container map.
     """
     ids = set(task_ids)
     result: dict[str, list[str]] = defaultdict(list)
@@ -1525,7 +1568,7 @@ def project_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
         select(Edge.target_id, Edge.source_id)
         .join(Node, Node.id == Edge.source_id)
         .join(NodeType, NodeType.key == Node.type)
-        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_container.is_(True), Edge.target_id.in_(ids))
+        .where(Edge.rel_type == REL_CONTAINS, source_filter, Edge.target_id.in_(ids))
         .order_by(Edge.position, Edge.created_at)
     ).all()
     for target_id, source_id in rows:

@@ -14,6 +14,17 @@ def _membership_project_ids(task, db, project_ids_by_task) -> list[str]:
     return graph.member_project_ids(db, task.id)
 
 
+def _membership_container_ids(task, db, container_ids_by_task) -> list[str]:
+    """Containers a task belongs to (generic ``is_container`` superset, ADR-0034).
+
+    ``container_ids_by_task`` is an optional prefetched ``{task_id: [container_id]}`` map
+    (``graph.container_ids_map``) used to batch a whole list of tasks (avoids N+1).
+    """
+    if container_ids_by_task is not None:
+        return list(container_ids_by_task.get(task.id, []))
+    return graph.member_container_ids(db, task.id)
+
+
 def _parent_id(task, db, parent_by_task) -> str | None:
     """A subtask's parent task id via the incoming task->task ``contains`` edge (ADR-0032).
 
@@ -60,10 +71,11 @@ def _subtask_count(task, db, subtasks_by_task) -> int:
     return len(graph.contained_task_ids(db, task.id))
 
 
-def _apply_containment(out, task, db, project_ids_by_task, parent_by_task) -> None:
-    """Populate the compat ``project_id``/``project_ids``/``parent_id`` from edges."""
+def _apply_containment(out, task, db, project_ids_by_task, parent_by_task, container_ids_by_task=None) -> None:
+    """Populate the compat ``project_id``/``project_ids``/``container_ids``/``parent_id`` from edges."""
     out.project_ids = _membership_project_ids(task, db, project_ids_by_task)
     out.project_id = out.project_ids[0] if out.project_ids else None
+    out.container_ids = _membership_container_ids(task, db, container_ids_by_task)
     out.parent_id = _parent_id(task, db, parent_by_task)
 
 
@@ -75,6 +87,7 @@ def enrich_task(
     subtasks_by_task=None,
     project_ids_by_task=None,
     parent_by_task=None,
+    container_ids_by_task=None,
 ) -> TaskOut:
     out = TaskOut.model_validate(task)
     out.labels = _task_labels(task, db, labels_by_task)
@@ -82,7 +95,7 @@ def enrich_task(
     out.comment_count = len(task.comments)
     out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
     out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
-    _apply_containment(out, task, db, project_ids_by_task, parent_by_task)
+    _apply_containment(out, task, db, project_ids_by_task, parent_by_task, container_ids_by_task)
     if task.assigned_agent is not None:
         out.assigned_agent_name = task.assigned_agent.name
     rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task.id).first()
@@ -98,6 +111,7 @@ def enrich_task_as_dict(
     subtasks_by_task=None,
     project_ids_by_task=None,
     parent_by_task=None,
+    container_ids_by_task=None,
 ) -> dict:
     out = TaskOut.model_validate(task)
     out.labels = _task_labels(task, db, labels_by_task)
@@ -105,7 +119,7 @@ def enrich_task_as_dict(
     out.comment_count = len(task.comments)
     out.blocked_by, out.blocking = _dependency_lists(task, db, dep_maps)
     out.pull_requests = [TaskPullRequestOut.model_validate(pr) for pr in task.pull_requests]
-    _apply_containment(out, task, db, project_ids_by_task, parent_by_task)
+    _apply_containment(out, task, db, project_ids_by_task, parent_by_task, container_ids_by_task)
     if task.assigned_agent is not None:
         out.assigned_agent_name = task.assigned_agent.name
     return out.model_dump()
@@ -134,9 +148,19 @@ def enrich_project(project, db) -> ProjectOut:
     labels_by_task = graph.labels_map(db, task_ids)
     subtasks_by_task = graph.child_task_ids_map(db, task_ids)
     project_ids_by_task = graph.project_ids_map(db, task_ids)
+    container_ids_by_task = graph.container_ids_map(db, task_ids)
     parent_by_task = graph.parent_task_map(db, task_ids)
     out.tasks = [
-        enrich_task(t, db, dep_maps, labels_by_task, subtasks_by_task, project_ids_by_task, parent_by_task)
+        enrich_task(
+            t,
+            db,
+            dep_maps,
+            labels_by_task,
+            subtasks_by_task,
+            project_ids_by_task,
+            parent_by_task,
+            container_ids_by_task,
+        )
         for t in tasks
     ]
 

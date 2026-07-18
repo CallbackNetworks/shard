@@ -35,3 +35,4 @@
 | [0031](0031-kinetic-typography-system.md) | Kinetic Typography System and Runtime-Switchable Display Font | Accepted | 2026-07-14 |
 | [0032](0032-unified-node-edge-graph-model.md) | Unified Node/Edge Graph Model over Fixed Container Relations | Accepted | 2026-07-15 |
 | [0033](0033-graph-foundation-final-shape.md) | Graph Foundation Final Shape — Data-Driven Type/Edge Vocabularies, Audit Provenance, Node-Only Endgame | Accepted | 2026-07-16 |
+| [0034](0034-user-defined-containers-and-compat-project-fields.md) | User-Defined Containers and Compat Project Fields — Literal-Project project_ids plus Generic container_ids | Accepted | 2026-07-17 |
