@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Plus, Trash2, Link2, X } from 'lucide-react'
@@ -148,8 +149,10 @@ export default function NodeExplorer() {
           ) : (
             <>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: DARK.text }}>{selectedNode.title || t('nodeExplorer.untitled')}</div>
-                <code style={{ fontSize: 11, color: DARK.textDim }}>{selectedNode.type} · {selectedNode.id}</code>
+                <Link to={`/n/${selectedNode.id}`} style={{ fontSize: 15, fontWeight: 700, color: DARK.text, textDecoration: 'none' }}>
+                  {selectedNode.title || t('nodeExplorer.untitled')}
+                </Link>
+                <div><code style={{ fontSize: 11, color: DARK.textDim }}>{selectedNode.type} · {selectedNode.id}</code></div>
               </div>
 
               <div style={{ fontSize: 11, fontWeight: 700, color: DARK.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
