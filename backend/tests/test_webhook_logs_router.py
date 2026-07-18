@@ -40,7 +40,7 @@ def _make_delivery(db, integration_id, **overrides):
 
 
 def test_list_deliveries_empty(client):
-    r = client.get("/deliveries")
+    r = client.get("/api/deliveries")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -53,7 +53,7 @@ def test_list_deliveries_with_data(client, db):
     _make_delivery(db, integ.id)
     db.commit()
 
-    r = client.get("/deliveries")
+    r = client.get("/api/deliveries")
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 1
@@ -71,7 +71,7 @@ def test_get_delivery(client, db):
     delivery = _make_delivery(db, integ.id)
     db.commit()
 
-    r = client.get(f"/deliveries/{delivery.id}")
+    r = client.get(f"/api/deliveries/{delivery.id}")
     assert r.status_code == 200
     data = r.json()
     assert data["id"] == delivery.id
@@ -83,7 +83,7 @@ def test_get_delivery(client, db):
 
 
 def test_get_delivery_not_found(client):
-    r = client.get("/deliveries/nonexistent-id")
+    r = client.get("/api/deliveries/nonexistent-id")
     assert r.status_code == 404
 
 
@@ -97,7 +97,7 @@ def test_list_deliveries_filter_status(client, db):
     _make_delivery(db, integ.id, status="failed", status_code=502)
     db.commit()
 
-    r = client.get("/deliveries", params={"status": "failed"})
+    r = client.get("/api/deliveries", params={"status": "failed"})
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 2
@@ -114,7 +114,7 @@ def test_list_deliveries_for_integration(client, db):
     _make_delivery(db, integ2.id)
     db.commit()
 
-    r = client.get(f"/integrations/{integ1.id}/deliveries")
+    r = client.get(f"/api/integrations/{integ1.id}/deliveries")
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 1
@@ -130,7 +130,7 @@ def test_integration_health(client, db):
     _make_delivery(db, integ.id, status="failed", status_code=500)
     db.commit()
 
-    r = client.get(f"/integrations/{integ.id}/health")
+    r = client.get(f"/api/integrations/{integ.id}/health")
     assert r.status_code == 200
     data = r.json()
     assert data["integration_id"] == integ.id
@@ -145,7 +145,7 @@ def test_integration_health(client, db):
 
 
 def test_integration_not_found(client):
-    r = client.get("/integrations/nonexistent-id/deliveries")
+    r = client.get("/api/integrations/nonexistent-id/deliveries")
     assert r.status_code == 404
 
 
@@ -159,11 +159,11 @@ def test_purge_deliveries(client, db):
     old_delivery.created_at = datetime.now(UTC) - timedelta(days=60)
     db.commit()
 
-    r = client.delete("/deliveries", params={"older_than_days": 30})
+    r = client.delete("/api/deliveries", params={"older_than_days": 30})
     assert r.status_code == 204
 
     # Verify it was purged
-    remaining = client.get("/deliveries")
+    remaining = client.get("/api/deliveries")
     assert remaining.json() == []
 
 
@@ -177,19 +177,19 @@ def test_list_deliveries_pagination(client, db):
     db.commit()
 
     # First page: 2 items
-    r = client.get("/deliveries", params={"limit": 2, "offset": 0})
+    r = client.get("/api/deliveries", params={"limit": 2, "offset": 0})
     assert r.status_code == 200
     page1 = r.json()
     assert len(page1) == 2
 
     # Second page: 2 items
-    r = client.get("/deliveries", params={"limit": 2, "offset": 2})
+    r = client.get("/api/deliveries", params={"limit": 2, "offset": 2})
     assert r.status_code == 200
     page2 = r.json()
     assert len(page2) == 2
 
     # Third page: 1 item
-    r = client.get("/deliveries", params={"limit": 2, "offset": 4})
+    r = client.get("/api/deliveries", params={"limit": 2, "offset": 4})
     assert r.status_code == 200
     page3 = r.json()
     assert len(page3) == 1

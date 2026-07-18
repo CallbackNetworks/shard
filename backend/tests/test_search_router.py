@@ -2,7 +2,7 @@ from tests.factories import make_project, make_task
 
 
 def test_search_empty(client, sample_project):
-    resp = client.get("/search", params={"q": "nonexistent"})
+    resp = client.get("/api/search", params={"q": "nonexistent"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["tasks"] == []
@@ -14,7 +14,7 @@ def test_search_finds_task(client, db, sample_project):
     db.add(t)
     db.commit()
 
-    resp = client.get("/search", params={"q": "Deploy"})
+    resp = client.get("/api/search", params={"q": "Deploy"})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["tasks"]) == 1
@@ -22,7 +22,7 @@ def test_search_finds_task(client, db, sample_project):
 
 
 def test_search_finds_project(client, sample_project):
-    resp = client.get("/search", params={"q": "Test Project"})
+    resp = client.get("/api/search", params={"q": "Test Project"})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["projects"]) >= 1
@@ -35,7 +35,7 @@ def test_search_case_insensitive(client, db, sample_project):
     db.add(t)
     db.commit()
 
-    resp = client.get("/search", params={"q": "urgent bug"})
+    resp = client.get("/api/search", params={"q": "urgent bug"})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["tasks"]) == 1
@@ -53,7 +53,7 @@ def test_search_filter_project(client, db, sample_project):
     db.commit()
 
     resp = client.get(
-        "/search",
+        "/api/search",
         params={"q": "Task in", "project_id": sample_project.id},
     )
     assert resp.status_code == 200
@@ -70,25 +70,25 @@ def test_search_pagination(client, db, sample_project):
     db.commit()
 
     # Limit to 2
-    resp = client.get("/search", params={"q": "Paginate task", "limit": 2})
+    resp = client.get("/api/search", params={"q": "Paginate task", "limit": 2})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["tasks"]) == 2
 
     # Offset by 3, should get remaining 2
-    resp = client.get("/search", params={"q": "Paginate task", "limit": 10, "offset": 3})
+    resp = client.get("/api/search", params={"q": "Paginate task", "limit": 10, "offset": 3})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["tasks"]) == 2
 
 
 def test_search_missing_query(client):
-    resp = client.get("/search")
+    resp = client.get("/api/search")
     assert resp.status_code == 422
 
 
 def test_search_returns_structure(client, sample_project):
-    resp = client.get("/search", params={"q": "anything"})
+    resp = client.get("/api/search", params={"q": "anything"})
     assert resp.status_code == 200
     data = resp.json()
     assert "query" in data

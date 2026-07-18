@@ -12,30 +12,30 @@ def _edge(db, source_id, target_id, rel_type):
 
 
 def _project(client, name="P"):
-    return client.post("/projects", json={"name": name}).json()["id"]
+    return client.post("/api/projects", json={"name": name}).json()["id"]
 
 
 def test_bulk_remove_label_clears_labeled_edge(client, db):
     pid = _project(client)
-    tid = client.post(f"/projects/{pid}/tasks", json={"title": "t"}).json()["id"]
-    lid = client.post(f"/projects/{pid}/labels", json={"name": "bug"}).json()["id"]
+    tid = client.post(f"/api/projects/{pid}/tasks", json={"title": "t"}).json()["id"]
+    lid = client.post(f"/api/projects/{pid}/labels", json={"name": "bug"}).json()["id"]
 
     # Attach via bulk-update, then confirm the mirror edge exists.
-    client.post(f"/projects/{pid}/tasks/bulk-update", json={"task_ids": [tid], "add_label_ids": [lid]})
+    client.post(f"/api/projects/{pid}/tasks/bulk-update", json={"task_ids": [tid], "add_label_ids": [lid]})
     assert _edge(db, tid, lid, "labeled") is not None
 
     # Bulk remove goes through query(...).delete() — the fix must still drop the edge.
-    client.post(f"/projects/{pid}/tasks/bulk-update", json={"task_ids": [tid], "remove_label_ids": [lid]})
+    client.post(f"/api/projects/{pid}/tasks/bulk-update", json={"task_ids": [tid], "remove_label_ids": [lid]})
     assert _edge(db, tid, lid, "labeled") is None
 
 
 def test_goal_project_replacement_clears_stale_part_of_edges(client, db):
     a = _project(client, "A")
     b = _project(client, "B")
-    goal_id = client.post("/goals", json={"title": "G", "project_ids": [a]}).json()["id"]
+    goal_id = client.post("/api/goals", json={"title": "G", "project_ids": [a]}).json()["id"]
     assert _edge(db, a, goal_id, "part_of") is not None
 
     # Replace linked projects with only B; A's part_of edge must be gone.
-    client.patch(f"/goals/{goal_id}", json={"project_ids": [b]})
+    client.patch(f"/api/goals/{goal_id}", json={"project_ids": [b]})
     assert _edge(db, a, goal_id, "part_of") is None
     assert _edge(db, b, goal_id, "part_of") is not None

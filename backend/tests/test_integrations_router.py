@@ -2,7 +2,7 @@
 
 
 def test_list_integrations_empty(client):
-    r = client.get("/integrations")
+    r = client.get("/api/integrations")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -12,7 +12,7 @@ def test_list_integrations_empty(client):
 
 def test_create_integration_webhook(client):
     r = client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "CI Webhook",
             "type": "generic",
@@ -37,7 +37,7 @@ def test_create_integration_webhook(client):
 
 def test_create_integration_email(client):
     r = client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "Email Alerts",
             "type": "email",
@@ -58,7 +58,7 @@ def test_create_integration_email(client):
 
 def test_list_integrations_after_create(client):
     client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "Hook A",
             "type": "generic",
@@ -67,7 +67,7 @@ def test_list_integrations_after_create(client):
         },
     )
     client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "Hook B",
             "type": "generic",
@@ -75,7 +75,7 @@ def test_list_integrations_after_create(client):
             "events": ["task.failed"],
         },
     )
-    r = client.get("/integrations")
+    r = client.get("/api/integrations")
     assert r.status_code == 200
     items = r.json()
     assert len(items) == 2
@@ -88,7 +88,7 @@ def test_list_integrations_after_create(client):
 
 def test_update_integration(client):
     create_r = client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "Original",
             "type": "generic",
@@ -99,7 +99,7 @@ def test_update_integration(client):
     iid = create_r.json()["id"]
 
     r = client.patch(
-        f"/integrations/{iid}",
+        f"/api/integrations/{iid}",
         json={"name": "Renamed", "events": ["task.done", "task.failed"]},
     )
     assert r.status_code == 200
@@ -113,7 +113,7 @@ def test_update_integration(client):
 
 def test_update_integration_deactivate(client):
     create_r = client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "Active Hook",
             "type": "generic",
@@ -124,7 +124,7 @@ def test_update_integration_deactivate(client):
     )
     iid = create_r.json()["id"]
 
-    r = client.patch(f"/integrations/{iid}", json={"active": False})
+    r = client.patch(f"/api/integrations/{iid}", json={"active": False})
     assert r.status_code == 200
     assert r.json()["active"] is False
 
@@ -134,7 +134,7 @@ def test_update_integration_deactivate(client):
 
 def test_delete_integration(client):
     create_r = client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "To Delete",
             "type": "generic",
@@ -144,10 +144,10 @@ def test_delete_integration(client):
     )
     iid = create_r.json()["id"]
 
-    r = client.delete(f"/integrations/{iid}")
+    r = client.delete(f"/api/integrations/{iid}")
     assert r.status_code == 204
 
-    listing = client.get("/integrations")
+    listing = client.get("/api/integrations")
     assert len(listing.json()) == 0
 
 
@@ -156,7 +156,7 @@ def test_delete_integration(client):
 
 def test_get_nonexistent_integration(client):
     r = client.patch(
-        "/integrations/nonexistent-id",
+        "/api/integrations/nonexistent-id",
         json={"name": "Nope"},
     )
     assert r.status_code == 404
@@ -166,7 +166,7 @@ def test_get_nonexistent_integration(client):
 
 
 def test_list_templates(client):
-    r = client.get("/integrations/templates")
+    r = client.get("/api/integrations/templates")
     assert r.status_code == 200
     templates = r.json()
     assert isinstance(templates, list)
@@ -182,10 +182,10 @@ def test_list_templates(client):
 
 def test_get_template(client):
     # First get the list to find a valid template ID
-    listing = client.get("/integrations/templates").json()
+    listing = client.get("/api/integrations/templates").json()
     template_id = listing[0]["id"]
 
-    r = client.get(f"/integrations/templates/{template_id}")
+    r = client.get(f"/api/integrations/templates/{template_id}")
     assert r.status_code == 200
     data = r.json()
     assert data["id"] == template_id
@@ -196,7 +196,7 @@ def test_get_template(client):
 
 
 def test_get_template_not_found(client):
-    r = client.get("/integrations/templates/nonexistent-template")
+    r = client.get("/api/integrations/templates/nonexistent-template")
     assert r.status_code == 404
 
 
@@ -205,11 +205,11 @@ def test_get_template_not_found(client):
 
 def test_create_integration_with_template(client):
     # Get a real template ID
-    listing = client.get("/integrations/templates").json()
+    listing = client.get("/api/integrations/templates").json()
     template_id = listing[0]["id"]
 
     r = client.post(
-        "/integrations",
+        "/api/integrations",
         json={
             "name": "Templated Hook",
             "type": "github",

@@ -167,14 +167,14 @@ class TestCriticalPathEndpoint:
         db.add(t)
         db.commit()
 
-        resp = client.get(f"/analytics/critical-path/{p.id}")
+        resp = client.get(f"/api/analytics/critical-path/{p.id}")
         assert resp.status_code == 200
         data = resp.json()
         assert "critical_path" in data
         assert t.id in data["critical_path"]
 
     def test_endpoint_nonexistent_project(self, client, db):
-        resp = client.get("/analytics/critical-path/nonexistent-id")
+        resp = client.get("/api/analytics/critical-path/nonexistent-id")
         assert resp.status_code == 200
         data = resp.json()
         assert data["critical_path"] == []

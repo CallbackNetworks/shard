@@ -24,6 +24,9 @@ from app.services.ical_token import verify_global_ical_token
 from app.services.ws_manager import ws_manager
 
 router = APIRouter()
+# iCal feeds are external contracts (calendar apps subscribe by URL) and must stay
+# at the root path, not under /api like the SPA-facing bulk routes (ADR-0036).
+ical_router = APIRouter()
 
 # ---------------------------------------------------------------------------
 # 1. Bulk Update
@@ -352,7 +355,7 @@ def _render_calendar(calname: str, tasks: list, alarm: int) -> PlainTextResponse
     return PlainTextResponse(content=body, media_type="text/calendar")
 
 
-@router.get("/ical/all/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
+@ical_router.get("/ical/all/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
 def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
     """Personal feed: every due-dated task across all projects (global token)."""
     if not verify_global_ical_token(db, token):
@@ -361,7 +364,7 @@ def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(g
     return _render_calendar("All tasks", [graph.task_view(n, db) for n in nodes], alarm)
 
 
-@router.get("/ical/identity/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
+@ical_router.get("/ical/identity/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
 def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
     """Shared feed: every due-dated task across one identity's projects."""
     identity = graph.find_identity_by_share_token(db, token)
@@ -377,7 +380,7 @@ def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depe
     return _render_calendar(identity.name, [graph.task_view(n, db) for n in nodes], alarm)
 
 
-@router.get("/ical/project/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
+@ical_router.get("/ical/project/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
 def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
     """Shared feed: a single project's due-dated tasks (same token as its share page)."""
     project = graph.find_project_by_share_token(db, token)

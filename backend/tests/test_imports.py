@@ -24,7 +24,7 @@ class TestTrelloImport:
                 },
             ]
         }
-        resp = client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
+        resp = client.post(f"/api/projects/{sample_project.id}/import/trello", json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data["imported"] == 2
@@ -37,7 +37,7 @@ class TestTrelloImport:
                 {"name": "Card with label", "desc": "", "closed": False, "labels": [{"name": "urgent"}]},
             ]
         }
-        client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
+        client.post(f"/api/projects/{sample_project.id}/import/trello", json=payload)
 
         label = graph.find_label_by_name(db, sample_project.id, "urgent")
         assert label is not None
@@ -45,7 +45,7 @@ class TestTrelloImport:
 
     def test_trello_closed_card_status_done(self, client, sample_project, db):
         payload = {"cards": [{"name": "Done card", "closed": True, "labels": []}]}
-        client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
+        client.post(f"/api/projects/{sample_project.id}/import/trello", json=payload)
 
         task = find_task_by_title(db, "Done card")
         assert task is not None
@@ -53,7 +53,7 @@ class TestTrelloImport:
 
     def test_trello_open_card_status_todo(self, client, sample_project, db):
         payload = {"cards": [{"name": "Todo card", "closed": False, "labels": []}]}
-        client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
+        client.post(f"/api/projects/{sample_project.id}/import/trello", json=payload)
 
         task = find_task_by_title(db, "Todo card")
         assert task is not None
@@ -61,7 +61,7 @@ class TestTrelloImport:
 
     def test_trello_due_date_parsed(self, client, sample_project, db):
         payload = {"cards": [{"name": "Due card", "closed": False, "due": "2026-09-15T10:00:00Z", "labels": []}]}
-        client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
+        client.post(f"/api/projects/{sample_project.id}/import/trello", json=payload)
 
         task = find_task_by_title(db, "Due card")
         assert task is not None
@@ -78,7 +78,7 @@ class TestLinearImport:
                 {"title": "Linear backlog", "state": "Backlog", "priority": 4, "labels": []},
             ]
         }
-        resp = client.post(f"/projects/{sample_project.id}/import/linear", json=payload)
+        resp = client.post(f"/api/projects/{sample_project.id}/import/linear", json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data["imported"] == 4
@@ -106,7 +106,7 @@ class TestLinearImport:
                 {"title": "Assigned issue", "state": "Todo", "assignee": "alice", "labels": []},
             ]
         }
-        client.post(f"/projects/{sample_project.id}/import/linear", json=payload)
+        client.post(f"/api/projects/{sample_project.id}/import/linear", json=payload)
 
         task = find_task_by_title(db, "Assigned issue")
         assert task.assignee == "alice"
@@ -117,7 +117,7 @@ class TestLinearImport:
                 {"title": "Labeled issue", "labels": ["enhancement", "p1"]},
             ]
         }
-        client.post(f"/projects/{sample_project.id}/import/linear", json=payload)
+        client.post(f"/api/projects/{sample_project.id}/import/linear", json=payload)
 
         labels = graph.labels_in_project(db, sample_project.id)
         label_names = {lb.name for lb in labels}
@@ -149,7 +149,7 @@ class TestGitHubImport:
                 },
             ]
         }
-        resp = client.post(f"/projects/{sample_project.id}/import/github", json=payload)
+        resp = client.post(f"/api/projects/{sample_project.id}/import/github", json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data["imported"] == 2
@@ -178,7 +178,7 @@ class TestGitHubImport:
                 },
             ]
         }
-        client.post(f"/projects/{sample_project.id}/import/github", json=payload)
+        client.post(f"/api/projects/{sample_project.id}/import/github", json=payload)
 
         labels = graph.labels_in_project(db, sample_project.id)
         label_names = {lb.name for lb in labels}
@@ -189,12 +189,12 @@ class TestGitHubImport:
 class TestImportEdgeCases:
     def test_import_nonexistent_project_404(self, client):
         payload = {"cards": [{"name": "X", "closed": False, "labels": []}]}
-        resp = client.post("/projects/nonexistent-id/import/trello", json=payload)
+        resp = client.post("/api/projects/nonexistent-id/import/trello", json=payload)
         assert resp.status_code == 404
 
     def test_empty_trello_import(self, client, sample_project):
         payload = {"cards": []}
-        resp = client.post(f"/projects/{sample_project.id}/import/trello", json=payload)
+        resp = client.post(f"/api/projects/{sample_project.id}/import/trello", json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data["imported"] == 0
@@ -202,24 +202,24 @@ class TestImportEdgeCases:
 
     def test_empty_linear_import(self, client, sample_project):
         payload = {"issues": []}
-        resp = client.post(f"/projects/{sample_project.id}/import/linear", json=payload)
+        resp = client.post(f"/api/projects/{sample_project.id}/import/linear", json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data["imported"] == 0
 
     def test_empty_github_import(self, client, sample_project):
         payload = {"issues": []}
-        resp = client.post(f"/projects/{sample_project.id}/import/github", json=payload)
+        resp = client.post(f"/api/projects/{sample_project.id}/import/github", json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data["imported"] == 0
 
     def test_linear_nonexistent_project(self, client):
         payload = {"issues": [{"title": "X", "labels": []}]}
-        resp = client.post("/projects/no-such-id/import/linear", json=payload)
+        resp = client.post("/api/projects/no-such-id/import/linear", json=payload)
         assert resp.status_code == 404
 
     def test_github_nonexistent_project(self, client):
         payload = {"issues": [{"title": "X", "state": "open", "labels": []}]}
-        resp = client.post("/projects/no-such-id/import/github", json=payload)
+        resp = client.post("/api/projects/no-such-id/import/github", json=payload)
         assert resp.status_code == 404

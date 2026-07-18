@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY)
-    axios.get('/auth/me', {
+    axios.get('/api/auth/me', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).then(res => {
       if (!res.data.auth_required) {
@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = async (password) => {
-    const res = await axios.post('/auth/login', { password })
+    const res = await axios.post('/api/auth/login', { password })
     const { token, auth_required } = res.data
     localStorage.setItem(TOKEN_KEY, token)
     setAuthRequired(auth_required)

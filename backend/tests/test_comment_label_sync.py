@@ -279,7 +279,7 @@ class TestOutboundReopen:
         _make_integration(db, sample_project.id)
         task = _make_external_task(db, sample_project.id, status="done")
 
-        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"status": "todo"})
+        r = client.patch(f"/api/projects/{sample_project.id}/tasks/{task.id}", json={"status": "todo"})
         assert r.status_code == 200
         mock_reopen.assert_called_once()
 
@@ -288,7 +288,7 @@ class TestOutboundReopen:
         _make_integration(db, sample_project.id)
         task = _make_external_task(db, sample_project.id, status="todo")
 
-        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"status": "in_progress"})
+        r = client.patch(f"/api/projects/{sample_project.id}/tasks/{task.id}", json={"status": "in_progress"})
         assert r.status_code == 200
         mock_reopen.assert_not_called()
 
@@ -299,7 +299,7 @@ class TestOutboundFieldSync:
         _make_integration(db, sample_project.id)
         task = _make_external_task(db, sample_project.id)
 
-        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"title": "New title"})
+        r = client.patch(f"/api/projects/{sample_project.id}/tasks/{task.id}", json={"title": "New title"})
         assert r.status_code == 200
         mock_update.assert_called_once_with(
             "owner/repo", "42", {"title": "New title"}, "ghp_testtoken", "https://api.github.com"
@@ -311,7 +311,7 @@ class TestOutboundFieldSync:
         task = _make_external_task(db, sample_project.id)
 
         r = client.patch(
-            f"/projects/{sample_project.id}/tasks/{task.id}",
+            f"/api/projects/{sample_project.id}/tasks/{task.id}",
             json={"title": "New title", "description": "New body"},
         )
         assert r.status_code == 200
@@ -324,7 +324,7 @@ class TestOutboundFieldSync:
         _make_integration(db, sample_project.id)
         task = _make_external_task(db, sample_project.id)
 
-        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"assignee": "devuser"})
+        r = client.patch(f"/api/projects/{sample_project.id}/tasks/{task.id}", json={"assignee": "devuser"})
         assert r.status_code == 200
         mock_update.assert_called_once_with(
             "owner/repo", "42", {"assignees": ["devuser"]}, "ghp_testtoken", "https://api.github.com"
@@ -335,7 +335,7 @@ class TestOutboundFieldSync:
         _make_integration(db, sample_project.id)
         task = _make_external_task(db, sample_project.id, status="todo")
 
-        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"status": "in_progress"})
+        r = client.patch(f"/api/projects/{sample_project.id}/tasks/{task.id}", json={"status": "in_progress"})
         assert r.status_code == 200
         mock_update.assert_not_called()
 
@@ -347,7 +347,7 @@ class TestOutboundFieldSync:
         db.commit()
         db.refresh(task)
 
-        r = client.patch(f"/projects/{sample_project.id}/tasks/{task.id}", json={"title": "Renamed"})
+        r = client.patch(f"/api/projects/{sample_project.id}/tasks/{task.id}", json={"title": "Renamed"})
         assert r.status_code == 200
         mock_update.assert_not_called()
 
@@ -365,7 +365,7 @@ class TestOutboundFieldSync:
         )
 
         r = client.patch(
-            f"/projects/{sample_project.id}/tasks/{task.id}",
+            f"/api/projects/{sample_project.id}/tasks/{task.id}",
             json={"title": "GL title", "assignee": "gluser"},
         )
         assert r.status_code == 200
@@ -392,7 +392,7 @@ class TestOutboundFieldSync:
         )
 
         r = client.patch(
-            f"/projects/{sample_project.id}/tasks/{task.id}",
+            f"/api/projects/{sample_project.id}/tasks/{task.id}",
             json={"title": "GL title", "assignee": "ghost"},
         )
         assert r.status_code == 200
@@ -409,7 +409,7 @@ class TestOutboundComments:
         task = _make_external_task(db, sample_project.id)
 
         r = client.post(
-            f"/projects/{sample_project.id}/tasks/{task.id}/comments",
+            f"/api/projects/{sample_project.id}/tasks/{task.id}/comments",
             json={"body": "hello from Shard", "author": "me"},
         )
         assert r.status_code == 201
@@ -422,7 +422,7 @@ class TestOutboundComments:
     def test_comment_not_pushed_without_integration(self, mock_create, client, sample_project, db):
         task = _make_external_task(db, sample_project.id)
 
-        r = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/comments", json={"body": "local only"})
+        r = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/comments", json={"body": "local only"})
         assert r.status_code == 201
         mock_create.assert_not_called()
         assert r.json()["external_id"] is None
@@ -437,7 +437,7 @@ class TestOutboundComments:
         db.refresh(comment)
 
         r = client.patch(
-            f"/projects/{sample_project.id}/tasks/{task.id}/comments/{comment.id}",
+            f"/api/projects/{sample_project.id}/tasks/{task.id}/comments/{comment.id}",
             json={"body": "edited"},
         )
         assert r.status_code == 200
@@ -452,7 +452,7 @@ class TestOutboundComments:
         db.commit()
         db.refresh(comment)
 
-        r = client.delete(f"/projects/{sample_project.id}/tasks/{task.id}/comments/{comment.id}")
+        r = client.delete(f"/api/projects/{sample_project.id}/tasks/{task.id}/comments/{comment.id}")
         assert r.status_code == 204
         mock_delete.assert_called_once_with("owner/repo", "9001", "ghp_testtoken", "https://api.github.com")
 
@@ -465,7 +465,7 @@ class TestOutboundLabels:
         label = graph.create_label(db, sample_project.id, name="bug")
         db.commit()
 
-        r = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")
+        r = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")
         assert r.status_code == 201
         mock_replace.assert_called_once_with("owner/repo", "42", ["bug"], "ghp_testtoken", "https://api.github.com")
 
@@ -477,7 +477,7 @@ class TestOutboundLabels:
         graph.set_label(db, task.id, label.id)
         db.commit()
 
-        r = client.delete(f"/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")
+        r = client.delete(f"/api/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")
         assert r.status_code == 204
         mock_replace.assert_called_once_with("owner/repo", "42", [], "ghp_testtoken", "https://api.github.com")
 
@@ -490,6 +490,6 @@ class TestOutboundLabels:
         label = graph.create_label(db, sample_project.id, name="bug")
         db.commit()
 
-        r = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")
+        r = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/labels/{label.id}")
         assert r.status_code == 201
         mock_replace.assert_not_called()

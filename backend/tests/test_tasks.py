@@ -1,5 +1,5 @@
 def _url(project_id, suffix=""):
-    return f"/projects/{project_id}/tasks{suffix}"
+    return f"/api/projects/{project_id}/tasks{suffix}"
 
 
 # --- 1. Create a task ---
@@ -161,7 +161,7 @@ def test_reparent_cycle_rejected(client, sample_project):
 
 
 def test_reparent_to_parent_in_other_project_rejected(client, sample_project):
-    other = client.post("/projects", json={"name": "Other"}).json()["id"]
+    other = client.post("/api/projects", json={"name": "Other"}).json()["id"]
     foreign_parent = client.post(_url(other), json={"title": "Foreign"}).json()["id"]
     a = client.post(_url(sample_project.id), json={"title": "A"}).json()["id"]
     resp = client.patch(_url(sample_project.id, f"/{a}"), json={"parent_id": foreign_parent})

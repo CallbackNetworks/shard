@@ -199,8 +199,8 @@ def test_task_note_attributed_inside_share_scope(client, db, sample_project):
     db.add(other)
     db.commit()
     # The task originates in the unshared project, then is linked into the shared one.
-    tid = client.post(f"/projects/{other.id}/tasks", json={"title": "Cross"}).json()["id"]
-    client.post(f"/projects/{other.id}/tasks/{tid}/memberships/{sample_project.id}")
+    tid = client.post(f"/api/projects/{other.id}/tasks", json={"title": "Cross"}).json()["id"]
+    client.post(f"/api/projects/{other.id}/tasks/{tid}/memberships/{sample_project.id}")
 
     resp = client.post(
         f"/share/project/{sample_project.share_token}/tasks/{tid}/notes",
@@ -318,18 +318,18 @@ def test_set_project_expiry_endpoint(client, db, sample_project):
     # Project is node-only (ADR-0033 B6): share_expires_at lives in node.data, so
     # read it back through the graph layer, not off the decorated node snapshot.
     when = (datetime.now(UTC) + timedelta(days=3)).isoformat()
-    resp = client.post(f"/projects/{sample_project.id}/set-expiry", json={"expires_at": when})
+    resp = client.post(f"/api/projects/{sample_project.id}/set-expiry", json={"expires_at": when})
     assert resp.status_code == 200
     assert graph.get_project(db, sample_project.id).share_expires_at is not None
 
     # Clearing sets it back to null.
-    resp = client.post(f"/projects/{sample_project.id}/set-expiry", json={"expires_at": None})
+    resp = client.post(f"/api/projects/{sample_project.id}/set-expiry", json={"expires_at": None})
     assert resp.status_code == 200
     assert graph.get_project(db, sample_project.id).share_expires_at is None
 
 
 def test_project_share_view_count(client, db, sample_project):
-    assert client.get(f"/projects/{sample_project.id}/share-views").json()["view_count"] == 0
+    assert client.get(f"/api/projects/{sample_project.id}/share-views").json()["view_count"] == 0
     # A public view is logged and counted.
     client.get(f"/share/project/{sample_project.share_token}")
-    assert client.get(f"/projects/{sample_project.id}/share-views").json()["view_count"] == 1
+    assert client.get(f"/api/projects/{sample_project.id}/share-views").json()["view_count"] == 1

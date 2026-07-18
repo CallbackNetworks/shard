@@ -16,7 +16,7 @@ def _make_decision(db, project_id, name, *, decision_status="proposed", descript
 
 
 def test_list_decisions_empty(client):
-    r = client.get("/decisions")
+    r = client.get("/api/decisions")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -30,7 +30,7 @@ def test_list_decisions(client, db, sample_project):
         description="We chose PostgreSQL for reliability.",
     )
 
-    r = client.get("/decisions")
+    r = client.get("/api/decisions")
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 1
@@ -50,7 +50,7 @@ def test_list_decisions_filter_project(client, db, sample_project):
     _make_decision(db, sample_project.id, "Decision A")
     _make_decision(db, p2.id, "Decision B")
 
-    r = client.get("/decisions", params={"project_id": sample_project.id})
+    r = client.get("/api/decisions", params={"project_id": sample_project.id})
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 1
@@ -61,7 +61,7 @@ def test_list_decisions_filter_status(client, db, sample_project):
     _make_decision(db, sample_project.id, "Accepted decision", decision_status="accepted")
     _make_decision(db, sample_project.id, "Proposed decision", decision_status="proposed")
 
-    r = client.get("/decisions", params={"status": "accepted"})
+    r = client.get("/api/decisions", params={"status": "accepted"})
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 1
@@ -77,7 +77,7 @@ def test_get_decision(client, db, sample_project):
         description="Chosen for caching layer.",
     )
 
-    r = client.get(f"/decisions/{label.id}")
+    r = client.get(f"/api/decisions/{label.id}")
     assert r.status_code == 200
     data = r.json()
     assert data["id"] == label.id
@@ -86,7 +86,7 @@ def test_get_decision(client, db, sample_project):
 
 
 def test_get_decision_not_found(client):
-    r = client.get("/decisions/nonexistent-id")
+    r = client.get("/api/decisions/nonexistent-id")
     assert r.status_code == 404
 
 
@@ -99,7 +99,7 @@ def test_export_decision(client, db, sample_project):
         description="We chose PostgreSQL for reliability.",
     )
 
-    r = client.get(f"/decisions/{label.id}/export")
+    r = client.get(f"/api/decisions/{label.id}/export")
     assert r.status_code == 200
     assert "text/markdown" in r.headers["content-type"]
 

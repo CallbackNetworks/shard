@@ -1,7 +1,9 @@
 import axios from 'axios'
 import { globalAddToast } from '../context/ToastContext'
 
-const api = axios.create({ baseURL: '' })
+// Internal API is namespaced under /api (ADR-0036) so backend paths never collide
+// with SPA page routes. Public share calls below use plain axios and stay at root.
+const api = axios.create({ baseURL: '/api' })
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('auth_token')

@@ -26,7 +26,7 @@ def test_trigger_github(client, db, monkeypatch):
     monkeypatch.setattr(_GH, mock)
 
     r = client.post(
-        "/cicd/trigger/github",
+        "/api/cicd/trigger/github",
         json={
             "repo": "owner/repo",
             "workflow_id": "deploy.yml",
@@ -55,7 +55,7 @@ def test_trigger_gitlab(client, db, monkeypatch):
     monkeypatch.setattr(_GL, mock)
 
     r = client.post(
-        "/cicd/trigger/gitlab",
+        "/api/cicd/trigger/gitlab",
         json={
             "project_id": "12345",
             "ref": "main",
@@ -77,7 +77,7 @@ def test_trigger_jenkins(client, db, monkeypatch):
     monkeypatch.setattr(_JK, mock)
 
     r = client.post(
-        "/cicd/trigger/jenkins",
+        "/api/cicd/trigger/jenkins",
         json={
             "url": "https://jenkins.example.com/job/my-job",
             "token": "jenkins-token",
@@ -103,7 +103,7 @@ def test_trigger_generic(client, db, monkeypatch):
     monkeypatch.setattr(_GN, mock)
 
     r = client.post(
-        "/cicd/trigger/generic",
+        "/api/cicd/trigger/generic",
         json={
             "url": "https://webhook.example.com/build",
         },
@@ -128,7 +128,7 @@ def test_trigger_github_with_task_id(client, db, sample_project, monkeypatch):
     monkeypatch.setattr(_GH, mock)
 
     r = client.post(
-        "/cicd/trigger/github",
+        "/api/cicd/trigger/github",
         params={"task_id": task.id},
         json={
             "repo": "owner/repo",
@@ -165,7 +165,7 @@ def test_trigger_github_failure(client, db, monkeypatch):
     monkeypatch.setattr(_GH, mock)
 
     r = client.post(
-        "/cicd/trigger/github",
+        "/api/cicd/trigger/github",
         json={
             "repo": "owner/repo",
             "workflow_id": "deploy.yml",
@@ -185,7 +185,7 @@ def test_trigger_github_failure(client, db, monkeypatch):
 def test_trigger_missing_fields(client):
     # GitHub trigger requires repo, workflow_id, and token
     r = client.post(
-        "/cicd/trigger/github",
+        "/api/cicd/trigger/github",
         json={
             "repo": "owner/repo",
             # missing workflow_id and token
@@ -202,7 +202,7 @@ def test_trigger_generic_custom_method(client, db, monkeypatch):
     monkeypatch.setattr(_GN, mock)
 
     r = client.post(
-        "/cicd/trigger/generic",
+        "/api/cicd/trigger/generic",
         json={
             "url": "https://api.example.com/deploy",
             "method": "PUT",

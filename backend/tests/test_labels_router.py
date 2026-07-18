@@ -3,11 +3,11 @@ from tests.factories import make_task
 
 
 def _label_url(project_id, suffix=""):
-    return f"/projects/{project_id}/labels{suffix}"
+    return f"/api/projects/{project_id}/labels{suffix}"
 
 
 def _task_label_url(project_id, task_id, label_id):
-    return f"/projects/{project_id}/tasks/{task_id}/labels/{label_id}"
+    return f"/api/projects/{project_id}/tasks/{task_id}/labels/{label_id}"
 
 
 def _make_task(db, project_id):

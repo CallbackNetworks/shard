@@ -1,12 +1,12 @@
 def test_list_templates_empty(client):
-    r = client.get("/templates")
+    r = client.get("/api/templates")
     assert r.status_code == 200
     assert r.json() == []
 
 
 def test_create_template(client):
     r = client.post(
-        "/templates",
+        "/api/templates",
         json={
             "name": "Bug report",
             "priority": "high",
@@ -23,7 +23,7 @@ def test_create_template(client):
 
 def test_create_template_with_subtasks(client):
     r = client.post(
-        "/templates",
+        "/api/templates",
         json={
             "name": "Feature request",
             "priority": "medium",
@@ -44,7 +44,7 @@ def test_create_template_with_subtasks(client):
 def test_list_templates_filter_project(client, sample_project):
     # Create a template linked to sample_project
     r1 = client.post(
-        "/templates",
+        "/api/templates",
         json={
             "name": "Project template",
             "priority": "low",
@@ -55,7 +55,7 @@ def test_list_templates_filter_project(client, sample_project):
 
     # Create a global template (no project_id)
     r2 = client.post(
-        "/templates",
+        "/api/templates",
         json={
             "name": "Global template",
             "priority": "medium",
@@ -64,7 +64,7 @@ def test_list_templates_filter_project(client, sample_project):
     assert r2.status_code == 201
 
     # Filter by project_id returns both project-specific and global templates
-    r = client.get("/templates", params={"project_id": sample_project.id})
+    r = client.get("/api/templates", params={"project_id": sample_project.id})
     assert r.status_code == 200
     data = r.json()
     names = [t["name"] for t in data]
@@ -74,7 +74,7 @@ def test_list_templates_filter_project(client, sample_project):
 
 def test_update_template(client):
     r = client.post(
-        "/templates",
+        "/api/templates",
         json={
             "name": "Original name",
             "priority": "low",
@@ -83,14 +83,14 @@ def test_update_template(client):
     assert r.status_code == 201
     tpl_id = r.json()["id"]
 
-    r = client.patch(f"/templates/{tpl_id}", json={"name": "Updated name"})
+    r = client.patch(f"/api/templates/{tpl_id}", json={"name": "Updated name"})
     assert r.status_code == 200
     assert r.json()["name"] == "Updated name"
 
 
 def test_delete_template(client):
     r = client.post(
-        "/templates",
+        "/api/templates",
         json={
             "name": "To delete",
             "priority": "medium",
@@ -99,11 +99,11 @@ def test_delete_template(client):
     assert r.status_code == 201
     tpl_id = r.json()["id"]
 
-    r = client.delete(f"/templates/{tpl_id}")
+    r = client.delete(f"/api/templates/{tpl_id}")
     assert r.status_code == 204
 
     # Verify it no longer appears in the list
-    r = client.get("/templates")
+    r = client.get("/api/templates")
     assert r.status_code == 200
     ids = [t["id"] for t in r.json()]
     assert tpl_id not in ids

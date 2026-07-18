@@ -192,9 +192,9 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh databas
 
 **State management**: React Query for all server state. Query keys: `['projects']`, `['project', projectId]`, `['integrations']`, `['deliveries', integrationId]`, `['workflow-rules']`, `['assistant-conversations']`, `['assistant-conv', convId]`. Mutations call `qc.invalidateQueries()` on success.
 
-**API layer**: `src/api/client.js` — all backend calls go through an axios instance with auth header injection. The `getShareData` function uses a plain `axios` instance (no auth interceptor) for public share endpoints.
+**API layer**: `src/api/client.js` — all backend calls go through an axios instance whose `baseURL` is `/api` (ADR-0036) with auth header injection. The internal API is namespaced under `/api` so backend paths never collide with SPA page routes. The `getShareData`/share-note functions use a plain `axios` instance (no auth interceptor, no `/api` baseURL) for public share endpoints, which stay at root.
 
-**Vite proxy** (`vite.config.js`): all backend paths listed in both `server.proxy` and the `isProxied` array in the SPA fallback middleware. When adding new backend routes, update **both** places.
+**Internal API is under `/api`** (ADR-0036): `main.py` mounts all SPA-consumed routers under an `APIRouter(prefix="/api")`. Root-level paths are external contracts only: `/api/v1` (external API), `/webhook`, `/share`, `/ical`, `/ws`, `/health`, `/docs`. Adding a new SPA-facing router needs no proxy/config change — it's automatically under `/api`. Both `vite.config.js` (`server.proxy` + `isProxied`) and `frontend/nginx.conf` (prod reverse-proxy) already route all of `/api` to the backend; only a *new external/root* route requires touching those two files.
 
 **Real-time sync**: `hooks/useRealtimeSync.js` — connects to `/ws` WebSocket, auto-reconnects on disconnect (3s delay), invalidates `['projects']` and `['project', id]` queries on `task.*` and `project.*` events.
 

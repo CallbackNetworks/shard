@@ -5,7 +5,7 @@ from app.services.runtime_settings import get_system_settings, update_system_set
 
 class TestGetSettings:
     def test_returns_effective_runtime_values(self, client):
-        resp = client.get("/settings")
+        resp = client.get("/api/settings")
         assert resp.status_code == 200
         body = resp.json()
         # Runtime settings surface with env/defaults
@@ -18,28 +18,28 @@ class TestGetSettings:
 
 class TestUpdateSystemSettings:
     def test_update_persists_and_is_reflected(self, client):
-        resp = client.put("/settings/system", json={"summary_hour": 6, "due_soon_window_hours": 48})
+        resp = client.put("/api/settings/system", json={"summary_hour": 6, "due_soon_window_hours": 48})
         assert resp.status_code == 200
         assert resp.json()["summary_hour"] == 6
         assert resp.json()["due_soon_window_hours"] == 48
 
         # GET reflects the override; unset field keeps its default
-        body = client.get("/settings").json()
+        body = client.get("/api/settings").json()
         assert body["summary_hour"] == 6
         assert body["due_soon_window_hours"] == 48
         assert body["reminder_cooldown_hours"] == 23
 
     def test_values_are_clamped(self, client):
-        resp = client.put("/settings/system", json={"summary_hour": 99, "due_soon_window_hours": 0})
+        resp = client.put("/api/settings/system", json={"summary_hour": 99, "due_soon_window_hours": 0})
         assert resp.status_code == 200
         body = resp.json()
         assert body["summary_hour"] == 23  # clamped to max
         assert body["due_soon_window_hours"] == 1  # clamped to min
 
     def test_partial_update_leaves_others(self, client):
-        client.put("/settings/system", json={"summary_hour": 10})
-        client.put("/settings/system", json={"due_soon_window_hours": 12})
-        body = client.get("/settings").json()
+        client.put("/api/settings/system", json={"summary_hour": 10})
+        client.put("/api/settings/system", json={"due_soon_window_hours": 12})
+        body = client.get("/api/settings").json()
         assert body["summary_hour"] == 10
         assert body["due_soon_window_hours"] == 12
 

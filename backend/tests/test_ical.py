@@ -123,7 +123,7 @@ def test_global_feed_includes_all_tasks(client, db, sample_project):
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="Anywhere", due_date=due)
 
-    token = client.get("/settings/ical-token").json()["token"]
+    token = client.get("/api/settings/ical-token").json()["token"]
     resp = client.get(f"/ical/all/{token}.ics")
     assert resp.status_code == 200
     assert "SUMMARY:Anywhere" in resp.text
@@ -134,17 +134,17 @@ def test_global_feed_rejects_bad_token(client):
 
 
 def test_global_token_is_stable(client):
-    first = client.get("/settings/ical-token").json()["token"]
-    second = client.get("/settings/ical-token").json()["token"]
+    first = client.get("/api/settings/ical-token").json()["token"]
+    second = client.get("/api/settings/ical-token").json()["token"]
     assert first == second
 
 
 def test_rotate_global_token_revokes_old_url(client, db, sample_project):
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="X", due_date=due)
-    old = client.get("/settings/ical-token").json()["token"]
+    old = client.get("/api/settings/ical-token").json()["token"]
 
-    new = client.post("/settings/ical-token/rotate").json()["token"]
+    new = client.post("/api/settings/ical-token/rotate").json()["token"]
     assert new != old
     assert client.get(f"/ical/all/{old}.ics").status_code == 404
     assert client.get(f"/ical/all/{new}.ics").status_code == 200

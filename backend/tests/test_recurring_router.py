@@ -2,7 +2,7 @@ from tests.factories import make_task
 
 
 def _url(project_id, task_id, suffix=""):
-    return f"/projects/{project_id}/tasks/{task_id}/recurrence{suffix}"
+    return f"/api/projects/{project_id}/tasks/{task_id}/recurrence{suffix}"
 
 
 def _make_task(db, project_id):

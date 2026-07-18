@@ -36,7 +36,7 @@ export default defineConfig({
         navigateFallbackAllowlist: [/^\//, /^\/share/],
         runtimeCaching: [
           {
-            urlPattern: /^\/(projects|identities|activity|analytics|api-keys|workflow-rules|decisions|search)/,
+            urlPattern: /^\/api\//,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
@@ -52,7 +52,7 @@ export default defineConfig({
         server.middlewares.use((req, _res, next) => {
           const url = req.url || '/'
           const isAsset = url.startsWith('/@') || url.startsWith('/src') || url.startsWith('/node_modules') || /\.\w+$/.test(url.split('?')[0])
-          const isProxied = ['/projects','/webhook','/integrations','/identities','/activity','/api-keys','/api/v1','/share/identity','/share/project','/auth','/health','/docs','/openapi.json','/redoc','/search','/deliveries','/analytics','/workflow-rules','/assistant','/templates','/notifications','/decisions','/cicd','/ws','/goals','/saved-filters','/ical','/settings','/backup','/graph-types','/nodes','/tasks'].some(p => url.startsWith(p))
+          const isProxied = ['/api','/webhook','/share/identity','/share/project','/ical','/ws','/health','/docs','/openapi.json','/redoc'].some(p => url.startsWith(p))
           if (!isAsset && !isProxied) req.url = '/'
           next()
         })
@@ -80,38 +80,19 @@ export default defineConfig({
       'localhost',
       ...(process.env.VITE_ALLOWED_HOSTS?.split(',').map(h => h.trim()).filter(Boolean) || []),
     ],
+    // Internal API is under /api (ADR-0036); the rest are external contracts that
+    // keep root paths. Share data is proxied granularly (/share/identity, /share/project)
+    // so the SPA share *pages* (/share/:token, /share/p/:token) still fall through.
     proxy: {
-      '/projects': backendUrl,
+      '/api': backendUrl,
       '/webhook': backendUrl,
-      '/integrations': backendUrl,
-      '/identities': backendUrl,
-      '/activity': backendUrl,
-      '/api-keys': backendUrl,
-      '/api/v1': backendUrl,
       '/share/identity': backendUrl,
       '/share/project': backendUrl,
-      '/auth': backendUrl,
+      '/ical': backendUrl,
       '/health': backendUrl,
       '/docs': backendUrl,
       '/openapi.json': backendUrl,
       '/redoc': backendUrl,
-      '/search': backendUrl,
-      '/deliveries': backendUrl,
-      '/analytics': backendUrl,
-      '/workflow-rules': backendUrl,
-      '/assistant': backendUrl,
-      '/templates': backendUrl,
-      '/notifications': backendUrl,
-      '/decisions': backendUrl,
-      '/cicd': backendUrl,
-      '/goals': backendUrl,
-      '/saved-filters': backendUrl,
-      '/ical': backendUrl,
-      '/settings': backendUrl,
-      '/backup': backendUrl,
-      '/graph-types': backendUrl,
-      '/nodes': backendUrl,
-      '/tasks': backendUrl,
       '/ws': { target: backendUrl, ws: true },
     }
   }

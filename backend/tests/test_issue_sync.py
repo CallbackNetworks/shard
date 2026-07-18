@@ -537,7 +537,7 @@ class TestCreateExternalIssue:
         db.add(task)
         db.commit()
 
-        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        resp = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["external_provider"] == "github"
@@ -558,7 +558,7 @@ class TestCreateExternalIssue:
         db.add(task)
         db.commit()
 
-        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        resp = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
         assert resp.status_code == 200, resp.text
         assert resp.json()["external_provider"] == "gitlab"
         assert resp.json()["external_id"] == "7"
@@ -576,7 +576,7 @@ class TestCreateExternalIssue:
         )
         db.add(task)
         db.commit()
-        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        resp = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
         assert resp.status_code == 409
 
     def test_rejects_without_integration(self, client, db, sample_project):
@@ -585,7 +585,7 @@ class TestCreateExternalIssue:
         task = make_task(db, project_id=sample_project.id, title="No integ")
         db.add(task)
         db.commit()
-        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        resp = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
         assert resp.status_code == 400
 
     def test_rejects_without_repo_url(self, client, db, sample_project):
@@ -593,7 +593,7 @@ class TestCreateExternalIssue:
         task = make_task(db, project_id=sample_project.id, title="No repo")
         db.add(task)
         db.commit()
-        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        resp = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
         assert resp.status_code == 400
 
     @patch("app.routers.issue_sync.create_github_issue", new_callable=AsyncMock, return_value=None)
@@ -603,7 +603,7 @@ class TestCreateExternalIssue:
         task = make_task(db, project_id=sample_project.id, title="Fails upstream")
         db.add(task)
         db.commit()
-        resp = client.post(f"/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
+        resp = client.post(f"/api/projects/{sample_project.id}/tasks/{task.id}/create-external-issue")
         assert resp.status_code == 502
 
 
@@ -770,7 +770,7 @@ class TestMilestoneCycle:
         db.add(task)
         db.commit()
 
-        resp = client.post(f"/projects/{sample_project.id}/cycles/{cycle.id}/tasks/{task.id}")
+        resp = client.post(f"/api/projects/{sample_project.id}/cycles/{cycle.id}/tasks/{task.id}")
         assert resp.status_code == 201, resp.text
         mock_find.assert_called_once()
         # find_or_create called with the cycle name and its end_date as RFC3339 due_on
@@ -797,7 +797,7 @@ class TestMilestoneCycle:
         graph.add_to_cycle(db, cycle.id, task.id)
         db.commit()
 
-        resp = client.delete(f"/projects/{sample_project.id}/cycles/{cycle.id}/tasks/{task.id}")
+        resp = client.delete(f"/api/projects/{sample_project.id}/cycles/{cycle.id}/tasks/{task.id}")
         assert resp.status_code == 204
         # No cycle left -> milestone cleared with None
         mock_set.assert_called_once_with("o/r", "10", None, "ghp", "https://api.github.com")

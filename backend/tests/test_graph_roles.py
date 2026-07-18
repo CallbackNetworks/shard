@@ -24,7 +24,7 @@ def test_role_key_helpers(db):
 
 def test_builtin_containment_unchanged(client, sample_project, db):
     # A task under a project resolves its project via the container role.
-    task = client.post(f"/projects/{sample_project.id}/tasks", json={"title": "T"}).json()
+    task = client.post(f"/api/projects/{sample_project.id}/tasks", json={"title": "T"}).json()
     assert sample_project.id in graph.member_project_ids(db, task["id"])
     assert task["id"] in graph.contained_task_ids(db, sample_project.id)
 
@@ -165,7 +165,7 @@ def test_task_like_node_enriches_in_project(db, sample_project):
 
 def test_task_like_node_in_project_task_list_endpoint(client, db, sample_project):
     node = _custom_task_node(db, sample_project)
-    r = client.get(f"/projects/{sample_project.id}/tasks")
+    r = client.get(f"/api/projects/{sample_project.id}/tasks")
     assert r.status_code == 200
     row = next((t for t in r.json() if t["id"] == node.id), None)
     assert row is not None
@@ -183,7 +183,7 @@ def test_task_like_node_deleted_with_project(db, sample_project):
 
 
 def test_node_type_out_exposes_roles(client):
-    types = {t["key"]: t for t in client.get("/graph-types/nodes").json()}
+    types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
     assert types[graph.NODE_PROJECT]["is_container"] is True
     assert types[graph.NODE_TASK]["is_task_like"] is True
 

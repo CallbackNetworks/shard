@@ -2,7 +2,7 @@ from tests.factories import make_task
 
 
 def _url(project_id, suffix=""):
-    return f"/projects/{project_id}/cycles{suffix}"
+    return f"/api/projects/{project_id}/cycles{suffix}"
 
 
 def _make_task(db, project_id, title="Test task", status="todo"):

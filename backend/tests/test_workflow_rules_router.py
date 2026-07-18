@@ -15,7 +15,7 @@ def _make_task(db, project_id, **overrides):
 
 
 def test_list_rules_empty(client):
-    r = client.get("/workflow-rules")
+    r = client.get("/api/workflow-rules")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -25,7 +25,7 @@ def test_list_rules_empty(client):
 
 def test_create_rule(client):
     r = client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Auto-prioritize",
             "trigger": "task.created",
@@ -52,7 +52,7 @@ def test_create_rule(client):
 
 def test_create_rule_with_project_scope(client, sample_project):
     r = client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Project-scoped rule",
             "project_id": sample_project.id,
@@ -72,7 +72,7 @@ def test_create_rule_with_project_scope(client, sample_project):
 
 def test_get_rule(client):
     create_r = client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Fetch me",
             "trigger": "task.created",
@@ -82,7 +82,7 @@ def test_get_rule(client):
     )
     rule_id = create_r.json()["id"]
 
-    r = client.get(f"/workflow-rules/{rule_id}")
+    r = client.get(f"/api/workflow-rules/{rule_id}")
     assert r.status_code == 200
     data = r.json()
     assert data["id"] == rule_id
@@ -94,7 +94,7 @@ def test_get_rule(client):
 
 def test_update_rule(client):
     create_r = client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Original name",
             "trigger": "task.created",
@@ -105,7 +105,7 @@ def test_update_rule(client):
     rule_id = create_r.json()["id"]
 
     r = client.patch(
-        f"/workflow-rules/{rule_id}",
+        f"/api/workflow-rules/{rule_id}",
         json={
             "name": "Updated name",
             "actions": [{"type": "set_priority", "value": "high"}],
@@ -122,7 +122,7 @@ def test_update_rule(client):
 
 def test_update_rule_deactivate(client):
     create_r = client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Active rule",
             "trigger": "task.created",
@@ -133,7 +133,7 @@ def test_update_rule_deactivate(client):
     )
     rule_id = create_r.json()["id"]
 
-    r = client.patch(f"/workflow-rules/{rule_id}", json={"active": False})
+    r = client.patch(f"/api/workflow-rules/{rule_id}", json={"active": False})
     assert r.status_code == 200
     assert r.json()["active"] is False
 
@@ -143,7 +143,7 @@ def test_update_rule_deactivate(client):
 
 def test_delete_rule(client):
     create_r = client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "To Delete",
             "trigger": "task.created",
@@ -153,10 +153,10 @@ def test_delete_rule(client):
     )
     rule_id = create_r.json()["id"]
 
-    r = client.delete(f"/workflow-rules/{rule_id}")
+    r = client.delete(f"/api/workflow-rules/{rule_id}")
     assert r.status_code == 204
 
-    listing = client.get("/workflow-rules")
+    listing = client.get("/api/workflow-rules")
     assert len(listing.json()) == 0
 
 
@@ -164,7 +164,7 @@ def test_delete_rule(client):
 
 
 def test_get_nonexistent_rule(client):
-    r = client.get("/workflow-rules/nonexistent-id")
+    r = client.get("/api/workflow-rules/nonexistent-id")
     assert r.status_code == 404
 
 
@@ -174,7 +174,7 @@ def test_get_nonexistent_rule(client):
 def test_list_rules_filter_project(client, sample_project):
     # Create a global rule (no project_id)
     client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Global rule",
             "trigger": "task.created",
@@ -184,7 +184,7 @@ def test_list_rules_filter_project(client, sample_project):
     )
     # Create a project-scoped rule
     client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Project rule",
             "project_id": sample_project.id,
@@ -195,7 +195,7 @@ def test_list_rules_filter_project(client, sample_project):
     )
 
     # Filter by project_id should return both the project-scoped rule and global rules
-    r = client.get(f"/workflow-rules?project_id={sample_project.id}")
+    r = client.get(f"/api/workflow-rules?project_id={sample_project.id}")
     assert r.status_code == 200
     items = r.json()
     assert len(items) == 2
@@ -211,7 +211,7 @@ def test_dry_run_rule(client, db, sample_project):
     task = _make_task(db, sample_project.id, status="todo", priority="medium")
 
     create_r = client.post(
-        "/workflow-rules",
+        "/api/workflow-rules",
         json={
             "name": "Match todo tasks",
             "trigger": "task.created",
@@ -221,7 +221,7 @@ def test_dry_run_rule(client, db, sample_project):
     )
     rule_id = create_r.json()["id"]
 
-    r = client.post(f"/workflow-rules/{rule_id}/test?task_id={task.id}")
+    r = client.post(f"/api/workflow-rules/{rule_id}/test?task_id={task.id}")
     assert r.status_code == 200
     data = r.json()
     assert data["would_fire"] is True

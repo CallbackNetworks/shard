@@ -4,7 +4,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect as sa_inspect
@@ -145,7 +145,7 @@ tags_metadata = [
 ]
 
 _AUTH_BYPASS = (
-    "/auth/",
+    "/api/auth/",
     "/health",
     "/webhook/",
     "/share/",
@@ -201,42 +201,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
-app.include_router(projects.router)
-app.include_router(tasks.router)
-app.include_router(tasks.task_ops_router)
-app.include_router(webhooks.router)
-app.include_router(issue_sync.router)
-app.include_router(integrations.router)
-app.include_router(labels.router)
-app.include_router(task_label_router)
-app.include_router(decisions.router)
-app.include_router(cycles.router)
-app.include_router(api_keys.router)
-app.include_router(external_api.router)
-app.include_router(activity.router)
-app.include_router(identities.router)
-app.include_router(share.router)
-app.include_router(comments.router)
-app.include_router(search.router)
-app.include_router(recurring.router)
-app.include_router(webhook_logs.router)
-app.include_router(analytics.router)
-app.include_router(workflow_rules.router)
-app.include_router(assistant.router)
-app.include_router(templates.router)
-app.include_router(saved_filters.router)
-app.include_router(attachments.router)
-app.include_router(notifications.router)
-app.include_router(cicd.router)
-app.include_router(goals.router)
-app.include_router(graph_types.router)
-app.include_router(nodes.router)
-app.include_router(bulk.router)
-app.include_router(imports.router)
-app.include_router(settings.router)
-app.include_router(backup.router)
-app.include_router(ws_router.router)
+# Internal API consumed by the SPA — namespaced under /api so frontend page routes
+# never collide with backend paths (ADR-0036). External contracts (webhook callbacks,
+# public share/ical links, the /api/v1 external API, websocket) keep their root paths.
+api_router = APIRouter(prefix="/api")
+api_router.include_router(auth_router)
+api_router.include_router(projects.router)
+api_router.include_router(tasks.router)
+api_router.include_router(tasks.task_ops_router)
+api_router.include_router(integrations.router)
+api_router.include_router(labels.router)
+api_router.include_router(task_label_router)
+api_router.include_router(decisions.router)
+api_router.include_router(cycles.router)
+api_router.include_router(api_keys.router)
+api_router.include_router(activity.router)
+api_router.include_router(identities.router)
+api_router.include_router(comments.router)
+api_router.include_router(search.router)
+api_router.include_router(recurring.router)
+api_router.include_router(webhook_logs.router)
+api_router.include_router(analytics.router)
+api_router.include_router(workflow_rules.router)
+api_router.include_router(assistant.router)
+api_router.include_router(templates.router)
+api_router.include_router(saved_filters.router)
+api_router.include_router(attachments.router)
+api_router.include_router(notifications.router)
+api_router.include_router(cicd.router)
+api_router.include_router(goals.router)
+api_router.include_router(graph_types.router)
+api_router.include_router(nodes.router)
+api_router.include_router(bulk.router)
+api_router.include_router(imports.router)
+api_router.include_router(settings.router)
+api_router.include_router(backup.router)
+app.include_router(api_router)
+
+# Root-level: external contracts + infrastructure (must keep their public paths).
+app.include_router(webhooks.router)  # /webhook/* inbound CI/CD callbacks
+app.include_router(issue_sync.router)  # /webhook/issues/* inbound issue sync
+app.include_router(external_api.router)  # /api/v1/* external API (X-API-Key auth)
+app.include_router(share.router)  # /share/* public share pages
+app.include_router(bulk.ical_router)  # /ical/* calendar subscriptions
+app.include_router(ws_router.router)  # /ws websocket
 
 
 @app.exception_handler(Exception)

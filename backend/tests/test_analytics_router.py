@@ -5,7 +5,7 @@ from tests.factories import make_project, make_task
 
 
 def test_overview_empty(client):
-    resp = client.get("/analytics/overview")
+    resp = client.get("/api/analytics/overview")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_projects"] == 0
@@ -26,7 +26,7 @@ def test_overview_with_data(client, db, sample_project):
     db.add_all(tasks)
     db.commit()
 
-    resp = client.get("/analytics/overview")
+    resp = client.get("/api/analytics/overview")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_projects"] == 1
@@ -38,7 +38,7 @@ def test_overview_with_data(client, db, sample_project):
 
 
 def test_heatmap_empty(client):
-    resp = client.get("/analytics/heatmap")
+    resp = client.get("/api/analytics/heatmap")
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -58,7 +58,7 @@ def test_heatmap_with_activity(client, db, sample_project):
     db.add(a)
     db.commit()
 
-    resp = client.get("/analytics/heatmap")
+    resp = client.get("/api/analytics/heatmap")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) >= 1
@@ -71,7 +71,7 @@ def test_heatmap_filter_project_param_accepted(client, sample_project):
     No activity data is inserted so the cast(Date) issue is not triggered.
     """
     resp = client.get(
-        "/analytics/heatmap",
+        "/api/analytics/heatmap",
         params={"project_id": sample_project.id},
     )
     assert resp.status_code == 200
@@ -80,22 +80,22 @@ def test_heatmap_filter_project_param_accepted(client, sample_project):
 
 def test_usage_empty(client):
     # Reset first to ensure clean state, then immediately check
-    client.delete("/analytics/usage")
+    client.delete("/api/analytics/usage")
     # The DELETE and GET above themselves generate usage entries,
     # so after a reset + GET we just verify the structure
-    resp = client.get("/analytics/usage")
+    resp = client.get("/api/analytics/usage")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
 
 def test_usage_after_requests(client):
     # Reset to start clean
-    client.delete("/analytics/usage")
+    client.delete("/api/analytics/usage")
     # Make some requests to generate usage
-    client.get("/analytics/overview")
-    client.get("/analytics/overview")
+    client.get("/api/analytics/overview")
+    client.get("/api/analytics/overview")
 
-    resp = client.get("/analytics/usage")
+    resp = client.get("/api/analytics/usage")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) > 0
@@ -106,16 +106,16 @@ def test_usage_after_requests(client):
 
 def test_usage_reset(client):
     # Make some requests
-    client.get("/analytics/overview")
+    client.get("/api/analytics/overview")
 
     # Clear usage
-    resp = client.delete("/analytics/usage")
+    resp = client.delete("/api/analytics/usage")
     assert resp.status_code == 200
     assert resp.json() == {"status": "cleared"}
 
     # After reset, making new requests should start fresh counts
-    client.delete("/analytics/usage")
-    resp = client.get("/analytics/usage")
+    client.delete("/api/analytics/usage")
+    resp = client.get("/api/analytics/usage")
     data = resp.json()
     assert isinstance(data, list)
     # The only entries should be from the requests we just made (delete + get)
@@ -133,7 +133,7 @@ def test_status_trend(client, db, sample_project):
     db.add_all(tasks)
     db.commit()
 
-    resp = client.get("/analytics/status-trend", params={"days": 7})
+    resp = client.get("/api/analytics/status-trend", params={"days": 7})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 7
@@ -161,7 +161,7 @@ def test_status_trend_filter_project(client, db, sample_project):
     db.commit()
 
     resp = client.get(
-        "/analytics/status-trend",
+        "/api/analytics/status-trend",
         params={"project_id": sample_project.id, "days": 3},
     )
     assert resp.status_code == 200
@@ -173,7 +173,7 @@ def test_status_trend_filter_project(client, db, sample_project):
 
 
 def test_estimation_calibration_empty(client):
-    resp = client.get("/analytics/estimation-calibration")
+    resp = client.get("/api/analytics/estimation-calibration")
     assert resp.status_code == 200
     data = resp.json()
     assert data["sample_size"] == 0
@@ -196,7 +196,7 @@ def test_estimation_calibration_ignores_incomplete_data(client, db, sample_proje
     db.add_all(tasks)
     db.commit()
 
-    resp = client.get("/analytics/estimation-calibration")
+    resp = client.get("/api/analytics/estimation-calibration")
     assert resp.status_code == 200
     assert resp.json()["sample_size"] == 0
 
@@ -213,7 +213,7 @@ def test_estimation_calibration_with_data(client, db, sample_project):
     db.add_all(tasks)
     db.commit()
 
-    resp = client.get("/analytics/estimation-calibration")
+    resp = client.get("/api/analytics/estimation-calibration")
     assert resp.status_code == 200
     data = resp.json()
     assert data["sample_size"] == 3
@@ -248,7 +248,7 @@ def test_estimation_calibration_project_filter(client, db, sample_project):
     )
     db.commit()
 
-    resp = client.get(f"/analytics/estimation-calibration?project_id={sample_project.id}")
+    resp = client.get(f"/api/analytics/estimation-calibration?project_id={sample_project.id}")
     assert resp.status_code == 200
     data = resp.json()
     assert data["sample_size"] == 1
@@ -269,7 +269,7 @@ def _completed(db, project_id, estimate, spent):
 def test_estimate_suggestion_not_enough_history(client, db, sample_project):
     db.add(_completed(db, sample_project.id, 60, 90))
     db.commit()
-    resp = client.get("/analytics/estimate-suggestion", params={"raw_estimate": 60})
+    resp = client.get("/api/analytics/estimate-suggestion", params={"raw_estimate": 60})
     assert resp.status_code == 200
     body = resp.json()
     assert body["suggested_estimate"] is None
@@ -281,7 +281,7 @@ def test_estimate_suggestion_uses_overall_median(client, db, sample_project):
     for est in (20, 45, 90, 200, 300):
         db.add(_completed(db, sample_project.id, est, est * 2))
     db.commit()
-    resp = client.get("/analytics/estimate-suggestion", params={"raw_estimate": 100})
+    resp = client.get("/api/analytics/estimate-suggestion", params={"raw_estimate": 100})
     assert resp.status_code == 200
     body = resp.json()
     assert body["basis"] == "overall_median"
@@ -296,7 +296,7 @@ def test_estimate_suggestion_prefers_bucket(client, db, sample_project):
     for est in (20, 300):
         db.add(_completed(db, sample_project.id, est, est * 5))
     db.commit()
-    resp = client.get("/analytics/estimate-suggestion", params={"raw_estimate": 100})
+    resp = client.get("/api/analytics/estimate-suggestion", params={"raw_estimate": 100})
     body = resp.json()
     assert body["basis"] == "bucket"
     assert body["bucket"] == "1-2h"
@@ -313,7 +313,7 @@ def test_estimate_suggestion_falls_back_to_global(client, db, sample_project):
         db.add(_completed(db, other.id, est, est * 3))
     db.commit()
     resp = client.get(
-        "/analytics/estimate-suggestion",
+        "/api/analytics/estimate-suggestion",
         params={"raw_estimate": 60, "project_id": sample_project.id},
     )
     body = resp.json()

@@ -19,7 +19,7 @@ def test_export_backup_contains_all_data(client, db, sample_project):
     db.add(task)
     db.commit()
 
-    resp = client.get("/backup/export")
+    resp = client.get("/api/backup/export")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/zip"
     assert "attachment" in resp.headers["content-disposition"]
@@ -44,14 +44,14 @@ def test_export_backup_contains_all_data(client, db, sample_project):
 def test_run_and_status_roundtrip(client, db, sample_project, tmp_path, monkeypatch):
     monkeypatch.setenv("BACKUP_DIR", str(tmp_path))
 
-    resp = client.post("/backup/run")
+    resp = client.post("/api/backup/run")
     assert resp.status_code == 200
     body = resp.json()
     assert body["filename"].startswith("shard-backup-")
     assert body["size_bytes"] > 0
     assert (tmp_path / body["filename"]).is_file()
 
-    resp = client.get("/backup/status")
+    resp = client.get("/api/backup/status")
     assert resp.status_code == 200
     status = resp.json()
     assert status["enabled"] is True
@@ -61,16 +61,16 @@ def test_run_and_status_roundtrip(client, db, sample_project, tmp_path, monkeypa
 
 def test_download_existing_backup(client, db, tmp_path, monkeypatch):
     monkeypatch.setenv("BACKUP_DIR", str(tmp_path))
-    created = client.post("/backup/run").json()["filename"]
+    created = client.post("/api/backup/run").json()["filename"]
 
-    resp = client.get(f"/backup/download/{created}")
+    resp = client.get(f"/api/backup/download/{created}")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/zip"
 
-    assert client.get("/backup/download/shard-backup-19990101-000000.zip").status_code == 404
+    assert client.get("/api/backup/download/shard-backup-19990101-000000.zip").status_code == 404
     # Encoded traversal never reaches the handler (path params reject slashes)
-    assert client.get("/backup/download/..%2Fshard.db").status_code == 404
-    assert client.get("/backup/download/evil.zip").status_code == 400
+    assert client.get("/api/backup/download/..%2Fshard.db").status_code == 404
+    assert client.get("/api/backup/download/evil.zip").status_code == 400
 
 
 def test_prune_backups_keeps_newest(tmp_path):
@@ -114,7 +114,7 @@ def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
     db.commit()
     parent_id = parent.id
 
-    archive = client.get("/backup/export").content
+    archive = client.get("/api/backup/export").content
 
     # Simulate operator error: wipe everything (tasks are node-only, ADR-0033).
     db.query(Comment).delete()
@@ -124,7 +124,7 @@ def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
     assert db.query(Node).filter(Node.type == "task").count() == 0
 
     resp = client.post(
-        "/backup/restore",
+        "/api/backup/restore",
         files={"file": ("backup.zip", archive, "application/zip")},
         data={"confirm": "replace"},
     )
@@ -142,9 +142,9 @@ def test_restore_roundtrip_recovers_wiped_data(client, db, sample_project):
 
 
 def test_restore_requires_confirm(client, sample_project):
-    archive = client.get("/backup/export").content
+    archive = client.get("/api/backup/export").content
     resp = client.post(
-        "/backup/restore",
+        "/api/backup/restore",
         files={"file": ("backup.zip", archive, "application/zip")},
     )
     assert resp.status_code == 400
@@ -152,7 +152,7 @@ def test_restore_requires_confirm(client, sample_project):
 
 def test_restore_rejects_non_zip(client):
     resp = client.post(
-        "/backup/restore",
+        "/api/backup/restore",
         files={"file": ("backup.zip", b"not a zip", "application/zip")},
         data={"confirm": "replace"},
     )
@@ -165,7 +165,7 @@ def test_restore_rejects_bad_format_version(client):
         zf.writestr("meta.json", json.dumps({"format_version": 999}))
         zf.writestr("data.json", json.dumps({}))
     resp = client.post(
-        "/backup/restore",
+        "/api/backup/restore",
         files={"file": ("backup.zip", buf.getvalue(), "application/zip")},
         data={"confirm": "replace"},
     )

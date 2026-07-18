@@ -54,12 +54,12 @@ def test_delete_node_logs_event(db):
 
 
 def test_node_events_endpoint(client):
-    client.post("/graph-types/nodes", json={"key": "topic", "label": "Topic"})
-    a = client.post("/nodes", json={"type": "topic", "title": "A"}).json()
-    b = client.post("/nodes", json={"type": "topic", "title": "B"}).json()
-    client.post(f"/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "contains"})
+    client.post("/api/graph-types/nodes", json={"key": "topic", "label": "Topic"})
+    a = client.post("/api/nodes", json={"type": "topic", "title": "A"}).json()
+    b = client.post("/api/nodes", json={"type": "topic", "title": "B"}).json()
+    client.post(f"/api/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "contains"})
 
-    events = client.get(f"/nodes/{a['id']}/events").json()
+    events = client.get(f"/api/nodes/{a['id']}/events").json()
     kinds = {e["event"] for e in events}
     assert "node_created" in kinds
     assert "edge_added" in kinds

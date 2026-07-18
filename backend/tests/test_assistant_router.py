@@ -4,13 +4,13 @@ from app.models import AssistantConversation, AssistantMessage
 
 
 def test_list_conversations_empty(client):
-    r = client.get("/assistant/conversations")
+    r = client.get("/api/assistant/conversations")
     assert r.status_code == 200
     assert r.json() == []
 
 
 def test_create_conversation(client):
-    r = client.post("/assistant/conversations")
+    r = client.post("/api/assistant/conversations")
     assert r.status_code == 201
     data = r.json()
     assert "id" in data
@@ -24,13 +24,13 @@ def test_get_conversation(client, db):
     db.commit()
     db.refresh(conv)
 
-    r = client.get(f"/assistant/conversations/{conv.id}")
+    r = client.get(f"/api/assistant/conversations/{conv.id}")
     assert r.status_code == 200
     assert r.json()["id"] == conv.id
 
 
 def test_get_conversation_not_found(client):
-    r = client.get("/assistant/conversations/nonexistent")
+    r = client.get("/api/assistant/conversations/nonexistent")
     assert r.status_code == 404
 
 
@@ -40,15 +40,15 @@ def test_delete_conversation(client, db):
     db.commit()
     db.refresh(conv)
 
-    r = client.delete(f"/assistant/conversations/{conv.id}")
+    r = client.delete(f"/api/assistant/conversations/{conv.id}")
     assert r.status_code == 204
 
-    r = client.get(f"/assistant/conversations/{conv.id}")
+    r = client.get(f"/api/assistant/conversations/{conv.id}")
     assert r.status_code == 404
 
 
 def test_delete_conversation_not_found(client):
-    r = client.delete("/assistant/conversations/nonexistent")
+    r = client.delete("/api/assistant/conversations/nonexistent")
     assert r.status_code == 404
 
 
@@ -57,7 +57,7 @@ def test_list_conversations_after_create(client, db):
     db.add(conv)
     db.commit()
 
-    r = client.get("/assistant/conversations")
+    r = client.get("/api/assistant/conversations")
     assert r.status_code == 200
     data = r.json()
     assert len(data) >= 1
@@ -73,19 +73,19 @@ def test_search_conversations(client, db):
     db.commit()
 
     # Search by title
-    r = client.get("/assistant/conversations", params={"q": "Deployment"})
+    r = client.get("/api/assistant/conversations", params={"q": "Deployment"})
     assert r.status_code == 200
     assert len(r.json()) >= 1
 
     # Search by message content
-    r = client.get("/assistant/conversations", params={"q": "deploy"})
+    r = client.get("/api/assistant/conversations", params={"q": "deploy"})
     assert r.status_code == 200
     assert len(r.json()) >= 1
 
 
 def test_send_message_to_nonexistent_conversation(client):
     r = client.post(
-        "/assistant/conversations/nonexistent/messages",
+        "/api/assistant/conversations/nonexistent/messages",
         json={"content": "Hello"},
     )
     assert r.status_code == 404

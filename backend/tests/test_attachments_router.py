@@ -12,7 +12,7 @@ def _make_task(db, project_id):
 
 
 def _url(project_id, task_id, suffix=""):
-    return f"/projects/{project_id}/tasks/{task_id}/attachments{suffix}"
+    return f"/api/projects/{project_id}/tasks/{task_id}/attachments{suffix}"
 
 
 # --- 1. List attachments on a fresh task ---

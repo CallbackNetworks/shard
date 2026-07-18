@@ -2,7 +2,7 @@ from tests.factories import make_task
 
 
 def test_create_project(client):
-    resp = client.post("/projects", json={"name": "My Project", "description": "A test project"})
+    resp = client.post("/api/projects", json={"name": "My Project", "description": "A test project"})
     assert resp.status_code == 201
     data = resp.json()
     assert data["name"] == "My Project"
@@ -17,7 +17,7 @@ def test_create_project(client):
 
 
 def test_create_project_minimal(client):
-    resp = client.post("/projects", json={"name": "Minimal"})
+    resp = client.post("/api/projects", json={"name": "Minimal"})
     assert resp.status_code == 201
     data = resp.json()
     assert data["name"] == "Minimal"
@@ -25,13 +25,13 @@ def test_create_project_minimal(client):
 
 
 def test_list_projects_empty(client):
-    resp = client.get("/projects")
+    resp = client.get("/api/projects")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
 def test_list_projects_with_data(client, sample_project):
-    resp = client.get("/projects")
+    resp = client.get("/api/projects")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
@@ -39,7 +39,7 @@ def test_list_projects_with_data(client, sample_project):
 
 
 def test_get_project(client, sample_project):
-    resp = client.get(f"/projects/{sample_project.id}")
+    resp = client.get(f"/api/projects/{sample_project.id}")
     assert resp.status_code == 200
     data = resp.json()
     assert data["id"] == sample_project.id
@@ -49,13 +49,13 @@ def test_get_project(client, sample_project):
 
 
 def test_get_project_not_found(client):
-    resp = client.get("/projects/nonexistent-id")
+    resp = client.get("/api/projects/nonexistent-id")
     assert resp.status_code == 404
 
 
 def test_update_project_name(client, sample_project):
     resp = client.patch(
-        f"/projects/{sample_project.id}",
+        f"/api/projects/{sample_project.id}",
         json={"name": "Renamed Project"},
     )
     assert resp.status_code == 200
@@ -65,7 +65,7 @@ def test_update_project_name(client, sample_project):
 
 def test_update_project_status_archived(client, sample_project):
     resp = client.patch(
-        f"/projects/{sample_project.id}",
+        f"/api/projects/{sample_project.id}",
         json={"status": "archived"},
     )
     assert resp.status_code == 200
@@ -73,25 +73,25 @@ def test_update_project_status_archived(client, sample_project):
 
 
 def test_update_project_not_found(client):
-    resp = client.patch("/projects/nonexistent-id", json={"name": "X"})
+    resp = client.patch("/api/projects/nonexistent-id", json={"name": "X"})
     assert resp.status_code == 404
 
 
 def test_delete_project(client, sample_project):
-    resp = client.delete(f"/projects/{sample_project.id}")
+    resp = client.delete(f"/api/projects/{sample_project.id}")
     assert resp.status_code == 204
 
-    resp = client.get(f"/projects/{sample_project.id}")
+    resp = client.get(f"/api/projects/{sample_project.id}")
     assert resp.status_code == 404
 
 
 def test_delete_project_not_found(client):
-    resp = client.delete("/projects/nonexistent-id")
+    resp = client.delete("/api/projects/nonexistent-id")
     assert resp.status_code == 404
 
 
 def test_progress_no_tasks(client, sample_project):
-    resp = client.get(f"/projects/{sample_project.id}")
+    resp = client.get(f"/api/projects/{sample_project.id}")
     data = resp.json()
     assert data["progress"] == 0.0
     assert data["total_tasks"] == 0
@@ -108,7 +108,7 @@ def test_progress_with_tasks(client, db, sample_project):
     db.add_all(tasks)
     db.commit()
 
-    resp = client.get(f"/projects/{sample_project.id}")
+    resp = client.get(f"/api/projects/{sample_project.id}")
     data = resp.json()
     assert data["total_tasks"] == 4
     assert data["done_tasks"] == 2
@@ -123,7 +123,7 @@ def test_progress_all_done(client, db, sample_project):
     db.add_all(tasks)
     db.commit()
 
-    resp = client.get(f"/projects/{sample_project.id}")
+    resp = client.get(f"/api/projects/{sample_project.id}")
     data = resp.json()
     assert data["total_tasks"] == 2
     assert data["done_tasks"] == 2
@@ -139,7 +139,7 @@ def test_progress_excludes_subtasks(client, db, sample_project):
     db.add(child)
     db.commit()
 
-    resp = client.get(f"/projects/{sample_project.id}")
+    resp = client.get(f"/api/projects/{sample_project.id}")
     data = resp.json()
     # Only the parent (top-level) counts for progress
     assert data["total_tasks"] == 1
