@@ -68,12 +68,12 @@ export default function GraphTypes() {
   const { data: nodeTypes = [], isLoading: nodeLoading } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes })
   const { data: edgeTypes = [], isLoading: edgeLoading } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes })
 
-  const [nodeForm, setNodeForm] = useState({ key: '', label: '', color: '#818cf8' })
+  const [nodeForm, setNodeForm] = useState({ key: '', label: '', color: '#818cf8', is_container: false })
   const [edgeForm, setEdgeForm] = useState({ key: '', label: '', is_containment: false })
 
   const nodeCreate = useMutation({
     mutationFn: createNodeType,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setNodeForm({ key: '', label: '', color: '#818cf8' }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setNodeForm({ key: '', label: '', color: '#818cf8', is_container: false }) },
   })
   const nodeDelete = useMutation({
     mutationFn: deleteNodeType,
@@ -137,6 +137,14 @@ export default function GraphTypes() {
               onChange={e => setNodeForm({ ...nodeForm, color: e.target.value })}
               style={{ width: 34, height: 30, padding: 0, border: `1px solid ${DARK.border}`, background: 'none', cursor: 'pointer' }}
             />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={nodeForm.is_container}
+                onChange={e => setNodeForm({ ...nodeForm, is_container: e.target.checked })}
+              />
+              {t('graphTypes.roleContainer')}
+            </label>
             <button
               className="kt-btn kt-btn-primary"
               disabled={!nodeForm.key || !nodeForm.label || nodeCreate.isPending}

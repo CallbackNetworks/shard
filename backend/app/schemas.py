@@ -962,6 +962,7 @@ class NodeTypeCreate(BaseModel):
     label: str
     icon: str | None = None
     color: str | None = None
+    is_container: bool = False  # ADR-0034: user-definable container layer
     data: dict | None = None
 
     @field_validator("key")
@@ -974,6 +975,7 @@ class NodeTypeUpdate(BaseModel):
     label: str | None = None
     icon: str | None = None
     color: str | None = None
+    is_container: bool | None = None  # ADR-0034: only settable on custom types
     data: dict | None = None
 
 

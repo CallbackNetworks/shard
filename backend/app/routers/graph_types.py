@@ -47,7 +47,12 @@ def update_node_type(key: str, body: NodeTypeUpdate, db: Session = Depends(get_d
     nt = db.get(NodeType, key)
     if nt is None:
         raise HTTPException(status_code=404, detail="node type not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    fields = body.model_dump(exclude_unset=True)
+    # Built-in role flags are immutable — flipping project's is_container off would
+    # collapse compat project_ids for every task (ADR-0034).
+    if nt.is_builtin and "is_container" in fields:
+        raise HTTPException(status_code=400, detail="cannot change roles of a built-in node type")
+    for field, value in fields.items():
         setattr(nt, field, value)
     db.commit()
     db.refresh(nt)

@@ -72,10 +72,24 @@ describe('GraphTypes', () => {
 
   it('shows role badges from the registry', () => {
     setup()
-    expect(screen.getByText('graphTypes.roleContainer')).toBeTruthy()
+    // roleContainer appears as the Project badge and as the node create-form checkbox label.
+    expect(screen.getAllByText('graphTypes.roleContainer').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('graphTypes.roleTask')).toBeTruthy()
-    // Appears as a badge on the "contains" edge and as the create-form checkbox label.
+    // Appears as a badge on the "contains" edge and as the edge create-form checkbox label.
     expect(screen.getAllByText('graphTypes.roleContainment').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('creates a custom container type when the checkbox is ticked (ADR-0034)', () => {
+    setup()
+    fireEvent.change(screen.getAllByPlaceholderText('graphTypes.keyPlaceholder')[0], { target: { value: 'workspace' } })
+    fireEvent.change(screen.getAllByPlaceholderText('graphTypes.labelPlaceholder')[0], { target: { value: 'Workspace' } })
+    // The node create form's container checkbox is the first roleContainer label with a checkbox.
+    const containerCheckboxes = screen.getAllByText('graphTypes.roleContainer')
+      .map(el => el.closest('label')?.querySelector('input[type=checkbox]'))
+      .filter(Boolean)
+    fireEvent.click(containerCheckboxes[0])
+    fireEvent.click(screen.getAllByText('graphTypes.add')[0].closest('button'))
+    expect(lastMutations.arg).toMatchObject({ key: 'workspace', label: 'Workspace', is_container: true })
   })
 
   it('lists edge types including custom ones', () => {
