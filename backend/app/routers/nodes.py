@@ -42,9 +42,7 @@ def graph_map(
         q = q.filter(Node.type.in_(keys))
     nodes = q.order_by(Node.created_at).limit(limit).all()
     ids = {n.id for n in nodes}
-    edges = (
-        db.query(Edge).filter(Edge.source_id.in_(ids), Edge.target_id.in_(ids)).all() if ids else []
-    )
+    edges = db.query(Edge).filter(Edge.source_id.in_(ids), Edge.target_id.in_(ids)).all() if ids else []
     return {
         "nodes": [
             {
@@ -59,8 +57,7 @@ def graph_map(
             for n in nodes
         ],
         "edges": [
-            {"id": e.id, "source_id": e.source_id, "target_id": e.target_id, "rel_type": e.rel_type}
-            for e in edges
+            {"id": e.id, "source_id": e.source_id, "target_id": e.target_id, "rel_type": e.rel_type} for e in edges
         ],
     }
 

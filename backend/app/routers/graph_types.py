@@ -7,6 +7,7 @@ cannot be deleted while nodes/edges of that type still exist.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -28,7 +29,11 @@ router = APIRouter(prefix="/graph-types", tags=["graph-types"])
 
 @router.get("/nodes", response_model=list[NodeTypeOut])
 def list_node_types(db: Session = Depends(get_db)):
-    return db.query(NodeType).order_by(NodeType.is_builtin.desc(), NodeType.key).all()
+    types = db.query(NodeType).order_by(NodeType.is_builtin.desc(), NodeType.key).all()
+    counts = dict(db.query(Node.type, func.count(Node.id)).group_by(Node.type).all())
+    for nt in types:
+        nt.usage_count = counts.get(nt.key, 0)
+    return types
 
 
 @router.post("/nodes", response_model=NodeTypeOut, status_code=status.HTTP_201_CREATED)
@@ -77,7 +82,11 @@ def delete_node_type(key: str, db: Session = Depends(get_db)):
 
 @router.get("/edges", response_model=list[EdgeTypeOut])
 def list_edge_types(db: Session = Depends(get_db)):
-    return db.query(EdgeType).order_by(EdgeType.is_builtin.desc(), EdgeType.key).all()
+    types = db.query(EdgeType).order_by(EdgeType.is_builtin.desc(), EdgeType.key).all()
+    counts = dict(db.query(Edge.rel_type, func.count(Edge.id)).group_by(Edge.rel_type).all())
+    for et in types:
+        et.usage_count = counts.get(et.key, 0)
+    return types
 
 
 @router.post("/edges", response_model=EdgeTypeOut, status_code=status.HTTP_201_CREATED)

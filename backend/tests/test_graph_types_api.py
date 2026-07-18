@@ -20,6 +20,20 @@ def test_list_edge_types_includes_builtins(client):
     assert contains["is_containment"] is True
 
 
+def test_type_listings_carry_usage_counts(client):
+    """ADR-0037: usage_count lets the UI show why a delete would 409."""
+    client.post("/api/graph-types/nodes", json={"key": "topic", "label": "Topic"})
+    client.post("/api/nodes", json={"type": "topic", "title": "A"})
+    a = client.post("/api/nodes", json={"type": "topic", "title": "B"}).json()
+    b = client.post("/api/nodes", json={"type": "topic", "title": "C"}).json()
+    client.post(f"/api/nodes/{a['id']}/edges", json={"target_id": b["id"], "rel_type": "contains"})
+
+    topic = next(t for t in client.get("/api/graph-types/nodes").json() if t["key"] == "topic")
+    assert topic["usage_count"] == 3
+    contains = next(t for t in client.get("/api/graph-types/edges").json() if t["key"] == graph.REL_CONTAINS)
+    assert contains["usage_count"] >= 1
+
+
 def test_create_custom_node_type(client):
     r = client.post("/api/graph-types/nodes", json={"key": "Topic", "label": "Topic", "color": "#abcdef"})
     assert r.status_code == 201

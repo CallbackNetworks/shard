@@ -993,6 +993,7 @@ class NodeTypeOut(BaseModel):
     is_container: bool = False
     is_task_like: bool = False
     data: dict | None = None
+    usage_count: int = 0
 
 
 class EdgeTypeCreate(BaseModel):
@@ -1024,6 +1025,7 @@ class EdgeTypeOut(BaseModel):
     is_containment: bool
     is_symmetric: bool
     data: dict | None = None
+    usage_count: int = 0
 
 
 # --- Generic graph nodes / edges (ADR-0033) ---

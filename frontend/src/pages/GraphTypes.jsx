@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shapes, Spline, Plus, Trash2, Lock } from 'lucide-react'
+import { Shapes, Spline, Plus, Trash2, Lock, Pencil, Check, X } from 'lucide-react'
 import {
-  getNodeTypes, createNodeType, deleteNodeType,
+  getNodeTypes, createNodeType, updateNodeType, deleteNodeType,
   getEdgeTypes, createEdgeType, deleteEdgeType,
 } from '../api/client'
 import { DARK } from '../constants/theme'
@@ -31,7 +31,8 @@ function RoleBadge({ label }) {
   )
 }
 
-function TypeRow({ item, onDelete, deleting, children }) {
+function TypeRow({ item, onDelete, deleting, onEdit, children }) {
+  const { t } = useTranslation()
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
@@ -42,20 +43,92 @@ function TypeRow({ item, onDelete, deleting, children }) {
       )}
       <span style={{ fontSize: 13, fontWeight: 600, color: DARK.text }}>{item.label}</span>
       <code style={{ fontSize: 11, color: DARK.textDim }}>{item.key}</code>
+      {item.usage_count > 0 && (
+        <span style={{ fontSize: 10, color: DARK.textDim }} title={t('graphTypes.usageHint')}>
+          {t('graphTypes.usage', { n: item.usage_count })}
+        </span>
+      )}
       <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', alignItems: 'center' }}>
         {children}
         {item.is_builtin ? (
           <Lock size={13} color={DARK.textDim} aria-label="built-in" />
         ) : (
-          <button
-            onClick={() => onDelete(item.key)}
-            disabled={deleting}
-            aria-label="delete"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 4 }}
-          >
-            <Trash2 size={14} />
-          </button>
+          <>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(item)}
+                aria-label={`edit ${item.key}`}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 4 }}
+              >
+                <Pencil size={13} />
+              </button>
+            )}
+            <button
+              onClick={() => onDelete(item.key)}
+              disabled={deleting}
+              aria-label="delete"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 4 }}
+            >
+              <Trash2 size={14} />
+            </button>
+          </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Inline editor for a custom node type: label, color, role flags (ADR-0037).
+function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState({
+    label: item.label,
+    color: item.color || '#818cf8',
+    is_container: !!item.is_container,
+    is_task_like: !!item.is_task_like,
+  })
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '9px 0', borderBottom: `1px solid ${DARK.border}` }}>
+      <code style={{ fontSize: 11, color: DARK.textDim }}>{item.key}</code>
+      <input
+        className="kt-input" style={{ width: 150 }}
+        aria-label={t('graphTypes.labelPlaceholder')}
+        value={draft.label}
+        onChange={e => setDraft({ ...draft, label: e.target.value })}
+      />
+      <input
+        type="color" aria-label={t('graphTypes.color')}
+        value={draft.color}
+        onChange={e => setDraft({ ...draft, color: e.target.value })}
+        style={{ width: 34, height: 30, padding: 0, border: `1px solid ${DARK.border}`, background: 'none', cursor: 'pointer' }}
+      />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={draft.is_container}
+          onChange={e => setDraft({ ...draft, is_container: e.target.checked })}
+        />
+        {t('graphTypes.roleContainer')}
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={draft.is_task_like}
+          onChange={e => setDraft({ ...draft, is_task_like: e.target.checked })}
+        />
+        {t('graphTypes.roleTask')}
+      </label>
+      <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+        <button
+          className="kt-btn kt-btn-primary" aria-label="save"
+          disabled={!draft.label || saving}
+          onClick={() => onSave(item.key, draft)}
+        >
+          <Check size={12} />
+        </button>
+        <button className="kt-btn" aria-label="cancel" onClick={onCancel}>
+          <X size={12} />
+        </button>
       </div>
     </div>
   )
@@ -70,6 +143,7 @@ export default function GraphTypes() {
 
   const [nodeForm, setNodeForm] = useState({ key: '', label: '', color: '#818cf8', is_container: false, is_task_like: false })
   const [edgeForm, setEdgeForm] = useState({ key: '', label: '', is_containment: false })
+  const [editingKey, setEditingKey] = useState(null)
 
   const nodeCreate = useMutation({
     mutationFn: createNodeType,
@@ -78,6 +152,10 @@ export default function GraphTypes() {
   const nodeDelete = useMutation({
     mutationFn: deleteNodeType,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['node-types'] }),
+  })
+  const nodeUpdate = useMutation({
+    mutationFn: ({ key, data }) => updateNodeType(key, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setEditingKey(null) },
   })
   const edgeCreate = useMutation({
     mutationFn: createEdgeType,
@@ -112,10 +190,24 @@ export default function GraphTypes() {
             <div style={{ fontSize: 12, color: DARK.textDim }}>{t('loading')}</div>
           ) : (
             nodeTypes.map(item => (
-              <TypeRow key={item.key} item={item} onDelete={(k) => confirmDelete(nodeDelete, k)} deleting={nodeDelete.isPending}>
-                {item.is_container && <RoleBadge label={t('graphTypes.roleContainer')} />}
-                {item.is_task_like && <RoleBadge label={t('graphTypes.roleTask')} />}
-              </TypeRow>
+              item.key === editingKey ? (
+                <NodeTypeEditRow
+                  key={item.key}
+                  item={item}
+                  saving={nodeUpdate.isPending}
+                  onSave={(key, data) => nodeUpdate.mutate({ key, data })}
+                  onCancel={() => setEditingKey(null)}
+                />
+              ) : (
+                <TypeRow
+                  key={item.key} item={item}
+                  onDelete={(k) => confirmDelete(nodeDelete, k)} deleting={nodeDelete.isPending}
+                  onEdit={(it) => setEditingKey(it.key)}
+                >
+                  {item.is_container && <RoleBadge label={t('graphTypes.roleContainer')} />}
+                  {item.is_task_like && <RoleBadge label={t('graphTypes.roleTask')} />}
+                </TypeRow>
+              )
             ))
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>

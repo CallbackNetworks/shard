@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash } from 'lucide-react'
-import { getProjects, search } from '../api/client'
+import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash, Boxes } from 'lucide-react'
+import { getProjects, search, getNodes, getNodeTypes } from '../api/client'
 import { BRAND, DARK } from '../constants/theme'
 
 const BACKDROP = 'rgba(0,0,0,0.8)'
@@ -103,6 +103,18 @@ export default function CommandPalette({ open, onClose }) {
     staleTime: 5000,
   })
 
+  // Custom graph nodes (ADR-0037): searched via the generic /nodes API; builtin
+  // entities are already covered by the search endpoint above.
+  const { data: nodeTypes = [] } = useQuery({
+    queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000, enabled: open,
+  })
+  const { data: nodeHits = [] } = useQuery({
+    queryKey: ['palette-nodes', debouncedQ],
+    queryFn: () => getNodes(null, debouncedQ),
+    enabled: open && debouncedQ.trim().length >= 2,
+    staleTime: 5000,
+  })
+
   // Build command list
   const items = []
   const q = query.trim().toLowerCase()
@@ -166,6 +178,23 @@ export default function CommandPalette({ open, onClose }) {
         icon: <FolderOpen size={14}/>,
         path: `/projects/${p.id}`,
       }))
+    }
+
+    // Custom graph nodes (ADR-0037): containers open their task view, the rest
+    // land on the universal node page.
+    const customTypeByKey = new Map(nodeTypes.filter(nt => !nt.is_builtin).map(nt => [nt.key, nt]))
+    if (customTypeByKey.size > 0) {
+      nodeHits.filter(n => customTypeByKey.has(n.type)).slice(0, 6).forEach(n => {
+        const nt = customTypeByKey.get(n.type)
+        items.push({
+          id: `node-${n.id}`,
+          label: n.title || n.id,
+          section: 'Nodes',
+          icon: <Boxes size={14}/>,
+          meta: nt.label,
+          path: nt.is_container ? `/c/${n.id}` : `/n/${n.id}`,
+        })
+      })
     }
   }
 

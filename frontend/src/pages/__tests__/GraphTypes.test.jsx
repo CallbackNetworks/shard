@@ -21,6 +21,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../api/client', () => ({
   getNodeTypes: vi.fn(),
   createNodeType: vi.fn(),
+  updateNodeType: vi.fn(),
   deleteNodeType: vi.fn(),
   getEdgeTypes: vi.fn(),
   createEdgeType: vi.fn(),
@@ -32,7 +33,7 @@ import GraphTypes from '../GraphTypes'
 const nodeTypes = [
   { key: 'project', label: 'Project', color: '#818cf8', is_builtin: true, is_container: true, is_task_like: false },
   { key: 'task', label: 'Task', color: '#38bdf8', is_builtin: true, is_container: false, is_task_like: true },
-  { key: 'topic', label: 'Topic', color: '#abcdef', is_builtin: false, is_container: false, is_task_like: false },
+  { key: 'topic', label: 'Topic', color: '#abcdef', is_builtin: false, is_container: false, is_task_like: false, usage_count: 4 },
 ]
 const edgeTypes = [
   { key: 'contains', label: 'Contains', is_builtin: true, is_containment: true, is_symmetric: false },
@@ -123,5 +124,25 @@ describe('GraphTypes', () => {
     fireEvent.click(taskCheckboxes[0])
     fireEvent.click(screen.getAllByText('graphTypes.add')[0].closest('button'))
     expect(lastMutations.arg).toMatchObject({ key: 'ticket', label: 'Ticket', is_task_like: true })
+  })
+
+  it('shows usage counts for types in use (ADR-0037)', () => {
+    setup()
+    expect(screen.getByText('graphTypes.usage')).toBeTruthy()
+  })
+
+  it('edits a custom node type inline (ADR-0037)', () => {
+    setup()
+    fireEvent.click(screen.getByLabelText('edit topic'))
+    const labelInput = screen.getByLabelText('graphTypes.labelPlaceholder')
+    fireEvent.change(labelInput, { target: { value: 'Topics' } })
+    fireEvent.click(screen.getByLabelText('save'))
+    expect(lastMutations.arg).toMatchObject({ key: 'topic', data: expect.objectContaining({ label: 'Topics' }) })
+  })
+
+  it('built-in types have no edit affordance', () => {
+    setup()
+    expect(screen.queryByLabelText('edit project')).toBeNull()
+    expect(screen.queryByLabelText('edit task')).toBeNull()
   })
 })

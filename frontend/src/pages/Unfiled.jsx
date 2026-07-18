@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Inbox, FolderInput } from 'lucide-react'
-import { getUnfiledTasks, fileTaskIntoProject, getProjects } from '../api/client'
+import { Inbox, FolderInput, Boxes } from 'lucide-react'
+import {
+  getUnfiledTasks, fileTaskIntoProject, getProjects,
+  getNodeTypes, getEdgeTypes, getGraphMap,
+} from '../api/client'
 import { DARK } from '../constants/theme'
 
 function TaskRow({ task, projects, onFile, filing }) {
@@ -56,6 +60,25 @@ export default function Unfiled() {
 
   const activeProjects = projects.filter(p => p.status !== 'archived')
 
+  // Unfiled custom nodes (ADR-0037): custom-type nodes with no incoming
+  // containment edge, derived client-side from the /graph/map slice.
+  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes, staleTime: 300000 })
+  const customTypes = nodeTypes.filter(nt => !nt.is_builtin)
+  const { data: graphMap } = useQuery({
+    queryKey: ['graph-map', 'unfiled'],
+    queryFn: () => getGraphMap(),
+    enabled: customTypes.length > 0,
+  })
+  const containmentRels = new Set(edgeTypes.filter(et => et.is_containment).map(et => et.key))
+  const containedIds = new Set(
+    (graphMap?.edges || []).filter(e => containmentRels.has(e.rel_type)).map(e => e.target_id)
+  )
+  const customTypeByKey = new Map(customTypes.map(nt => [nt.key, nt]))
+  const unfiledNodes = (graphMap?.nodes || []).filter(
+    n => customTypeByKey.has(n.type) && !containedIds.has(n.id)
+  )
+
   return (
     <div className="kt-page">
       <div className="kt-page-header">
@@ -87,6 +110,42 @@ export default function Unfiled() {
           ))
         )}
       </div>
+
+      {unfiledNodes.length > 0 && (
+        <div className="kt-card" style={{ padding: 20, marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Boxes size={15} color="#818cf8" />
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: DARK.text }}>{t('unfiled.nodes')}</h3>
+            <span style={{ fontSize: 11, color: DARK.textDim }}>{unfiledNodes.length}</span>
+          </div>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: DARK.textDim }}>{t('unfiled.nodesHint')}</p>
+          {unfiledNodes.map(n => {
+            const nt = customTypeByKey.get(n.type)
+            const color = nt?.color || '#818cf8'
+            return (
+              <Link
+                key={n.id}
+                to={`/n/${n.id}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
+                  borderBottom: `1px solid ${DARK.border}`, textDecoration: 'none',
+                }}
+              >
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                  textTransform: 'uppercase', letterSpacing: 0.4,
+                  color, background: `${color}22`, border: `1px solid ${color}44`,
+                }}>
+                  {nt?.label || n.type}
+                </span>
+                <span style={{ flex: 1, fontSize: 13, color: DARK.text }}>
+                  {n.title || <em style={{ color: DARK.textDim }}>{t('nodePage.untitled')}</em>}
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

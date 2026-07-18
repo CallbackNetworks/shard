@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { STATUS_COLS, PRIORITY, SHADOW_SM, SHADOW_LG, DARK } from '../constants/theme'
+import { TypeBadge } from './TaskIcons'
 
 function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOverlay }) {
   const { t } = useTranslation()
@@ -27,7 +28,10 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
 
   return (
     <>
-      <div style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)', marginBottom: 4, fontFamily: 'monospace' }}>{issueId}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)', fontFamily: 'monospace' }}>{issueId}</span>
+        <TypeBadge type={task.type} />
+      </div>
       <div style={{ fontSize: 13, color: DARK.text, lineHeight: 1.4, marginBottom: 6, fontWeight: 400 }}>{task.title}</div>
       {task.description && (
         <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)', lineHeight: 1.4, marginBottom: 6 }}>
