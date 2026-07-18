@@ -38,3 +38,4 @@
 | [0034](0034-user-defined-containers-and-compat-project-fields.md) | User-Defined Containers and Compat Project Fields — Literal-Project project_ids plus Generic container_ids | Accepted | 2026-07-17 |
 | [0035](0035-user-defined-task-like-types.md) | User-Defined Task-Like Types as First-Class Tasks | Accepted | 2026-07-17 |
 | [0036](0036-internal-api-under-api-prefix.md) | Internal API under an /api Prefix — Eliminate Frontend/Backend Path Collisions | Accepted | 2026-07-18 |
+| [0037](0037-graph-native-frontend.md) | Graph-Native Frontend — Universal Node Page and Container Views | Accepted | 2026-07-18 |
