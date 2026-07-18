@@ -1069,6 +1069,17 @@ class NodeOut(BaseModel):
     updated_at: datetime
 
 
+class NodeRef(BaseModel):
+    """Lightweight summary of an edge endpoint, embedded to spare clients an N+1."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    type: str
+    title: str
+    status: str | None = None
+
+
 class EdgeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -1079,6 +1090,8 @@ class EdgeOut(BaseModel):
     position: int = 0
     data: dict | None = None
     created_at: datetime
+    source: NodeRef | None = None
+    target: NodeRef | None = None
 
 
 class EdgeCreate(BaseModel):

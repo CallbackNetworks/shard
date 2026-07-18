@@ -10,7 +10,7 @@ a ``contains`` edge; only ``detect_cycle`` guards the structure.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
@@ -23,12 +23,15 @@ router = APIRouter(prefix="/nodes", tags=["nodes"])
 @router.get("", response_model=list[NodeOut])
 def list_nodes(
     type: str | None = Query(default=None),
+    query: str | None = Query(default=None, description="case-insensitive title substring filter"),
     limit: int = Query(default=100, le=500),
     db: Session = Depends(get_db),
 ):
     q = db.query(Node)
     if type is not None:
         q = q.filter(Node.type == type)
+    if query:
+        q = q.filter(Node.title.ilike(f"%{query}%"))
     return q.order_by(Node.position, Node.created_at).limit(limit).all()
 
 
@@ -86,6 +89,7 @@ def list_node_edges(node_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="node not found")
     return (
         db.query(Edge)
+        .options(selectinload(Edge.source), selectinload(Edge.target))
         .filter((Edge.source_id == node_id) | (Edge.target_id == node_id))
         .order_by(Edge.rel_type, Edge.position, Edge.created_at)
         .all()

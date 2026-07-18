@@ -92,6 +92,31 @@ def test_attach_and_list_edges(client, topic_type):
     assert edges[0]["target_id"] == b["id"]
 
 
+def test_edge_listing_embeds_node_summaries(client, topic_type, sample_project):
+    """ADR-0037: edge listing embeds both endpoints so clients need no N+1 lookups."""
+    topic = client.post("/api/nodes", json={"type": "topic", "title": "Q3"}).json()
+    client.post(f"/api/nodes/{topic['id']}/edges", json={"target_id": sample_project.id, "rel_type": "contains"})
+
+    edges = client.get(f"/api/nodes/{topic['id']}/edges").json()
+    assert len(edges) == 1
+    assert edges[0]["source"] == {"id": topic["id"], "type": "topic", "title": "Q3", "status": None}
+    assert edges[0]["target"]["id"] == sample_project.id
+    assert edges[0]["target"]["type"] == "project"
+    assert edges[0]["target"]["title"]
+
+
+def test_list_nodes_title_query(client, topic_type):
+    client.post("/api/nodes", json={"type": "topic", "title": "Research Alpha"})
+    client.post("/api/nodes", json={"type": "topic", "title": "Beta"})
+
+    hits = client.get("/api/nodes", params={"type": "topic", "query": "alpha"}).json()
+    assert [n["title"] for n in hits] == ["Research Alpha"]
+
+    # Query works across types too (no type filter).
+    hits = client.get("/api/nodes", params={"query": "research alp"}).json()
+    assert any(n["title"] == "Research Alpha" for n in hits)
+
+
 def test_attach_custom_node_contains_project(client, topic_type, sample_project):
     """Free-form containment: a custom topic node may contain a built-in project."""
     topic = client.post("/api/nodes", json={"type": "topic", "title": "Q3"}).json()
