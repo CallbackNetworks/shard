@@ -12,6 +12,7 @@ import { BRAND, DARK, DELIVERY_STATUS_COLORS as STATUS_COLORS } from '../constan
 import FormModal from '../components/shared/FormModal'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
+import EmptyState from '../components/shared/EmptyState'
 import s from './Integrations.module.css'
 
 const TYPE_ICONS = {
@@ -598,21 +599,24 @@ export default function Integrations() {
       </div>
 
       {integrations.length === 0 ? (
-        <div className={`kt-empty ${s.emptyState}`}>
-          <Zap size={36} className="kt-empty-icon" />
-          <p className="kt-empty-title">{t('integrations.empty')}</p>
-          <p style={{ marginTop: 6, fontSize: 13 }}>{t('integrations.emptyHint')}</p>
-          <div className={s.emptyActions}>
-            <button onClick={() => setTemplatePicker(true)}
-              className={`kt-btn ${s.inlineFlex}`}>
-              <BookOpen size={14} /> {t('integrations.fromTemplate')}
-            </button>
-            <button onClick={() => setModal({ mode: 'create' })}
-              className={`kt-btn kt-btn-primary ${s.inlineFlex}`}>
-              {t('integrations.new')}
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          className={s.emptyState}
+          icon={<Zap size={36} className="kt-empty-icon" />}
+          message={t('integrations.empty')}
+          hint={t('integrations.emptyHint')}
+          action={(
+            <div className={s.emptyActions}>
+              <button onClick={() => setTemplatePicker(true)}
+                className={`kt-btn ${s.inlineFlex}`}>
+                <BookOpen size={14} /> {t('integrations.fromTemplate')}
+              </button>
+              <button onClick={() => setModal({ mode: 'create' })}
+                className={`kt-btn kt-btn-primary ${s.inlineFlex}`}>
+                {t('integrations.new')}
+              </button>
+            </div>
+          )}
+        />
       ) : (
         <div className={`kt-stack ${s.cardList}`}>
           {integrations.map((intg, intgIdx) => (

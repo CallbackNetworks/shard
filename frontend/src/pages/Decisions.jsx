@@ -9,6 +9,7 @@ import { BRAND, DARK, DECISION_STATUS_COLORS as STATUS_COLORS } from '../constan
 import { deriveDecisionRoom, groupDecisionsByProject } from '../utils/decisionRoom'
 import useBreakpoint from '../hooks/useBreakpoint'
 import FormModal from '../components/shared/FormModal'
+import EmptyState from '../components/shared/EmptyState'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
 
@@ -271,14 +272,16 @@ export default function Decisions() {
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>{t('loading')}</div>
       ) : decisions.length === 0 ? (
-        <div className="kt-empty">
-          <GitFork size={36} className="kt-empty-icon" />
-          <div className="kt-empty-title">{t('decisions.empty')}</div>
-          <div style={{ fontSize: 13, marginBottom: 16 }}>{t('decisions.emptyHint')}</div>
-          <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
-            {t('decisions.new')}
-          </button>
-        </div>
+        <EmptyState
+          icon={<GitFork size={36} className="kt-empty-icon" />}
+          message={t('decisions.empty')}
+          hint={t('decisions.emptyHint')}
+          action={(
+            <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
+              {t('decisions.new')}
+            </button>
+          )}
+        />
       ) : (
         <div className={isMobile ? 'kt-decision-room is-mobile' : 'kt-decision-room'}>
           <aside className="kt-decision-console">

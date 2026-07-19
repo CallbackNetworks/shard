@@ -6,6 +6,7 @@ import { getAllDeliveries, getIntegrations, retryDelivery, purgeDeliveries } fro
 import { DARK, DELIVERY_STATUS_TEXT as STATUS_COLORS } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
+import EmptyState from '../components/shared/EmptyState'
 
 function DeliveryRow({ delivery, integrationMap, isMobile }) {
   const [expanded, setExpanded] = useState(false)
@@ -176,10 +177,10 @@ export default function WebhookLogs() {
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>Loading...</div>
         ) : deliveries.length === 0 ? (
-          <div className="kt-empty">
-            <ScrollText size={32} className="kt-empty-icon" />
-            <div className="kt-empty-title">{t('webhookLogs.noDeliveries')}</div>
-          </div>
+          <EmptyState
+            icon={<ScrollText size={32} className="kt-empty-icon" />}
+            message={t('webhookLogs.noDeliveries')}
+          />
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>

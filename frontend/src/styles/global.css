@@ -2936,6 +2936,10 @@ h1 {
   font-weight: 700;
   margin-bottom: 6px;
 }
+.kt-empty-hint {
+  font-size: 13px;
+  margin-bottom: 16px;
+}
 .kt-muted {
   color: var(--kt-faint);
 }

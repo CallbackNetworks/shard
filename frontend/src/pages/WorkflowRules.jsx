@@ -7,6 +7,7 @@ import { DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import FormField from '../components/shared/FormField'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
+import EmptyState from '../components/shared/EmptyState'
 
 const TRIGGERS = [
   { value: 'task.created', label: 'Task Created' },
@@ -182,18 +183,16 @@ export default function WorkflowRules() {
       {isLoading ? (
         <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 13 }}>Loading…</div>
       ) : rules.length === 0 ? (
-        <div className="kt-empty">
-          <GitMerge size={36} className="kt-empty-icon" />
-          <p className="kt-empty-title">{t('rules.empty')}</p>
-          <p style={{ marginTop: 6, fontSize: 13 }}>{t('rules.emptyHint')}</p>
-          <button
-            onClick={() => setModal({ mode: 'create' })}
-            className="kt-btn kt-btn-primary"
-            style={{ marginTop: 16 }}
-          >
-            <Plus size={13} /> {t('rules.new')}
-          </button>
-        </div>
+        <EmptyState
+          icon={<GitMerge size={36} className="kt-empty-icon" />}
+          message={t('rules.empty')}
+          hint={t('rules.emptyHint')}
+          action={(
+            <button onClick={() => setModal({ mode: 'create' })} className="kt-btn kt-btn-primary">
+              <Plus size={13} /> {t('rules.new')}
+            </button>
+          )}
+        />
       ) : (
         <div className="kt-stack">
           {rules.map((rule, ruleIdx) => (

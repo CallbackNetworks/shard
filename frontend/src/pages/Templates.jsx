@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
 import { BRAND, DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
+import EmptyState from '../components/shared/EmptyState'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
 
@@ -239,14 +240,16 @@ export default function Templates() {
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>{t('loading')}</div>
       ) : templates.length === 0 ? (
-        <div className="kt-empty">
-          <FileText size={36} className="kt-empty-icon" />
-          <div className="kt-empty-title">{t('templates.empty')}</div>
-          <div style={{ fontSize: 13, marginBottom: 16 }}>{t('templates.emptyHint')}</div>
-          <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
-            {t('templates.new')}
-          </button>
-        </div>
+        <EmptyState
+          icon={<FileText size={36} className="kt-empty-icon" />}
+          message={t('templates.empty')}
+          hint={t('templates.emptyHint')}
+          action={(
+            <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
+              {t('templates.new')}
+            </button>
+          )}
+        />
       ) : (
         <>
           <input

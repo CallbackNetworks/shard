@@ -5,6 +5,7 @@ import { Target, Plus, Trash2, Edit2, Calendar, Link2, CheckCircle2, XCircle, Cl
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
 import { BRAND, DARK, GOAL_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
+import EmptyState from '../components/shared/EmptyState'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
 
@@ -380,18 +381,16 @@ export default function Goals() {
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>{t('loading')}</div>
       ) : goals.length === 0 ? (
-        <div className="kt-empty">
-          <Target size={36} className="kt-empty-icon" />
-          <div className="kt-empty-title">
-            {statusFilter ? t('goals.emptyFiltered') : t('goals.empty')}
-          </div>
-          <div style={{ fontSize: 13, marginBottom: 16 }}>{t('goals.emptyHint')}</div>
-          {!statusFilter && (
+        <EmptyState
+          icon={<Target size={36} className="kt-empty-icon" />}
+          message={statusFilter ? t('goals.emptyFiltered') : t('goals.empty')}
+          hint={t('goals.emptyHint')}
+          action={!statusFilter && (
             <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
               {t('goals.create')}
             </button>
           )}
-        </div>
+        />
       ) : (
         <div className="kt-stack">
           {goals.map((goal, i) => (

@@ -1,13 +1,16 @@
-export default function EmptyState({ message, hint, icon }) {
+/**
+ * Standard empty-state block rendering the shared kt-empty look.
+ *
+ * `icon` is an optional node (e.g. <Target size={36} className="kt-empty-icon" />),
+ * `action` an optional call-to-action rendered below the hint.
+ */
+export default function EmptyState({ icon, message, hint, action, className }) {
   return (
-    <div style={{
-      textAlign: 'center',
-      padding: '48px 24px',
-      color: 'rgba(var(--kt-ink-rgb), 0.3)',
-    }}>
-      {icon && <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>{icon}</div>}
-      <div style={{ fontSize: 13, marginBottom: hint ? 6 : 0 }}>{message}</div>
-      {hint && <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>{hint}</div>}
+    <div className={className ? `kt-empty ${className}` : 'kt-empty'}>
+      {icon}
+      <div className="kt-empty-title">{message}</div>
+      {hint && <div className="kt-empty-hint">{hint}</div>}
+      {action}
     </div>
   )
 }
