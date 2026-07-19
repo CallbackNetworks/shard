@@ -21,6 +21,7 @@ from app.schemas import (
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.ical_token import verify_global_ical_token
+from app.services.task_mutations import apply_task_update
 from app.services.ws_manager import ws_manager
 
 router = APIRouter()
@@ -117,12 +118,16 @@ async def bulk_update_tasks(
 
     updated_ids: list[str] = []
     for tid in ids:
-        if field_changes:
-            graph.update_task(db, tid, **field_changes)
         for label_id in body.add_label_ids:
             graph.set_label(db, tid, label_id)
         for label_id in body.remove_label_ids:
             graph.unset_label(db, tid, label_id)
+        if field_changes:
+            # Full pipeline per task (rules, notifications, activity); the
+            # aggregate broadcast below replaces per-task ws events.
+            await apply_task_update(
+                db, tid, dict(field_changes), source="bulk", project_id=project_id, broadcast=False
+            )
         updated_ids.append(tid)
 
     changes: list[str] = []

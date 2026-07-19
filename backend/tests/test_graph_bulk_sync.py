@@ -39,3 +39,32 @@ def test_goal_project_replacement_clears_stale_part_of_edges(client, db):
     client.patch(f"/api/goals/{goal_id}", json={"project_ids": [b]})
     assert _edge(db, a, goal_id, "part_of") is None
     assert _edge(db, b, goal_id, "part_of") is not None
+
+
+def test_bulk_update_runs_workflow_rules(client, db):
+    """SPA bulk status changes now trigger workflow rules (ADR-0038)."""
+    from app.models import ActivityLog, WorkflowRule
+
+    pid = _project(client)
+    tid = client.post(f"/api/projects/{pid}/tasks", json={"title": "bulk rules"}).json()["id"]
+    db.add(
+        WorkflowRule(
+            name="Escalate done tasks",
+            trigger="task.status_changed",
+            conditions=[{"field": "status", "op": "eq", "value": "done"}],
+            actions=[{"type": "set_priority", "value": "high"}],
+            active=True,
+        )
+    )
+    db.commit()
+
+    r = client.post(f"/api/projects/{pid}/tasks/bulk-update", json={"task_ids": [tid], "status": "done"})
+    assert r.status_code == 200
+    task = client.get(f"/api/projects/{pid}").json()
+    updated = next(t for t in task["tasks"] if t["id"] == tid)
+    assert updated["status"] == "done"
+    assert updated["priority"] == "high"
+    # Per-task status activity is now recorded alongside the aggregate row.
+    actions = [row.action for row in db.query(ActivityLog).all()]
+    assert "task.status_changed" in actions
+    assert "task.bulk_updated" in actions
