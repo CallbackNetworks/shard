@@ -1,0 +1,20 @@
+/* Integration health badge (extracted from pages/Integrations). */
+
+.healthStats {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.healthLatency {
+  color: rgba(var(--kt-ink-rgb), 0.35);
+}
+
+.healthLastSuccess {
+  color: rgba(var(--kt-ink-rgb), 0.25);
+}
+
+.healthDead {
+  color: var(--kt-hit);
+}

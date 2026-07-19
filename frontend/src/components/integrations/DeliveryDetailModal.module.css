@@ -1,0 +1,83 @@
+/* Delivery detail modal body (extracted from pages/Integrations). */
+
+.deliveryDetailBody {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailLabel {
+  font-size: 10px;
+  color: rgba(var(--kt-ink-rgb), 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.errorPre {
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #fca5a5;
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.responsePre {
+  background: rgba(var(--kt-ink-rgb), 0.04);
+  border: 1px solid var(--kt-line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--kt-muted);
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.payloadPre {
+  background: rgba(var(--kt-ink-rgb), 0.04);
+  border: 1px solid var(--kt-line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--kt-muted);
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.modalActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.rowLabel {
+  font-size: 10px;
+  color: rgba(var(--kt-ink-rgb), 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 80px;
+  padding-top: 1px;
+}
+
+.rowValue {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.rowValueMono {
+  composes: rowValue;
+  font-family: monospace;
+}

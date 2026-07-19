@@ -1,0 +1,116 @@
+/* Recent-deliveries log (extracted from pages/Integrations). */
+
+.deliveryLogWrapper {
+  margin-top: 12px;
+  border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
+  padding-top: 10px;
+}
+
+.deliveryToggleBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(var(--kt-ink-rgb), 0.35);
+  font-size: 12px;
+  padding: 0;
+}
+
+.refreshBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(var(--kt-ink-rgb), 0.2);
+  padding: 0 2px;
+  display: flex;
+}
+
+.deliveryContent {
+  margin-top: 8px;
+}
+
+.filtersRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.filterSelect {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--kt-line);
+  background: var(--kt-surface);
+  color: var(--kt-muted);
+}
+
+.bulkRetryBtn {
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid rgba(250,204,21,0.4);
+  border-radius: 6px;
+  background: rgba(250,204,21,0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.noDeliveries {
+  font-size: 12px;
+  color: rgba(var(--kt-ink-rgb), 0.2);
+  padding: 4px 0;
+}
+
+.deliveryList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.deliveryRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.03);
+}
+
+.deliveryDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.deliveryEvent {
+  font-size: 11px;
+  color: rgba(var(--kt-ink-rgb), 0.5);
+  flex: 1;
+}
+
+.deliveryStatusCode {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.deliveryDate {
+  font-size: 10px;
+  color: rgba(var(--kt-ink-rgb), 0.2);
+}
+
+.retryBtn {
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid rgba(250,204,21,0.4);
+  border-radius: 4px;
+  background: rgba(250,204,21,0.1);
+  color: var(--kt-hit);
+  cursor: pointer;
+}

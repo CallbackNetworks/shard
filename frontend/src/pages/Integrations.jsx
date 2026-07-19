@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, RefreshCw, X, Zap, Plus, Trash2, BookOpen, Activity, RotateCcw } from 'lucide-react'
+import { X, Zap, Plus, Trash2, BookOpen } from 'lucide-react'
 import {
   getIntegrations, createIntegration, updateIntegration, deleteIntegration,
-  testIntegration, getDeliveries, retryDelivery, getIntegrationTemplates,
-  getIntegrationTemplate, getIntegrationHealth, bulkRetryDeliveries,
+  testIntegration, getIntegrationTemplates, getIntegrationTemplate,
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
-import { BRAND, DARK, DELIVERY_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
+import { BRAND, DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
+import DeliveryLog from '../components/integrations/DeliveryLog'
+import HealthStats from '../components/integrations/HealthStats'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import EmptyState from '../components/shared/EmptyState'
@@ -26,205 +27,6 @@ const EVENT_GROUPS = {
 }
 const ALL_EVENTS = [...EVENT_GROUPS.task, ...EVENT_GROUPS.project, ...EVENT_GROUPS.other]
 const CRITICAL_EVENTS = ['task.done', 'task.failed', 'task.overdue', 'project.complete']
-
-/* ── Delivery Detail Modal ── */
-function DeliveryDetailModal({ delivery, onClose, onRetry }) {
-  const { t } = useTranslation()
-  return (
-    <FormModal
-      title="Delivery Detail"
-      onClose={onClose}
-      footer={(
-        <div className={s.modalActions}>
-          {['failed', 'dead'].includes(delivery.status) && (
-            <button onClick={() => onRetry(delivery.id)} className="btn-primary">{t('retry')}</button>
-          )}
-          <button onClick={onClose} className="btn-ghost">{t('cancel')}</button>
-        </div>
-      )}
-    >
-      <div className={s.deliveryDetailBody}>
-        <Row label="Event" value={delivery.event} />
-        <Row label="Status" value={delivery.status} color={STATUS_COLORS[delivery.status]?.color} />
-        <Row label="Status Code" value={delivery.status_code ?? '—'} />
-        <Row label="Attempt" value={delivery.attempt} />
-        <Row label="URL" value={delivery.request_url} mono />
-        <Row label="Created" value={new Date(delivery.created_at).toLocaleString()} />
-        {delivery.delivered_at && <Row label="Delivered" value={new Date(delivery.delivered_at).toLocaleString()} />}
-        {delivery.next_retry_at && <Row label="Next Retry" value={new Date(delivery.next_retry_at).toLocaleString()} />}
-        {delivery.error && (
-          <div>
-            <div className={s.detailLabel}>Error</div>
-            <pre className={s.errorPre}>{delivery.error}</pre>
-          </div>
-        )}
-        {delivery.response_body && (
-          <div>
-            <div className={s.detailLabel}>Response Body</div>
-            <pre className={s.responsePre}>{delivery.response_body}</pre>
-          </div>
-        )}
-        <div>
-          <div className={s.detailLabel}>Payload</div>
-          <pre className={s.payloadPre}>{JSON.stringify(delivery.payload, null, 2)}</pre>
-        </div>
-      </div>
-    </FormModal>
-  )
-}
-
-function Row({ label, value, mono, color }) {
-  return (
-    <div className={s.row}>
-      <span className={s.rowLabel}>{label}</span>
-      <span className={mono ? s.rowValueMono : s.rowValue} style={{ color: color || DARK.textMid }}>{String(value)}</span>
-    </div>
-  )
-}
-
-/* ── Health Stats Badge ── */
-function HealthStats({ integrationId }) {
-  const { t } = useTranslation()
-  const { data: health } = useQuery({
-    queryKey: ['integration-health', integrationId],
-    queryFn: () => getIntegrationHealth(integrationId),
-    staleTime: 60000,
-  })
-  if (!health || health.total_deliveries === 0) return null
-
-  const rateColor = health.success_rate >= 90 ? BRAND : health.success_rate >= 50 ? '#f59e0b' : BRAND
-
-  return (
-    <div className={s.healthStats}>
-      <span style={{ color: rateColor }}>
-        <Activity size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
-        {health.success_rate}% {t('integrations.successRate').toLowerCase()}
-      </span>
-      {health.avg_latency_ms != null && (
-        <span className={s.healthLatency}>
-          {health.avg_latency_ms}ms {t('integrations.avgLatency').toLowerCase()}
-        </span>
-      )}
-      {health.last_success_at && (
-        <span className={s.healthLastSuccess}>
-          {t('integrations.lastSuccess')}: {new Date(health.last_success_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-        </span>
-      )}
-      {health.dead > 0 && (
-        <span className={s.healthDead}>{health.dead} dead</span>
-      )}
-    </div>
-  )
-}
-
-/* ── Delivery Log with Filters ── */
-function DeliveryLog({ integrationId }) {
-  const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
-  const [selected, setSelected] = useState(null)
-  const [filterEvent, setFilterEvent] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-
-  const { data: deliveries = [], refetch } = useQuery({
-    queryKey: ['deliveries', integrationId, filterEvent, filterStatus],
-    queryFn: () => getDeliveries(integrationId, {
-      ...(filterEvent ? { event: filterEvent } : {}),
-      ...(filterStatus ? { status: filterStatus } : {}),
-    }),
-    enabled: expanded,
-    staleTime: 10000,
-  })
-
-  const retryMut = useInvalidatingMutation({
-    mutationFn: retryDelivery,
-    invalidateKeys: [['deliveries', integrationId]],
-    onSuccess: () => setSelected(null),
-  })
-
-  const bulkRetryMut = useInvalidatingMutation({
-    mutationFn: () => bulkRetryDeliveries(integrationId),
-    invalidateKeys: [['deliveries', integrationId], ['integration-health', integrationId]],
-    onSuccess: (data) => {
-      globalAddToast(t('integrations.bulkRetryResult', data), 'info')
-    },
-  })
-
-  const hasFailures = deliveries.some(d => ['failed', 'dead'].includes(d.status))
-
-  return (
-    <div className={s.deliveryLogWrapper}>
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className={s.deliveryToggleBtn}
-      >
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        {t('integrations.recentDeliveries')}
-        <button
-          onClick={(e) => { e.stopPropagation(); refetch() }}
-          className={s.refreshBtn}
-          title="Refresh"
-        >
-          <RefreshCw size={10} />
-        </button>
-      </button>
-
-      {expanded && (
-        <div className={s.deliveryContent}>
-          {/* Filters Row */}
-          <div className={s.filtersRow}>
-            <select value={filterEvent} onChange={e => setFilterEvent(e.target.value)}
-              className={s.filterSelect}>
-              <option value="">{t('integrations.allEvents')}</option>
-              {ALL_EVENTS.map(ev => <option key={ev} value={ev}>{ev}</option>)}
-            </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              className={s.filterSelect}>
-              <option value="">{t('integrations.allStatuses')}</option>
-              {['success', 'failed', 'dead', 'pending'].map(st => <option key={st} value={st}>{st}</option>)}
-            </select>
-            {hasFailures && (
-              <button onClick={() => bulkRetryMut.mutate()} disabled={bulkRetryMut.isPending}
-                className={s.bulkRetryBtn} style={{ color: BRAND }}>
-                <RotateCcw size={10} /> {t('integrations.bulkRetry')}
-              </button>
-            )}
-          </div>
-
-          {deliveries.length === 0 ? (
-            <div className={s.noDeliveries}>{t('integrations.noDeliveries')}</div>
-          ) : (
-            <div className={s.deliveryList}>
-              {deliveries.slice(0, 20).map(d => {
-                const sc = STATUS_COLORS[d.status] || STATUS_COLORS.pending
-                return (
-                  <div key={d.id} onClick={() => setSelected(d)}
-                    className={s.deliveryRow}>
-                    <span className={s.deliveryDot} style={{ background: sc.dot }} />
-                    <span className={s.deliveryEvent}>{d.event}</span>
-                    <span className={s.deliveryStatusCode} style={{ color: sc.color }}>{d.status_code ?? d.status}</span>
-                    <span className={s.deliveryDate}>
-                      {new Date(d.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {['failed', 'dead'].includes(d.status) && (
-                      <button onClick={(e) => { e.stopPropagation(); retryMut.mutate(d.id) }}
-                        className={s.retryBtn}>
-                        {t('retry')}
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {selected && (
-        <DeliveryDetailModal delivery={selected} onClose={() => setSelected(null)} onRetry={(id) => retryMut.mutate(id)} />
-      )}
-    </div>
-  )
-}
 
 /* ── Template Selector ── */
 function TemplatePicker({ onSelect, onClose }) {
