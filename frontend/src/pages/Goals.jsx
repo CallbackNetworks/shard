@@ -4,14 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, X, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
 import { useToast } from '../context/ToastContext'
-import { BRAND, DARK } from '../constants/theme'
+import { BRAND, DARK, GOAL_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import useFocusTrap from '../hooks/useFocusTrap'
-
-const STATUS_COLORS = {
-  active:    { bg: 'rgba(250,204,21,0.14)', color: BRAND },
-  completed: { bg: 'rgba(250,204,21,0.12)', color: BRAND },
-  cancelled: { bg: 'rgba(250,204,21,0.12)', color: DARK.danger },
-}
 
 /* ── Goal Form Modal ── */
 function GoalForm({ projects, initial, onSave, onClose }) {

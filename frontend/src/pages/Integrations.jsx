@@ -8,7 +8,7 @@ import {
   getIntegrationTemplate, getIntegrationHealth, bulkRetryDeliveries,
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
-import { BRAND, DARK, STATUS_COLOR, STATUS_BG } from '../constants/theme'
+import { BRAND, DARK, DELIVERY_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Integrations.module.css'
 
@@ -23,13 +23,6 @@ const EVENT_GROUPS = {
 }
 const ALL_EVENTS = [...EVENT_GROUPS.task, ...EVENT_GROUPS.project, ...EVENT_GROUPS.other]
 const CRITICAL_EVENTS = ['task.done', 'task.failed', 'task.overdue', 'project.complete']
-
-const STATUS_COLORS = {
-  success: { bg: STATUS_BG.done, color: STATUS_COLOR.done, dot: STATUS_COLOR.done },
-  failed:  { bg: STATUS_BG.failed, color: STATUS_COLOR.failed, dot: STATUS_COLOR.failed },
-  dead:    { bg: STATUS_BG.failed, color: STATUS_COLOR.failed, dot: STATUS_COLOR.failed },
-  pending: { bg: STATUS_BG.in_progress, color: STATUS_COLOR.in_progress, dot: STATUS_COLOR.in_progress },
-}
 
 /* ── Delivery Detail Modal ── */
 function DeliveryDetailModal({ delivery, onClose, onRetry }) {

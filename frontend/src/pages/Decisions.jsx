@@ -5,17 +5,10 @@ import { GitFork, Plus, Trash2, Edit2, X, Download, Check, XCircle, Bot, User } 
 import { getDecisions, getProjects, createLabel, updateLabel, deleteLabel, exportDecision } from '../api/client'
 import MarkdownEditor from '../components/MarkdownEditor'
 import MarkdownPreview from '../components/MarkdownPreview'
-import { BRAND, DARK } from '../constants/theme'
+import { BRAND, DARK, DECISION_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import { deriveDecisionRoom, groupDecisionsByProject } from '../utils/decisionRoom'
 import useBreakpoint from '../hooks/useBreakpoint'
 import useFocusTrap from '../hooks/useFocusTrap'
-
-const STATUS_COLORS = {
-  proposed: { bg: 'rgba(250,204,21,0.15)', color: BRAND, border: `1px dashed ${BRAND}` },
-  accepted: { bg: 'rgba(250,204,21,0.12)', color: BRAND, border: `1px solid ${BRAND}` },
-  deprecated: { bg: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: '1px solid #94a3b8' },
-  superseded: { bg: 'rgba(250,204,21,0.12)', color: BRAND, border: `1px solid ${BRAND}` },
-}
 
 const TEMPLATE_DESC = `## Context\n\n\n## Decision\n\n\n## Consequences\n`
 

@@ -19,13 +19,6 @@ const ChartFallback = () => (
   <div style={{ padding: '24px 0', textAlign: 'center', color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 12 }}>Loading...</div>
 )
 
-const STATUS_COLORS = {
-  done: STATUS_COLOR.done,
-  in_progress: STATUS_COLOR.in_progress,
-  todo: STATUS_COLOR.todo,
-  failed: STATUS_COLOR.failed,
-}
-
 function StatCard({ label, value, color, delay = 0 }) {
   return (
     <div style={{
@@ -85,10 +78,10 @@ function IdentityCard({ identity, onNavigate }) {
     ? Math.round((identity.done / identity.total_tasks) * 100) : 0
 
   const segments = [
-    { value: identity.done, color: STATUS_COLORS.done, label: t('hub.done') },
-    { value: identity.in_progress, color: STATUS_COLORS.in_progress, label: t('hub.inProgress') },
-    { value: identity.todo, color: STATUS_COLORS.todo, label: t('hub.todoLabel') },
-    { value: identity.failed, color: STATUS_COLORS.failed, label: t('hub.failed') },
+    { value: identity.done, color: STATUS_COLOR.done, label: t('hub.done') },
+    { value: identity.in_progress, color: STATUS_COLOR.in_progress, label: t('hub.inProgress') },
+    { value: identity.todo, color: STATUS_COLOR.todo, label: t('hub.todoLabel') },
+    { value: identity.failed, color: STATUS_COLOR.failed, label: t('hub.failed') },
   ]
 
   return (
@@ -128,8 +121,8 @@ function IdentityCard({ identity, onNavigate }) {
         />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
-            { label: t('hub.done'), value: identity.done, color: STATUS_COLORS.done },
-            { label: t('hub.inProgress'), value: identity.in_progress, color: STATUS_COLORS.in_progress },
+            { label: t('hub.done'), value: identity.done, color: STATUS_COLOR.done },
+            { label: t('hub.inProgress'), value: identity.in_progress, color: STATUS_COLOR.in_progress },
             { label: t('hub.todoLabel'), value: identity.todo, color: STATUS_COLOR.todo },
             { label: t('hub.overdueCount'), value: identity.overdue, color: identity.overdue > 0 ? STATUS_COLOR.failed : STATUS_COLOR.todo },
           ].map(s => (
@@ -229,7 +222,7 @@ function buildTreesByStatus(data) {
   return statuses.map(status => ({
     id: `status-${status}`,
     label: status.replace('_', ' ').toUpperCase(),
-    color: STATUS_COLORS[status],
+    color: STATUS_COLOR[status],
     children: data.identities
       .filter(i => i[status] > 0)
       .map(ident => ({
@@ -468,10 +461,10 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
                   : stackedBars
                 }
                 segments={[
-                  { key: 'done', label: t('hub.done'), color: STATUS_COLORS.done },
-                  { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLORS.in_progress },
-                  { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLORS.todo },
-                  { key: 'failed', label: t('hub.failed'), color: STATUS_COLORS.failed },
+                  { key: 'done', label: t('hub.done'), color: STATUS_COLOR.done },
+                  { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLOR.in_progress },
+                  { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLOR.todo },
+                  { key: 'failed', label: t('hub.failed'), color: STATUS_COLOR.failed },
                 ]}
                 horizontal
               />
@@ -559,10 +552,10 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
                   </div>
                   <WaffleChart
                     segments={[
-                      { value: ident.done, color: STATUS_COLORS.done, label: t('hub.done') },
-                      { value: ident.in_progress, color: STATUS_COLORS.in_progress, label: t('hub.inProgress') },
-                      { value: ident.todo, color: STATUS_COLORS.todo, label: t('hub.todoLabel') },
-                      { value: ident.failed, color: STATUS_COLORS.failed, label: t('hub.failed') },
+                      { value: ident.done, color: STATUS_COLOR.done, label: t('hub.done') },
+                      { value: ident.in_progress, color: STATUS_COLOR.in_progress, label: t('hub.inProgress') },
+                      { value: ident.todo, color: STATUS_COLOR.todo, label: t('hub.todoLabel') },
+                      { value: ident.failed, color: STATUS_COLOR.failed, label: t('hub.failed') },
                     ]}
                     cols={8}
                     cellSize={12}
@@ -577,10 +570,10 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
               <StackedBarChart
                 bars={stackedBars}
                 segments={[
-                  { key: 'done', label: t('hub.done'), color: STATUS_COLORS.done },
-                  { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLORS.in_progress },
-                  { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLORS.todo },
-                  { key: 'failed', label: t('hub.failed'), color: STATUS_COLORS.failed },
+                  { key: 'done', label: t('hub.done'), color: STATUS_COLOR.done },
+                  { key: 'in_progress', label: t('hub.inProgress'), color: STATUS_COLOR.in_progress },
+                  { key: 'todo', label: t('hub.todoLabel'), color: STATUS_COLOR.todo },
+                  { key: 'failed', label: t('hub.failed'), color: STATUS_COLOR.failed },
                 ]}
               />
             </Section>

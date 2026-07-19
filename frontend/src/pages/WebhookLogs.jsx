@@ -3,15 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { RefreshCw, ChevronDown, ChevronUp, ScrollText, Trash2 } from 'lucide-react'
 import { getAllDeliveries, getIntegrations, retryDelivery, purgeDeliveries } from '../api/client'
-import { DARK, STATUS_COLOR } from '../constants/theme'
+import { DARK, DELIVERY_STATUS_TEXT as STATUS_COLORS } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
-
-const STATUS_COLORS = {
-  success: STATUS_COLOR.done,
-  failed: STATUS_COLOR.failed,
-  dead: '#6b7280',
-  pending: STATUS_COLOR.in_progress,
-}
 
 function DeliveryRow({ delivery, integrationMap, isMobile }) {
   const [expanded, setExpanded] = useState(false)

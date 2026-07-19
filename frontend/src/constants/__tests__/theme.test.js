@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { DARK, BRAND, STATUS_COLS, STATUS_MAP, PRIORITY, LABEL_PALETTE, STATUS_COLOR } from '../theme'
+import {
+  DARK, BRAND, STATUS_COLS, STATUS_MAP, PRIORITY, LABEL_PALETTE, STATUS_COLOR,
+  GOAL_STATUS_COLORS, DECISION_STATUS_COLORS, DELIVERY_STATUS_COLORS, DELIVERY_STATUS_TEXT,
+} from '../theme'
 
 describe('theme constants', () => {
   it('DARK has all required color tokens', () => {
@@ -40,5 +43,26 @@ describe('theme constants', () => {
     for (const c of LABEL_PALETTE) {
       expect(c).toMatch(/^#[0-9a-f]{6}$/i)
     }
+  })
+  it('GOAL_STATUS_COLORS covers every goal status', () => {
+    for (const key of ['active', 'completed', 'cancelled']) {
+      expect(GOAL_STATUS_COLORS[key].bg).toBeTruthy()
+      expect(GOAL_STATUS_COLORS[key].color).toBeTruthy()
+    }
+  })
+
+  it('DECISION_STATUS_COLORS covers every decision status', () => {
+    for (const key of ['proposed', 'accepted', 'deprecated', 'superseded']) {
+      expect(DECISION_STATUS_COLORS[key].border).toBeTruthy()
+    }
+  })
+
+  it('DELIVERY_STATUS maps cover every delivery status', () => {
+    for (const key of ['success', 'failed', 'dead', 'pending']) {
+      expect(DELIVERY_STATUS_COLORS[key].dot).toBeTruthy()
+      expect(DELIVERY_STATUS_TEXT[key]).toBeTruthy()
+    }
+    // WebhookLogs renders dead deliveries muted, not failure-red.
+    expect(DELIVERY_STATUS_TEXT.dead).toBe('#6b7280')
   })
 })

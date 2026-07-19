@@ -5,8 +5,6 @@ import { BarChart2, TrendingUp, Activity, Flame, Download, Crosshair } from 'luc
 import { getProjects, getCycles, getAnalyticsOverview, getAnalyticsHeatmap, getAnalyticsBurndown, getAnalyticsVelocity, getAnalyticsStatusTrend, getEstimationCalibration } from '../api/client'
 import { BRAND, STATUS_COLOR } from '../constants/theme'
 
-const STATUS_COLORS = STATUS_COLOR
-
 // ——— Tooltip component ———
 function SvgTooltip({ x, y, text, svgWidth }) {
   if (!text) return null
@@ -305,7 +303,7 @@ function StatusTrendChart({ data }) {
         )
       })}
       {statuses.map(s => (
-        <polyline key={s} points={lineFor(s)} fill="none" stroke={STATUS_COLORS[s]} strokeWidth={1.5} strokeLinejoin="round" opacity={0.8} />
+        <polyline key={s} points={lineFor(s)} fill="none" stroke={STATUS_COLOR[s]} strokeWidth={1.5} strokeLinejoin="round" opacity={0.8} />
       ))}
       {/* Hover vertical line and circles */}
       {hover !== null && (
@@ -314,7 +312,7 @@ function StatusTrendChart({ data }) {
       )}
       {hover !== null && statuses.map(s => {
         const yv = PAD.t + innerH - (data[hover][s] / maxTotal) * innerH
-        return <circle key={s} cx={xAt(hover)} cy={yv} r={3} fill={STATUS_COLORS[s]} />
+        return <circle key={s} cx={xAt(hover)} cy={yv} r={3} fill={STATUS_COLOR[s]} />
       })}
       {/* Invisible hover areas */}
       {data.map((_, i) => (
@@ -339,7 +337,7 @@ function StatusTrendChart({ data }) {
       })}
       {statuses.map((s, i) => (
         <g key={s}>
-          <rect x={PAD.l + i * 80} y={H - 22} width={10} height={4} rx={2} fill={STATUS_COLORS[s]} />
+          <rect x={PAD.l + i * 80} y={H - 22} width={10} height={4} rx={2} fill={STATUS_COLOR[s]} />
           <text x={PAD.l + i * 80 + 14} y={H - 16} fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.3)">{s}</text>
         </g>
       ))}

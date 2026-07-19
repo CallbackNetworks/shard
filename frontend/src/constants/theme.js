@@ -149,3 +149,38 @@ export const LABEL_PALETTE = [
   '#facc15', '#3b82f6', '#eab308', '#f59e0b', '#6b7280',
   '#a3a3a3', '#d4d4d4', '#06b6d4', '#ca8a04', '#f97316',
 ]
+
+// ── Domain status color maps ─────────────────────────────────────────────
+// Single source of truth for per-domain status chips; pages must import these
+// rather than redefining local maps.
+
+// Goal status chips (Goals page).
+export const GOAL_STATUS_COLORS = {
+  active:    { bg: 'rgba(250,204,21,0.14)', color: BRAND },
+  completed: { bg: 'rgba(250,204,21,0.12)', color: BRAND },
+  cancelled: { bg: 'rgba(250,204,21,0.12)', color: DARK.danger },
+}
+
+// ADR decision status chips (Decisions page).
+export const DECISION_STATUS_COLORS = {
+  proposed: { bg: 'rgba(250,204,21,0.15)', color: BRAND, border: `1px dashed ${BRAND}` },
+  accepted: { bg: 'rgba(250,204,21,0.12)', color: BRAND, border: `1px solid ${BRAND}` },
+  deprecated: { bg: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: '1px solid #94a3b8' },
+  superseded: { bg: 'rgba(250,204,21,0.12)', color: BRAND, border: `1px solid ${BRAND}` },
+}
+
+// Webhook delivery status chips/dots (Integrations page).
+export const DELIVERY_STATUS_COLORS = {
+  success: { bg: STATUS_BG.done, color: STATUS_COLOR.done, dot: STATUS_COLOR.done },
+  failed:  { bg: STATUS_BG.failed, color: STATUS_COLOR.failed, dot: STATUS_COLOR.failed },
+  dead:    { bg: STATUS_BG.failed, color: STATUS_COLOR.failed, dot: STATUS_COLOR.failed },
+  pending: { bg: STATUS_BG.in_progress, color: STATUS_COLOR.in_progress, dot: STATUS_COLOR.in_progress },
+}
+
+// Webhook delivery text colors (WebhookLogs page renders `dead` muted, not red).
+export const DELIVERY_STATUS_TEXT = {
+  success: STATUS_COLOR.done,
+  failed: STATUS_COLOR.failed,
+  dead: '#6b7280',
+  pending: STATUS_COLOR.in_progress,
+}
