@@ -229,3 +229,33 @@ def test_regenerate_callback_token(client, sample_project):
     assert resp.status_code == 200
     new_token = resp.json()["callback_token"]
     assert new_token != old_token
+
+
+# --- Unified mutation pipeline (ADR-0038) ---
+
+
+def test_web_status_done_fires_status_events(client, sample_project, monkeypatch):
+    """Web updates now emit task.{status} and project.complete like API/webhook paths."""
+    from app.services import task_mutations
+
+    events = []
+
+    async def fake_notify(db, task, event):
+        events.append(event)
+
+    monkeypatch.setattr(task_mutations, "fire_notifications", fake_notify)
+    pid = sample_project.id
+    tid = client.post(_url(pid), json={"title": "Only task"}).json()["id"]
+    resp = client.patch(_url(pid, f"/{tid}"), json={"status": "done"})
+    assert resp.status_code == 200
+    assert "task.status_changed" in events
+    assert "task.done" in events
+    assert "project.complete" in events
+
+
+def test_web_update_rejects_bad_agent_key(client, sample_project):
+    pid = sample_project.id
+    tid = client.post(_url(pid), json={"title": "Agent task"}).json()["id"]
+    resp = client.patch(_url(pid, f"/{tid}"), json={"assigned_agent_key_id": "missing"})
+    assert resp.status_code == 400
+    assert "not found" in resp.json()["detail"]

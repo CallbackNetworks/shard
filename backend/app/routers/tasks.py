@@ -5,21 +5,15 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ApiKey, Node
+from app.models import Node
 from app.routers.deps import get_parent_task_or_error, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
-from app.routers.issue_sync import (
-    create_external_issue_from_task,
-    sync_task_closure_to_external,
-    sync_task_fields_to_external,
-    sync_task_reopen_to_external,
-)
+from app.routers.issue_sync import create_external_issue_from_task
 from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate, TaskWithSubtasksOut
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.enrichment import enrich_task
-from app.services.notifier import fire_notifications
-from app.services.rules_engine import run_rules
+from app.services.task_mutations import AgentKeyError, apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["tasks"])
@@ -80,34 +74,18 @@ def list_tasks(
 
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(get_db)):
-    project = _get_project_or_404(project_id, db)
+    _get_project_or_404(project_id, db)
     if body.parent_id is not None:
         get_parent_task_or_error(db, project_id, body.parent_id)
     task = graph.create_task(db, project_id=project_id, **body.model_dump())
-    task_id = task.id
-    log_activity(
-        db,
-        "task.created",
-        project_id=project_id,
-        task_id=task_id,
-        actor=body.assignee,
-        detail=f'Task "{task.title}" created in {project.name}',
-        meta={"title": task.title, "priority": task.priority},
-    )
-    db.commit()
-    task = graph.get_task(db, task_id)
-    await run_rules(db, "task.created", task, {})
-    db.commit()
-    task = graph.get_task(db, task_id)
-    await fire_notifications(db, task, "task.created")
-    await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task_id})
+    task = await finalize_task_create(db, task.id, actor=body.assignee, source="web", project_id=project_id)
     return enrich_task(task, db)
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
 async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
-    task = get_task_or_404(task_id, db, project_id=project_id)
+    get_task_or_404(task_id, db, project_id=project_id)
 
     changes = body.model_dump(exclude_none=True)
 
@@ -118,101 +96,10 @@ async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Sessi
         get_parent_task_or_error(db, project_id, new_parent_id, child_id=task_id)
         graph.set_parent_task(db, task_id, new_parent_id)
 
-    _validated_agent: ApiKey | None = None
-    if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] is not None:
-        _validated_agent = db.query(ApiKey).filter(ApiKey.id == changes["assigned_agent_key_id"]).first()
-        if not _validated_agent:
-            raise HTTPException(status_code=400, detail="Agent API key not found")
-        if not _validated_agent.active:
-            raise HTTPException(status_code=400, detail="Agent API key is inactive")
-
-    old_status = task.status
-    old_priority = task.priority
-    old_assignee = task.assignee
-    old_agent_key_id = task.assigned_agent_key_id
-    old_title = task.title
-    old_description = task.description
-    old_due_date = task.due_date
-
-    if changes:
-        task = graph.update_task(db, task_id, **changes)
-
-    triggered_rules = []
-
-    # Log status change
-    if "status" in changes and changes["status"] != old_status:
-        log_activity(
-            db,
-            "task.status_changed",
-            project_id=project_id,
-            task_id=task_id,
-            actor=task.assignee,
-            detail=f'Task "{task.title}" changed from {old_status} to {changes["status"]}',
-            meta={"old_status": old_status, "new_status": changes["status"]},
-        )
-        triggered_rules.append(("task.status_changed", {"old_status": old_status}))
-
-    # Log priority change
-    if "priority" in changes and changes["priority"] != old_priority:
-        triggered_rules.append(("task.priority_changed", {"old_priority": old_priority}))
-
-    # Log assignee change
-    if "assignee" in changes and changes["assignee"] != old_assignee:
-        log_activity(
-            db,
-            "task.assigned",
-            project_id=project_id,
-            task_id=task_id,
-            actor=changes["assignee"],
-            detail=f'Task "{task.title}" assigned to {changes["assignee"] or "unassigned"}',
-            meta={"old_assignee": old_assignee, "new_assignee": changes["assignee"]},
-        )
-
-    # Log agent assignment change
-    if "assigned_agent_key_id" in changes and changes["assigned_agent_key_id"] != old_agent_key_id:
-        agent_name = _validated_agent.name if _validated_agent else None
-        log_activity(
-            db,
-            "task.agent_assigned",
-            project_id=project_id,
-            task_id=task_id,
-            actor=agent_name or "system",
-            detail=f'Task "{task.title}" agent assignment changed to {agent_name or "none"}',
-            meta={"agent_name": agent_name},
-        )
-
-    db.commit()
-    task = graph.get_task(db, task_id)
-
-    if "status" in changes and changes["status"] != old_status:
-        await fire_notifications(db, task, "task.status_changed")
-        if changes["status"] == "done":
-            await sync_task_closure_to_external(task, db)
-        elif old_status == "done":
-            await sync_task_reopen_to_external(task, db)
-    if "assignee" in changes and changes["assignee"] != old_assignee:
-        await fire_notifications(db, task, "task.assigned")
-
-    if task.external_provider:
-        changed_fields = set()
-        if "title" in changes and changes["title"] != old_title:
-            changed_fields.add("title")
-        if "description" in changes and changes["description"] != old_description:
-            changed_fields.add("description")
-        if "assignee" in changes and changes["assignee"] != old_assignee:
-            changed_fields.add("assignee")
-        if "due_date" in changes and changes["due_date"] != old_due_date:
-            changed_fields.add("due_date")
-        if changed_fields:
-            await sync_task_fields_to_external(task, db, changed_fields)
-
-    for trigger, ctx in triggered_rules:
-        await run_rules(db, trigger, task, {"_rule_depth": 1, **ctx})
-    if triggered_rules:
-        db.commit()
-        task = graph.get_task(db, task_id)
-
-    await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task_id})
+    try:
+        task = await apply_task_update(db, task_id, changes, source="web", project_id=project_id)
+    except AgentKeyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return enrich_task(task, db)
 
 
