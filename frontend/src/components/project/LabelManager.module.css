@@ -1,0 +1,158 @@
+/* Label chip + project label manager (extracted from ProjectDetail).
+   Header labels read as bold graphic tags, not contained pills: display font,
+   uppercase, and a solid colored tick instead of a filled box. --label-color is
+   set inline per label. */
+
+.labelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--kt-display);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--label-color);
+  padding: 0;
+}
+
+.labelChip::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 0.92em;
+  background: var(--label-color);
+}
+
+.labelChipRemoveBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+}
+
+.labelManagerToggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 0;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--kt-ink);
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.labelManagerDropdown {
+  position: absolute;
+  z-index: 50;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--kt-surface);
+  border: 1px solid var(--kt-line);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 14px;
+  min-width: 260px;
+}
+
+.labelManagerTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--kt-ink);
+  margin-bottom: 10px;
+}
+
+.labelManagerEmpty {
+  font-size: 12px;
+  color: rgba(var(--kt-ink-rgb), 0.25);
+  margin-bottom: 10px;
+}
+
+.labelManagerList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.labelManagerLabelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 0;
+  font-weight: 500;
+}
+
+.labelManagerDeleteBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+}
+
+.labelManagerNewLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(var(--kt-ink-rgb), 0.35);
+  margin-bottom: 6px;
+}
+
+.labelManagerInputRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.labelManagerInput {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--kt-line);
+  border-radius: 0;
+  font-size: 12px;
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  color: var(--kt-ink);
+}
+
+.labelManagerPalette {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.labelManagerColorBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+  border: none;
+  cursor: pointer;
+  outline-offset: 2px;
+}
+
+.labelManagerCreateBtn {
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-radius: 0;
+  background: var(--kt-hit);
+  color: var(--kt-bg);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}

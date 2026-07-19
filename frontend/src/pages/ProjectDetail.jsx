@@ -1,7 +1,7 @@
 import { useState, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Tag, Zap, X, SlidersHorizontal, Bot, Download, Upload, CheckSquare, Bookmark, Rss, Check, Share2, MessageSquare, CalendarClock, Eye } from 'lucide-react'
+import { ArrowLeft, Plus, Zap, Bot, Rss, Check, Share2, MessageSquare, CalendarClock } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -12,96 +12,20 @@ import {
   setProjectShareExpiry, getProjectShareViewCount,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
+import LabelManager, { LabelChip } from '../components/project/LabelManager'
+import TaskFiltersPanel from '../components/project/TaskFiltersPanel'
+import BulkToolbar from '../components/project/BulkToolbar'
+import ShareSettingsPanel from '../components/project/ShareSettingsPanel'
 import GanttChart from '../components/GanttChart'
 import BoardView from '../components/BoardView'
 import CalendarView from '../components/CalendarView'
 import TableView from '../components/TableView'
 import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
-import { BRAND, DARK, LABEL_PALETTE } from '../constants/theme'
+import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { getUiPrefs } from '../utils/uiPrefs'
 import s from './ProjectDetail.module.css'
-
-function LabelChip({ label, onRemove }) {
-  return (
-    <span className={s.labelChip} style={{ '--label-color': label.color }}>
-      {label.name}
-      {onRemove && (
-        <button onClick={onRemove} className={s.labelChipRemoveBtn} style={{ color: label.color }}>
-          <X size={10} />
-        </button>
-      )}
-    </span>
-  )
-}
-
-function LabelManager({ labels, onCreateLabel, onDeleteLabel }) {
-  const [newName, setNewName] = useState('')
-  const [newColor, setNewColor] = useState(LABEL_PALETTE[0])
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className={s.labelManagerToggle}
-      >
-        <Tag size={12} /> Labels ({labels.length})
-      </button>
-      {open && (
-        <div className={s.labelManagerDropdown}>
-          <div className={s.labelManagerTitle}>Project Labels</div>
-          {labels.length === 0 && (
-            <div className={s.labelManagerEmpty}>No labels yet.</div>
-          )}
-          <div className={s.labelManagerList}>
-            {labels.map(lb => (
-              <span key={lb.id} className={s.labelManagerLabelChip} style={{
-                background: lb.color + '22', color: lb.color, border: `1px solid ${lb.color}44`,
-              }}>
-                {lb.name}
-                <button onClick={() => onDeleteLabel(lb.id)} className={s.labelManagerDeleteBtn} style={{ color: lb.color }}>
-                  <X size={10} />
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className={s.labelManagerNewLabel}>New label</div>
-          <div className={s.labelManagerInputRow}>
-            <input
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              placeholder="Label name"
-              className={s.labelManagerInput}
-            />
-          </div>
-          <div className={s.labelManagerPalette}>
-            {LABEL_PALETTE.map(c => (
-              <button
-                key={c}
-                onClick={() => setNewColor(c)}
-                className={s.labelManagerColorBtn}
-                style={{
-                  background: c,
-                  outline: newColor === c ? `2px solid ${c}` : '2px solid transparent',
-                }}
-              />
-            ))}
-          </div>
-          <button
-            disabled={!newName.trim()}
-            onClick={() => { if (newName.trim()) { onCreateLabel({ name: newName.trim(), color: newColor }); setNewName('') } }}
-            className={s.labelManagerCreateBtn}
-            style={{ opacity: newName.trim() ? 1 : 0.5 }}
-          >
-            Create Label
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
@@ -315,6 +239,51 @@ export default function ProjectDetail() {
 
   const activeFilterCount = [filterPriority, filterLabel, filterAssignee, filterDue, filterAgent].filter(f => f !== 'all').length
 
+  const applyFilterPatch = (patch) => {
+    if ('status' in patch) setFilter(patch.status)
+    if ('priority' in patch) setFilterPriority(patch.priority)
+    if ('label' in patch) setFilterLabel(patch.label)
+    if ('assignee' in patch) setFilterAssignee(patch.assignee)
+    if ('due' in patch) setFilterDue(patch.due)
+    if ('agent' in patch) setFilterAgent(patch.agent)
+  }
+
+  const applySavedFilter = (filterId) => {
+    const sf = savedFilters.find(f => f.id === filterId)
+    if (!sf) return
+    const fl = sf.filters || {}
+    setFilter(fl.status || 'all')
+    setFilterPriority(fl.priority || 'all')
+    setFilterLabel(fl.label_id || 'all')
+    setFilterAssignee(fl.assignee || 'all')
+    setFilterDue(fl.due || 'all')
+    setShowFilters(true)
+  }
+
+  const saveCurrentFilter = () => {
+    const name = prompt('Name for this saved view:')
+    if (!name) return
+    saveFilterMut.mutate({
+      name,
+      project_id: id,
+      filters: {
+        status: filter !== 'all' ? filter : undefined,
+        priority: filterPriority !== 'all' ? filterPriority : undefined,
+        label_id: filterLabel !== 'all' ? filterLabel : undefined,
+        assignee: filterAssignee !== 'all' ? filterAssignee : undefined,
+        due: filterDue !== 'all' ? filterDue : undefined,
+      },
+    })
+  }
+
+  const exportTasksToFile = async () => {
+    const data = await exportTasks(id, 'json')
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `${project?.name || 'tasks'}.json`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const deferredSearch = useDeferredValue(searchQ)
   const searchFiltered = deferredSearch.trim()
     ? tasks.filter(t =>
@@ -460,41 +429,14 @@ export default function ProjectDetail() {
         </div>
 
         {shareSettingsOpen && (
-          <div className={s.agentInstrPanel}>
-            <div className={s.agentInstrTitle}>
-              Share Link Settings
-            </div>
-            <div className={s.agentInstrDesc}>
-              Time-box the public share link and see how many times it has been viewed.
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                <CalendarClock size={13} /> Expires
-                <input
-                  type="datetime-local"
-                  value={expiryInput}
-                  onChange={e => setExpiryInput(e.target.value)}
-                  className="kt-input"
-                  style={{ width: 'auto' }}
-                />
-              </label>
-              <button
-                onClick={() => setExpiryMut.mutate(expiryInput ? new Date(expiryInput).toISOString() : null)}
-                disabled={setExpiryMut.isPending}
-                className={s.archiveBtn}
-              >
-                {expiryInput ? 'Set' : 'Clear'}
-              </button>
-              {project.share_expires_at && (
-                <span style={{ fontSize: 12, color: '#facc15' }}>
-                  Expires {new Date(project.share_expires_at).toLocaleString()}
-                </span>
-              )}
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginLeft: 'auto' }}>
-                <Eye size={13} /> {shareViews === null ? '—' : shareViews} views
-              </span>
-            </div>
-          </div>
+          <ShareSettingsPanel
+            project={project}
+            expiryInput={expiryInput}
+            setExpiryInput={setExpiryInput}
+            shareViews={shareViews}
+            onSetExpiry={(iso) => setExpiryMut.mutate(iso)}
+            isPending={setExpiryMut.isPending}
+          />
         )}
 
         {showAgentInstr && (
@@ -577,200 +519,37 @@ export default function ProjectDetail() {
         {/* Issues */}
         {tab === 'issues' && (
           <div>
-            <div className={s.filterBar}>
-              {!searchQ && ['all', 'todo', 'in_progress', 'done', 'failed'].map(f => (
-                <button key={f} onClick={() => setFilter(f)} className={`${s.filterBtn} ${filter === f ? s.filterBtnActive : s.filterBtnInactive}`}>
-                  {f === 'all' ? 'All' : f === 'in_progress' ? 'In Progress' : f.charAt(0).toUpperCase() + f.slice(1)}
-                  {' '}<span className={s.filterCount}>{f === 'all' ? topTasks.length : topTasks.filter(t => t.status === f).length}</span>
-                </button>
-              ))}
-              <div className={s.filterRight}>
-                {/* Saved filters dropdown */}
-                {savedFilters.length > 0 && (
-                  <select
-                    onChange={e => {
-                      const sf = savedFilters.find(f => f.id === e.target.value)
-                      if (!sf) return
-                      const fl = sf.filters || {}
-                      setFilter(fl.status || 'all')
-                      setFilterPriority(fl.priority || 'all')
-                      setFilterLabel(fl.label_id || 'all')
-                      setFilterAssignee(fl.assignee || 'all')
-                      setFilterDue(fl.due || 'all')
-                      setShowFilters(true)
-                    }}
-                    style={{ fontSize: 11, background: DARK.elevated, color: DARK.textMid, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
-                    value=""
-                  >
-                    <option value="">Saved views</option>
-                    {savedFilters.map(sf => (
-                      <option key={sf.id} value={sf.id}>{sf.name}</option>
-                    ))}
-                  </select>
-                )}
-                {/* Save current filter */}
-                {activeFilterCount > 0 && (
-                  <button
-                    onClick={() => {
-                      const name = prompt('Name for this saved view:')
-                      if (!name) return
-                      saveFilterMut.mutate({
-                        name,
-                        project_id: id,
-                        filters: {
-                          status: filter !== 'all' ? filter : undefined,
-                          priority: filterPriority !== 'all' ? filterPriority : undefined,
-                          label_id: filterLabel !== 'all' ? filterLabel : undefined,
-                          assignee: filterAssignee !== 'all' ? filterAssignee : undefined,
-                          due: filterDue !== 'all' ? filterDue : undefined,
-                        },
-                      })
-                    }}
-                    title="Save current filter"
-                    style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}
-                  >
-                    <Bookmark size={11} /> Save
-                  </button>
-                )}
-                {/* Bulk mode toggle */}
-                <button
-                  onClick={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
-                  style={{
-                    background: bulkMode ? 'rgba(250,204,21,0.12)' : 'none',
-                    border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
-                    color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
-                  }}
-                >
-                  <CheckSquare size={11} /> Bulk
-                </button>
-                {/* Export */}
-                <button
-                  onClick={async () => {
-                    const data = await exportTasks(id, 'json')
-                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a'); a.href = url; a.download = `${project?.name || 'tasks'}.json`; a.click()
-                    URL.revokeObjectURL(url)
-                  }}
-                  title="Export tasks"
-                  style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center' }}
-                >
-                  <Download size={11} />
-                </button>
-                {/* Import */}
-                <button
-                  onClick={() => setShowImport(v => !v)}
-                  title="Import tasks"
-                  style={{ background: showImport ? 'rgba(250,204,21,0.12)' : 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
-                >
-                  <Upload size={11} />
-                </button>
-                <button
-                  onClick={() => setShowFilters(v => !v)}
-                  className={`${s.advancedFilterBtn} ${activeFilterCount > 0 ? s.advancedFilterActive : s.advancedFilterInactive}`}
-                >
-                  <SlidersHorizontal size={12} />
-                  Filter
-                  {activeFilterCount > 0 && (
-                    <span className={s.activeFilterBadge}>
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-                <input
-                  value={searchQ}
-                  onChange={e => setSearchQ(e.target.value)}
-                  placeholder="Search issues\u2026"
-                  className={s.searchInput}
-                />
-                {searchQ && (
-                  <button onClick={() => setSearchQ('')} className={s.clearSearchBtn}>
-                    {'\u2715'}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Advanced filter bar */}
-            {showFilters && (
-              <div className={s.advancedFilterBar}>
-                <span className={s.advancedFilterLabel}>Filters:</span>
-                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                  className={`${s.filterSelect} ${filterPriority !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-                  <option value="all">Priority: All</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-                <select value={filterLabel} onChange={e => setFilterLabel(e.target.value)}
-                  className={`${s.filterSelect} ${filterLabel !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-                  <option value="all">Label: All</option>
-                  {labels.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
-                </select>
-                <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-                  className={`${s.filterSelect} ${filterAssignee !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-                  <option value="all">Assignee: All</option>
-                  {assignees.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-                <select value={filterDue} onChange={e => setFilterDue(e.target.value)}
-                  className={`${s.filterSelect} ${filterDue !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-                  <option value="all">Due: All</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="this_week">This week</option>
-                  <option value="no_date">No date</option>
-                </select>
-                {agentNames.length > 0 && (
-                  <select value={filterAgent} onChange={e => setFilterAgent(e.target.value)}
-                    className={`${s.filterSelect} ${filterAgent !== 'all' ? s.filterSelectAgent : s.filterSelectAgentDefault}`}>
-                    <option value="all">Agent: All</option>
-                    {agentNames.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                )}
-                {activeFilterCount > 0 && (
-                  <button
-                    onClick={() => { setFilterPriority('all'); setFilterLabel('all'); setFilterAssignee('all'); setFilterDue('all'); setFilterAgent('all') }}
-                    className={s.clearAllFiltersBtn}
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-            )}
+            <TaskFiltersPanel
+              filters={{ status: filter, priority: filterPriority, label: filterLabel, assignee: filterAssignee, due: filterDue, agent: filterAgent }}
+              setFilters={applyFilterPatch}
+              searchQ={searchQ}
+              setSearchQ={setSearchQ}
+              showFilters={showFilters}
+              setShowFilters={setShowFilters}
+              activeFilterCount={activeFilterCount}
+              topTasks={topTasks}
+              labels={labels}
+              assignees={assignees}
+              agentNames={agentNames}
+              savedFilters={savedFilters}
+              onApplySavedFilter={applySavedFilter}
+              onSaveFilter={saveCurrentFilter}
+              bulkMode={bulkMode}
+              onToggleBulk={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
+              onExport={exportTasksToFile}
+              showImport={showImport}
+              onToggleImport={() => setShowImport(v => !v)}
+            />
 
             {/* Bulk action bar */}
             {bulkMode && selectedTasks.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(250,204,21,0.08)', borderBottom: '1px solid rgba(250,204,21,0.2)' }}>
-                <span style={{ fontSize: 12, color: DARK.info, fontWeight: 600 }}>{selectedTasks.size} selected</span>
-                <select
-                  onChange={e => { if (e.target.value) { bulkUpdateMut.mutate({ task_ids: [...selectedTasks], status: e.target.value }); e.target.value = '' } }}
-                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 4, padding: '3px 6px' }}
-                  defaultValue=""
-                >
-                  <option value="" disabled>Set status...</option>
-                  <option value="todo">Todo</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="done">Done</option>
-                  <option value="failed">Failed</option>
-                </select>
-                <select
-                  onChange={e => { if (e.target.value) { bulkUpdateMut.mutate({ task_ids: [...selectedTasks], priority: e.target.value }); e.target.value = '' } }}
-                  style={{ fontSize: 11, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 4, padding: '3px 6px' }}
-                  defaultValue=""
-                >
-                  <option value="" disabled>Set priority...</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-                <button
-                  onClick={() => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], is_pinned: true })}
-                  style={{ fontSize: 11, background: 'rgba(255,164,43,0.1)', color: DARK.warning, border: '1px solid rgba(255,164,43,0.3)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
-                >Pin</button>
-                <button
-                  onClick={() => setSelectedTasks(new Set())}
-                  style={{ marginLeft: 'auto', fontSize: 11, background: 'none', color: DARK.textMid, border: 'none', cursor: 'pointer' }}
-                >Clear</button>
-              </div>
+              <BulkToolbar
+                selectedCount={selectedTasks.size}
+                onSetStatus={(status) => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], status })}
+                onSetPriority={(priority) => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], priority })}
+                onPin={() => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], is_pinned: true })}
+                onClear={() => setSelectedTasks(new Set())}
+              />
             )}
 
             {/* Import modal */}

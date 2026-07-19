@@ -1,0 +1,44 @@
+/* Bulk-selection action bar (extracted from ProjectDetail; ADR-0012). */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(250, 204, 21, 0.08);
+  border-bottom: 1px solid rgba(250, 204, 21, 0.2);
+}
+
+.count {
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.select {
+  font-size: 11px;
+  background: var(--kt-elev, #262626);
+  color: var(--kt-ink, #ffffff);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.15);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.pinBtn {
+  font-size: 11px;
+  background: rgba(255, 164, 43, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(255, 164, 43, 0.3);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.clearBtn {
+  margin-left: auto;
+  font-size: 11px;
+  background: none;
+  color: var(--kt-muted, #9ca3af);
+  border: none;
+  cursor: pointer;
+}
