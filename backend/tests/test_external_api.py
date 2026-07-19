@@ -459,3 +459,101 @@ class TestSummary:
         data = r.json()
         assert "projects" in data
         assert len(data["projects"]) >= 1
+
+
+# ── Unified mutation pipeline (ADR-0038) ─────────────────────────────────
+
+
+class TestExternalApiMutationPipeline:
+    def test_update_runs_workflow_rules(self, client, db, api_key_write, project_with_tasks):
+        """External API status changes now trigger workflow rules."""
+        from app.models import WorkflowRule
+
+        raw_key, _ = api_key_write
+        p, _, t2 = project_with_tasks
+        db.add(
+            WorkflowRule(
+                name="Escalate done tasks",
+                trigger="task.status_changed",
+                conditions=[{"field": "status", "op": "eq", "value": "done"}],
+                actions=[{"type": "set_priority", "value": "high"}],
+                active=True,
+            )
+        )
+        db.commit()
+
+        r = client.patch(
+            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            json={"status": "done"},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 200
+        assert r.json()["priority"] == "high"
+
+    def test_update_rejects_invalid_agent_key(self, client, api_key_write, project_with_tasks):
+        raw_key, _ = api_key_write
+        p, _, t2 = project_with_tasks
+        r = client.patch(
+            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            json={"assigned_agent_key_id": "missing"},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 400
+        assert "not found" in r.json()["detail"]
+
+    def test_bulk_update_logs_activity(self, client, db, api_key_write, project_with_tasks):
+        from app.models import ActivityLog
+
+        raw_key, _ = api_key_write
+        p, _, t2 = project_with_tasks
+        r = client.post(
+            f"/api/v1/projects/{p.id}/tasks/bulk-update",
+            json=[{"id": t2.id, "status": "in_progress"}],
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 200
+        row = db.query(ActivityLog).filter(ActivityLog.action == "task.status_changed").one()
+        assert row.task_id == t2.id
+        assert row.meta["api_key"] == "Write Key"
+
+    def test_update_syncs_fields_to_external(self, client, db, api_key_write, project_with_tasks, monkeypatch):
+        import app.routers.issue_sync as issue_sync
+        from app.services import graph
+
+        synced = []
+
+        async def fake_sync(task, db_, changed):
+            synced.append(changed)
+            return True
+
+        monkeypatch.setattr(issue_sync, "sync_task_fields_to_external", fake_sync)
+        raw_key, _ = api_key_write
+        p, _, t2 = project_with_tasks
+        graph.update_task(db, t2.id, external_provider="github", external_id="7")
+        db.commit()
+        r = client.patch(
+            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            json={"title": "Synced title"},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 200
+        assert synced == [{"title"}]
+
+    def test_create_fires_created_notification(self, client, api_key_write, project_with_tasks, monkeypatch):
+        from app.services import task_mutations
+
+        events = []
+
+        async def fake_notify(db_, task, event):
+            events.append(event)
+
+        monkeypatch.setattr(task_mutations, "fire_notifications", fake_notify)
+        raw_key, _ = api_key_write
+        p, _, _ = project_with_tasks
+        r = client.post(
+            f"/api/v1/projects/{p.id}/tasks",
+            json={"title": "API created"},
+            headers={"X-API-Key": raw_key},
+        )
+        assert r.status_code == 201
+        assert "task.created" in events

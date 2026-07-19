@@ -17,9 +17,9 @@ from app.routers.external_api.auth import (
 )
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 from app.services import graph
-from app.services.activity import log_activity
 from app.services.enrichment import enrich_task
-from app.services.notifier import fire_notifications
+from app.services.task_mutations import AgentKeyError, apply_task_update, finalize_task_create
+from app.services.ws_manager import ws_manager
 
 sub_router = APIRouter()
 
@@ -77,7 +77,7 @@ def api_get_task(
     response_model=TaskOut,
     responses={**_auth_errors, 404: {"description": "Project not found"}},
 )
-def api_create_task(
+async def api_create_task(
     project_id: str,
     body: TaskCreate,
     db: Session = Depends(get_db),
@@ -92,18 +92,15 @@ def api_create_task(
     if body.parent_id is not None:
         get_parent_task_or_error(db, project_id, body.parent_id)
     task = graph.create_task(db, project_id=project_id, **body.model_dump())
-    actor = _build_actor(api_key, x_agent_id)
-    log_activity(
+    task = await finalize_task_create(
         db,
-        "task.created",
+        task.id,
+        actor=_build_actor(api_key, x_agent_id),
+        source="api",
         project_id=project_id,
-        task_id=task.id,
-        actor=actor,
-        detail=f'Task "{task.title}" created via API',
-        meta={"title": task.title, "priority": task.priority, "api_key": api_key.name, "agent_id": x_agent_id},
+        activity_meta={"api_key": api_key.name, "agent_id": x_agent_id},
     )
-    db.commit()
-    return enrich_task(graph.get_task(db, task.id), db)
+    return enrich_task(task, db)
 
 
 @sub_router.patch(
@@ -126,40 +123,24 @@ async def api_update_task(
     task = graph.get_task(db, task_id)
     if not task or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
-    old_status = task.status
     changes = body.model_dump(exclude_none=True)
     # Re-parenting is a graph move, not a column write (ADR-0032).
     new_parent_id = changes.pop("parent_id", None)
     if new_parent_id is not None:
         get_parent_task_or_error(db, project_id, new_parent_id, child_id=task_id)
         graph.set_parent_task(db, task_id, new_parent_id)
-    if changes:
-        task = graph.update_task(db, task_id, **changes)
-
-    actor = _build_actor(api_key, x_agent_id)
-    if body.status and body.status != old_status:
-        log_activity(
+    try:
+        task = await apply_task_update(
             db,
-            "task.status_changed",
+            task_id,
+            changes,
+            actor=_build_actor(api_key, x_agent_id),
+            source="api",
             project_id=project_id,
-            task_id=task_id,
-            actor=actor,
-            detail=f'Task "{task.title}" changed from {old_status} to {body.status} via API',
-            meta={"old_status": old_status, "new_status": body.status, "api_key": api_key.name, "agent_id": x_agent_id},
+            activity_meta={"api_key": api_key.name, "agent_id": x_agent_id},
         )
-
-    db.commit()
-    task = graph.get_task(db, task_id)
-
-    # Fire notifications on status change
-    if body.status and body.status != old_status:
-        event = f"task.{body.status}"
-        await fire_notifications(db, task, event)
-        if body.status == "done":
-            project = graph.project_of_task(db, task.id)
-            if project is not None and all(t.status == "done" for t in graph.tasks_in_project(db, project.id)):
-                await fire_notifications(db, task, "project.complete")
-
+    except AgentKeyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return enrich_task(task, db)
 
 
@@ -206,13 +187,28 @@ async def api_bulk_create_tasks(
     project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    created = []
+    # Validate the whole batch up front so a bad item cannot leave a
+    # partially-created batch behind (single commit below).
     for body in tasks:
         if body.parent_id is not None:
             get_parent_task_or_error(db, project_id, body.parent_id)
+    actor = _build_actor(api_key, None)
+    created = []
+    for body in tasks:
         task = graph.create_task(db, project_id=project_id, **body.model_dump())
+        await finalize_task_create(
+            db,
+            task.id,
+            actor=actor,
+            source="api",
+            project_id=project_id,
+            activity_meta={"api_key": api_key.name},
+            commit=False,
+            broadcast=False,
+        )
         created.append(task.id)
     db.commit()
+    await ws_manager.broadcast("task.imported", {"project_id": project_id, "task_ids": created})
     return [enrich_task(graph.get_task(db, tid), db) for tid in created]
 
 
@@ -246,6 +242,7 @@ async def api_bulk_update_tasks(
         "position",
         "progress_pct",
     }
+    actor = _build_actor(api_key, None)
     results = []
     for update in updates:
         task_id = update.pop("id", None)
@@ -254,7 +251,6 @@ async def api_bulk_update_tasks(
         task = graph.get_task(db, task_id)
         if not task or task_id not in graph.contained_task_ids(db, project_id):
             continue
-        old_status = task.status
         changes: dict = {}
         for field, value in update.items():
             if field not in _ALLOWED_FIELDS:
@@ -272,13 +268,19 @@ async def api_bulk_update_tasks(
                     raise HTTPException(status_code=422, detail="Title must be 500 characters or fewer")
                 value = value.strip()
             changes[field] = value
-        if changes:
-            task = graph.update_task(db, task_id, **changes)
+        # Per-task commit keeps a rule failure from rolling back earlier
+        # items; the aggregate broadcast below replaces per-task events.
+        await apply_task_update(
+            db,
+            task_id,
+            changes,
+            actor=actor,
+            source="api",
+            project_id=project_id,
+            activity_meta={"api_key": api_key.name},
+            broadcast=False,
+        )
         results.append(task_id)
 
-        if "status" in update and update["status"] != old_status:
-            event = f"task.{update['status']}"
-            await fire_notifications(db, task, event)
-
-    db.commit()
+    await ws_manager.broadcast("task.bulk_updated", {"project_id": project_id, "task_ids": results})
     return [enrich_task(graph.get_task(db, tid), db) for tid in results]
