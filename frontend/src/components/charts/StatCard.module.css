@@ -1,0 +1,55 @@
+/* Headline stat tiles (extracted from Analytics + IdentityChartsView; ADR-0012).
+   fadeUpIn is redeclared locally: CSS modules scope animation names, so a bare
+   reference to the global.css keyframe would be renamed and never match. */
+
+@keyframes fadeUpIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.card {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeUpIn 0.35s ease forwards;
+  opacity: 0;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(var(--kt-ink-rgb), 0.4);
+  font-size: 12px;
+}
+
+.value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.sub {
+  font-size: 11px;
+  color: rgba(var(--kt-ink-rgb), 0.3);
+}
+
+.compactCard {
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.07);
+  border-radius: 8px;
+  padding: 14px 16px;
+  animation: fadeUpIn 0.35s ease forwards;
+  opacity: 0;
+}
+
+.compactLabel {
+  font-size: 11px;
+  color: rgba(var(--kt-ink-rgb), 0.35);
+  margin-bottom: 4px;
+}
+
+.compactValue {
+  font-size: 22px;
+  font-weight: 800;
+}
