@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import { DARK, STATUS_COLOR } from '../constants/theme'
-import { createTask } from '../api/client'
 import { formatMinutes } from '../utils/formatTime'
 import { formatTimestamp } from '../utils/datetime'
+import QuickAddTask from './overview/QuickAddTask'
+import PinButton from './overview/PinButton'
 
 export const FONT = '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif'
 export const BG   = '#121212'
@@ -23,83 +23,8 @@ const PARA   = (px = 10) => `polygon(${px}px 0, 100% 0, calc(100% - ${px}px) 100
 // Preference-aware timestamp (relative vs. absolute, 12/24h). See utils/datetime.
 const relativeTime = formatTimestamp
 
-const PINNED_KEY = 'overview_pinned_projects'
-
-export function getPinnedIds() {
-  try { return JSON.parse(localStorage.getItem(PINNED_KEY) || '[]') } catch { return [] }
-}
-
-export function togglePin(projectId) {
-  const ids = getPinnedIds()
-  const next = ids.includes(projectId) ? ids.filter(id => id !== projectId) : [...ids, projectId].slice(-3)
-  localStorage.setItem(PINNED_KEY, JSON.stringify(next))
-  return next
-}
-
-/* ── QuickAddTask — inline task creator on project cards ── */
-function QuickAddTask({ projectId }) {
-  const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const qc = useQueryClient()
-  const addMut = useMutation({
-    mutationFn: (data) => createTask(projectId, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); setTitle(''); setOpen(false) },
-  })
-  const submit = useCallback(() => {
-    if (!title.trim()) return
-    addMut.mutate({ title: title.trim(), priority: 'medium' })
-  }, [title, addMut])
-
-  if (!open) {
-    return (
-      <button onClick={(e) => { e.stopPropagation(); setOpen(true) }} style={{
-        background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4,
-        color: DIM, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '2px 8px',
-        letterSpacing: '0.08em', fontFamily: FONT,
-      }}>+ TASK</button>
-    )
-  }
-
-  return (
-    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-      <input
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setOpen(false) }}
-        placeholder="Task title..."
-        autoFocus
-        style={{
-          background: 'rgba(var(--kt-ink-rgb), 0.05)', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)',
-          borderRadius: 4, padding: '3px 8px', fontSize: 11, color: HI, outline: 'none',
-          width: 160, fontFamily: FONT,
-        }}
-      />
-      <button onClick={submit} disabled={!title.trim()} style={{
-        background: DARK.success, border: 'none', borderRadius: 4, color: '#000',
-        fontSize: 10, fontWeight: 800, padding: '4px 8px', cursor: 'pointer',
-        opacity: title.trim() ? 1 : 0.4,
-      }}>ADD</button>
-      <button onClick={() => setOpen(false)} style={{
-        background: 'none', border: 'none', color: DIM, fontSize: 12, cursor: 'pointer', padding: '2px 4px',
-      }}>✕</button>
-    </div>
-  )
-}
-
-/* ── PinButton ── */
-function PinButton({ projectId, pinned, onToggle }) {
-  const isPinned = pinned.includes(projectId)
-  return (
-    <button onClick={(e) => { e.stopPropagation(); onToggle(projectId) }} title={isPinned ? 'Unpin' : 'Pin to top'} style={{
-      background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px',
-      color: isPinned ? '#f0b429' : DIM, fontSize: 12, lineHeight: 1,
-      transition: 'color 0.15s',
-    }}>
-      {isPinned ? '★' : '☆'}
-    </button>
-  )
-}
-
+// Pin storage moved to components/overview/pinnedProjects (re-exported for Dashboard).
+export { getPinnedIds, togglePin } from './overview/pinnedProjects'
 
 function formatDate(dateStr) {
   if (!dateStr) return null

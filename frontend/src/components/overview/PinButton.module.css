@@ -1,0 +1,16 @@
+/* Pin star on overview cards (extracted from OverviewViews; ADR-0012). */
+
+.btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+  color: rgba(var(--kt-ink-rgb), 0.22);
+  font-size: 12px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.btnPinned {
+  color: #f0b429;
+}
