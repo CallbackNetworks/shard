@@ -92,3 +92,32 @@ def test_message_field_is_optional(client, db, sample_project):
         json={"status": "done", "message": "Build passed"},
     )
     assert resp.status_code == 200
+
+
+def test_callback_fires_status_changed_event(client, db, sample_project, monkeypatch):
+    """Webhook callbacks now emit task.status_changed alongside task.{status} (ADR-0038)."""
+    from app.services import task_mutations
+
+    events = []
+
+    async def fake_notify(db_, task, event):
+        events.append(event)
+
+    monkeypatch.setattr(task_mutations, "fire_notifications", fake_notify)
+    task = _make_task(db, sample_project.id)
+    resp = client.post(f"/webhook/callback/{task.callback_token}", json={"status": "done"})
+    assert resp.status_code == 200
+    assert "task.status_changed" in events
+    assert "task.done" in events
+    assert "project.complete" in events
+
+
+def test_callback_same_status_logs_no_activity(client, db, sample_project):
+    """A no-op status callback no longer records a bogus status_changed row."""
+    from app.models import ActivityLog
+
+    task = _make_task(db, sample_project.id, status="done")
+    resp = client.post(f"/webhook/callback/{task.callback_token}", json={"status": "done"})
+    assert resp.status_code == 200
+    rows = db.query(ActivityLog).filter(ActivityLog.action == "task.status_changed").count()
+    assert rows == 0

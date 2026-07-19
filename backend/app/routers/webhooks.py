@@ -10,11 +10,9 @@ from app.database import get_db
 from app.models import WebhookEvent
 from app.schemas import TaskOut, WebhookEventOut
 from app.services import graph
-from app.services.activity import log_activity
 from app.services.cicd_adapters import normalize_webhook_payload
 from app.services.enrichment import enrich_task
-from app.services.notifier import fire_notifications
-from app.services.rules_engine import run_rules
+from app.services.task_mutations import apply_task_update
 
 logger = logging.getLogger(__name__)
 
@@ -117,33 +115,7 @@ async def webhook_callback(
     # Normalize the payload through CI/CD adapters
     normalized = normalize_webhook_payload(headers, body, provider_hint=provider)
 
-    prev_status = task.status
-    task = graph.update_task(db, task.id, status=normalized["status"])
-
-    # Build a human-readable detail message
-    detail_msg = normalized.get("message") or f"Status changed to {normalized['status']} via webhook"
-    if normalized.get("provider") != "generic":
-        detail_msg = f"[{normalized['provider']}] {detail_msg}"
-
-    log_activity(
-        db,
-        "task.status_changed",
-        project_id=graph.project_id_of_task(db, task.id),
-        task_id=task.id,
-        actor="webhook",
-        detail=f'Task "{task.title}" changed from {prev_status} to {normalized["status"]} via webhook',
-        meta={
-            "old_status": prev_status,
-            "new_status": normalized["status"],
-            "source": "webhook",
-            "provider": normalized.get("provider"),
-            "commit_sha": normalized.get("commit_sha"),
-            "branch": normalized.get("branch"),
-            "build_url": normalized.get("build_url"),
-        },
-    )
-
-    # Store webhook event for build history
+    # Store webhook event for build history (committed by the pipeline below).
     webhook_event = WebhookEvent(
         task_id=task.id,
         provider=normalized.get("provider", "generic"),
@@ -161,25 +133,23 @@ async def webhook_callback(
     )
     db.add(webhook_event)
 
-    db.commit()
-    task = graph.get_task(db, task.id)
-
-    event = f"task.{normalized['status']}"
-    await fire_notifications(db, task, event)
-
-    # Run workflow rules on status change
-    if prev_status != normalized["status"]:
-        await run_rules(db, "task.status_changed", task, {"old_status": prev_status, "_rule_depth": 1})
-
-    # If all tasks are done, also fire project.complete
-    project = graph.project_of_task(db, task.id)
-    if project is not None:
-        project_tasks = graph.tasks_in_project(db, project.id)
-        total = len(project_tasks)
-        done = sum(1 for t in project_tasks if t.status == "done")
-        if total > 0 and done == total:
-            await fire_notifications(db, task, "project.complete")
-
+    # sync_external=False: the change originated externally, echoing it back
+    # to the external issue would loop.
+    task = await apply_task_update(
+        db,
+        task.id,
+        {"status": normalized["status"]},
+        actor="webhook",
+        source="webhook",
+        sync_external=False,
+        activity_meta={
+            "source": "webhook",
+            "provider": normalized.get("provider"),
+            "commit_sha": normalized.get("commit_sha"),
+            "branch": normalized.get("branch"),
+            "build_url": normalized.get("build_url"),
+        },
+    )
     return enrich_task(task, db)
 
 
