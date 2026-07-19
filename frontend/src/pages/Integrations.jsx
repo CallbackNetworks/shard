@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, RefreshCw, X, Zap, Plus, Trash2, BookOpen, Activity, RotateCcw } from 'lucide-react'
 import {
   getIntegrations, createIntegration, updateIntegration, deleteIntegration,
@@ -11,6 +11,7 @@ import { globalAddToast } from '../context/ToastContext'
 import { BRAND, DARK, DELIVERY_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import useBreakpoint from '../hooks/useBreakpoint'
+import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import s from './Integrations.module.css'
 
 const TYPE_ICONS = {
@@ -118,7 +119,6 @@ function HealthStats({ integrationId }) {
 /* ── Delivery Log with Filters ── */
 function DeliveryLog({ integrationId }) {
   const { t } = useTranslation()
-  const qc = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [selected, setSelected] = useState(null)
   const [filterEvent, setFilterEvent] = useState('')
@@ -134,16 +134,16 @@ function DeliveryLog({ integrationId }) {
     staleTime: 10000,
   })
 
-  const retryMut = useMutation({
+  const retryMut = useInvalidatingMutation({
     mutationFn: retryDelivery,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['deliveries', integrationId] }); setSelected(null) },
+    invalidateKeys: [['deliveries', integrationId]],
+    onSuccess: () => setSelected(null),
   })
 
-  const bulkRetryMut = useMutation({
+  const bulkRetryMut = useInvalidatingMutation({
     mutationFn: () => bulkRetryDeliveries(integrationId),
+    invalidateKeys: [['deliveries', integrationId], ['integration-health', integrationId]],
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['deliveries', integrationId] })
-      qc.invalidateQueries({ queryKey: ['integration-health', integrationId] })
       globalAddToast(t('integrations.bulkRetryResult', data), 'info')
     },
   })
@@ -512,23 +512,37 @@ export default function Integrations() {
   const { t } = useTranslation()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
-  const qc = useQueryClient()
   const { data: integrations = [], isLoading } = useQuery({ queryKey: ['integrations'], queryFn: getIntegrations })
   const [modal, setModal] = useState(null)
   const [templatePicker, setTemplatePicker] = useState(false)
   const [testResults, setTestResults] = useState({})
   const [setupModal, setSetupModal] = useState(null)
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['integrations'] })
-
   const _checkSmtpWarning = (data) => {
     if (data?.smtp_warning) globalAddToast(data.smtp_warning, 'warning')
   }
 
-  const createMut = useMutation({ mutationFn: createIntegration, onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data); globalAddToast(t('integrations.createdSuccess'), 'success') } })
-  const updateMut = useMutation({ mutationFn: ({ id, data }) => updateIntegration(id, data), onSuccess: (data) => { invalidate(); setModal(null); _checkSmtpWarning(data); globalAddToast(t('integrations.updatedSuccess'), 'success') } })
-  const deleteMut = useMutation({ mutationFn: deleteIntegration, onSuccess: () => { invalidate(); globalAddToast(t('integrations.deletedSuccess'), 'success') } })
-  const testMut = useMutation({ mutationFn: testIntegration, onSuccess: (data, id) => setTestResults(r => ({ ...r, [id]: data })) })
+  const createMut = useInvalidatingMutation({
+    mutationFn: createIntegration,
+    invalidateKeys: [['integrations']],
+    successMessage: t('integrations.createdSuccess'),
+    onSuccess: (data) => { setModal(null); _checkSmtpWarning(data) },
+  })
+  const updateMut = useInvalidatingMutation({
+    mutationFn: ({ id, data }) => updateIntegration(id, data),
+    invalidateKeys: [['integrations']],
+    successMessage: t('integrations.updatedSuccess'),
+    onSuccess: (data) => { setModal(null); _checkSmtpWarning(data) },
+  })
+  const deleteMut = useInvalidatingMutation({
+    mutationFn: deleteIntegration,
+    invalidateKeys: [['integrations']],
+    successMessage: t('integrations.deletedSuccess'),
+  })
+  const testMut = useInvalidatingMutation({
+    mutationFn: testIntegration,
+    onSuccess: (data, id) => setTestResults(r => ({ ...r, [id]: data })),
+  })
 
   const handleSave = (form) => {
     const data = {

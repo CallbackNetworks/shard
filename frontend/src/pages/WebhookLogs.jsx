@@ -1,19 +1,19 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { RefreshCw, ChevronDown, ChevronUp, ScrollText, Trash2 } from 'lucide-react'
 import { getAllDeliveries, getIntegrations, retryDelivery, purgeDeliveries } from '../api/client'
 import { DARK, DELIVERY_STATUS_TEXT as STATUS_COLORS } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
+import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 
 function DeliveryRow({ delivery, integrationMap, isMobile }) {
   const [expanded, setExpanded] = useState(false)
-  const qc = useQueryClient()
   const { t } = useTranslation()
 
-  const retry = useMutation({
+  const retry = useInvalidatingMutation({
     mutationFn: () => retryDelivery(delivery.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['all-deliveries'] }),
+    invalidateKeys: [['all-deliveries']],
   })
 
   const integration = integrationMap[delivery.integration_id]
@@ -106,7 +106,6 @@ const thStyle = {
 }
 
 export default function WebhookLogs() {
-  const qc = useQueryClient()
   const { t } = useTranslation()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
@@ -132,9 +131,9 @@ export default function WebhookLogs() {
     }),
   })
 
-  const purge = useMutation({
+  const purge = useInvalidatingMutation({
     mutationFn: () => purgeDeliveries(30),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['all-deliveries'] }),
+    invalidateKeys: [['all-deliveries']],
   })
 
   return (

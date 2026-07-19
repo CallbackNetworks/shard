@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { GitFork, Plus, Trash2, Edit2, Download, Check, XCircle, Bot, User } from 'lucide-react'
 import { getDecisions, getProjects, createLabel, updateLabel, deleteLabel, exportDecision } from '../api/client'
 import MarkdownEditor from '../components/MarkdownEditor'
@@ -9,6 +9,7 @@ import { BRAND, DARK, DECISION_STATUS_COLORS as STATUS_COLORS } from '../constan
 import { deriveDecisionRoom, groupDecisionsByProject } from '../utils/decisionRoom'
 import useBreakpoint from '../hooks/useBreakpoint'
 import FormModal from '../components/shared/FormModal'
+import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
 
 const TEMPLATE_DESC = `## Context\n\n\n## Decision\n\n\n## Consequences\n`
@@ -164,7 +165,6 @@ export default function Decisions() {
   const { t } = useTranslation()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
-  const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [filterProject, setFilterProject] = useState('')
@@ -188,7 +188,7 @@ export default function Decisions() {
   const room = deriveDecisionRoom(decisions)
   const pendingCount = room.counts.proposed
 
-  const createDecision = useMutation({
+  const createDecision = useInvalidatingMutation({
     mutationFn: (form) => createLabel(form.project_id, {
       name: form.name,
       color: form.color || BRAND,
@@ -197,17 +197,19 @@ export default function Decisions() {
       decision_status: 'proposed',
       source: 'manual',
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['decisions'] }); setShowForm(false) },
+    invalidateKeys: [['decisions']],
+    onSuccess: () => setShowForm(false),
   })
 
-  const editDecision = useMutation({
+  const editDecision = useInvalidatingMutation({
     mutationFn: ({ projectId, id, data }) => updateLabel(projectId, id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['decisions'] }); setEditTarget(null) },
+    invalidateKeys: [['decisions']],
+    onSuccess: () => setEditTarget(null),
   })
 
-  const removeDecision = useMutation({
+  const removeDecision = useInvalidatingMutation({
     mutationFn: ({ projectId, id }) => deleteLabel(projectId, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['decisions'] }),
+    invalidateKeys: [['decisions']],
   })
 
   const handleAccept = (d) => {

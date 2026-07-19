@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
-import { useToast } from '../context/ToastContext'
 import { BRAND, DARK, GOAL_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
+import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
 
 /* ── Goal Form Modal ── */
@@ -291,8 +291,6 @@ function StatusTabs({ active, onChange, counts }) {
 /* ── Main Goals Page ── */
 export default function Goals() {
   const { t } = useTranslation()
-  const qc = useQueryClient()
-  const { addToast } = useToast()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
@@ -321,19 +319,24 @@ export default function Goals() {
     cancelled: allGoals.filter(g => g.status === 'cancelled').length,
   }
 
-  const createMut = useMutation({
+  const createMut = useInvalidatingMutation({
     mutationFn: createGoal,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); setShowForm(false); addToast(t('goals.created'), 'success') },
+    invalidateKeys: [['goals']],
+    successMessage: t('goals.created'),
+    onSuccess: () => setShowForm(false),
   })
 
-  const updateMut = useMutation({
+  const updateMut = useInvalidatingMutation({
     mutationFn: ({ id, data }) => updateGoal(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); setEditTarget(null); addToast(t('goals.updated'), 'success') },
+    invalidateKeys: [['goals']],
+    successMessage: t('goals.updated'),
+    onSuccess: () => setEditTarget(null),
   })
 
-  const deleteMut = useMutation({
+  const deleteMut = useInvalidatingMutation({
     mutationFn: deleteGoal,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['goals'] }); addToast(t('goals.deleted'), 'success') },
+    invalidateKeys: [['goals']],
+    successMessage: t('goals.deleted'),
   })
 
   const handleSave = (form) => {

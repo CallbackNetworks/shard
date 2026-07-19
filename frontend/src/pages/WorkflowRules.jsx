@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, GitMerge } from 'lucide-react'
 import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule } from '../api/client'
-import { useToast } from '../context/ToastContext'
 import { DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import FormField from '../components/shared/FormField'
+import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 
 const TRIGGERS = [
   { value: 'task.created', label: 'Task Created' },
@@ -121,23 +121,33 @@ function RuleModal({ initial, onSave, onClose }) {
 
 export default function WorkflowRules() {
   const { t } = useTranslation()
-  const qc = useQueryClient()
-  const { addToast } = useToast()
   const { data: rules = [], isLoading } = useQuery({ queryKey: ['workflow-rules'], queryFn: getWorkflowRules })
   const [modal, setModal] = useState(null)
   const [testResults, setTestResults] = useState({})
   const [testTaskId, setTestTaskId] = useState('')
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['workflow-rules'] })
-
-  const createMut = useMutation({ mutationFn: createWorkflowRule, onSuccess: () => { invalidate(); setModal(null); addToast(t('rules.createdSuccess'), 'success') } })
-  const updateMut = useMutation({ mutationFn: ({ id, data }) => updateWorkflowRule(id, data), onSuccess: () => { invalidate(); setModal(null); addToast(t('rules.updatedSuccess'), 'success') } })
-  const deleteMut = useMutation({ mutationFn: deleteWorkflowRule, onSuccess: () => { invalidate(); addToast(t('rules.deletedSuccess'), 'success') } })
-  const toggleMut = useMutation({
-    mutationFn: ({ id, active }) => updateWorkflowRule(id, { active }),
-    onSuccess: invalidate,
+  const createMut = useInvalidatingMutation({
+    mutationFn: createWorkflowRule,
+    invalidateKeys: [['workflow-rules']],
+    successMessage: t('rules.createdSuccess'),
+    onSuccess: () => setModal(null),
   })
-  const testMut = useMutation({
+  const updateMut = useInvalidatingMutation({
+    mutationFn: ({ id, data }) => updateWorkflowRule(id, data),
+    invalidateKeys: [['workflow-rules']],
+    successMessage: t('rules.updatedSuccess'),
+    onSuccess: () => setModal(null),
+  })
+  const deleteMut = useInvalidatingMutation({
+    mutationFn: deleteWorkflowRule,
+    invalidateKeys: [['workflow-rules']],
+    successMessage: t('rules.deletedSuccess'),
+  })
+  const toggleMut = useInvalidatingMutation({
+    mutationFn: ({ id, active }) => updateWorkflowRule(id, { active }),
+    invalidateKeys: [['workflow-rules']],
+  })
+  const testMut = useInvalidatingMutation({
     mutationFn: ({ ruleId, taskId }) => testWorkflowRule(ruleId, taskId),
     onSuccess: (data, { ruleId }) => setTestResults(r => ({ ...r, [ruleId]: data })),
   })

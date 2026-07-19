@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
-import { useToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
+import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
 
 const PRIORITIES = ['low', 'medium', 'high']
@@ -189,8 +189,6 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
 
 export default function Templates() {
   const { t } = useTranslation()
-  const { addToast } = useToast()
-  const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [search, setSearch] = useState('')
@@ -200,19 +198,24 @@ export default function Templates() {
     queryFn: () => getTemplates(),
   })
 
-  const create = useMutation({
+  const create = useInvalidatingMutation({
     mutationFn: createTemplate,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setShowForm(false); addToast(t('templates.createdSuccess'), 'success') },
+    invalidateKeys: [['templates']],
+    successMessage: t('templates.createdSuccess'),
+    onSuccess: () => setShowForm(false),
   })
 
-  const edit = useMutation({
+  const edit = useInvalidatingMutation({
     mutationFn: ({ id, data }) => updateTemplate(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setEditTarget(null); addToast(t('templates.updatedSuccess'), 'success') },
+    invalidateKeys: [['templates']],
+    successMessage: t('templates.updatedSuccess'),
+    onSuccess: () => setEditTarget(null),
   })
 
-  const remove = useMutation({
+  const remove = useInvalidatingMutation({
     mutationFn: deleteTemplate,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); addToast(t('templates.deletedSuccess'), 'success') },
+    invalidateKeys: [['templates']],
+    successMessage: t('templates.deletedSuccess'),
   })
 
   const handleDelete = (id) => {
