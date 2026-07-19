@@ -5,7 +5,8 @@ import { Plus, Trash2, Play, X, GitMerge } from 'lucide-react'
 import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { DARK } from '../constants/theme'
-import useFocusTrap from '../hooks/useFocusTrap'
+import FormModal from '../components/shared/FormModal'
+import FormField from '../components/shared/FormField'
 
 const TRIGGERS = [
   { value: 'task.created', label: 'Task Created' },
@@ -58,7 +59,6 @@ function ActionRow({ action, onChange, onRemove }) {
 }
 
 function RuleModal({ initial, onSave, onClose }) {
-  const trapRef = useFocusTrap(onClose)
   const emptyRule = { name: '', trigger: 'task.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
   const [form, setForm] = useState(initial ? {
     ...initial,
@@ -76,57 +76,46 @@ function RuleModal({ initial, onSave, onClose }) {
   const addAction = () => set('actions', [...form.actions, { type: 'set_status', value: 'in_progress' }])
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={initial ? 'Edit Workflow Rule' : 'New Workflow Rule'} className="kt-modal-backdrop">
-      <div ref={trapRef} className="kt-modal kt-modal-wide">
-        <h2 style={{ fontWeight: 700, marginBottom: 20, color: DARK.text, fontSize: 16 }}>{initial ? 'Edit' : 'New'} Workflow Rule</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</div>
-            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Auto-escalate urgent tasks" className="kt-input" />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trigger</div>
-            <select value={form.trigger} onChange={e => set('trigger', e.target.value)} className="kt-input">
-              {TRIGGERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Conditions (all must match)
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} />)}
-              <button onClick={addCond} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
-                <Plus size={10} /> Add Condition
-              </button>
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Actions
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {form.actions.map((a, i) => <ActionRow key={i} action={a} onChange={v => updateAction(i, v)} onRemove={() => removeAction(i)} />)}
-              <button onClick={addAction} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
-                <Plus size={10} /> Add Action
-              </button>
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Project ID (optional, leave blank for global)</div>
-            <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder="(all projects)" className="kt-input" />
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} />
-            Active
-          </label>
+    <FormModal
+      title={`${initial ? 'Edit' : 'New'} Workflow Rule`}
+      onClose={onClose}
+      onSubmit={() => onSave(form)}
+      submitLabel="Save"
+      submitDisabled={!form.name || form.actions.length === 0}
+      wide
+    >
+      <FormField label="Name">
+        <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Auto-escalate urgent tasks" className="kt-input" />
+      </FormField>
+      <FormField label="Trigger">
+        <select value={form.trigger} onChange={e => set('trigger', e.target.value)} className="kt-input">
+          {TRIGGERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+      </FormField>
+      <FormField label="Conditions (all must match)">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} />)}
+          <button onClick={addCond} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
+            <Plus size={10} /> Add Condition
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-          <button onClick={() => onSave(form)} disabled={!form.name || form.actions.length === 0} className="kt-btn kt-btn-primary" style={{ opacity: (!form.name || form.actions.length === 0) ? 0.4 : 1 }}>Save</button>
-          <button onClick={onClose} className="kt-btn">Cancel</button>
+      </FormField>
+      <FormField label="Actions">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {form.actions.map((a, i) => <ActionRow key={i} action={a} onChange={v => updateAction(i, v)} onRemove={() => removeAction(i)} />)}
+          <button onClick={addAction} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
+            <Plus size={10} /> Add Action
+          </button>
         </div>
-      </div>
-    </div>
+      </FormField>
+      <FormField label="Project ID (optional, leave blank for global)">
+        <input value={form.project_id} onChange={e => set('project_id', e.target.value)} placeholder="(all projects)" className="kt-input" />
+      </FormField>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+        <input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} />
+        Active
+      </label>
+    </FormModal>
   )
 }
 

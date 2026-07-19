@@ -9,6 +9,7 @@ import {
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
 import { BRAND, DARK, DELIVERY_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
+import FormModal from '../components/shared/FormModal'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Integrations.module.css'
 
@@ -28,46 +29,45 @@ const CRITICAL_EVENTS = ['task.done', 'task.failed', 'task.overdue', 'project.co
 function DeliveryDetailModal({ delivery, onClose, onRetry }) {
   const { t } = useTranslation()
   return (
-    <div className={s.overlayDark}>
-      <div className={s.modalPanelNarrow}>
-        <div className={s.modalHeader}>
-          <h3 className={s.modalTitle}>Delivery Detail</h3>
-          <button onClick={onClose} className={s.closeBtn}><X size={16} /></button>
-        </div>
-        <div className={s.deliveryDetailBody}>
-          <Row label="Event" value={delivery.event} />
-          <Row label="Status" value={delivery.status} color={STATUS_COLORS[delivery.status]?.color} />
-          <Row label="Status Code" value={delivery.status_code ?? '—'} />
-          <Row label="Attempt" value={delivery.attempt} />
-          <Row label="URL" value={delivery.request_url} mono />
-          <Row label="Created" value={new Date(delivery.created_at).toLocaleString()} />
-          {delivery.delivered_at && <Row label="Delivered" value={new Date(delivery.delivered_at).toLocaleString()} />}
-          {delivery.next_retry_at && <Row label="Next Retry" value={new Date(delivery.next_retry_at).toLocaleString()} />}
-          {delivery.error && (
-            <div>
-              <div className={s.detailLabel}>Error</div>
-              <pre className={s.errorPre}>{delivery.error}</pre>
-            </div>
-          )}
-          {delivery.response_body && (
-            <div>
-              <div className={s.detailLabel}>Response Body</div>
-              <pre className={s.responsePre}>{delivery.response_body}</pre>
-            </div>
-          )}
-          <div>
-            <div className={s.detailLabel}>Payload</div>
-            <pre className={s.payloadPre}>{JSON.stringify(delivery.payload, null, 2)}</pre>
-          </div>
-        </div>
+    <FormModal
+      title="Delivery Detail"
+      onClose={onClose}
+      footer={(
         <div className={s.modalActions}>
           {['failed', 'dead'].includes(delivery.status) && (
             <button onClick={() => onRetry(delivery.id)} className="btn-primary">{t('retry')}</button>
           )}
           <button onClick={onClose} className="btn-ghost">{t('cancel')}</button>
         </div>
+      )}
+    >
+      <div className={s.deliveryDetailBody}>
+        <Row label="Event" value={delivery.event} />
+        <Row label="Status" value={delivery.status} color={STATUS_COLORS[delivery.status]?.color} />
+        <Row label="Status Code" value={delivery.status_code ?? '—'} />
+        <Row label="Attempt" value={delivery.attempt} />
+        <Row label="URL" value={delivery.request_url} mono />
+        <Row label="Created" value={new Date(delivery.created_at).toLocaleString()} />
+        {delivery.delivered_at && <Row label="Delivered" value={new Date(delivery.delivered_at).toLocaleString()} />}
+        {delivery.next_retry_at && <Row label="Next Retry" value={new Date(delivery.next_retry_at).toLocaleString()} />}
+        {delivery.error && (
+          <div>
+            <div className={s.detailLabel}>Error</div>
+            <pre className={s.errorPre}>{delivery.error}</pre>
+          </div>
+        )}
+        {delivery.response_body && (
+          <div>
+            <div className={s.detailLabel}>Response Body</div>
+            <pre className={s.responsePre}>{delivery.response_body}</pre>
+          </div>
+        )}
+        <div>
+          <div className={s.detailLabel}>Payload</div>
+          <pre className={s.payloadPre}>{JSON.stringify(delivery.payload, null, 2)}</pre>
+        </div>
       </div>
-    </div>
+    </FormModal>
   )
 }
 
@@ -269,24 +269,24 @@ function SetupModal({ templateId, onClose }) {
   if (!template) return null
 
   return (
-    <div className={s.overlayDark}>
-      <div className={s.modalPanelWide}>
-        <div className={s.modalHeader}>
-          <h3 className={s.modalTitle}>{template.name} - {t('integrations.templateSetup')}</h3>
-          <button onClick={onClose} className={s.closeBtn}><X size={16} /></button>
-        </div>
-        <div className={s.setupBody}>
-          {template.setup_instructions?.split('```').map((block, i) =>
-            i % 2 === 0
-              ? <span key={i}>{block}</span>
-              : <pre key={i} className={s.setupCodeBlock}>{block.replace(/^(yaml|groovy|json)\n/, '')}</pre>
-          )}
-        </div>
+    <FormModal
+      title={`${template.name} - ${t('integrations.templateSetup')}`}
+      onClose={onClose}
+      wide
+      footer={(
         <div className={s.setupFooter}>
           <button onClick={onClose} className="btn-ghost">{t('close')}</button>
         </div>
+      )}
+    >
+      <div className={s.setupBody}>
+        {template.setup_instructions?.split('```').map((block, i) =>
+          i % 2 === 0
+            ? <span key={i}>{block}</span>
+            : <pre key={i} className={s.setupCodeBlock}>{block.replace(/^(yaml|groovy|json)\n/, '')}</pre>
+        )}
       </div>
-    </div>
+    </FormModal>
   )
 }
 

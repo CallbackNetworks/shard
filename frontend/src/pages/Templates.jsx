@@ -5,7 +5,8 @@ import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
-import useFocusTrap from '../hooks/useFocusTrap'
+import FormModal from '../components/shared/FormModal'
+import FormField from '../components/shared/FormField'
 
 const PRIORITIES = ['low', 'medium', 'high']
 
@@ -19,7 +20,6 @@ const EMPTY_FORM = { name: '', description: '', priority: 'medium', subtasks: []
 
 function TemplateForm({ initial, onSave, onClose }) {
   const { t } = useTranslation()
-  const trapRef = useFocusTrap(onClose)
   const [form, setForm] = useState(initial || EMPTY_FORM)
   const [subtaskInput, setSubtaskInput] = useState('')
   const [labelInput, setLabelInput] = useState('')
@@ -45,112 +45,89 @@ function TemplateForm({ initial, onSave, onClose }) {
   const removeLabel = (label) => set('label_names', form.label_names.filter(l => l !== label))
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={initial ? t('templates.editDialog') : t('templates.newDialog')} className="kt-modal-backdrop">
-      <div ref={trapRef} className="kt-modal">
-        <div className="kt-modal-header">
-          <span className="kt-modal-title">
-            {initial ? t('templates.editDialog') : t('templates.newDialog')}
-          </span>
-          <button onClick={onClose} className="kt-icon-btn">
-            <X size={16} />
-          </button>
+    <FormModal
+      title={initial ? t('templates.editDialog') : t('templates.newDialog')}
+      onClose={onClose}
+      onSubmit={() => form.name.trim() && onSave(form)}
+      submitLabel={initial ? t('templates.saveChanges') : t('templates.createTemplate')}
+      submitDisabled={!form.name.trim()}
+    >
+      <FormField label={t('name')} required>
+        <input value={form.name} onChange={e => set('name', e.target.value)}
+          placeholder={t('templates.namePlaceholder')} className="kt-input" />
+      </FormField>
+
+      <FormField label={t('description')}>
+        <textarea
+          value={form.description || ''}
+          onChange={e => set('description', e.target.value)}
+          placeholder={t('templates.descriptionPlaceholder')}
+          rows={2}
+          className="kt-input"
+          style={{ resize: 'vertical' }}
+        />
+      </FormField>
+
+      <FormField label={t('templates.defaultPriority')}>
+        <select value={form.priority} onChange={e => set('priority', e.target.value)} className="kt-input">
+          {PRIORITIES.map(p => (
+            <option key={p} value={p}>{t(p)}</option>
+          ))}
+        </select>
+      </FormField>
+
+      <FormField label={t('templates.subtasks')}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <input
+            value={subtaskInput}
+            onChange={e => setSubtaskInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addSubtask()}
+            placeholder={t('templates.addSubtask')}
+            className="kt-input"
+            style={{ flex: 1 }}
+          />
+          <button onClick={addSubtask} className="kt-btn">{t('add')}</button>
         </div>
-
-        <div className="kt-form-stack">
-          <div>
-            <div className="kt-field-label">{t('name')} *</div>
-            <input value={form.name} onChange={e => set('name', e.target.value)}
-              placeholder={t('templates.namePlaceholder')} className="kt-input" />
+        {form.subtasks.map((s, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px',
+            background: 'rgba(var(--kt-ink-rgb), 0.03)', marginBottom: 4,
+          }}>
+            <span style={{ flex: 1, fontSize: 12 }}>{s.title}</span>
+            <button onClick={() => removeSubtask(i)} className="kt-icon-btn" style={{ color: DARK.danger, padding: 0 }}>
+              <X size={11} />
+            </button>
           </div>
+        ))}
+      </FormField>
 
-          <div>
-            <div className="kt-field-label">{t('description')}</div>
-            <textarea
-              value={form.description || ''}
-              onChange={e => set('description', e.target.value)}
-              placeholder={t('templates.descriptionPlaceholder')}
-              rows={2}
-              className="kt-input"
-              style={{ resize: 'vertical' }}
-            />
-          </div>
-
-          <div>
-            <div className="kt-field-label">{t('templates.defaultPriority')}</div>
-            <select value={form.priority} onChange={e => set('priority', e.target.value)} className="kt-input">
-              {PRIORITIES.map(p => (
-                <option key={p} value={p}>{t(p)}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div className="kt-field-label">{t('templates.subtasks')}</div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-              <input
-                value={subtaskInput}
-                onChange={e => setSubtaskInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addSubtask()}
-                placeholder={t('templates.addSubtask')}
-                className="kt-input"
-                style={{ flex: 1 }}
-              />
-              <button onClick={addSubtask} className="kt-btn">{t('add')}</button>
-            </div>
-            {form.subtasks.map((s, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px',
-                background: 'rgba(var(--kt-ink-rgb), 0.03)', marginBottom: 4,
-              }}>
-                <span style={{ flex: 1, fontSize: 12 }}>{s.title}</span>
-                <button onClick={() => removeSubtask(i)} className="kt-icon-btn" style={{ color: DARK.danger, padding: 0 }}>
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <div className="kt-field-label">{t('templates.labelsNames')}</div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-              <input
-                value={labelInput}
-                onChange={e => setLabelInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addLabel()}
-                placeholder={t('templates.addLabel')}
-                className="kt-input"
-                style={{ flex: 1 }}
-              />
-              <button onClick={addLabel} className="kt-btn">{t('add')}</button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {form.label_names.map(l => (
-                <span key={l} style={{
-                  display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-                  background: 'rgba(250,204,21,0.15)', fontSize: 11, color: BRAND,
-                }}>
-                  {l}
-                  <button onClick={() => removeLabel(l)} className="kt-icon-btn" style={{ color: BRAND, padding: 0, lineHeight: 1 }}>
-                    <X size={10} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
+      <FormField label={t('templates.labelsNames')}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <input
+            value={labelInput}
+            onChange={e => setLabelInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addLabel()}
+            placeholder={t('templates.addLabel')}
+            className="kt-input"
+            style={{ flex: 1 }}
+          />
+          <button onClick={addLabel} className="kt-btn">{t('add')}</button>
         </div>
-
-        <div className="kt-toolbar" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
-          <button onClick={onClose} className="kt-btn">{t('cancel')}</button>
-          <button
-            onClick={() => form.name.trim() && onSave(form)}
-            className="kt-btn kt-btn-primary"
-            disabled={!form.name.trim()}
-          >
-            {initial ? t('templates.saveChanges') : t('templates.createTemplate')}
-          </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {form.label_names.map(l => (
+            <span key={l} style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+              background: 'rgba(250,204,21,0.15)', fontSize: 11, color: BRAND,
+            }}>
+              {l}
+              <button onClick={() => removeLabel(l)} className="kt-icon-btn" style={{ color: BRAND, padding: 0, lineHeight: 1 }}>
+                <X size={10} />
+              </button>
+            </span>
+          ))}
         </div>
-      </div>
-    </div>
+      </FormField>
+    </FormModal>
   )
 }
 

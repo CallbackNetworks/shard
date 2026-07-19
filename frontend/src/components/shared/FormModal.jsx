@@ -18,6 +18,7 @@ export default function FormModal({
   submitLabel,
   submitDisabled = false,
   footer,
+  wide = false,
   width,
   children,
 }) {
@@ -26,7 +27,11 @@ export default function FormModal({
 
   return (
     <div role="dialog" aria-modal="true" aria-label={ariaLabel || title} className="kt-modal-backdrop">
-      <div ref={trapRef} className="kt-modal" style={width ? { width, maxWidth: '95vw' } : undefined}>
+      <div
+        ref={trapRef}
+        className={wide ? 'kt-modal kt-modal-wide' : 'kt-modal'}
+        style={width ? { width, maxWidth: '95vw' } : undefined}
+      >
         <div className="kt-modal-header">
           <span className="kt-modal-title">{title}</span>
           <button onClick={onClose} className="kt-icon-btn" aria-label={t('close', { defaultValue: 'Close' })}>

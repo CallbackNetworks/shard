@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { GitFork, Plus, Trash2, Edit2, X, Download, Check, XCircle, Bot, User } from 'lucide-react'
+import { GitFork, Plus, Trash2, Edit2, Download, Check, XCircle, Bot, User } from 'lucide-react'
 import { getDecisions, getProjects, createLabel, updateLabel, deleteLabel, exportDecision } from '../api/client'
 import MarkdownEditor from '../components/MarkdownEditor'
 import MarkdownPreview from '../components/MarkdownPreview'
 import { BRAND, DARK, DECISION_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import { deriveDecisionRoom, groupDecisionsByProject } from '../utils/decisionRoom'
 import useBreakpoint from '../hooks/useBreakpoint'
-import useFocusTrap from '../hooks/useFocusTrap'
+import FormModal from '../components/shared/FormModal'
+import FormField from '../components/shared/FormField'
 
 const TEMPLATE_DESC = `## Context\n\n\n## Decision\n\n\n## Consequences\n`
 
@@ -22,7 +23,6 @@ const DECISION_SNIPPETS = [
 
 function DecisionForm({ projects, initial, onSave, onClose }) {
   const { t } = useTranslation()
-  const trapRef = useFocusTrap(onClose)
   const [form, setForm] = useState(initial ? {
     name: initial.name,
     description: initial.description || '',
@@ -44,63 +44,43 @@ function DecisionForm({ projects, initial, onSave, onClose }) {
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={initial ? t('decisions.editTitle') : t('decisions.createTitle')} className="kt-modal-backdrop">
-      <div ref={trapRef} className="kt-modal kt-modal-wide">
-        <div className="kt-modal-header">
-          <span className="kt-modal-title">
-            {initial ? t('decisions.editTitle') : t('decisions.createTitle')}
-          </span>
-          <button onClick={onClose} className="kt-icon-btn">
-            <X size={16} />
-          </button>
+    <FormModal
+      title={initial ? t('decisions.editTitle') : t('decisions.createTitle')}
+      onClose={onClose}
+      onSubmit={() => form.name.trim() && form.project_id && onSave(form)}
+      submitLabel={initial ? t('save') : t('create')}
+      submitDisabled={!form.name.trim() || !form.project_id}
+      wide
+    >
+      <FormField label={t('decisions.projectLabel')} required>
+        <select value={form.project_id} onChange={e => set('project_id', e.target.value)} className="kt-input">
+          {projects.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </FormField>
+
+      <FormField label={t('decisions.nameLabel')} required>
+        <input value={form.name} onChange={e => set('name', e.target.value)}
+          placeholder={t('decisions.namePlaceholder')} className="kt-input" />
+      </FormField>
+
+      <FormField label={t('decisions.descriptionLabel')}>
+        <div className="kt-decision-editor-tools">
+          {DECISION_SNIPPETS.map(snippet => (
+            <button key={snippet.key} type="button" onClick={() => insertSnippet(snippet.text)}>
+              {t(`decisions.snippet.${snippet.key}`)}
+            </button>
+          ))}
         </div>
-
-        <div className="kt-form-stack">
-          <div>
-            <div className="kt-field-label">{t('decisions.projectLabel')} *</div>
-            <select value={form.project_id} onChange={e => set('project_id', e.target.value)} className="kt-input">
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div className="kt-field-label">{t('decisions.nameLabel')} *</div>
-            <input value={form.name} onChange={e => set('name', e.target.value)}
-              placeholder={t('decisions.namePlaceholder')} className="kt-input" />
-          </div>
-
-          <div>
-            <div className="kt-field-label">{t('decisions.descriptionLabel')}</div>
-            <div className="kt-decision-editor-tools">
-              {DECISION_SNIPPETS.map(snippet => (
-                <button key={snippet.key} type="button" onClick={() => insertSnippet(snippet.text)}>
-                  {t(`decisions.snippet.${snippet.key}`)}
-                </button>
-              ))}
-            </div>
-            <MarkdownEditor
-              value={form.description}
-              onChange={val => set('description', val)}
-              placeholder={t('decisions.contextPlaceholder')}
-              minHeight={260}
-            />
-          </div>
-        </div>
-
-        <div className="kt-toolbar" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
-          <button onClick={onClose} className="kt-btn">{t('cancel')}</button>
-          <button
-            onClick={() => form.name.trim() && form.project_id && onSave(form)}
-            className="kt-btn kt-btn-primary"
-            disabled={!form.name.trim() || !form.project_id}
-          >
-            {initial ? t('save') : t('create')}
-          </button>
-        </div>
-      </div>
-    </div>
+        <MarkdownEditor
+          value={form.description}
+          onChange={val => set('description', val)}
+          placeholder={t('decisions.contextPlaceholder')}
+          minHeight={260}
+        />
+      </FormField>
+    </FormModal>
   )
 }
 
