@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ActivityLog, Comment, Node, WorkflowRule
 from app.services import graph
+from app.services.task_mutations import apply_task_update, finalize_task_create
 
 TOOLS = [
     {
@@ -233,10 +234,10 @@ async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
         elif tool_name == "create_task":
             return await _tool_create_task(db, **tool_input)
         elif tool_name == "update_task":
-            return _tool_update_task(db, **tool_input)
+            return await _tool_update_task(db, **tool_input)
         elif tool_name == "update_task_status":
             # Backward compat alias
-            return _tool_update_task(db, task_id=tool_input["task_id"], status=tool_input["status"])
+            return await _tool_update_task(db, task_id=tool_input["task_id"], status=tool_input["status"])
         elif tool_name == "create_subtask":
             return await _tool_create_subtask(db, **tool_input)
         elif tool_name == "manage_labels":
@@ -339,11 +340,11 @@ async def _tool_create_task(
         due_date=due,
         callback_token=str(uuid.uuid4()),
     )
-    db.commit()
+    task = await finalize_task_create(db, task.id, actor="assistant", source="assistant", project_id=project_id)
     return json.dumps({"id": task.id, "title": task.title, "status": task.status})
 
 
-def _tool_update_task(db: Session, task_id: str, **kwargs) -> str:
+async def _tool_update_task(db: Session, task_id: str, **kwargs) -> str:
     if graph.get_task(db, task_id) is None:
         return f"Task {task_id} not found"
     updatable = ("status", "priority", "title", "description", "assignee", "time_estimate", "time_spent")
@@ -358,8 +359,7 @@ def _tool_update_task(db: Session, task_id: str, **kwargs) -> str:
             )
         else:
             changes["due_date"] = None
-    task = graph.update_task(db, task_id, **changes)
-    db.commit()
+    task = await apply_task_update(db, task_id, changes, actor="assistant", source="assistant")
     return json.dumps(
         {
             "id": task.id,
@@ -382,16 +382,17 @@ async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, pri
     parent = graph.get_task(db, parent_task_id)
     if not parent:
         return f"Parent task {parent_task_id} not found"
+    parent_project_id = graph.project_id_of_task(db, parent.id)
     task = graph.create_task(
         db,
         id=str(uuid.uuid4()),
-        project_id=graph.project_id_of_task(db, parent.id),
+        project_id=parent_project_id,
         title=title,
         priority=priority,
         parent_id=parent_task_id,
         callback_token=str(uuid.uuid4()),
     )
-    db.commit()
+    task = await finalize_task_create(db, task.id, actor="assistant", source="assistant", project_id=parent_project_id)
     return json.dumps({"id": task.id, "title": task.title, "parent_id": parent_task_id})
 
 
@@ -676,6 +677,9 @@ async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dic
             description=item.get("description"),
             due_date=due,
         )
+        await finalize_task_create(
+            db, task.id, actor="assistant", source="assistant", project_id=project_id, commit=False, broadcast=False
+        )
         created_ids.append(task.id)
 
         for sub in item.get("subtasks") or []:
@@ -688,6 +692,15 @@ async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dic
                 title=sub_title,
                 priority=sub.get("priority", "medium"),
                 parent_id=task.id,
+            )
+            await finalize_task_create(
+                db,
+                subtask.id,
+                actor="assistant",
+                source="assistant",
+                project_id=project_id,
+                commit=False,
+                broadcast=False,
             )
             created_ids.append(subtask.id)
 

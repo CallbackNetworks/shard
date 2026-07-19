@@ -262,3 +262,68 @@ class TestGetActivity:
         data = json.loads(result)
         assert len(data) >= 1
         assert data[0]["action"] == "task.created"
+
+
+# ── Unified mutation pipeline (ADR-0038) ─────────────────────────────────
+
+
+class TestAssistantMutationPipeline:
+    @pytest.mark.asyncio
+    async def test_update_task_logs_activity_and_broadcasts(self, db, project_with_tasks, monkeypatch):
+        """Assistant mutations were previously invisible: no activity, no ws events."""
+        from app.models import ActivityLog
+        from app.services import task_mutations
+
+        broadcasts = []
+
+        async def fake_broadcast(event, data=None):
+            broadcasts.append(event)
+
+        monkeypatch.setattr(task_mutations.ws_manager, "broadcast", fake_broadcast)
+        _, t1, _ = project_with_tasks
+        result = await dispatch_tool("update_task", {"task_id": t1.id, "status": "in_progress"}, db)
+        assert "in_progress" in result
+        row = db.query(ActivityLog).filter(ActivityLog.action == "task.status_changed").one()
+        assert row.actor == "assistant"
+        assert "via assistant" in row.detail
+        assert "task.updated" in broadcasts
+
+    @pytest.mark.asyncio
+    async def test_update_task_runs_rules(self, db, project_with_tasks):
+        from app.models import WorkflowRule
+
+        db.add(
+            WorkflowRule(
+                name="Escalate done tasks",
+                trigger="task.status_changed",
+                conditions=[{"field": "status", "op": "eq", "value": "done"}],
+                actions=[{"type": "set_priority", "value": "high"}],
+                active=True,
+            )
+        )
+        db.commit()
+        _, t1, _ = project_with_tasks
+        await dispatch_tool("update_task", {"task_id": t1.id, "status": "done"}, db)
+        assert graph.get_task(db, t1.id).priority == "high"
+
+    @pytest.mark.asyncio
+    async def test_create_task_logs_activity(self, db, project_with_tasks):
+        from app.models import ActivityLog
+
+        p, _, _ = project_with_tasks
+        await dispatch_tool("create_task", {"project_id": p.id, "title": "From assistant"}, db)
+        row = db.query(ActivityLog).filter(ActivityLog.action == "task.created").one()
+        assert row.actor == "assistant"
+
+    @pytest.mark.asyncio
+    async def test_batch_create_logs_each_task(self, db, project_with_tasks):
+        from app.models import ActivityLog
+
+        p, _, _ = project_with_tasks
+        await dispatch_tool(
+            "batch_create_tasks",
+            {"project_id": p.id, "tasks": [{"title": "A"}, {"title": "B", "subtasks": [{"title": "B1"}]}]},
+            db,
+        )
+        rows = db.query(ActivityLog).filter(ActivityLog.action == "task.created").count()
+        assert rows == 3
