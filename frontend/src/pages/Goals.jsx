@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Target, Plus, Trash2, Edit2, X, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Target, Plus, Trash2, Edit2, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { BRAND, DARK, GOAL_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
-import useFocusTrap from '../hooks/useFocusTrap'
+import FormModal from '../components/shared/FormModal'
+import FormField from '../components/shared/FormField'
 
 /* ── Goal Form Modal ── */
 function GoalForm({ projects, initial, onSave, onClose }) {
   const { t } = useTranslation()
-  const trapRef = useFocusTrap(onClose)
   const [form, setForm] = useState(initial ? {
     title: initial.title,
     description: initial.description || '',
@@ -43,101 +43,75 @@ function GoalForm({ projects, initial, onSave, onClose }) {
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={initial ? t('goals.editTitle') : t('goals.createTitle')} className="kt-modal-backdrop">
-      <div ref={trapRef} className="kt-modal">
-        <div className="kt-modal-header">
-          <span className="kt-modal-title">
-            {initial ? t('goals.editTitle') : t('goals.createTitle')}
-          </span>
-          <button onClick={onClose} className="kt-icon-btn">
-            <X size={16} />
-          </button>
-        </div>
+    <FormModal
+      title={initial ? t('goals.editTitle') : t('goals.createTitle')}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      submitLabel={initial ? t('save') : t('create')}
+      submitDisabled={!form.title.trim()}
+    >
+      <FormField label={t('goals.titleLabel')} required>
+        <input
+          value={form.title}
+          onChange={e => set('title', e.target.value)}
+          placeholder={t('goals.titlePlaceholder')}
+          className="kt-input"
+          autoFocus
+        />
+      </FormField>
 
-        <div className="kt-form-stack">
-          {/* Title */}
-          <div>
-            <div className="kt-field-label">{t('goals.titleLabel')} *</div>
-            <input
-              value={form.title}
-              onChange={e => set('title', e.target.value)}
-              placeholder={t('goals.titlePlaceholder')}
-              className="kt-input"
-              autoFocus
-            />
-          </div>
+      <FormField label={t('goals.descriptionLabel')}>
+        <textarea
+          value={form.description}
+          onChange={e => set('description', e.target.value)}
+          placeholder={t('goals.descriptionPlaceholder')}
+          rows={3}
+          className="kt-input"
+          style={{ resize: 'vertical' }}
+        />
+      </FormField>
 
-          {/* Description */}
-          <div>
-            <div className="kt-field-label">{t('goals.descriptionLabel')}</div>
-            <textarea
-              value={form.description}
-              onChange={e => set('description', e.target.value)}
-              placeholder={t('goals.descriptionPlaceholder')}
-              rows={3}
-              className="kt-input"
-              style={{ resize: 'vertical' }}
-            />
-          </div>
+      <FormField label={t('goals.targetDate')}>
+        <input
+          type="date"
+          value={form.target_date}
+          onChange={e => set('target_date', e.target.value)}
+          className="kt-input"
+          style={{ colorScheme: 'dark' }}
+        />
+      </FormField>
 
-          {/* Target Date */}
-          <div>
-            <div className="kt-field-label">{t('goals.targetDate')}</div>
-            <input
-              type="date"
-              value={form.target_date}
-              onChange={e => set('target_date', e.target.value)}
-              className="kt-input"
-              style={{ colorScheme: 'dark' }}
-            />
-          </div>
-
-          {/* Projects multi-select */}
-          <div>
-            <div className="kt-field-label">{t('goals.linkProjects')}</div>
-            <div className="kt-panel" style={{ maxHeight: 180, overflow: 'auto', padding: 4 }}>
-              {projects.length === 0 ? (
-                <div style={{ padding: 12, fontSize: 12, color: '#4b5563', textAlign: 'center' }}>
-                  {t('goals.noProjects')}
-                </div>
-              ) : projects.map(p => (
-                <label key={p.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
-                  borderRadius: 4, cursor: 'pointer',
-                  background: form.project_ids.includes(p.id) ? 'rgba(250,204,21,0.1)' : 'transparent',
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={form.project_ids.includes(p.id)}
-                    onChange={() => toggleProject(p.id)}
-                    style={{ cursor: 'pointer', accentColor: BRAND }}
-                  />
-                  <span style={{ fontSize: 12, color: form.project_ids.includes(p.id) ? DARK.text : DARK.textMid }}>
-                    {p.name}
-                  </span>
-                  {p.progress != null && (
-                    <span style={{ fontSize: 10, color: '#4b5563', marginLeft: 'auto' }}>
-                      {Math.round(p.progress)}%
-                    </span>
-                  )}
-                </label>
-              ))}
+      <FormField label={t('goals.linkProjects')}>
+        <div className="kt-panel" style={{ maxHeight: 180, overflow: 'auto', padding: 4 }}>
+          {projects.length === 0 ? (
+            <div style={{ padding: 12, fontSize: 12, color: '#4b5563', textAlign: 'center' }}>
+              {t('goals.noProjects')}
             </div>
-          </div>
+          ) : projects.map(p => (
+            <label key={p.id} style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
+              borderRadius: 4, cursor: 'pointer',
+              background: form.project_ids.includes(p.id) ? 'rgba(250,204,21,0.1)' : 'transparent',
+            }}>
+              <input
+                type="checkbox"
+                checked={form.project_ids.includes(p.id)}
+                onChange={() => toggleProject(p.id)}
+                style={{ cursor: 'pointer', accentColor: BRAND }}
+              />
+              <span style={{ fontSize: 12, color: form.project_ids.includes(p.id) ? DARK.text : DARK.textMid }}>
+                {p.name}
+              </span>
+              {p.progress != null && (
+                <span style={{ fontSize: 10, color: '#4b5563', marginLeft: 'auto' }}>
+                  {Math.round(p.progress)}%
+                </span>
+              )}
+            </label>
+          ))}
         </div>
-
-        <div className="kt-toolbar" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
-          <button onClick={onClose} className="kt-btn">{t('cancel')}</button>
-          <button
-            onClick={handleSubmit}
-            className="kt-btn kt-btn-primary"
-            disabled={!form.title.trim()}
-          >
-            {initial ? t('save') : t('create')}
-          </button>
-        </div>
-      </div>
-    </div>
+      </FormField>
+    </FormModal>
   )
 }
 
