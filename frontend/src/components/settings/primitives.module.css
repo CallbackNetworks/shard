@@ -1,0 +1,101 @@
+/* Settings layout primitives (extracted from pages/Settings; ADR-0012). */
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(var(--kt-ink-rgb), 0.04);
+  color: var(--kt-faint, #6b7280);
+  border: 1px solid var(--kt-line, #3a3a3a);
+}
+
+.statusBadgeOk {
+  background: rgba(250, 204, 21, 0.12);
+  color: #34d399;
+  border-color: rgba(250, 204, 21, 0.25);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sectionTitleText {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--kt-ink, #ffffff);
+}
+
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--kt-line, #3a3a3a);
+}
+
+.infoRowLabel {
+  font-size: 13px;
+  color: var(--kt-muted, #9ca3af);
+}
+
+.infoRowValue {
+  font-size: 13px;
+  color: var(--kt-ink, #ffffff);
+  font-weight: 600;
+}
+
+.controlRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--kt-line, #3a3a3a);
+}
+
+.controlRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.controlRowHint {
+  font-size: 11px;
+  color: var(--kt-faint, #6b7280);
+}
+
+.controlRowControl {
+  flex-shrink: 0;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--kt-line, #3a3a3a);
+  overflow: hidden;
+}
+
+.segmentedBtn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--kt-faint, #6b7280);
+}
+
+.segmentedBtn + .segmentedBtn {
+  border-left: 1px solid var(--kt-line, #3a3a3a);
+}
+
+.segmentedBtnActive {
+  background: rgba(129, 140, 248, 0.18);
+  color: var(--kt-ink, #ffffff);
+}
