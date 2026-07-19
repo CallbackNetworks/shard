@@ -216,7 +216,7 @@ export default function NodePage() {
               {t('nodePage.openContainer')}
             </button>
           )}
-          {!typeMeta?.is_builtin && (
+          {typeMeta && !typeMeta.is_builtin && (
             <button
               onClick={() => { if (window.confirm(t('nodePage.deleteConfirm'))) deleteMut.mutate() }}
               aria-label={t('delete')} title={t('delete')}

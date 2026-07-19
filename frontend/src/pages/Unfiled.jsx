@@ -125,7 +125,7 @@ export default function Unfiled() {
             return (
               <Link
                 key={n.id}
-                to={`/n/${n.id}`}
+                to={nt?.is_container ? `/c/${n.id}` : `/n/${n.id}`}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
                   borderBottom: `1px solid ${DARK.border}`, textDecoration: 'none',

@@ -1,10 +1,10 @@
-"""Generic graph node/edge API for user-defined layers (ADR-0033 Phase A).
+"""Generic graph node/edge API (ADR-0033).
 
-Create, read, update, and delete nodes of any *node-only* type (a user-defined
-type with no backing entity table), and attach/detach edges between any two
-nodes. Built-in entity-backed types (task/project/identity/goal/cycle/label)
-must still be mutated through their dedicated routers so their table and node
-mirror stay consistent — this API rejects writes to them (reads are allowed).
+Create, read, update, and delete nodes of any registered type, and
+attach/detach edges between any two nodes. Since Phase C every built-in type
+(task/project/identity/goal/cycle/label) is node-only — there is no separate
+entity table to keep in sync — so this API accepts them too; the dedicated
+routers remain the richer surface (enrichment, activity, notifications).
 Free-form containment is the point: a custom node may contain a project/task via
 a ``contains`` edge; only ``detect_cycle`` guards the structure.
 """

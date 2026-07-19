@@ -160,3 +160,23 @@ def test_create_and_delete_custom_edge_type(client):
 def test_cannot_delete_builtin_edge_type(client):
     r = client.delete(f"/api/graph-types/edges/{graph.REL_CONTAINS}")
     assert r.status_code == 400
+
+
+def test_cannot_change_structural_flags_of_builtin_edge_type(client):
+    # Flipping contains' is_containment would collapse the containment pipeline
+    # (mirrors the built-in node-type role guard).
+    r = client.patch(f"/api/graph-types/edges/{graph.REL_CONTAINS}", json={"is_containment": False})
+    assert r.status_code == 400
+    contains = next(t for t in client.get("/api/graph-types/edges").json() if t["key"] == graph.REL_CONTAINS)
+    assert contains["is_containment"] is True
+    # Label stays editable on built-ins.
+    r = client.patch(f"/api/graph-types/edges/{graph.REL_CONTAINS}", json={"label": "Contains!"})
+    assert r.status_code == 200
+    assert r.json()["label"] == "Contains!"
+
+
+def test_update_structural_flags_of_custom_edge_type(client):
+    client.post("/api/graph-types/edges", json={"key": "groups", "label": "Groups"})
+    r = client.patch("/api/graph-types/edges/groups", json={"is_containment": True})
+    assert r.status_code == 200
+    assert r.json()["is_containment"] is True

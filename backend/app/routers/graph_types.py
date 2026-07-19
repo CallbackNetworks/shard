@@ -105,7 +105,13 @@ def update_edge_type(key: str, body: EdgeTypeUpdate, db: Session = Depends(get_d
     et = db.get(EdgeType, key)
     if et is None:
         raise HTTPException(status_code=404, detail="edge type not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    fields = body.model_dump(exclude_unset=True)
+    # Built-in structural flags are immutable — mirroring the node-type role
+    # guard: flipping contains' is_containment would collapse the containment
+    # pipeline (project/task membership, structure map, unfiled detection).
+    if et.is_builtin and ("is_containment" in fields or "is_symmetric" in fields):
+        raise HTTPException(status_code=400, detail="cannot change structural flags of a built-in edge type")
+    for field, value in fields.items():
         setattr(et, field, value)
     db.commit()
     db.refresh(et)
