@@ -5,7 +5,9 @@ const ZOOM_MAX = 2.4
 
 // Pan/zoom/fit state for the structure-map canvas: tracks the frame size via
 // ResizeObserver, computes a fit-to-frame scale, and exposes pointer/keyboard/
-// wheel handlers that pan and zoom around the cursor.
+// wheel handlers that pan and zoom around the cursor. Two simultaneous
+// pointers drive a pinch gesture (zoom around the finger midpoint), since
+// touch-action: none on the frame disables the browser's own pinch handling.
 export default function useMapViewport({ width, height }) {
   // Callback ref instead of a mount-time effect: the graph frame mounts and
   // unmounts as the user switches layout styles, so measurement has to follow
@@ -13,8 +15,17 @@ export default function useMapViewport({ width, height }) {
   const [frameEl, setFrameEl] = useState(null)
   const graphRef = useCallback((el) => setFrameEl(el), [])
   const panRef = useRef(null)
+  // pointerId -> {x, y} for all pointers currently down on the frame.
+  const pointersRef = useRef(new Map())
+  const pinchRef = useRef(null)
+  // Mirrors the latest view set by any handler. Pointer events can fire
+  // several times between renders, so handlers must not trust the `view`
+  // closure when chaining gestures (pan -> pinch -> pan).
+  const liveViewRef = useRef({ zoom: 1, x: 0, y: 0 })
   const [frame, setFrame] = useState({ width: 0, height: 0 })
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
+
+  useEffect(() => { liveViewRef.current = view }, [view])
 
   useEffect(() => {
     if (!frameEl) return undefined
@@ -89,40 +100,114 @@ export default function useMapViewport({ width, height }) {
     }
   }
 
+  const applyView = (next) => {
+    liveViewRef.current = next
+    setView(next)
+  }
+
+  const startPinch = (frameNode) => {
+    const points = [...pointersRef.current.values()]
+    if (points.length < 2) return
+    const rect = frameNode.getBoundingClientRect()
+    const startView = liveViewRef.current
+    const startScale = fit.scale * startView.zoom
+    const midX = (points[0].x + points[1].x) / 2 - rect.left
+    const midY = (points[0].y + points[1].y) / 2 - rect.top
+    pinchRef.current = {
+      rect,
+      startZoom: startView.zoom,
+      startDist: Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y)),
+      // Canvas-space point under the finger midpoint; kept glued to the
+      // moving midpoint while zooming, like wheel zoom around the cursor.
+      canvasX: (midX - fit.x - startView.x) / startScale,
+      canvasY: (midY - fit.y - startView.y) / startScale,
+    }
+    panRef.current = null
+  }
+
+  const movePinch = () => {
+    const pinch = pinchRef.current
+    const points = [...pointersRef.current.values()]
+    if (!pinch || points.length < 2) return
+    const dist = Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y))
+    const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pinch.startZoom * (dist / pinch.startDist)))
+    const nextScale = fit.scale * nextZoom
+    const midX = (points[0].x + points[1].x) / 2 - pinch.rect.left
+    const midY = (points[0].y + points[1].y) / 2 - pinch.rect.top
+    applyView({
+      zoom: nextZoom,
+      x: midX - fit.x - pinch.canvasX * nextScale,
+      y: midY - fit.y - pinch.canvasY * nextScale,
+    })
+  }
+
   const startPan = (event) => {
-    if ((event.button !== undefined && event.button !== 0) || event.target.closest('.kt-map-node, .kt-map-empty button')) return
+    if (event.button !== undefined && event.button !== 0) return
+    // Track every pointer so a pinch can start even when a finger lands on a
+    // node — on a phone the map is dense enough that this is the common case.
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (pointersRef.current.size >= 2) {
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+      event.currentTarget.classList.add('is-panning')
+      event.preventDefault()
+      startPinch(event.currentTarget)
+      return
+    }
+    // A single pointer on a node is a tap/select, not a pan.
+    if (event.target.closest('.kt-map-node, .kt-map-empty button')) return
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    event.currentTarget.classList.add('is-panning')
+    event.preventDefault()
     panRef.current = {
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
-      view,
+      view: liveViewRef.current,
     }
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-    event.currentTarget.classList.add('is-panning')
-    event.preventDefault()
   }
 
   const movePan = (event) => {
+    if (pointersRef.current.has(event.pointerId)) {
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    }
+    if (pinchRef.current) {
+      movePinch()
+      return
+    }
     const pan = panRef.current
     if (!pan) return
     if (pan.pointerId !== undefined && event.pointerId !== pan.pointerId) return
-    setView(current => ({
-      ...current,
+    applyView({
+      ...liveViewRef.current,
       x: pan.view.x + event.clientX - pan.x,
       y: pan.view.y + event.clientY - pan.y,
-    }))
+    })
   }
 
   const endPan = (event) => {
+    if (event.pointerId !== undefined) {
+      pointersRef.current.delete(event.pointerId)
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+      }
+    }
+    if (pinchRef.current && pointersRef.current.size < 2) {
+      pinchRef.current = null
+      // One finger left: hand the gesture over to a fresh pan from where
+      // that finger currently is, instead of ending the interaction.
+      const remaining = [...pointersRef.current.entries()][0]
+      if (remaining) {
+        const [pointerId, point] = remaining
+        panRef.current = { pointerId, x: point.x, y: point.y, view: liveViewRef.current }
+        return
+      }
+    }
     const pan = panRef.current
     if (!pan) {
-      event.currentTarget.classList.remove('is-panning')
+      if (pointersRef.current.size === 0) event.currentTarget.classList.remove('is-panning')
       return
     }
-    if (pan?.pointerId !== undefined && event.pointerId !== undefined && event.pointerId !== pan.pointerId) return
-    if (pan.pointerId !== undefined && event.currentTarget.hasPointerCapture?.(pan.pointerId)) {
-      event.currentTarget.releasePointerCapture?.(pan.pointerId)
-    }
+    if (pan.pointerId !== undefined && event.pointerId !== undefined && event.pointerId !== pan.pointerId) return
     panRef.current = null
     event.currentTarget.classList.remove('is-panning')
   }
@@ -130,14 +215,15 @@ export default function useMapViewport({ width, height }) {
   const zoomMap = (event) => {
     event.preventDefault()
     const rect = event.currentTarget.getBoundingClientRect()
-    const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, view.zoom * (event.deltaY > 0 ? 0.92 : 1.08)))
-    const currentScale = fit.scale * view.zoom
+    const current = liveViewRef.current
+    const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, current.zoom * (event.deltaY > 0 ? 0.92 : 1.08)))
+    const currentScale = fit.scale * current.zoom
     const nextScale = fit.scale * nextZoom
     const px = event.clientX - rect.left
     const py = event.clientY - rect.top
-    const canvasX = (px - transform.x) / currentScale
-    const canvasY = (py - transform.y) / currentScale
-    setView({
+    const canvasX = (px - fit.x - current.x) / currentScale
+    const canvasY = (py - fit.y - current.y) / currentScale
+    applyView({
       zoom: nextZoom,
       x: px - fit.x - canvasX * nextScale,
       y: py - fit.y - canvasY * nextScale,
