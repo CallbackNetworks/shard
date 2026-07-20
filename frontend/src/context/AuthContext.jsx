@@ -4,6 +4,9 @@ import axios from 'axios'
 const AuthContext = createContext(null)
 
 const TOKEN_KEY = 'auth_token'
+// Last auth mode confirmed by the server ('open' | 'required'). Lets the PWA
+// shell stay usable offline instead of falling back to the login gate.
+const AUTH_MODE_KEY = 'auth_mode'
 
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -15,6 +18,7 @@ export function AuthProvider({ children }) {
     axios.get('/api/auth/me', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).then(res => {
+      localStorage.setItem(AUTH_MODE_KEY, res.data.auth_required ? 'required' : 'open')
       if (!res.data.auth_required) {
         // Server has no password set — always authenticated
         setAuthRequired(false)
@@ -23,7 +27,17 @@ export function AuthProvider({ children }) {
         setAuthRequired(true)
         setIsAuthenticated(!!token && res.data.ok)
       }
-    }).catch(() => {
+    }).catch(err => {
+      // Network failure (offline PWA): reuse the last server-confirmed auth
+      // mode. An HTTP error response still means "locked out".
+      if (!err.response) {
+        const lastMode = localStorage.getItem(AUTH_MODE_KEY)
+        if (lastMode === 'open' || (lastMode === 'required' && token)) {
+          setAuthRequired(lastMode === 'required')
+          setIsAuthenticated(true)
+          return
+        }
+      }
       setAuthRequired(true)
       setIsAuthenticated(false)
     }).finally(() => {
