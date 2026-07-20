@@ -260,7 +260,14 @@ export default function TerritoryCanvas({
     !projects.some(project => highlight.projectIds.has(project.id))
 
   return (
-    <div className={s.wrap}>
+    <div
+      className={s.wrap}
+      onClick={(event) => {
+        // Click/tap on the background (every interactive element here is a
+        // button) clears the selection, matching the graph views.
+        if (!event.target.closest('button, a, input')) onSelect(null)
+      }}
+    >
       <div ref={contentRef} className={s.content}>
         <svg className={s.overlay} aria-hidden="true">
           {paths.map((path, index) => (

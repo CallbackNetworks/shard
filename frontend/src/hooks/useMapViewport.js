@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const ZOOM_MIN = 0.65
 const ZOOM_MAX = 2.4
+// Movement below this (px) is a tap/click; beyond it the gesture is a drag.
+const TAP_SLOP = 7
 
 // Pan/zoom/fit state for the structure-map canvas: tracks the frame size via
 // ResizeObserver, computes a fit-to-frame scale, and exposes pointer/keyboard/
@@ -22,6 +24,9 @@ export default function useMapViewport({ width, height }) {
   // several times between renders, so handlers must not trust the `view`
   // closure when chaining gestures (pan -> pinch -> pan).
   const liveViewRef = useRef({ zoom: 1, x: 0, y: 0 })
+  // True once the current gesture moved past TAP_SLOP; the trailing click
+  // then gets swallowed so a drag never selects or deselects anything.
+  const movedRef = useRef(false)
   const [frame, setFrame] = useState({ width: 0, height: 0 })
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
 
@@ -129,6 +134,7 @@ export default function useMapViewport({ width, height }) {
     const pinch = pinchRef.current
     const points = [...pointersRef.current.values()]
     if (!pinch || points.length < 2) return
+    movedRef.current = true
     const dist = Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y))
     const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pinch.startZoom * (dist / pinch.startDist)))
     const nextScale = fit.scale * nextZoom
@@ -146,6 +152,7 @@ export default function useMapViewport({ width, height }) {
     // Track every pointer so a pinch can start even when a finger lands on a
     // node — on a phone the map is dense enough that this is the common case.
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (pointersRef.current.size === 1) movedRef.current = false
     if (pointersRef.current.size >= 2) {
       event.currentTarget.setPointerCapture?.(event.pointerId)
       event.currentTarget.classList.add('is-panning')
@@ -153,16 +160,20 @@ export default function useMapViewport({ width, height }) {
       startPinch(event.currentTarget)
       return
     }
-    // A single pointer on a node is a tap/select, not a pan.
-    if (event.target.closest('.kt-map-node, .kt-map-empty button')) return
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-    event.currentTarget.classList.add('is-panning')
-    event.preventDefault()
+    const onNode = !!event.target.closest('.kt-map-node, .kt-map-empty button')
+    if (!onNode) {
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+      event.currentTarget.classList.add('is-panning')
+      event.preventDefault()
+    }
     panRef.current = {
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
       view: liveViewRef.current,
+      // A drag that starts on a node only becomes a pan once it travels past
+      // the tap slop, so plain taps/clicks still select the node.
+      pending: onNode,
     }
   }
 
@@ -177,10 +188,24 @@ export default function useMapViewport({ width, height }) {
     const pan = panRef.current
     if (!pan) return
     if (pan.pointerId !== undefined && event.pointerId !== pan.pointerId) return
+    const dx = event.clientX - pan.x
+    const dy = event.clientY - pan.y
+    if (!movedRef.current && Math.hypot(dx, dy) > TAP_SLOP) movedRef.current = true
+    if (pan.pending) {
+      if (!movedRef.current) return
+      pan.pending = false
+      // Only mice need explicit capture here. Touch pointers are implicitly
+      // captured by the node they went down on (a child of the frame, so
+      // events still bubble here) — stealing that capture mid-gesture fires
+      // lostpointercapture on the node, which endPan would treat as the
+      // gesture ending.
+      if (event.pointerType === 'mouse') event.currentTarget.setPointerCapture?.(pan.pointerId)
+      event.currentTarget.classList.add('is-panning')
+    }
     applyView({
       ...liveViewRef.current,
-      x: pan.view.x + event.clientX - pan.x,
-      y: pan.view.y + event.clientY - pan.y,
+      x: pan.view.x + dx,
+      y: pan.view.y + dy,
     })
   }
 
@@ -212,11 +237,11 @@ export default function useMapViewport({ width, height }) {
     event.currentTarget.classList.remove('is-panning')
   }
 
-  const zoomMap = (event) => {
-    event.preventDefault()
+  // Zoom by `factor` keeping the canvas point under the cursor stationary.
+  const zoomAtPoint = (event, factor) => {
     const rect = event.currentTarget.getBoundingClientRect()
     const current = liveViewRef.current
-    const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, current.zoom * (event.deltaY > 0 ? 0.92 : 1.08)))
+    const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, current.zoom * factor))
     const currentScale = fit.scale * current.zoom
     const nextScale = fit.scale * nextZoom
     const px = event.clientX - rect.left
@@ -230,6 +255,29 @@ export default function useMapViewport({ width, height }) {
     })
   }
 
+  const zoomMap = (event) => {
+    event.preventDefault()
+    zoomAtPoint(event, event.deltaY > 0 ? 0.92 : 1.08)
+  }
+
+  // Swallow the click that trails a pan/pinch so a drag never selects a node
+  // or clears the selection. The flag resets on the next pointerdown.
+  const handleGraphClickCapture = (event) => {
+    if (movedRef.current) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+  }
+
+  // Double-click/double-tap on empty canvas zooms in around the cursor
+  // (shift inverts to zoom out). Nodes keep their own dblclick = open.
+  const handleGraphDoubleClick = (event) => {
+    if (movedRef.current) return
+    if (event.target.closest('.kt-map-node, button, a')) return
+    event.preventDefault()
+    zoomAtPoint(event, event.shiftKey ? 1 / 1.4 : 1.4)
+  }
+
   return {
     graphRef,
     transform,
@@ -240,5 +288,7 @@ export default function useMapViewport({ width, height }) {
     movePan,
     endPan,
     zoomMap,
+    handleGraphClickCapture,
+    handleGraphDoubleClick,
   }
 }

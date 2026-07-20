@@ -215,7 +215,23 @@ export default function StructureMap() {
     movePan,
     endPan,
     zoomMap,
+    handleGraphClickCapture,
+    handleGraphDoubleClick,
   } = useMapViewport({ width: mapLayout.width, height: mapLayout.height })
+
+  // Escape clears the selection in every layout style — matches the "click
+  // empty space to deselect" habit for keyboard users.
+  useEffect(() => {
+    if (!selected) return undefined
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return
+      const tag = event.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || event.target.isContentEditable) return
+      setSelected(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected])
 
   useEffect(() => {
     resetView()
@@ -456,6 +472,12 @@ export default function StructureMap() {
               onPointerCancel={endPan}
               onLostPointerCapture={endPan}
               onWheel={zoomMap}
+              onClickCapture={handleGraphClickCapture}
+              onClick={(event) => {
+                // Click/tap on empty canvas clears the selection.
+                if (!event.target.closest('.kt-map-node, button, a')) setSelected(null)
+              }}
+              onDoubleClick={handleGraphDoubleClick}
             >
               <MapCanvas
                 layout={mapLayout}

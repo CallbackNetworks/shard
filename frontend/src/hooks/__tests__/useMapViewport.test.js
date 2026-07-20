@@ -99,6 +99,68 @@ describe('useMapViewport', () => {
     expect(after.y - pinched.y).toBeCloseTo(30)
   })
 
+  it('pans when a drag starts on a node and moves past the tap slop', () => {
+    const { hook, el } = setup()
+    const node = document.createElement('div')
+    node.className = 'kt-map-node'
+    el.appendChild(node)
+    const before = hook.result.current.transform
+    act(() => hook.result.current.startPan({ ...pointerEvent(el, 1, 100, 100), target: node }))
+    // Within the slop: still a potential tap, no pan yet.
+    act(() => hook.result.current.movePan(pointerEvent(el, 1, 104, 100)))
+    expect(hook.result.current.transform.x).toBeCloseTo(before.x)
+    // Past the slop: the drag becomes a pan.
+    act(() => hook.result.current.movePan(pointerEvent(el, 1, 150, 120)))
+    expect(hook.result.current.transform.x - before.x).toBeCloseTo(50)
+    expect(hook.result.current.transform.y - before.y).toBeCloseTo(20)
+    // The trailing click is swallowed so the node is not selected.
+    const click = { preventDefault: vi.fn(), stopPropagation: vi.fn(), target: node }
+    act(() => hook.result.current.handleGraphClickCapture(click))
+    expect(click.stopPropagation).toHaveBeenCalled()
+  })
+
+  it('keeps a plain tap on a node as a click (no pan, no suppression)', () => {
+    const { hook, el } = setup()
+    const node = document.createElement('div')
+    node.className = 'kt-map-node'
+    el.appendChild(node)
+    const before = hook.result.current.transform
+    act(() => hook.result.current.startPan({ ...pointerEvent(el, 1, 100, 100), target: node }))
+    act(() => hook.result.current.endPan(pointerEvent(el, 1, 101, 100)))
+    expect(hook.result.current.transform.x).toBeCloseTo(before.x)
+    const click = { preventDefault: vi.fn(), stopPropagation: vi.fn(), target: node }
+    act(() => hook.result.current.handleGraphClickCapture(click))
+    expect(click.stopPropagation).not.toHaveBeenCalled()
+  })
+
+  it('zooms in on double-click on empty canvas, out with shift', () => {
+    const { hook, el } = setup()
+    const before = hook.result.current.transform
+    act(() => hook.result.current.handleGraphDoubleClick({
+      clientX: 150, clientY: 100, shiftKey: false,
+      currentTarget: el, target: el, preventDefault: () => {},
+    }))
+    expect(hook.result.current.transform.scale).toBeCloseTo(before.scale * 1.4)
+    act(() => hook.result.current.handleGraphDoubleClick({
+      clientX: 150, clientY: 100, shiftKey: true,
+      currentTarget: el, target: el, preventDefault: () => {},
+    }))
+    expect(hook.result.current.transform.scale).toBeCloseTo(before.scale)
+  })
+
+  it('ignores double-click on a node', () => {
+    const { hook, el } = setup()
+    const node = document.createElement('div')
+    node.className = 'kt-map-node'
+    el.appendChild(node)
+    const before = hook.result.current.transform
+    act(() => hook.result.current.handleGraphDoubleClick({
+      clientX: 150, clientY: 100, shiftKey: false,
+      currentTarget: el, target: node, preventDefault: () => {},
+    }))
+    expect(hook.result.current.transform.scale).toBeCloseTo(before.scale)
+  })
+
   it('still zooms around the cursor on wheel', () => {
     const { hook, el } = setup()
     const before = hook.result.current.transform
