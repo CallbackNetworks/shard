@@ -117,8 +117,12 @@
 .headerActions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  flex-shrink: 0;
+  /* Must be allowed to shrink below content width so flex-wrap can kick in
+     on tablet/mobile instead of clipping the rightmost buttons. */
+  flex-shrink: 1;
+  min-width: 0;
   flex-wrap: wrap;
   position: relative;
 }

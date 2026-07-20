@@ -58,6 +58,8 @@
   gap: 16px;
   padding: 12px 0;
   border-bottom: 1px solid var(--kt-line, #3a3a3a);
+  /* On narrow viewports the control drops to its own line instead of clipping. */
+  flex-wrap: wrap;
 }
 
 .controlRowText {
@@ -77,6 +79,7 @@
 
 .segmented {
   display: inline-flex;
+  flex-wrap: wrap;
   border: 1px solid var(--kt-line, #3a3a3a);
   overflow: hidden;
 }
