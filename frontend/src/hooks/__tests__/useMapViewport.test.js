@@ -20,6 +20,10 @@ function pointerEvent(el, pointerId, clientX, clientY) {
   }
 }
 
+// Gesture handlers paint the DOM immediately but coalesce the React state
+// update to one per animation frame — flush that frame before asserting.
+const nextFrame = () => act(() => new Promise((resolve) => requestAnimationFrame(() => resolve())))
+
 function setup() {
   const hook = renderHook(() => useMapViewport({ width: 1000, height: 800 }))
   const el = makeFrame()
@@ -28,31 +32,46 @@ function setup() {
 }
 
 describe('useMapViewport', () => {
-  it('pans with a single pointer', () => {
+  it('pans with a single pointer', async () => {
     const { hook, el } = setup()
     const before = hook.result.current.transform
     act(() => hook.result.current.startPan(pointerEvent(el, 1, 100, 100)))
     act(() => hook.result.current.movePan(pointerEvent(el, 1, 140, 70)))
+    await nextFrame()
     const after = hook.result.current.transform
     expect(after.x - before.x).toBeCloseTo(40)
     expect(after.y - before.y).toBeCloseTo(-30)
     expect(after.scale).toBeCloseTo(before.scale)
   })
 
-  it('zooms with a two-finger pinch, clamped to the zoom range', () => {
+  it('paints the canvas transform synchronously during the gesture', () => {
+    const { hook, el } = setup()
+    const canvas = document.createElement('div')
+    canvas.className = 'kt-map-canvas'
+    el.appendChild(canvas)
+    act(() => hook.result.current.startPan(pointerEvent(el, 1, 100, 100)))
+    act(() => hook.result.current.movePan(pointerEvent(el, 1, 140, 70)))
+    // No frame flush: the DOM must already carry the new transform.
+    expect(canvas.style.transform).toMatch(/translate\(/)
+  })
+
+  it('zooms with a two-finger pinch, clamped to the zoom range', async () => {
     const { hook, el } = setup()
     const before = hook.result.current.transform
     act(() => hook.result.current.startPan(pointerEvent(el, 1, 100, 100)))
     act(() => hook.result.current.startPan(pointerEvent(el, 2, 200, 100)))
     // Spread fingers to double the distance -> 2x zoom.
     act(() => hook.result.current.movePan(pointerEvent(el, 2, 300, 100)))
+    await nextFrame()
     expect(hook.result.current.transform.scale).toBeCloseTo(before.scale * 2)
-    // Spreading far beyond the limit clamps at ZOOM_MAX (2.4).
+    // Spreading far beyond the limit clamps at the absolute scale cap (2.0),
+    // which on small fit scales lies beyond the relative ZOOM_MAX.
     act(() => hook.result.current.movePan(pointerEvent(el, 2, 900, 100)))
-    expect(hook.result.current.transform.scale).toBeCloseTo(before.scale * 2.4)
+    await nextFrame()
+    expect(hook.result.current.transform.scale).toBeCloseTo(2)
   })
 
-  it('keeps the canvas point under the pinch midpoint stationary', () => {
+  it('keeps the canvas point under the pinch midpoint stationary', async () => {
     const { hook, el } = setup()
     const before = hook.result.current.transform
     // Midpoint at (150, 100) in frame coordinates (rect is at 0,0 in jsdom).
@@ -65,12 +84,13 @@ describe('useMapViewport', () => {
       hook.result.current.movePan(pointerEvent(el, 1, 50, 100))
       hook.result.current.movePan(pointerEvent(el, 2, 250, 100))
     })
+    await nextFrame()
     const after = hook.result.current.transform
     expect(after.x + canvasX * after.scale).toBeCloseTo(150, 5)
     expect(after.y + canvasY * after.scale).toBeCloseTo(100, 5)
   })
 
-  it('pinches even when the first finger lands on a node', () => {
+  it('pinches even when the first finger lands on a node', async () => {
     const { hook, el } = setup()
     const node = document.createElement('div')
     node.className = 'kt-map-node'
@@ -82,24 +102,27 @@ describe('useMapViewport', () => {
     // Second finger anywhere starts the pinch.
     act(() => hook.result.current.startPan(pointerEvent(el, 2, 200, 100)))
     act(() => hook.result.current.movePan(pointerEvent(el, 2, 300, 100)))
+    await nextFrame()
     expect(hook.result.current.transform.scale).toBeCloseTo(before.scale * 2)
   })
 
-  it('hands off to a pan when one pinch finger lifts', () => {
+  it('hands off to a pan when one pinch finger lifts', async () => {
     const { hook, el } = setup()
     act(() => hook.result.current.startPan(pointerEvent(el, 1, 100, 100)))
     act(() => hook.result.current.startPan(pointerEvent(el, 2, 200, 100)))
     act(() => hook.result.current.movePan(pointerEvent(el, 2, 300, 100)))
+    await nextFrame()
     const pinched = hook.result.current.transform
     act(() => hook.result.current.endPan(pointerEvent(el, 1, 100, 100)))
     act(() => hook.result.current.movePan(pointerEvent(el, 2, 320, 130)))
+    await nextFrame()
     const after = hook.result.current.transform
     expect(after.scale).toBeCloseTo(pinched.scale)
     expect(after.x - pinched.x).toBeCloseTo(20)
     expect(after.y - pinched.y).toBeCloseTo(30)
   })
 
-  it('pans when a drag starts on a node and moves past the tap slop', () => {
+  it('pans when a drag starts on a node and moves past the tap slop', async () => {
     const { hook, el } = setup()
     const node = document.createElement('div')
     node.className = 'kt-map-node'
@@ -108,9 +131,11 @@ describe('useMapViewport', () => {
     act(() => hook.result.current.startPan({ ...pointerEvent(el, 1, 100, 100), target: node }))
     // Within the slop: still a potential tap, no pan yet.
     act(() => hook.result.current.movePan(pointerEvent(el, 1, 104, 100)))
+    await nextFrame()
     expect(hook.result.current.transform.x).toBeCloseTo(before.x)
     // Past the slop: the drag becomes a pan.
     act(() => hook.result.current.movePan(pointerEvent(el, 1, 150, 120)))
+    await nextFrame()
     expect(hook.result.current.transform.x - before.x).toBeCloseTo(50)
     expect(hook.result.current.transform.y - before.y).toBeCloseTo(20)
     // The trailing click is swallowed so the node is not selected.
@@ -119,7 +144,7 @@ describe('useMapViewport', () => {
     expect(click.stopPropagation).toHaveBeenCalled()
   })
 
-  it('keeps a plain tap on a node as a click (no pan, no suppression)', () => {
+  it('keeps a plain tap on a node as a click (no pan, no suppression)', async () => {
     const { hook, el } = setup()
     const node = document.createElement('div')
     node.className = 'kt-map-node'
@@ -127,28 +152,31 @@ describe('useMapViewport', () => {
     const before = hook.result.current.transform
     act(() => hook.result.current.startPan({ ...pointerEvent(el, 1, 100, 100), target: node }))
     act(() => hook.result.current.endPan(pointerEvent(el, 1, 101, 100)))
+    await nextFrame()
     expect(hook.result.current.transform.x).toBeCloseTo(before.x)
     const click = { preventDefault: vi.fn(), stopPropagation: vi.fn(), target: node }
     act(() => hook.result.current.handleGraphClickCapture(click))
     expect(click.stopPropagation).not.toHaveBeenCalled()
   })
 
-  it('zooms in on double-click on empty canvas, out with shift', () => {
+  it('zooms in on double-click on empty canvas, out with shift', async () => {
     const { hook, el } = setup()
     const before = hook.result.current.transform
     act(() => hook.result.current.handleGraphDoubleClick({
       clientX: 150, clientY: 100, shiftKey: false,
       currentTarget: el, target: el, preventDefault: () => {},
     }))
+    await nextFrame()
     expect(hook.result.current.transform.scale).toBeCloseTo(before.scale * 1.4)
     act(() => hook.result.current.handleGraphDoubleClick({
       clientX: 150, clientY: 100, shiftKey: true,
       currentTarget: el, target: el, preventDefault: () => {},
     }))
+    await nextFrame()
     expect(hook.result.current.transform.scale).toBeCloseTo(before.scale)
   })
 
-  it('ignores double-click on a node', () => {
+  it('ignores double-click on a node', async () => {
     const { hook, el } = setup()
     const node = document.createElement('div')
     node.className = 'kt-map-node'
@@ -158,10 +186,11 @@ describe('useMapViewport', () => {
       clientX: 150, clientY: 100, shiftKey: false,
       currentTarget: el, target: node, preventDefault: () => {},
     }))
+    await nextFrame()
     expect(hook.result.current.transform.scale).toBeCloseTo(before.scale)
   })
 
-  it('still zooms around the cursor on wheel', () => {
+  it('still zooms around the cursor on wheel', async () => {
     const { hook, el } = setup()
     const before = hook.result.current.transform
     act(() => hook.result.current.zoomMap({
@@ -171,6 +200,7 @@ describe('useMapViewport', () => {
       currentTarget: el,
       preventDefault: () => {},
     }))
+    await nextFrame()
     const after = hook.result.current.transform
     expect(after.scale).toBeCloseTo(before.scale * 1.08)
     // Point under the cursor stays put.

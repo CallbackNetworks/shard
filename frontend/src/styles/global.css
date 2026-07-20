@@ -2058,6 +2058,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   left: 0;
   top: 0;
   transform-origin: top left;
+  /* Keep the canvas on its own compositor layer: pan/zoom gestures update
+     the transform imperatively every frame (see useMapViewport). */
+  will-change: transform;
 }
 .kt-map-links {
   position: absolute;

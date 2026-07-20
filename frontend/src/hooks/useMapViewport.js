@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const ZOOM_MIN = 0.65
 const ZOOM_MAX = 2.4
+// The fit scale can be tiny on small screens, where a relative ZOOM_MAX still
+// leaves nodes unreadable — always allow zooming until the canvas reaches
+// this absolute scale (2 = 200% of native node size).
+const ABS_SCALE_MAX = 2
 // Movement below this (px) is a tap/click; beyond it the gesture is a drag.
 const TAP_SLOP = 7
 
@@ -63,8 +67,10 @@ export default function useMapViewport({ width, height }) {
     y: fit.y + view.y,
   }
 
+  const zoomMax = Math.max(ZOOM_MAX, ABS_SCALE_MAX / fit.scale)
+
   const zoomBy = (delta) => {
-    setView(current => ({ ...current, zoom: Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, current.zoom + delta)) }))
+    setView(current => ({ ...current, zoom: Math.max(ZOOM_MIN, Math.min(zoomMax, current.zoom + delta)) }))
   }
 
   const resetView = useCallback(() => {
@@ -105,9 +111,32 @@ export default function useMapViewport({ width, height }) {
     }
   }
 
+  const rafRef = useRef(0)
+  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }, [])
+
+  // Paint the transform straight onto the canvas element so gestures track
+  // the pointer within the same frame; the React state update (which
+  // re-renders the whole node tree) is coalesced to one per animation frame.
+  const paintCanvas = (next) => {
+    const canvas = frameEl?.querySelector('.kt-map-canvas')
+    if (!canvas) return
+    canvas.style.transform =
+      `translate(${fit.x + next.x}px, ${fit.y + next.y}px) scale(${fit.scale * next.zoom})`
+  }
+
   const applyView = (next) => {
     liveViewRef.current = next
-    setView(next)
+    paintCanvas(next)
+    if (typeof requestAnimationFrame !== 'function') {
+      setView(next)
+      return
+    }
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = 0
+        setView(liveViewRef.current)
+      })
+    }
   }
 
   const startPinch = (frameNode) => {
@@ -136,7 +165,7 @@ export default function useMapViewport({ width, height }) {
     if (!pinch || points.length < 2) return
     movedRef.current = true
     const dist = Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y))
-    const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pinch.startZoom * (dist / pinch.startDist)))
+    const nextZoom = Math.max(ZOOM_MIN, Math.min(zoomMax, pinch.startZoom * (dist / pinch.startDist)))
     const nextScale = fit.scale * nextZoom
     const midX = (points[0].x + points[1].x) / 2 - pinch.rect.left
     const midY = (points[0].y + points[1].y) / 2 - pinch.rect.top
@@ -241,7 +270,7 @@ export default function useMapViewport({ width, height }) {
   const zoomAtPoint = (event, factor) => {
     const rect = event.currentTarget.getBoundingClientRect()
     const current = liveViewRef.current
-    const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, current.zoom * factor))
+    const nextZoom = Math.max(ZOOM_MIN, Math.min(zoomMax, current.zoom * factor))
     const currentScale = fit.scale * current.zoom
     const nextScale = fit.scale * nextZoom
     const px = event.clientX - rect.left
