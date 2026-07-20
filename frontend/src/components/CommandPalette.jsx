@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -115,88 +115,93 @@ export default function CommandPalette({ open, onClose }) {
     staleTime: 5000,
   })
 
-  // Build command list
-  const items = []
-  const q = query.trim().toLowerCase()
-  const resolvedStatic = STATIC_COMMANDS.map(c => ({ ...c, label: t(c.labelKey) }))
+  // Build command list. Memoized so its reference is stable across renders that
+  // don't touch a source — otherwise the keyboard-nav effect below rebinds its
+  // listener on every render.
+  const items = useMemo(() => {
+    const list = []
+    const q = query.trim().toLowerCase()
+    const resolvedStatic = STATIC_COMMANDS.map(c => ({ ...c, label: t(c.labelKey) }))
 
-  if (!q) {
-    // No query: show static nav + all projects
-    const matchedStatic = resolvedStatic
-    matchedStatic.forEach(c => items.push(c))
+    if (!q) {
+      // No query: show static nav + all projects
+      resolvedStatic.forEach(c => list.push(c))
 
-    if (projects.length > 0) {
-      const activeProjects = projects.filter(p => p.status === 'active').slice(0, 8)
-      activeProjects.forEach(p => items.push({
+      if (projects.length > 0) {
+        const activeProjects = projects.filter(p => p.status === 'active').slice(0, 8)
+        activeProjects.forEach(p => list.push({
+          id: `proj-${p.id}`,
+          label: p.name,
+          section: 'Projects',
+          icon: <FolderOpen size={14}/>,
+          meta: p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined,
+          path: `/projects/${p.id}`,
+        }))
+      }
+    } else {
+      // With query: filter static commands
+      const matchedStatic = resolvedStatic.filter(c =>
+        c.label.toLowerCase().includes(q)
+      )
+      matchedStatic.forEach(c => list.push(c))
+
+      // Filter projects by name
+      const matchedProjects = projects.filter(p =>
+        p.name.toLowerCase().includes(q)
+      ).slice(0, 6)
+      matchedProjects.forEach(p => list.push({
         id: `proj-${p.id}`,
         label: p.name,
         section: 'Projects',
         icon: <FolderOpen size={14}/>,
-        meta: p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined,
+        meta: p.status === 'archived' ? 'archived' : (p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined),
         path: `/projects/${p.id}`,
       }))
-    }
-  } else {
-    // With query: filter static commands
-    const matchedStatic = resolvedStatic.filter(c =>
-      c.label.toLowerCase().includes(q)
-    )
-    matchedStatic.forEach(c => items.push(c))
 
-    // Filter projects by name
-    const matchedProjects = projects.filter(p =>
-      p.name.toLowerCase().includes(q)
-    ).slice(0, 6)
-    matchedProjects.forEach(p => items.push({
-      id: `proj-${p.id}`,
-      label: p.name,
-      section: 'Projects',
-      icon: <FolderOpen size={14}/>,
-      meta: p.status === 'archived' ? 'archived' : (p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined),
-      path: `/projects/${p.id}`,
-    }))
+      // Search results (tasks)
+      if (searchResults?.tasks?.length > 0) {
+        searchResults.tasks.slice(0, 8).forEach(task => list.push({
+          id: `task-${task.id}`,
+          label: task.title,
+          section: 'Tasks',
+          icon: <Hash size={14}/>,
+          meta: task.status,
+          path: `/projects/${task.project_id}`,
+        }))
+      }
 
-    // Search results (tasks)
-    if (searchResults?.tasks?.length > 0) {
-      searchResults.tasks.slice(0, 8).forEach(t => items.push({
-        id: `task-${t.id}`,
-        label: t.title,
-        section: 'Tasks',
-        icon: <Hash size={14}/>,
-        meta: t.status,
-        path: `/projects/${t.project_id}`,
-      }))
-    }
+      // Search results (projects from search API)
+      if (searchResults?.projects?.length > 0) {
+        const alreadyIds = new Set(list.filter(i => i.id.startsWith('proj-')).map(i => i.id.replace('proj-', '')))
+        searchResults.projects.filter(p => !alreadyIds.has(p.id)).slice(0, 4).forEach(p => list.push({
+          id: `proj-${p.id}`,
+          label: p.name,
+          section: 'Projects',
+          icon: <FolderOpen size={14}/>,
+          path: `/projects/${p.id}`,
+        }))
+      }
 
-    // Search results (projects from search API)
-    if (searchResults?.projects?.length > 0) {
-      const alreadyIds = new Set(items.filter(i => i.id.startsWith('proj-')).map(i => i.id.replace('proj-', '')))
-      searchResults.projects.filter(p => !alreadyIds.has(p.id)).slice(0, 4).forEach(p => items.push({
-        id: `proj-${p.id}`,
-        label: p.name,
-        section: 'Projects',
-        icon: <FolderOpen size={14}/>,
-        path: `/projects/${p.id}`,
-      }))
-    }
-
-    // Custom graph nodes (ADR-0037): containers open their task view, the rest
-    // land on the universal node page.
-    const customTypeByKey = new Map(nodeTypes.filter(nt => !nt.is_builtin).map(nt => [nt.key, nt]))
-    if (customTypeByKey.size > 0) {
-      nodeHits.filter(n => customTypeByKey.has(n.type)).slice(0, 6).forEach(n => {
-        const nt = customTypeByKey.get(n.type)
-        items.push({
-          id: `node-${n.id}`,
-          label: n.title || n.id,
-          section: 'Nodes',
-          icon: <Boxes size={14}/>,
-          meta: nt.label,
-          path: nt.is_container ? `/c/${n.id}` : `/n/${n.id}`,
+      // Custom graph nodes (ADR-0037): containers open their task view, the rest
+      // land on the universal node page.
+      const customTypeByKey = new Map(nodeTypes.filter(nt => !nt.is_builtin).map(nt => [nt.key, nt]))
+      if (customTypeByKey.size > 0) {
+        nodeHits.filter(n => customTypeByKey.has(n.type)).slice(0, 6).forEach(n => {
+          const nt = customTypeByKey.get(n.type)
+          list.push({
+            id: `node-${n.id}`,
+            label: n.title || n.id,
+            section: 'Nodes',
+            icon: <Boxes size={14}/>,
+            meta: nt.label,
+            path: nt.is_container ? `/c/${n.id}` : `/n/${n.id}`,
+          })
         })
-      })
+      }
     }
-  }
+
+    return list
+  }, [query, t, projects, searchResults, nodeTypes, nodeHits])
 
   // Group items by section for rendering
   const grouped = []
