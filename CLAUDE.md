@@ -97,7 +97,7 @@ scripts/test.sh postgres     # PostgreSQL only (isolated shard_test DB, never ap
 scripts/test.sh both -k foo  # extra args after the target pass through to pytest
 ```
 
-`conftest.py` provides `db`, `client`, `sample_identity`, and `sample_project` fixtures. Auth middleware is disabled in tests (`AUTH_PASSWORD=""`). Both databases enforce `--cov-fail-under=70` in CI. Some tests are dialect-aware (e.g. skip under enforced foreign keys) — see ADR-0018.
+`conftest.py` provides `db`, `client`, `sample_identity`, and `sample_project` fixtures. Auth middleware is disabled in tests (`AUTH_PASSWORD=""`). Both databases enforce `--cov-fail-under=78` in CI. Some tests are dialect-aware (e.g. skip under enforced foreign keys) — see ADR-0018.
 
 ### Frontend (vitest)
 
@@ -138,7 +138,7 @@ Config in `frontend/eslint.config.js` (flat config). CI allows up to 300 warning
 
 Runs on push/PR to `main`. Seven jobs:
 1. **Backend checks**: ruff lint + format check, pip-audit (DB-independent, runs once)
-2. **Backend tests (SQLite)**: pytest with coverage (>=70%) against SQLite
+2. **Backend tests (SQLite)**: pytest with coverage (>=78%) against SQLite
 3. **Backend tests (PostgreSQL)**: the same suite with the same coverage gate against a `postgres:16-alpine` service (`pgtest` profile in `docker-compose.ci.yml`). SQLite and PostgreSQL are co-equal, symmetric targets — neither is primary; both gate deploy (see ADR-0018, ADR-0020)
 4. **Frontend**: ESLint, vitest, npm audit, vite build
 5. **Integration**: production compose up, backend health check, frontend smoke test (needs backend-checks + backend-sqlite + backend-postgres + frontend)
