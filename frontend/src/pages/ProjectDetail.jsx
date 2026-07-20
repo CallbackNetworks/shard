@@ -25,6 +25,7 @@ import CyclePanel from '../components/CyclePanel'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { getUiPrefs } from '../utils/uiPrefs'
+import { filterTasks } from '../utils/taskFilters'
 import s from './ProjectDetail.module.css'
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -222,20 +223,14 @@ export default function ProjectDetail() {
 
   const agentNames = [...new Set(tasks.map(t => t.assigned_agent_name).filter(Boolean))].sort()
 
-  const applyFilters = (list) => {
-    let result = list
-    if (filter !== 'all') result = result.filter(t => t.status === filter)
-    if (filterPriority !== 'all') result = result.filter(t => t.priority === filterPriority)
-    if (filterLabel !== 'all') result = result.filter(t => (t.labels || []).some(l => l.id === filterLabel))
-    if (filterAssignee !== 'all') result = result.filter(t => t.assignee === filterAssignee)
-    if (filterAgent !== 'all') result = result.filter(t => t.assigned_agent_name === filterAgent)
-    if (filterDue === 'overdue') result = result.filter(t => t.due_date && new Date(t.due_date) < new Date())
-    else if (filterDue === 'this_week') {
-      const now = new Date(); const end = new Date(); end.setDate(now.getDate() + 7)
-      result = result.filter(t => t.due_date && new Date(t.due_date) >= now && new Date(t.due_date) <= end)
-    } else if (filterDue === 'no_date') result = result.filter(t => !t.due_date)
-    return result
-  }
+  const applyFilters = (list) => filterTasks(list, {
+    status: filter,
+    priority: filterPriority,
+    label: filterLabel,
+    assignee: filterAssignee,
+    agent: filterAgent,
+    due: filterDue,
+  })
 
   const activeFilterCount = [filterPriority, filterLabel, filterAssignee, filterDue, filterAgent].filter(f => f !== 'all').length
 
