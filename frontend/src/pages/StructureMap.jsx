@@ -8,7 +8,7 @@ import { STATUS_COLOR } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { dependencyNeighborhood } from '../utils/structureMap'
 import { deriveGraphStructure, focusGraph } from '../utils/graphStructure'
-import { buildMindMapLayout, buildNetworkLayout, taskWeight } from '../utils/structureMapLayout'
+import { buildMindMapLayout, buildNetworkLayout, buildTreeLayout, taskWeight } from '../utils/structureMapLayout'
 import { buildTerritoryModel } from '../utils/territoryModel'
 import useMapViewport from '../hooks/useMapViewport'
 import MapCanvas from '../components/structure/MapCanvas'
@@ -198,6 +198,10 @@ export default function StructureMap() {
       const params = { visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks: visibleDependencyLinks, viewMode }
       if (layoutStyle === 'network') {
         return buildNetworkLayout({ ...params, customNodes: visibleCustomNodes, customLinks: visibleCustomLinks })
+      }
+      // "lines" is the top-down tree; sankey keeps the columnar mind map.
+      if (layoutStyle === 'lines') {
+        return buildTreeLayout(params)
       }
       return buildMindMapLayout(params)
     },

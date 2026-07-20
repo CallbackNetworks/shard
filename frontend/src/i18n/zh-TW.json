@@ -830,7 +830,7 @@
   "structure.view.dependencies": "依賴",
   "structure.styleMode": "版面樣式",
   "structure.style.sankey": "帶狀",
-  "structure.style.lines": "線條",
+  "structure.style.lines": "樹狀",
   "structure.style.network": "網路圖",
   "structure.style.territory": "領地",
   "structure.goals": "目標",

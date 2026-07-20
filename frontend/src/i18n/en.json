@@ -830,7 +830,7 @@
   "structure.view.dependencies": "Dependencies",
   "structure.styleMode": "Layout style",
   "structure.style.sankey": "Sankey",
-  "structure.style.lines": "Lines",
+  "structure.style.lines": "Tree",
   "structure.style.network": "Network",
   "structure.style.territory": "Territory",
   "structure.goals": "Goals",

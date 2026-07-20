@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Boxes, GitFork, Network, Target, UserRound } from 'lucide-react'
-import { computePath, networkPath, ribbonPath } from '../../utils/structureMapLayout'
+import { computePath, networkPath, ribbonPath, treePath } from '../../utils/structureMapLayout'
 
 function GraphNode({ children, active, muted, color, label, onClick, onDoubleClick, className = '', style }) {
   return (
@@ -78,7 +78,11 @@ export default function MapCanvas({
               />
             )
           }
-          const d = layoutStyle === 'network' ? networkPath(from, to) : computePath(from, to, link.type)
+          const d = layoutStyle === 'network'
+            ? networkPath(from, to)
+            : layoutStyle === 'lines'
+              ? treePath(from, to, link.type)
+              : computePath(from, to, link.type)
           const dash = link.type === 'dependency' ? '1.75 1.75' : accent ? '4 4' : undefined
           return (
             <path
