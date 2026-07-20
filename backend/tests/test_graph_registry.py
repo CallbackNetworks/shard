@@ -43,6 +43,22 @@ def test_seed_marks_builtins_and_containment(db):
     assert depends.is_containment is False
 
 
+def test_seed_marks_capability_flags(db):
+    # ADR-0039: cross-cutting capabilities are seeded on identity and project,
+    # and only on those two among the built-ins.
+    seed_builtin_types(db)
+
+    for key in (graph.NODE_IDENTITY, graph.NODE_PROJECT):
+        nt = db.get(NodeType, key)
+        assert nt.is_shareable is True, key
+        assert nt.is_subscribable is True, key
+
+    for key in (graph.NODE_TASK, graph.NODE_GOAL, graph.NODE_CYCLE, graph.NODE_LABEL):
+        nt = db.get(NodeType, key)
+        assert nt.is_shareable is False, key
+        assert nt.is_subscribable is False, key
+
+
 def test_seed_is_idempotent(db):
     seed_builtin_types(db)
     seed_builtin_types(db)

@@ -110,6 +110,30 @@ def test_cannot_change_role_of_builtin_type(client):
     assert proj["is_container"] is True
 
 
+def test_custom_type_can_opt_into_capabilities(client):
+    # ADR-0039: is_shareable/is_subscribable are settable on a custom type, so a
+    # user "topic" gets the same share-facade / iCal capability as identity.
+    r = client.post(
+        "/api/graph-types/nodes",
+        json={"key": "topic", "label": "Topic", "is_shareable": True, "is_subscribable": True},
+    )
+    assert r.status_code == 201
+    assert r.json()["is_shareable"] is True
+    assert r.json()["is_subscribable"] is True
+    listed = next(t for t in client.get("/api/graph-types/nodes").json() if t["key"] == "topic")
+    assert listed["is_shareable"] is True
+    assert listed["is_subscribable"] is True
+
+
+def test_toggle_capability_on_custom_type(client):
+    # Unlike the traversal roles, capabilities are also settable via PATCH.
+    client.post("/api/graph-types/nodes", json={"key": "topic", "label": "Topic"})
+    r = client.patch("/api/graph-types/nodes/topic", json={"is_shareable": True})
+    assert r.status_code == 200
+    assert r.json()["is_shareable"] is True
+    assert r.json()["is_subscribable"] is False
+
+
 def test_custom_container_surfaces_in_container_ids_not_project_ids(client, db, sample_project):
     # End-to-end: a task under a user-defined container appears in container_ids but
     # never leaks into project_ids (ADR-0034), so the frontend won't 404.

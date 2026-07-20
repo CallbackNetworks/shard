@@ -416,6 +416,13 @@ class NodeType(Base):
     # task=task_like. See ADR-0033.
     is_container: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_task_like: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Cross-cutting capabilities (ADR-0039), data-driven like the traversal roles
+    # above rather than hardcoded to identity/project. ``is_shareable`` = can mint a
+    # public share facade (share_token/PIN/expiry in node.data); ``is_subscribable``
+    # = can expose an iCal feed over its ``contains`` subtree. Seeded true for
+    # identity and project; user types may opt in.
+    is_shareable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_subscribable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # e.g. default hot-field hints
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
