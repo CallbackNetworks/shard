@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Link2, Search } from 'lucide-react'
 import { getNode, getNodeTypes, getContainedTasks, updateTask, deleteTask } from '../api/client'
+import NodeShareFacet from '../components/NodeShareFacet'
 import { DARK } from '../constants/theme'
 import BoardView from '../components/BoardView'
 import TableView from '../components/TableView'
@@ -95,6 +96,10 @@ export default function ContainerView() {
         </div>
         <Boxes size={22} color={color} />
       </div>
+
+      {typeMeta?.is_shareable && (
+        <NodeShareFacet node={node} subscribable={!!typeMeta?.is_subscribable} />
+      )}
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '0 1 260px' }}>

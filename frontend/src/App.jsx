@@ -199,6 +199,7 @@ export default function App() {
                 <Routes>
                   <Route path="/share/:token" element={<ShareView scope="identity" />} />
                   <Route path="/share/p/:token" element={<ShareView scope="project" />} />
+                  <Route path="/share/n/:token" element={<ShareView scope="n" />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/*" element={<IdentityFocusProvider><Layout /></IdentityFocusProvider>} />
                 </Routes>

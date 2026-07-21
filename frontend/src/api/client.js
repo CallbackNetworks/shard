@@ -311,6 +311,12 @@ export const getNodeTypes = () => api.get('/graph-types/nodes').then(r => r.data
 export const createNodeType = (data) => api.post('/graph-types/nodes', data).then(r => r.data)
 export const updateNodeType = (key, data) => api.patch(`/graph-types/nodes/${key}`, data).then(r => r.data)
 export const deleteNodeType = (key) => api.delete(`/graph-types/nodes/${key}`)
+
+// Generic node share facade (ADR-0039)
+export const rotateNodeShareToken = (id) => api.post(`/nodes/${id}/share/rotate-token`).then(r => r.data)
+export const setNodeSharePin = (id, pin) => api.post(`/nodes/${id}/share/set-pin`, { pin }).then(r => r.data)
+export const clearNodeSharePin = (id) => api.delete(`/nodes/${id}/share/pin`).then(r => r.data)
+export const setNodeShareExpiry = (id, expires_at) => api.post(`/nodes/${id}/share/set-expiry`, { expires_at }).then(r => r.data)
 export const getEdgeTypes = () => api.get('/graph-types/edges').then(r => r.data)
 export const createEdgeType = (data) => api.post('/graph-types/edges', data).then(r => r.data)
 export const updateEdgeType = (key, data) => api.patch(`/graph-types/edges/${key}`, data).then(r => r.data)
