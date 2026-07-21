@@ -398,3 +398,28 @@ def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depen
         else []
     )
     return _render_calendar(project.name, [graph.task_view(n, db) for n in nodes], alarm)
+
+
+@ical_router.get("/ical/node/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
+def ical_feed_node(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
+    """Generic feed for any ``is_subscribable`` node (ADR-0039).
+
+    Identity aggregates its member_of projects (matching /ical/identity); every
+    other subscribable container yields the due-dated tasks in its own
+    ``contains`` subtree. The token is the node's ``share_token`` (same as its
+    share facade), so a feed and its share page are revoked together.
+    """
+    node = graph.find_subscribable_node_by_share_token(db, token)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+    if node.type == graph.NODE_IDENTITY:
+        container_ids = graph.project_ids_for_identity(db, node.id)
+    else:
+        container_ids = [node.id]
+    task_ids = {tid for cid in container_ids for tid in graph.contained_task_ids(db, cid)}
+    nodes = (
+        db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), Node.due_date.isnot(None)).all()
+        if task_ids
+        else []
+    )
+    return _render_calendar(node.title, [graph.task_view(n, db) for n in nodes], alarm)

@@ -80,23 +80,33 @@ def node_is_subscribable(db: Session, node: Node) -> bool:
     return node.type in subscribable_type_keys(db)
 
 
-def find_node_by_share_token(db: Session, token: str) -> Node | None:
-    """Locate any shareable node by its ``share_token`` (stored in ``data``).
+def _find_node_by_token(db: Session, token: str, type_keys: set[str]) -> Node | None:
+    """Scan nodes of ``type_keys`` for a ``data.share_token`` match.
 
-    Generalizes ``find_identity_by_share_token``/``find_project_by_share_token``
-    across every ``is_shareable`` type (ADR-0039). Scans in Python because the
-    token lives in the JSON ``data`` bag; node counts are small at personal-tool
-    scale. Returns the raw ``Node`` so the caller can serialize per type.
+    Python-side scan because the token lives in the JSON ``data`` bag (no indexed
+    column); node counts are small at personal-tool scale.
     """
-    if not token:
+    if not token or not type_keys:
         return None
-    keys = shareable_type_keys(db)
-    if not keys:
-        return None
-    for node in db.query(Node).filter(Node.type.in_(keys)).all():
+    for node in db.query(Node).filter(Node.type.in_(type_keys)).all():
         if (node.data or {}).get("share_token") == token:
             return node
     return None
+
+
+def find_node_by_share_token(db: Session, token: str) -> Node | None:
+    """Locate any shareable node by its ``share_token`` (ADR-0039).
+
+    Generalizes ``find_identity_by_share_token``/``find_project_by_share_token``
+    across every ``is_shareable`` type. Returns the raw ``Node`` so the caller
+    can serialize per type.
+    """
+    return _find_node_by_token(db, token, shareable_type_keys(db))
+
+
+def find_subscribable_node_by_share_token(db: Session, token: str) -> Node | None:
+    """Locate any ``is_subscribable`` node by its ``share_token`` (ADR-0039)."""
+    return _find_node_by_token(db, token, subscribable_type_keys(db))
 
 
 # --- Shared JSON datetime helpers --------------------------------------------

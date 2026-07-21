@@ -148,3 +148,39 @@ def test_rotate_global_token_revokes_old_url(client, db, sample_project):
     assert new != old
     assert client.get(f"/ical/all/{old}.ics").status_code == 404
     assert client.get(f"/ical/all/{new}.ics").status_code == 200
+
+
+# --- generic node feed (ADR-0039) ---------------------------------------------
+
+
+def test_node_feed_unknown_token_404(client):
+    assert client.get("/ical/node/nope.ics").status_code == 404
+
+
+def test_node_feed_serves_custom_subscribable_container(client, db):
+    from app.models import NodeType
+    from app.services import graph
+
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
+                    is_container=True, is_subscribable=True))
+    db.commit()
+    topic = graph.create_node(db, "topic", title="Launch", status="active", share_token="tok-cal")
+    due = datetime.now(UTC) + timedelta(days=1)
+    task = make_task(db, title="Ship it", due_date=due)
+    graph.add_edge(db, topic.id, task.id, graph.REL_CONTAINS)
+    db.commit()
+
+    resp = client.get("/ical/node/tok-cal.ics")
+    assert resp.status_code == 200
+    assert "Ship it" in resp.text
+    assert "X-WR-CALNAME:Launch" in resp.text
+
+
+def test_node_feed_dispatches_identity_and_project(client, db, sample_identity, sample_project):
+    due = datetime.now(UTC) + timedelta(days=1)
+    _add_task(db, sample_project, title="ProjTask", due_date=due)
+    proj = client.get(f"/ical/node/{sample_project.share_token}.ics")
+    assert proj.status_code == 200
+    assert "ProjTask" in proj.text
+    ident = client.get(f"/ical/node/{sample_identity.share_token}.ics")
+    assert ident.status_code == 200

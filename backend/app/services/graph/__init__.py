@@ -42,6 +42,7 @@ from app.services.graph.core import (
     detect_cycle,
     ensure_node,
     find_node_by_share_token,
+    find_subscribable_node_by_share_token,
     get_node,
     nearest_ancestor_of_type,
     neighbors,
