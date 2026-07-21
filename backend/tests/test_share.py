@@ -371,3 +371,39 @@ def test_share_node_dispatches_identity_and_project(client, sample_identity, sam
 
 def test_share_node_unknown_token_404(client):
     assert client.get("/share/n/nope").status_code == 404
+
+
+def test_share_node_pin_gate_and_verify(client, db):
+    # ADR-0039: a PIN-protected shareable container gates the page, and the
+    # generic verify endpoint unlocks it with a session cookie.
+    from app.models import NodeType
+    from app.services import graph
+    from app.services.pin_utils import hash_pin
+
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
+                    is_container=True, is_shareable=True))
+    db.commit()
+    graph.create_node(db, "topic", title="Locked", status="active",
+                      share_token="tok-pin", share_pin_hash=hash_pin("2468"))
+    db.commit()
+
+    gated = client.get("/share/n/tok-pin")
+    assert gated.status_code == 200
+    assert gated.json()["meta"]["requires_pin"] is True
+
+    assert client.post("/share/n/tok-pin/verify", json={"pin": "0000"}).status_code == 403
+    ok = client.post("/share/n/tok-pin/verify", json={"pin": "2468"})
+    assert ok.status_code == 200
+    assert ok.json()["meta"]["scope"] == "node"
+
+
+def test_share_node_verify_without_pin_400(client, db):
+    from app.models import NodeType
+    from app.services import graph
+
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
+                    is_container=True, is_shareable=True))
+    db.commit()
+    graph.create_node(db, "topic", title="Open", status="active", share_token="tok-nopin")
+    db.commit()
+    assert client.post("/share/n/tok-nopin/verify", json={"pin": "1234"}).status_code == 400

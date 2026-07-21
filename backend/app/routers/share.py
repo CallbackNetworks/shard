@@ -487,6 +487,32 @@ def verify_share_pin(token: str, body: PinVerifyRequest, response: Response, db:
     return _build_response(identity, db)
 
 
+@router.post("/n/{token}/verify", dependencies=[Depends(share_rate_limit)])
+def verify_share_node_pin(token: str, body: PinVerifyRequest, response: Response, db: Session = Depends(get_db)):
+    """Verify a PIN for a generic shareable node and mint a session cookie (ADR-0039)."""
+    node = graph.find_node_by_share_token(db, token)
+    if not node:
+        raise HTTPException(status_code=404, detail="Share link not found")
+    pin_hash = (node.data or {}).get("share_pin_hash")
+    if not pin_hash:
+        raise HTTPException(status_code=400, detail="No PIN set for this share link")
+    if not check_pin(body.pin, pin_hash):
+        raise HTTPException(status_code=403, detail="Invalid PIN")
+
+    ts = int(datetime.now(UTC).timestamp())
+    response.set_cookie(
+        key="share_session",
+        value=_sign_token(node.id, ts),
+        max_age=_PIN_TTL,
+        httponly=True,
+        samesite="lax",
+    )
+    view = graph.container_view(db, node.id)
+    if not view or view.status != "active":
+        raise HTTPException(status_code=404, detail="Share link not found")
+    return _build_container_response(node, view, db)
+
+
 # ── Guest notes ──────────────────────────────────────────────────
 
 
