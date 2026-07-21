@@ -125,6 +125,7 @@ from app.services.graph.projects import (
     _project_view,
     all_projects,
     contained_task_ids,
+    container_view,
     create_project,
     find_project_by_share_token,
     get_project,

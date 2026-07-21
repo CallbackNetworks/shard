@@ -333,3 +333,41 @@ def test_project_share_view_count(client, db, sample_project):
     # A public view is logged and counted.
     client.get(f"/share/project/{sample_project.share_token}")
     assert client.get(f"/api/projects/{sample_project.id}/share-views").json()["view_count"] == 1
+
+
+def test_share_node_serves_custom_shareable_container(client, db):
+    # ADR-0039: a user-defined shareable container is served by the generic
+    # /share/n/{token} route with the same payload shape as a project share.
+    from app.models import NodeType
+    from app.services import graph
+
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
+                    is_container=True, is_shareable=True))
+    db.commit()
+    topic = graph.create_node(db, "topic", title="Launch", status="active", share_token="tok-topic")
+    task = make_task(db, title="Ship it", status="todo")
+    graph.add_edge(db, topic.id, task.id, graph.REL_CONTAINS)
+    db.commit()
+
+    resp = client.get("/share/n/tok-topic")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["identity"]["name"] == "Launch"
+    assert data["meta"]["scope"] == "node"
+    titles = [t["title"] for p in data["projects"] for t in p["tasks"]]
+    assert "Ship it" in titles
+
+
+def test_share_node_dispatches_identity_and_project(client, sample_identity, sample_project):
+    # The generic route delegates identity/project to their existing handlers.
+    ident = client.get(f"/share/n/{sample_identity.share_token}")
+    assert ident.status_code == 200
+    assert ident.json()["meta"]["scope"] == "identity"
+
+    proj = client.get(f"/share/n/{sample_project.share_token}")
+    assert proj.status_code == 200
+    assert proj.json()["meta"]["scope"] == "project"
+
+
+def test_share_node_unknown_token_404(client):
+    assert client.get("/share/n/nope").status_code == 404

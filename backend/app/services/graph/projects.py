@@ -137,6 +137,18 @@ def projects_by_ids(db: Session, project_ids) -> dict[str, ProjectView]:
     return {n.id: _project_view(n) for n in nodes}
 
 
+def container_view(db: Session, node_id: str) -> ProjectView | None:
+    """Build a ``ProjectView`` for any container node, regardless of its type.
+
+    ``_project_view`` reads only generic fields (title/status/data), so a
+    user-defined container (ADR-0034/0039) can reuse the project serialization
+    path for its share facade. Not type-filtered — the caller has already
+    resolved capability via ``is_shareable``.
+    """
+    node = db.get(Node, node_id)
+    return _project_view(node) if node is not None else None
+
+
 def find_project_by_share_token(db: Session, token: str) -> ProjectView | None:
     """Locate a project by its ``share_token`` (stored in ``data``).
 

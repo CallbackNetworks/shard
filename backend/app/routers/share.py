@@ -404,6 +404,61 @@ def get_share_project(token: str, request: Request, db: Session = Depends(get_db
     return _build_project_response(project, db)
 
 
+def _build_container_response(node, view: graph.ProjectView, db: Session):
+    """Share payload for any shareable container node (ADR-0039).
+
+    Mirrors ``_build_project_response`` but for a generic container: the node's
+    own contained task-like children are serialized as a single project-like
+    group. Identity keeps its aggregate (member_of) behaviour via delegation.
+    """
+    idents = graph.identities_for_project(db, node.id)
+    identity = idents[0] if idents else None
+    owner = {
+        "id": node.id,
+        "name": view.name,
+        "color": identity.color if identity else "#facc15",
+        "avatar": (view.name[:1].upper() if view.name else "?"),
+        "description": view.description,
+    }
+    return _build_payload(owner, [view], db, scope="node", include_notes=view.allow_guest_notes)
+
+
+@router.get("/n/{token}", dependencies=[Depends(share_rate_limit)])
+def get_share_node(token: str, request: Request, db: Session = Depends(get_db)):
+    """Generic share facade for any ``is_shareable`` node (ADR-0039).
+
+    Dispatches: identity and project delegate to their existing handlers so
+    their behaviour is byte-for-byte unchanged; every other shareable container
+    type is served through the generic container path.
+    """
+    node = graph.find_node_by_share_token(db, token)
+    if not node:
+        raise HTTPException(status_code=404, detail="Share link not found")
+    if node.type == graph.NODE_IDENTITY:
+        return get_share_identity(token, request, db)
+    if node.type == graph.NODE_PROJECT:
+        return get_share_project(token, request, db)
+
+    data = node.data or {}
+    expires = data.get("share_expires_at")
+    if expires and datetime.now(UTC) > _as_utc(expires):
+        raise HTTPException(status_code=410, detail="Share link has expired")
+
+    pin_hash = data.get("share_pin_hash")
+    if pin_hash:
+        session_token = request.cookies.get("share_session")
+        if not session_token or not _verify_token(session_token, node.id):
+            return {
+                "meta": {"requires_pin": True, "generated_at": datetime.now(UTC).isoformat()},
+                "identity": {"name": node.title, "color": data.get("color", "#facc15"), "avatar": None},
+            }
+
+    view = graph.container_view(db, node.id)
+    if not view or view.status != "active":
+        raise HTTPException(status_code=404, detail="Share link not found")
+    return _build_container_response(node, view, db)
+
+
 class PinVerifyRequest(BaseModel):
     pin: str = Field(..., min_length=4, max_length=6, pattern=r"^\d{4,6}$")
 
