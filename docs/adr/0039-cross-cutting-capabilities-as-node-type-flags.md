@@ -1,7 +1,7 @@
 # ADR-0039: 跨切能力作為節點型別旗標 —— 解除內建 identity 的特權
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-07-20
