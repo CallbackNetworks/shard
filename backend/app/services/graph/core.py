@@ -53,6 +53,52 @@ def task_type_keys(db: Session) -> set[str]:
     return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_task_like.is_(True)).all()}
 
 
+def shareable_type_keys(db: Session) -> set[str]:
+    """Node-type keys that may mint a public share facade (seeded: identity, project).
+
+    Data-driven from ``node_types.is_shareable`` (ADR-0039); callers gate share
+    endpoints by capability instead of hardcoding identity/project.
+    """
+    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_shareable.is_(True)).all()}
+
+
+def subscribable_type_keys(db: Session) -> set[str]:
+    """Node-type keys that may expose an iCal feed (seeded: identity, project).
+
+    Data-driven from ``node_types.is_subscribable`` (ADR-0039).
+    """
+    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_subscribable.is_(True)).all()}
+
+
+def node_is_shareable(db: Session, node: Node) -> bool:
+    """Whether ``node``'s type carries the shareable capability (ADR-0039)."""
+    return node.type in shareable_type_keys(db)
+
+
+def node_is_subscribable(db: Session, node: Node) -> bool:
+    """Whether ``node``'s type carries the subscribable (iCal) capability (ADR-0039)."""
+    return node.type in subscribable_type_keys(db)
+
+
+def find_node_by_share_token(db: Session, token: str) -> Node | None:
+    """Locate any shareable node by its ``share_token`` (stored in ``data``).
+
+    Generalizes ``find_identity_by_share_token``/``find_project_by_share_token``
+    across every ``is_shareable`` type (ADR-0039). Scans in Python because the
+    token lives in the JSON ``data`` bag; node counts are small at personal-tool
+    scale. Returns the raw ``Node`` so the caller can serialize per type.
+    """
+    if not token:
+        return None
+    keys = shareable_type_keys(db)
+    if not keys:
+        return None
+    for node in db.query(Node).filter(Node.type.in_(keys)).all():
+        if (node.data or {}).get("share_token") == token:
+            return node
+    return None
+
+
 # --- Shared JSON datetime helpers --------------------------------------------
 
 

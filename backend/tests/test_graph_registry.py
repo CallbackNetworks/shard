@@ -78,3 +78,36 @@ def test_seed_preserves_user_customization(db):
 
     assert db.get(NodeType, graph.NODE_TASK).label == "Ticket"
     assert db.get(NodeType, "topic") is not None
+
+
+def test_capability_key_sets(db):
+    # ADR-0039: capability key-sets are data-driven from the flags.
+    seed_builtin_types(db)
+    assert graph.shareable_type_keys(db) == {graph.NODE_IDENTITY, graph.NODE_PROJECT}
+    assert graph.subscribable_type_keys(db) == {graph.NODE_IDENTITY, graph.NODE_PROJECT}
+
+
+def test_find_node_by_share_token_spans_shareable_types(db):
+    # A custom "topic" type opts into shareable; a topic node with a share_token
+    # is then resolvable by the generic lookup, exactly like identity/project.
+    seed_builtin_types(db)
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False, is_shareable=True))
+    db.commit()
+    node = graph.create_node(db, "topic", title="Launch", share_token="tok-123")
+    db.commit()
+
+    found = graph.find_node_by_share_token(db, "tok-123")
+    assert found is not None and found.id == node.id
+    assert graph.node_is_shareable(db, found) is True
+    assert graph.node_is_subscribable(db, found) is False
+    assert graph.find_node_by_share_token(db, "nope") is None
+
+
+def test_find_node_by_share_token_ignores_non_shareable_types(db):
+    # A token sitting on a non-shareable type's node must not resolve.
+    seed_builtin_types(db)
+    db.add(NodeType(key="note", label="Note", is_builtin=False, is_shareable=False))
+    db.commit()
+    graph.create_node(db, "note", title="Secret", share_token="tok-x")
+    db.commit()
+    assert graph.find_node_by_share_token(db, "tok-x") is None
