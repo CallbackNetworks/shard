@@ -582,6 +582,8 @@
   "graphTypes.deleteConfirm": "刪除型別「{{key}}」?",
   "graphTypes.roleContainer": "容器",
   "graphTypes.roleTask": "任務",
+  "graphTypes.capShareable": "可分享",
+  "graphTypes.capSubscribable": "行事曆",
   "graphTypes.usage": "{{n}} 個使用中",
   "graphTypes.usageHint": "使用中的型別無法刪除",
   "graphTypes.roleContainment": "包含",

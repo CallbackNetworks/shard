@@ -86,6 +86,8 @@ function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
     color: item.color || '#818cf8',
     is_container: !!item.is_container,
     is_task_like: !!item.is_task_like,
+    is_shareable: !!item.is_shareable,
+    is_subscribable: !!item.is_subscribable,
   })
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '9px 0', borderBottom: `1px solid ${DARK.border}` }}>
@@ -118,6 +120,22 @@ function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
         />
         {t('graphTypes.roleTask')}
       </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={draft.is_shareable}
+          onChange={e => setDraft({ ...draft, is_shareable: e.target.checked })}
+        />
+        {t('graphTypes.capShareable')}
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={draft.is_subscribable}
+          onChange={e => setDraft({ ...draft, is_subscribable: e.target.checked })}
+        />
+        {t('graphTypes.capSubscribable')}
+      </label>
       <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
         <button
           className="kt-btn kt-btn-primary" aria-label="save"
@@ -141,13 +159,13 @@ export default function GraphTypes() {
   const { data: nodeTypes = [], isLoading: nodeLoading } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes })
   const { data: edgeTypes = [], isLoading: edgeLoading } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes })
 
-  const [nodeForm, setNodeForm] = useState({ key: '', label: '', color: '#818cf8', is_container: false, is_task_like: false })
+  const [nodeForm, setNodeForm] = useState({ key: '', label: '', color: '#818cf8', is_container: false, is_task_like: false, is_shareable: false, is_subscribable: false })
   const [edgeForm, setEdgeForm] = useState({ key: '', label: '', is_containment: false })
   const [editingKey, setEditingKey] = useState(null)
 
   const nodeCreate = useMutation({
     mutationFn: createNodeType,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setNodeForm({ key: '', label: '', color: '#818cf8', is_container: false, is_task_like: false }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setNodeForm({ key: '', label: '', color: '#818cf8', is_container: false, is_task_like: false, is_shareable: false, is_subscribable: false }) },
   })
   const nodeDelete = useMutation({
     mutationFn: deleteNodeType,
@@ -206,6 +224,8 @@ export default function GraphTypes() {
                 >
                   {item.is_container && <RoleBadge label={t('graphTypes.roleContainer')} />}
                   {item.is_task_like && <RoleBadge label={t('graphTypes.roleTask')} />}
+                  {item.is_shareable && <RoleBadge label={t('graphTypes.capShareable')} />}
+                  {item.is_subscribable && <RoleBadge label={t('graphTypes.capSubscribable')} />}
                 </TypeRow>
               )
             ))
@@ -244,6 +264,22 @@ export default function GraphTypes() {
                 onChange={e => setNodeForm({ ...nodeForm, is_task_like: e.target.checked })}
               />
               {t('graphTypes.roleTask')}
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={nodeForm.is_shareable}
+                onChange={e => setNodeForm({ ...nodeForm, is_shareable: e.target.checked })}
+              />
+              {t('graphTypes.capShareable')}
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={nodeForm.is_subscribable}
+                onChange={e => setNodeForm({ ...nodeForm, is_subscribable: e.target.checked })}
+              />
+              {t('graphTypes.capSubscribable')}
             </label>
             <button
               className="kt-btn kt-btn-primary"

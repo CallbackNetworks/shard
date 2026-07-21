@@ -582,6 +582,8 @@
   "graphTypes.deleteConfirm": "Delete type \"{{key}}\"?",
   "graphTypes.roleContainer": "Container",
   "graphTypes.roleTask": "Task",
+  "graphTypes.capShareable": "Shareable",
+  "graphTypes.capSubscribable": "Calendar",
   "graphTypes.usage": "{{n}} in use",
   "graphTypes.usageHint": "Types in use cannot be deleted",
   "graphTypes.roleContainment": "Containment",
