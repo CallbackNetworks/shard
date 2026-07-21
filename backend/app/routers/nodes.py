@@ -9,7 +9,11 @@ Free-form containment is the point: a custom node may contain a project/task via
 a ``contains`` edge; only ``detect_cycle`` guards the structure.
 """
 
+import uuid
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -206,3 +210,64 @@ def detach_edge(
     if not removed:
         raise HTTPException(status_code=404, detail="edge not found")
     db.commit()
+
+
+# ── Share facade management (ADR-0039) ───────────────────────────────────────
+# Generic share-token/PIN/expiry operations for any is_shareable node. Identity
+# keeps its own /identities/{id}/... endpoints (behaviourally identical); these
+# make the same facade available to user-defined shareable types (e.g. topic).
+
+
+def _load_shareable_node(node_id: str, db: Session) -> Node:
+    node = db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    if not graph.node_is_shareable(db, node):
+        raise HTTPException(status_code=400, detail="node type is not shareable")
+    return node
+
+
+class SetPinBody(BaseModel):
+    pin: str
+
+
+class SetExpiryBody(BaseModel):
+    expires_at: datetime | None
+
+
+@router.post("/{node_id}/share/rotate-token")
+def rotate_node_share_token(node_id: str, db: Session = Depends(get_db)):
+    _load_shareable_node(node_id, db)
+    token = str(uuid.uuid4())
+    graph.update_node(db, node_id, share_token=token)
+    db.commit()
+    return {"share_token": token}
+
+
+@router.post("/{node_id}/share/set-pin")
+def set_node_share_pin(node_id: str, body: SetPinBody, db: Session = Depends(get_db)):
+    from app.services.pin_utils import hash_pin
+
+    _load_shareable_node(node_id, db)
+    if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
+        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
+    graph.update_node(db, node_id, share_pin_hash=hash_pin(body.pin))
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/{node_id}/share/pin")
+def clear_node_share_pin(node_id: str, db: Session = Depends(get_db)):
+    _load_shareable_node(node_id, db)
+    graph.update_node(db, node_id, share_pin_hash=None)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/{node_id}/share/set-expiry")
+def set_node_share_expiry(node_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
+    _load_shareable_node(node_id, db)
+    # Stored as an ISO string in node.data (update_node does not encode datetimes).
+    graph.update_node(db, node_id, share_expires_at=body.expires_at.isoformat() if body.expires_at else None)
+    db.commit()
+    return {"ok": True}

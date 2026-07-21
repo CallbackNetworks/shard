@@ -207,3 +207,43 @@ def test_detach_edge(client, topic_type):
     r = client.delete(f"/api/nodes/{a['id']}/edges", params={"target_id": b["id"], "rel_type": "contains"})
     assert r.status_code == 204
     assert client.get(f"/api/nodes/{a['id']}/edges").json() == []
+
+
+# --- Share facade management (ADR-0039) ---------------------------------------
+
+
+@pytest.fixture()
+def shareable_topic(client):
+    client.post(
+        "/api/graph-types/nodes",
+        json={"key": "topic", "label": "Topic", "is_container": True, "is_shareable": True},
+    )
+    return client.post("/api/nodes", json={"type": "topic", "title": "Launch"}).json()
+
+
+def test_rotate_token_on_shareable_node(client, shareable_topic):
+    r = client.post(f"/api/nodes/{shareable_topic['id']}/share/rotate-token")
+    assert r.status_code == 200
+    token = r.json()["share_token"]
+    assert token
+    # The generic share route now resolves it.
+    assert client.get(f"/share/n/{token}").status_code == 200
+
+
+def test_share_ops_rejected_on_non_shareable_type(client, topic_type):
+    # topic_type is not shareable — every share op returns 400.
+    node = client.post("/api/nodes", json={"type": "topic", "title": "X"}).json()
+    assert client.post(f"/api/nodes/{node['id']}/share/rotate-token").status_code == 400
+    assert client.post(f"/api/nodes/{node['id']}/share/set-pin", json={"pin": "1234"}).status_code == 400
+
+
+def test_set_and_clear_pin_and_expiry(client, shareable_topic):
+    nid = shareable_topic["id"]
+    assert client.post(f"/api/nodes/{nid}/share/set-pin", json={"pin": "4321"}).status_code == 200
+    assert client.post(f"/api/nodes/{nid}/share/set-pin", json={"pin": "12"}).status_code == 400
+    assert client.delete(f"/api/nodes/{nid}/share/pin").status_code == 200
+    assert client.post(f"/api/nodes/{nid}/share/set-expiry", json={"expires_at": None}).status_code == 200
+
+
+def test_share_ops_404_on_missing_node(client):
+    assert client.post("/api/nodes/nope/share/rotate-token").status_code == 404
