@@ -5,7 +5,7 @@ import { MessageCircle, X, Plus, Send, ChevronDown, Wrench, Loader } from 'lucid
 import axios from 'axios'
 import { BRAND, DARK } from '../constants/theme'
 
-const _api = axios.create({ baseURL: '' })
+const _api = axios.create({ baseURL: '/api' })
 _api.interceptors.request.use(cfg => {
   const t = localStorage.getItem('auth_token')
   if (t) cfg.headers.Authorization = `Bearer ${t}`
@@ -170,7 +170,7 @@ export default function AssistantPanel() {
 
     try {
       const token = localStorage.getItem('auth_token')
-      const resp = await fetch(`/assistant/conversations/${convId}/messages`, {
+      const resp = await fetch(`/api/assistant/conversations/${convId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
