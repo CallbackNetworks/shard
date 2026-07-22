@@ -60,3 +60,5 @@ Proposed
 1. 圖寫入核心發領域事件 + role-driven dispatcher。**此步完成後通用端點即不再啞寫入 → 分叉當場消失,零裁撤、零契約破壞**,可先獨立上線止血。
 2. `roles` 集合遷移 + `has_role` helper;`organization` 以使用者自訂型別建立並驗證 role 模型。
 3. 逐一裁撤內部富寫入路由,前端改走核心。`/api/v1` 暫緩,待首個外部消費者再另立 ADR 凍結門面。
+
+**範圍界線(本 ADR 不涵蓋,留待後續)**:本 ADR 只將**現有四個布林**遷為 roles 集合,不重構既有型別的既有語義。`goal`(目前無 role,靠 `goals.py` 專屬程式碼)與 `decision`(目前無 role,建模為「增強版 label」複用 label 機制,見 [ADR-0004](0004-decision-records-as-enhanced-labels.md))的 role 化——把 goal 收為帶 role 的一般型別、把 decision 從 label 複用中獨立——**依賴本 ADR 的 roles 機制先落地**,屬第二順位,留待後續 ADR-0041。註:dispatcher 對節點狀態變遷的**統一治理**已一併覆蓋 goal/decision 節點的活動/廣播/role 門控反應(寫入分叉對它們同樣消失);本界線僅指其**型別語義的 role 化**尚未進行。comments/attachments 的 nodify 亦同屬後續。
