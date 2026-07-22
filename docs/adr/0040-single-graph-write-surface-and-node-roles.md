@@ -30,7 +30,7 @@ Proposed
   - **dependencies / labels / cycle-membership** 本就是邊,改走 `/edges`(`depends_on` / `labeled` / `in_cycle`)。
   - **comments / attachments** 目前是獨立資料表(非節點)。本 ADR 決定**先保留為 sub-resource 端點**——它們不觸發節點生命週期副作用,不構成分叉;將其 nodify(comment 亦成 node + `contains` 邊)列為後續 ADR,不在本次範圍。
   - **inbound ingress**(webhook callback、cicd trigger、share / ical 公開端點)**不是 client 寫入端點,是外部入口**,保留;其內部一律呼叫同一寫入核心,故仍受 dispatcher 統一治理。
-  - **外部 `/api/v1` 與 MCP 保留為薄門面(thin façade)覆寫於同一核心之上。** 這是對「前端/MCP/外部全改走 `/api/nodes`」的一處工程修正:`/api/v1` 是**刻意穩定的版本化外部契約**,MCP 亦透過它代理([ADR-0005](0005-mcp-server-http-proxy.md));破壞它違背版本化的初衷。行為分叉的消除靠的是**單一寫入核心**,不需要連外部契約一起打破。因此「裁撤富端點」精確地作用於**內部 `/api` 面**;`/api/v1` 以最小翻譯層維持契約穩定,其寫入同樣落到核心與 dispatcher。
+  - **外部 `/api/v1` 暫緩 / 最小化,不現在投入門面建設。** 版本化外部契約的價值在於保護「你控制不了、不會與你同步修改的外部消費者」;但截至本 ADR,**外部 API 尚未投入生產,沒有任何這類消費者**——MCP 雖透過 `/api/v1` 代理([ADR-0005](0005-mcp-server-http-proxy.md)),但它是本專案自有程式碼,可與核心同步修改,不構成需凍結的契約。因此本次收斂**全力聚焦內部圖核心 + dispatcher**;`/api/v1` 維持現狀或最小化,不為不存在的消費者承擔穩定性負擔。**待接入第一個真實外部消費者時,再凍結一層精選的 `/api/v1` 門面覆寫於同一核心之上**——屆時另立 ADR。這使「單一寫入面」在此階段可近乎字面成立。
 
 ### B. `node_types` 能力改以 `roles` 集合表達,取代四個布林
 
@@ -39,7 +39,7 @@ Proposed
 - 一個型別可**同時具多個 role**(`project = {container, shareable, subscribable}`;`identity = {shareable, subscribable}`;`task = {task}`)——這正是 role 必須是「集合」而非單值的原因。
 - 讀取點統一改用 `has_role(type_key, "task")` 等 helper,取代散落的 `is_*` 讀取與 `task_type_keys` / `container_type_keys`。
 - role 詞彙一律用**名詞**(`container` / `task` / `shareable` / `subscribable`),去除 `-like`。
-- **新增內建型別 `organization`**,`roles = {container, shareable, subscribable}`;`identity` 經 `member_of` 掛入。dispatcher 與遍歷 helper 皆為 role-driven,對 organization **零特判**即生效。
+- **`organization` 先作為使用者自訂型別**(非內建),`roles = {container, shareable, subscribable}`;`identity` 經 `member_of` 掛入。dispatcher 與遍歷 helper 皆為 role-driven,對 organization **零特判**即生效——這本身就是 role 模型的**驗收測試**:若它作為純資料型別即可正確參與容器/分享/訂閱/遍歷,證明架構成立,無需 code 特權。**升級為內建的觸發信號**:任何一天程式碼開始特判 `type == "organization"`(組織級帳單、成員管理 UI、組織級權限等),或需要 `is_builtin` 的防誤刪保護——屆時只是往 `BUILTIN_NODE_TYPES` 加一行,不鎖死任何退路。
 - 未來新增能力(`assignable` / `schedulable` / …)= 集合加一個字串 + dispatcher 加一條規則,**零 schema 改動**。
 
 ## Consequences
@@ -53,10 +53,10 @@ Proposed
 - **一次性遷移量大**:9 個富路由的行為需無損搬進核心並補測試;前端所有寫入呼叫改走通用 API;現有約 833 個後端測試中觸及 tasks/projects 寫入路徑者需重寫。
 - **邊界妥協**:comments / attachments 暫留 sub-resource,尚未完全「純圖」——這是本 ADR **明確接受**的妥協,非疏漏。
 - **schema 遷移**:`roles` 需 Alembic migration + 資料回填,並顧及 SQLite 的 `render_as_batch`;約 130 處 `is_*` 讀取需一次改到 `has_role`。
-- **外部契約**:`/api/v1` + MCP 維持薄門面,意味「單一寫入面」在**外部面**上不是字面成立;這是刻意保留的契約穩定性,取捨已在 Decision A 說明。
+- **外部契約(暫緩)**:因外部 API 尚未生產,`/api/v1` 本次不投入門面建設;好處是「單一寫入面」在此階段近乎字面成立、收斂更徹底。**代價是延後負債**——接入首個外部消費者時須補一層精選 `/api/v1` 門面(另立 ADR),而非現在就把契約邊界定下來。
 - **回滾成本**:前端與核心耦合到位後,回到雙路由需反向工程;故應分階段落地,每階段獨立可驗證。
 
 **建議實作階段(非本 ADR 強制)**
 1. 圖寫入核心發領域事件 + role-driven dispatcher。**此步完成後通用端點即不再啞寫入 → 分叉當場消失,零裁撤、零契約破壞**,可先獨立上線止血。
-2. `roles` 集合遷移 + `has_role` helper + 新增 `organization` 型別。
-3. 逐一裁撤內部富寫入路由,前端改走核心;`/api/v1` 收斂為薄門面。
+2. `roles` 集合遷移 + `has_role` helper;`organization` 以使用者自訂型別建立並驗證 role 模型。
+3. 逐一裁撤內部富寫入路由,前端改走核心。`/api/v1` 暫緩,待首個外部消費者再另立 ADR 凍結門面。
