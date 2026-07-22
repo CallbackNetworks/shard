@@ -41,3 +41,4 @@
 | [0037](0037-graph-native-frontend.md) | Graph-Native Frontend — Universal Node Page and Container Views | Accepted | 2026-07-18 |
 | [0038](0038-unified-task-mutation-pipeline.md) | Unified Task Mutation Pipeline — Single Post-Mutation Sequence Service | Accepted | 2026-07-19 |
 | [0039](0039-cross-cutting-capabilities-as-node-type-flags.md) | Cross-cutting Capabilities as Node-Type Flags — De-privileging Built-in Identity | Accepted | 2026-07-20 |
+| [0040](0040-single-graph-write-surface-and-node-roles.md) | Single Graph Write Surface and Node Capabilities as a Roles Set | Proposed | 2026-07-22 |
