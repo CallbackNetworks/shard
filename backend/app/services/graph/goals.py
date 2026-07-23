@@ -1,10 +1,11 @@
-"""Goals (node-only, ADR-0033 Phase B).
+"""Goals (node-only; ADR-0033 Phase B, container role ADR-0041).
 
 A goal is a ``Node(type="goal")``: ``title`` = title, ``status`` is a real hot
 column, ``target_date`` maps to the node's ``due_date`` column, and
-``description`` lives in ``data``. Unlike labels/cycles a goal is NOT project-
-scoped — projects link to it via ``part_of`` edges (project -> goal), so a goal
-has no containing ``contains`` edge. ``GoalView`` exposes the historical
+``description`` lives in ``data``. Since ADR-0041 a goal carries the ``container``
+role: the projects (and tasks) it groups are its **outgoing** ``contains``
+children (``goal -> project`` / ``goal -> task``), replacing the retired
+one-off ``part_of`` (project -> goal) edge. ``GoalView`` exposes the historical
 ``Goal`` attribute surface so ``GoalOut.model_validate`` keeps working.
 """
 
@@ -18,25 +19,55 @@ from app.models import Edge, Node
 from app.services.graph.core import (
     NODE_GOAL,
     NODE_PROJECT,
-    REL_PART_OF,
+    REL_CONTAINS,
     add_edge,
     create_node,
     delete_node,
+    descendants_of,
     ensure_node,
+    task_type_keys,
 )
 from app.services.graph.projects import ProjectView, projects_by_ids
+from app.services.graph.tasks import top_level_task_filter
 
 
 def link_goal_project(db: Session, goal_id: str, project_id: str) -> None:
-    """Attach a project to a goal as a ``part_of`` edge (idempotent)."""
+    """Group a project under a goal as a ``goal -> project`` ``contains`` edge (idempotent)."""
     ensure_node(db, project_id, NODE_PROJECT)
     ensure_node(db, goal_id, NODE_GOAL)
-    add_edge(db, project_id, goal_id, REL_PART_OF)
+    add_edge(db, goal_id, project_id, REL_CONTAINS)
 
 
 def project_ids_for_goal(db: Session, goal_id: str) -> list[str]:
-    rows = db.execute(select(Edge.source_id).where(Edge.target_id == goal_id, Edge.rel_type == REL_PART_OF)).scalars()
+    """Ids of the literal ``project`` nodes a goal contains (excludes directly-held tasks)."""
+    rows = db.execute(
+        select(Edge.target_id)
+        .join(Node, Node.id == Edge.target_id)
+        .where(Edge.source_id == goal_id, Edge.rel_type == REL_CONTAINS, Node.type == NODE_PROJECT)
+        .order_by(Edge.position, Edge.created_at)
+    ).scalars()
     return list(rows)
+
+
+def goal_subtree_progress(db: Session, goal_id: str) -> float:
+    """Task-weighted progress over the whole goal subtree (ADR-0041).
+
+    ``done top-level tasks / all top-level tasks`` across every container the goal
+    contains — tasks held directly by the goal and tasks nested in projects under it
+    count the same. Subtasks are excluded (mirrors the old per-project ``top_level``
+    rule) so a parent task and its children are not double-counted. Replaces the old
+    "average of each linked project's progress" (project-weighted) figure.
+    """
+    subtree = descendants_of(db, goal_id)
+    if not subtree:
+        return 0.0
+    tasks = task_type_keys(db)
+    base = db.query(Node).filter(Node.type.in_(tasks), Node.id.in_(subtree), top_level_task_filter(db))
+    total = base.count()
+    if total == 0:
+        return 0.0
+    done = base.filter(Node.status == "done").count()
+    return round(done / total * 100, 1)
 
 
 def projects_for_goal(db: Session, goal_id: str) -> list[ProjectView]:
@@ -80,7 +111,7 @@ def create_goal(
     status: str = "active",
     actor: str | None = None,
 ) -> GoalView:
-    """Create a top-level goal node (no project containment; see ``part_of``)."""
+    """Create a top-level goal node (a container; children are attached via ``contains``)."""
     node = create_node(
         db,
         NODE_GOAL,
@@ -113,7 +144,7 @@ def update_goal(db: Session, goal_id: str, **fields) -> GoalView | None:
 
 
 def delete_goal(db: Session, goal_id: str, *, actor: str | None = None) -> bool:
-    """Delete a goal node and every edge touching it (part_of)."""
+    """Delete a goal node and every edge touching it (its ``contains`` children survive)."""
     node = db.get(Node, goal_id)
     if node is None or node.type != NODE_GOAL:
         return False

@@ -35,7 +35,16 @@ BUILTIN_NODE_TYPES: list[dict] = [
         "color": "#f472b6",
         "roles": [graph.ROLE_SHAREABLE, graph.ROLE_SUBSCRIBABLE],
     },
-    {"key": graph.NODE_GOAL, "label": "Goal", "icon": "target", "color": "#34d399"},
+    {
+        "key": graph.NODE_GOAL,
+        "label": "Goal",
+        "icon": "target",
+        "color": "#34d399",
+        # A goal plays the container role (ADR-0041): projects/tasks it groups are its
+        # ``contains`` children. Kept ``is_builtin`` so it stays out of the custom-container
+        # nav (it has its own Goals view) while still traversing/aggregating like a container.
+        "roles": [graph.ROLE_CONTAINER],
+    },
     {"key": graph.NODE_CYCLE, "label": "Cycle", "icon": "repeat", "color": "#fbbf24"},
     {"key": graph.NODE_LABEL, "label": "Label", "icon": "tag", "color": "#a78bfa"},
 ]
@@ -48,7 +57,6 @@ BUILTIN_EDGE_TYPES: list[dict] = [
     {"key": graph.REL_DEPENDS_ON, "label": "Depends on"},
     {"key": graph.REL_LABELED, "label": "Labeled"},
     {"key": graph.REL_IN_CYCLE, "label": "In cycle"},
-    {"key": graph.REL_PART_OF, "label": "Part of"},
 ]
 
 

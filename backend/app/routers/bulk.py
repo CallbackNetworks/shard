@@ -125,9 +125,7 @@ async def bulk_update_tasks(
         if field_changes:
             # Full pipeline per task (rules, notifications, activity); the
             # aggregate broadcast below replaces per-task ws events.
-            await apply_task_update(
-                db, tid, dict(field_changes), source="bulk", project_id=project_id, broadcast=False
-            )
+            await apply_task_update(db, tid, dict(field_changes), source="bulk", project_id=project_id, broadcast=False)
         updated_ids.append(tid)
 
     changes: list[str] = []

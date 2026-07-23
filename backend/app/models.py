@@ -325,9 +325,10 @@ class SavedFilter(Base):
 
 # ``Goal`` was collapsed to a node-only entity in ADR-0033 Phase B: a goal is a
 # ``Node(type="goal")`` (title in ``title``; status a real column; target_date ->
-# node ``due_date``; description in ``data``). Goals are top-level (not project-
-# scoped); projects link to a goal via ``part_of`` edges. The dedicated ``goals``
-# table was dropped; see the goal helpers in ``services/graph.py``.
+# node ``due_date``; description in ``data``). A goal plays the ``container`` role
+# (ADR-0041): the projects and tasks it groups are its outgoing ``contains``
+# children (replacing the retired ``part_of`` edge). The dedicated ``goals`` table
+# was dropped; see the goal helpers in ``services/graph.py``.
 
 
 class UserPreference(Base):
@@ -382,7 +383,7 @@ class Edge(Base):
     target_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # contains / member_of / assigned_to / depends_on / labeled / in_cycle / part_of
+    # contains / member_of / assigned_to / depends_on / labeled / in_cycle
     rel_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -430,7 +431,7 @@ class EdgeType(Base):
     """Registry of relationship (edge) vocabulary, data-driven (see ADR-0033).
 
     Built-in relations (contains/member_of/assigned_to/depends_on/labeled/
-    in_cycle/part_of) are seeded with ``is_builtin=True``; users may invent their
+    in_cycle) are seeded with ``is_builtin=True``; users may invent their
     own (e.g. ``blocks``, ``relates_to``). ``is_containment`` marks the relations
     that participate in ``contains``-style traversal; ``is_symmetric`` marks
     undirected relations. ``key`` is the string written into ``edges.rel_type``.

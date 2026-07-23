@@ -30,7 +30,6 @@ REL_ASSIGNED_TO = "assigned_to"  # task -> identity
 REL_DEPENDS_ON = "depends_on"  # blocked task -> prerequisite task
 REL_LABELED = "labeled"  # task -> label
 REL_IN_CYCLE = "in_cycle"  # task -> cycle
-REL_PART_OF = "part_of"  # project -> goal
 
 
 # --- Capability roles (registry-driven; ADR-0033 A5, ADR-0040) ---------------

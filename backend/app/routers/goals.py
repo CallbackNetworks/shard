@@ -26,17 +26,15 @@ def _project_progress(db: Session, project_id: str) -> float:
 
 
 def _enrich_goal(goal: graph.GoalView, db: Session) -> GoalOut:
-    """Build GoalOut with computed progress from linked projects."""
+    """Build GoalOut: per-project breakdown + task-weighted subtree progress (ADR-0041)."""
     projects: list[GoalProjectOut] = []
     for proj in graph.projects_for_goal(db, goal.id):
         prog = _project_progress(db, proj.id)
         projects.append(GoalProjectOut(project_id=proj.id, project_name=proj.name, progress=prog))
 
-    overall = round(sum(p.progress for p in projects) / len(projects), 1) if projects else 0.0
-
     out = GoalOut.model_validate(goal)
     out.projects = projects
-    out.progress = overall
+    out.progress = graph.goal_subtree_progress(db, goal.id)
     return out
 
 
@@ -89,8 +87,10 @@ async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_
     goal = graph.update_goal(db, goal_id, **changes)
 
     if project_ids is not None:
-        # Replace linked projects: clear all part_of edges for this goal, then re-add.
-        graph.remove_edges(db, target_id=goal_id, rel_type=graph.REL_PART_OF)
+        # Replace linked projects: drop only the goal -> project ``contains`` edges (leaving
+        # any tasks the goal holds directly untouched), then re-add the requested projects.
+        for pid in graph.project_ids_for_goal(db, goal_id):
+            graph.remove_edge(db, goal_id, pid, graph.REL_CONTAINS)
         for pid in project_ids:
             if not graph.get_project(db, pid):
                 raise HTTPException(status_code=404, detail=f"Project {pid} not found")

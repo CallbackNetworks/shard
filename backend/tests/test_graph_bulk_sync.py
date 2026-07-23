@@ -29,16 +29,17 @@ def test_bulk_remove_label_clears_labeled_edge(client, db):
     assert _edge(db, tid, lid, "labeled") is None
 
 
-def test_goal_project_replacement_clears_stale_part_of_edges(client, db):
+def test_goal_project_replacement_clears_stale_contains_edges(client, db):
     a = _project(client, "A")
     b = _project(client, "B")
     goal_id = client.post("/api/goals", json={"title": "G", "project_ids": [a]}).json()["id"]
-    assert _edge(db, a, goal_id, "part_of") is not None
+    # ADR-0041: a goal contains its projects (goal -> project), not the retired part_of.
+    assert _edge(db, goal_id, a, "contains") is not None
 
-    # Replace linked projects with only B; A's part_of edge must be gone.
+    # Replace linked projects with only B; A's contains edge must be gone.
     client.patch(f"/api/goals/{goal_id}", json={"project_ids": [b]})
-    assert _edge(db, a, goal_id, "part_of") is None
-    assert _edge(db, b, goal_id, "part_of") is not None
+    assert _edge(db, goal_id, a, "contains") is None
+    assert _edge(db, goal_id, b, "contains") is not None
 
 
 def test_bulk_update_runs_workflow_rules(client, db):

@@ -301,7 +301,7 @@ def delete_project_and_tasks(db: Session, project) -> None:
     for entity in labels_in_project(db, project.id) + cycles_in_project(db, project.id):
         delete_node(db, entity.id)
     # The project itself is node-only (ADR-0033 Phase B, B6): delete_node drops the
-    # node and every touching edge (contains/member_of/part_of).
+    # node and every touching edge (contains/member_of).
     delete_node(db, project.id)
 
 

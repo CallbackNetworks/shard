@@ -12,13 +12,15 @@ from app.services import graph
 def test_builtin_roles_seeded(db):
     assert db.get(NodeType, graph.NODE_PROJECT).has_role("container") is True
     assert db.get(NodeType, graph.NODE_TASK).has_role("task") is True
+    # goal is a container too (ADR-0041): it groups projects/tasks via ``contains``.
+    assert db.get(NodeType, graph.NODE_GOAL).has_role("container") is True
     # Others carry neither role.
     assert db.get(NodeType, graph.NODE_LABEL).has_role("container") is False
     assert db.get(NodeType, graph.NODE_LABEL).has_role("task") is False
 
 
 def test_role_key_helpers(db):
-    assert graph.container_type_keys(db) == {graph.NODE_PROJECT}
+    assert graph.container_type_keys(db) == {graph.NODE_PROJECT, graph.NODE_GOAL}
     assert graph.task_type_keys(db) == {graph.NODE_TASK}
 
 

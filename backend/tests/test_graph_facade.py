@@ -25,7 +25,6 @@ EXPECTED_NAMES = [
     "REL_DEPENDS_ON",
     "REL_LABELED",
     "REL_IN_CYCLE",
-    "REL_PART_OF",
     # views
     "CycleView",
     "GoalView",
