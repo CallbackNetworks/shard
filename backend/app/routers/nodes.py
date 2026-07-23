@@ -96,19 +96,42 @@ def list_nodes(
     return q.order_by(Node.position, Node.created_at).limit(limit).all()
 
 
-@router.post("", response_model=NodeOut, status_code=status.HTTP_201_CREATED)
+def _node_write_out(db: Session, node: Node):
+    """Serialize a written node: enriched ``TaskOut`` for task-role nodes, else ``NodeOut``.
+
+    ADR-0040: the generic write surface returns the same rich shape the retired
+    ``/projects/{id}/tasks`` routes did, so callers get ``project_id`` / subtask &
+    comment counts / dependency lists without a second request.
+    """
+    if node.type in graph.task_type_keys(db):
+        return enrich_task(graph.get_task(db, node.id), db)
+    return NodeOut.model_validate(node)
+
+
+@router.post("", response_model=None, status_code=status.HTTP_201_CREATED)
 async def create_node(body: NodeCreate, db: Session = Depends(get_db)):
     if db.get(NodeType, body.type) is None:
         raise HTTPException(status_code=422, detail=f"unknown node type '{body.type}'")
-    fields = body.model_dump(exclude={"type", "title", "data"}, exclude_none=True)
+    fields = body.model_dump(exclude={"type", "title", "data", "container_id", "parent_id"}, exclude_none=True)
     if body.data:
         fields.update(body.data)
     node = graph.create_node(db, body.type, title=body.title, **fields)
+    # Establish containment before dispatch so the task pipeline can resolve the
+    # node's project (nearest container ancestor) for activity/notifications.
+    for container_id in (body.container_id, body.parent_id):
+        if container_id is None:
+            continue
+        if db.get(Node, container_id) is None:
+            raise HTTPException(status_code=422, detail=f"container node '{container_id}' not found")
+        try:
+            graph.add_edge(db, container_id, node.id, graph.REL_CONTAINS)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     # Role-driven reactions live below the endpoint now (ADR-0040): a task written
-    # here runs the same pipeline as one written via /projects/{id}/tasks.
+    # here runs the same pipeline as one written via the retired /projects/{id}/tasks.
     await dispatch_node_created(db, node)
     db.refresh(node)
-    return node
+    return _node_write_out(db, node)
 
 
 @router.get("/{node_id}", response_model=NodeOut)
@@ -119,7 +142,7 @@ def get_node(node_id: str, db: Session = Depends(get_db)):
     return node
 
 
-@router.patch("/{node_id}", response_model=NodeOut)
+@router.patch("/{node_id}", response_model=None)
 async def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_db)):
     node = db.get(Node, node_id)
     if node is None:
@@ -128,12 +151,19 @@ async def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_
     data = fields.pop("data", None)
     if data is not None:
         fields.update(data)
+    # Re-parenting is a graph move, not a column write (ADR-0032/0040).
+    new_parent_id = fields.pop("parent_id", None)
+    if new_parent_id is not None and node.type in graph.task_type_keys(db):
+        try:
+            graph.set_parent_task(db, node_id, new_parent_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
         node = await dispatch_node_updated(db, node, fields)
     except AgentKeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.refresh(node)
-    return node
+    return _node_write_out(db, node)
 
 
 @router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT)

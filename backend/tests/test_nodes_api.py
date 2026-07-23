@@ -280,6 +280,44 @@ def test_task_status_change_via_nodes_fires_status_events(client, db):
     assert "task.status_changed" in _activity_actions(db, task_id)
 
 
+def test_task_create_via_nodes_with_container_returns_enriched(client, sample_project):
+    # ADR-0040 single write surface: container_id files the task under a project in
+    # one call and the response is the enriched TaskOut shape (project_id resolved).
+    r = client.post(
+        "/api/nodes",
+        json={"type": "task", "title": "Filed", "priority": "high", "container_id": sample_project.id},
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["project_id"] == sample_project.id
+    assert body["priority"] == "high"
+    assert "subtask_count" in body  # enriched TaskOut, not a bare NodeOut
+
+
+def test_task_create_via_nodes_with_parent_is_subtask(client, sample_project, db):
+    parent = client.post(
+        "/api/nodes", json={"type": "task", "title": "Parent", "container_id": sample_project.id}
+    ).json()
+    child = client.post(
+        "/api/nodes", json={"type": "task", "title": "Child", "parent_id": parent["id"]}
+    ).json()
+    assert child["parent_id"] == parent["id"]
+    assert child["id"] in graph.contained_task_ids(db, parent["id"])
+
+
+def test_task_reparent_via_nodes_patch(client, sample_project):
+    a = client.post("/api/nodes", json={"type": "task", "title": "A", "container_id": sample_project.id}).json()
+    b = client.post("/api/nodes", json={"type": "task", "title": "B", "container_id": sample_project.id}).json()
+    r = client.patch(f"/api/nodes/{b['id']}", json={"parent_id": a["id"]})
+    assert r.status_code == 200
+    assert r.json()["parent_id"] == a["id"]
+
+
+def test_task_create_via_nodes_unknown_container_422(client):
+    r = client.post("/api/nodes", json={"type": "task", "title": "X", "container_id": "nope"})
+    assert r.status_code == 422
+
+
 def test_task_delete_via_nodes_cleans_subtree(client, db):
     parent = client.post("/api/nodes", json={"type": "task", "title": "Parent"}).json()["id"]
     child = client.post("/api/nodes", json={"type": "task", "title": "Child"}).json()["id"]

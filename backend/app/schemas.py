@@ -1047,6 +1047,11 @@ class NodeCreate(BaseModel):
     position: int = 0
     is_pinned: bool = False
     data: dict | None = None
+    # ADR-0040 single write surface: optional containment established atomically on
+    # create. ``container_id`` files the node under a container (project/custom) and
+    # ``parent_id`` under a parent task — both as ``contains`` edges.
+    container_id: str | None = None
+    parent_id: str | None = None
 
 
 class NodeUpdate(BaseModel):
@@ -1058,6 +1063,9 @@ class NodeUpdate(BaseModel):
     position: int | None = None
     is_pinned: bool | None = None
     data: dict | None = None
+    # ADR-0040: re-parenting a task is a graph move (swap the incoming task->task
+    # ``contains`` edge), not a column write.
+    parent_id: str | None = None
 
 
 class NodeOut(BaseModel):
