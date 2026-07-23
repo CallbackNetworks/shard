@@ -422,7 +422,7 @@ def _tool_manage_labels(
 
 
 def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
-    q = db.query(Node).filter(Node.type == graph.NODE_TASK, graph.top_level_task_filter())
+    q = db.query(Node).filter(Node.type == graph.NODE_TASK, graph.top_level_task_filter(db))
     if project_id:
         q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
     tasks = [graph.task_view(n, db) for n in q.all()]

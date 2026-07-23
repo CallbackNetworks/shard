@@ -241,6 +241,6 @@ def test_top_level_task_filter_excludes_subtasks(db):
     db.add(child)
     db.commit()
 
-    top_ids = {t.id for t in db.query(Node).filter(Node.type == "task", graph.top_level_task_filter()).all()}
+    top_ids = {t.id for t in db.query(Node).filter(Node.type == "task", graph.top_level_task_filter(db)).all()}
     assert top.id in top_ids
     assert child.id not in top_ids

@@ -409,23 +409,65 @@ class NodeType(Base):
     icon: Mapped[str | None] = mapped_column(String(40), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    # Traversal roles (ADR-0033 A5): data-drives the leaf helpers in graph.py that
-    # previously hardcoded ``n.type == NODE_TASK/PROJECT``. ``is_container`` = plays
-    # the project role (its ``contains`` children that are task-like are "its tasks");
-    # ``is_task_like`` = plays the task/subtask role. Seeded: project=container,
-    # task=task_like. See ADR-0033.
-    is_container: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_task_like: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    # Cross-cutting capabilities (ADR-0039), data-driven like the traversal roles
-    # above rather than hardcoded to identity/project. ``is_shareable`` = can mint a
-    # public share facade (share_token/PIN/expiry in node.data); ``is_subscribable``
-    # = can expose an iCal feed over its ``contains`` subtree. Seeded true for
-    # identity and project; user types may opt in.
-    is_shareable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_subscribable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Capability roles as a set (ADR-0040), stored as a JSON array. Replaces the four
+    # former booleans (is_container/is_task_like/is_shareable/is_subscribable): a type
+    # may carry several roles at once (project = {container, shareable, subscribable}).
+    # ``container`` = plays the project role (its task-role ``contains`` children are
+    # "its tasks"); ``task`` = plays the task/subtask role; ``shareable`` = can mint a
+    # public share facade (share_token/PIN/expiry in node.data); ``subscribable`` = can
+    # expose an iCal feed over its ``contains`` subtree. Adding a new capability is a
+    # string in this set + a dispatcher rule — no schema change (ADR-0040).
+    roles: Mapped[list | None] = mapped_column(JSON, nullable=True)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # e.g. default hot-field hints
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    def has_role(self, role: str) -> bool:
+        return role in (self.roles or [])
+
+    def _set_role(self, role: str, on: bool) -> None:
+        current = list(self.roles or [])
+        if on and role not in current:
+            current.append(role)
+        elif not on and role in current:
+            current.remove(role)
+        self.roles = current or None
+
+    # Backward-compatible boolean views over the canonical ``roles`` set (ADR-0040).
+    # They keep the graph-types API surface and older callers working while ``roles``
+    # is the single source of truth; being settable lets ``NodeType(is_task_like=True)``
+    # and ``setattr(nt, "is_container", ...)`` fold straight into ``roles``.
+    @property
+    def is_container(self) -> bool:
+        return self.has_role("container")
+
+    @is_container.setter
+    def is_container(self, value: bool) -> None:
+        self._set_role("container", bool(value))
+
+    @property
+    def is_task_like(self) -> bool:
+        return self.has_role("task")
+
+    @is_task_like.setter
+    def is_task_like(self, value: bool) -> None:
+        self._set_role("task", bool(value))
+
+    @property
+    def is_shareable(self) -> bool:
+        return self.has_role("shareable")
+
+    @is_shareable.setter
+    def is_shareable(self, value: bool) -> None:
+        self._set_role("shareable", bool(value))
+
+    @property
+    def is_subscribable(self) -> bool:
+        return self.has_role("subscribable")
+
+    @is_subscribable.setter
+    def is_subscribable(self, value: bool) -> None:
+        self._set_role("subscribable", bool(value))
 
 
 class EdgeType(Base):

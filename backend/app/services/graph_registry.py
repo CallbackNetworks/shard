@@ -13,17 +13,28 @@ from app.models import EdgeType, NodeType
 from app.services import graph
 
 # Built-in node types. Kept in sync with the ``graph.NODE_*`` constants.
-# ``is_container``/``is_task_like`` seed the traversal roles used by graph.py's
-# leaf helpers (ADR-0033 A5): project is the container, task is the item.
-# ``is_shareable``/``is_subscribable`` seed the cross-cutting capabilities (ADR-0039):
-# project and identity carry both (public share facade + iCal feed), matching the
-# historical identity/project-only behaviour. User types may opt in via the flags.
+# ``roles`` seeds each type's capability set (ADR-0040, replacing the four booleans):
+# ``container``/``task`` are the traversal roles (ADR-0033 A5 — project is the
+# container, task is the item); ``shareable``/``subscribable`` are the cross-cutting
+# capabilities (ADR-0039 — a public share facade + an iCal feed). project and identity
+# carry both, matching the historical identity/project-only behaviour. User types opt
+# in by adding role strings.
 BUILTIN_NODE_TYPES: list[dict] = [
-    {"key": graph.NODE_PROJECT, "label": "Project", "icon": "folder", "color": "#818cf8",
-     "is_container": True, "is_shareable": True, "is_subscribable": True},
-    {"key": graph.NODE_TASK, "label": "Task", "icon": "check-square", "color": "#38bdf8", "is_task_like": True},
-    {"key": graph.NODE_IDENTITY, "label": "Identity", "icon": "user", "color": "#f472b6",
-     "is_shareable": True, "is_subscribable": True},
+    {
+        "key": graph.NODE_PROJECT,
+        "label": "Project",
+        "icon": "folder",
+        "color": "#818cf8",
+        "roles": [graph.ROLE_CONTAINER, graph.ROLE_SHAREABLE, graph.ROLE_SUBSCRIBABLE],
+    },
+    {"key": graph.NODE_TASK, "label": "Task", "icon": "check-square", "color": "#38bdf8", "roles": [graph.ROLE_TASK]},
+    {
+        "key": graph.NODE_IDENTITY,
+        "label": "Identity",
+        "icon": "user",
+        "color": "#f472b6",
+        "roles": [graph.ROLE_SHAREABLE, graph.ROLE_SUBSCRIBABLE],
+    },
     {"key": graph.NODE_GOAL, "label": "Goal", "icon": "target", "color": "#34d399"},
     {"key": graph.NODE_CYCLE, "label": "Cycle", "icon": "repeat", "color": "#fbbf24"},
     {"key": graph.NODE_LABEL, "label": "Label", "icon": "tag", "color": "#a78bfa"},

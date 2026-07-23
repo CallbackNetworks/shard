@@ -18,7 +18,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, Node, NodeType
+from app.models import Edge, Node
 from app.services.graph.core import (
     NODE_PROJECT,
     REL_CONTAINS,
@@ -194,9 +194,5 @@ def unfiled_task_ids(db: Session) -> list[str]:
     node ids are filtered out by the caller when it loads ``Task`` rows.
     """
     filed = select(Edge.target_id).where(Edge.rel_type == REL_CONTAINS)
-    rows = db.execute(
-        select(Node.id)
-        .join(NodeType, NodeType.key == Node.type)
-        .where(NodeType.is_task_like.is_(True), Node.id.notin_(filed))
-    ).scalars()
+    rows = db.execute(select(Node.id).where(Node.type.in_(task_type_keys(db)), Node.id.notin_(filed))).scalars()
     return list(rows)

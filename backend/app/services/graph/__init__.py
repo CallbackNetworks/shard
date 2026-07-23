@@ -13,6 +13,7 @@ reaches labels/cycles via deferred imports.
 
 from app.services.graph.core import (
     _TASK_DATA_SCALARS,
+    LEGACY_ROLE_FLAGS,
     NODE_CYCLE,
     NODE_GOAL,
     NODE_IDENTITY,
@@ -26,6 +27,10 @@ from app.services.graph.core import (
     REL_LABELED,
     REL_MEMBER_OF,
     REL_PART_OF,
+    ROLE_CONTAINER,
+    ROLE_SHAREABLE,
+    ROLE_SUBSCRIBABLE,
+    ROLE_TASK,
     _apply_task_data_defaults,
     _iso,
     _log_event,
@@ -44,6 +49,7 @@ from app.services.graph.core import (
     find_node_by_share_token,
     find_subscribable_node_by_share_token,
     get_node,
+    has_role,
     nearest_ancestor_of_type,
     neighbors,
     node_is_shareable,

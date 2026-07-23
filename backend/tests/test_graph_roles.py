@@ -194,6 +194,70 @@ def test_top_level_task_filter_uses_role(db, sample_project):
     sub = graph.create_task(db, title="sub", project_id=sample_project.id, parent_id=root.id)
     db.commit()
 
-    top_ids = {t.id for t in db.query(Node).filter(Node.type == "task", graph.top_level_task_filter()).all()}
+    top_ids = {t.id for t in db.query(Node).filter(Node.type == "task", graph.top_level_task_filter(db)).all()}
     assert root.id in top_ids
     assert sub.id not in top_ids
+
+
+# --- Roles set (ADR-0040) -----------------------------------------------------
+
+
+def test_legacy_boolean_input_folds_to_roles(client):
+    # The graph-types API still accepts the four legacy booleans; they fold into the
+    # canonical roles set so existing clients keep working (ADR-0040 compat).
+    r = client.post(
+        "/api/graph-types/nodes",
+        json={"key": "area", "label": "Area", "is_container": True, "is_shareable": True},
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert set(body["roles"]) == {"container", "shareable"}
+    assert body["is_container"] is True and body["is_shareable"] is True
+    assert body["is_task_like"] is False and body["is_subscribable"] is False
+
+
+def test_builtin_container_role_immutable_via_roles(client):
+    # Dropping project's container role (sent as a roles set) is rejected — a built-in
+    # traversal role is frozen (ADR-0034/0035), whether toggled by boolean or roles.
+    r = client.patch("/api/graph-types/nodes/project", json={"roles": ["shareable"]})
+    assert r.status_code == 400
+
+
+def test_builtin_capability_role_toggle_allowed(client):
+    # A cross-cutting capability (not container/task) may be toggled on a built-in.
+    r = client.patch("/api/graph-types/nodes/identity", json={"is_subscribable": False})
+    assert r.status_code == 200
+    assert r.json()["is_subscribable"] is False
+    assert r.json()["is_shareable"] is True  # untouched
+
+
+def test_organization_user_defined_type_plays_all_roles(client, db):
+    """ADR-0040 acid test: an ``organization`` defined purely as data (a roles set)
+    participates in container/share/subscribe traversal with zero code special-casing.
+
+    This is the forcing use-case for the role model — a container above identity —
+    proving capability-typing works without promoting the type to a built-in.
+    """
+    r = client.post(
+        "/api/graph-types/nodes",
+        json={"key": "organization", "label": "Organization", "roles": ["container", "shareable", "subscribable"]},
+    )
+    assert r.status_code == 201
+    assert set(r.json()["roles"]) == {"container", "shareable", "subscribable"}
+
+    # Role-driven registry helpers pick it up with no hardcoding.
+    assert "organization" in graph.container_type_keys(db)
+    assert "organization" in graph.shareable_type_keys(db)
+    assert "organization" in graph.subscribable_type_keys(db)
+    assert graph.has_role(db, "organization", "container")
+
+    # Container role: a task filed under the org lists as a contained task.
+    org = client.post("/api/nodes", json={"type": "organization", "title": "Acme"}).json()
+    task = client.post("/api/nodes", json={"type": "task", "title": "org task"}).json()
+    client.post(f"/api/nodes/{org['id']}/edges", json={"target_id": task["id"], "rel_type": "contains"})
+    contained = client.get(f"/api/nodes/{org['id']}/contained-tasks").json()
+    assert [t["title"] for t in contained] == ["org task"]
+
+    # Shareable role: the generic share facade mints a token that resolves publicly.
+    token = client.post(f"/api/nodes/{org['id']}/share/rotate-token").json()["share_token"]
+    assert client.get(f"/share/n/{token}").status_code == 200

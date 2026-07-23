@@ -17,7 +17,7 @@ def _project_progress(db: Session, project_id: str) -> float:
     task_ids = graph.contained_task_ids(db, project_id)
     if not task_ids:
         return 0.0
-    base = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), graph.top_level_task_filter())
+    base = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), graph.top_level_task_filter(db))
     total = base.count()
     if total == 0:
         return 0.0

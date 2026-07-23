@@ -342,8 +342,7 @@ def parent_task_map(db: Session, task_ids) -> dict[str, str]:
     rows = db.execute(
         select(Edge.target_id, Edge.source_id)
         .join(Node, Node.id == Edge.source_id)
-        .join(NodeType, NodeType.key == Node.type)
-        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_task_like.is_(True), Edge.target_id.in_(ids))
+        .where(Edge.rel_type == REL_CONTAINS, Node.type.in_(task_type_keys(db)), Edge.target_id.in_(ids))
         .order_by(Edge.position, Edge.created_at)
     ).all()
     for target_id, source_id in rows:
@@ -373,7 +372,7 @@ def container_ids_map(db: Session, task_ids) -> dict[str, list[str]]:
     projects plus user-defined container types). Feeds the generic ``TaskOut.container_ids``
     (ADR-0034). Same deterministic ordering as ``project_ids_map``.
     """
-    return _containment_ids_map(db, task_ids, source_filter=NodeType.is_container.is_(True))
+    return _containment_ids_map(db, task_ids, source_filter=Node.type.in_(container_type_keys(db)))
 
 
 def _containment_ids_map(db: Session, task_ids, *, source_filter) -> dict[str, list[str]]:
@@ -446,22 +445,22 @@ def subtask_ids_among(db: Session, task_ids) -> set[str]:
     rows = db.execute(
         select(Edge.target_id)
         .join(Node, Node.id == Edge.source_id)
-        .join(NodeType, NodeType.key == Node.type)
-        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_task_like.is_(True), Edge.target_id.in_(ids))
+        .where(Edge.rel_type == REL_CONTAINS, Node.type.in_(task_type_keys(db)), Edge.target_id.in_(ids))
     ).scalars()
     return set(rows)
 
 
-def top_level_task_filter():
+def top_level_task_filter(db: Session):
     """SQL filter expression selecting top-level tasks (not a subtask of any task).
 
-    A subtask is the target of a ``contains`` edge whose source is a task node;
+    A subtask is the target of a ``contains`` edge whose source is a task-role node;
     top-level tasks have no such edge. Replaces ``Task.parent_id == None`` in queries.
+    Takes ``db`` to resolve the task-role key set (ADR-0040: roles are read in Python,
+    not via a JSON operator in the subquery).
     """
     subquery = (
         select(Edge.target_id)
         .join(Node, Node.id == Edge.source_id)
-        .join(NodeType, NodeType.key == Node.type)
-        .where(Edge.rel_type == REL_CONTAINS, NodeType.is_task_like.is_(True))
+        .where(Edge.rel_type == REL_CONTAINS, Node.type.in_(task_type_keys(db)))
     )
     return Node.id.notin_(subquery)

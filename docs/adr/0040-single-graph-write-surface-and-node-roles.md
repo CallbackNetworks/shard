@@ -7,8 +7,13 @@ Accepted
      階段 1(已完成 2026-07-22):圖寫入核心的領域反應下沉至 role-driven dispatcher
        (`services/graph_dispatch.py`);`/api/nodes` 的 create/update/delete 不再啞寫入,
        task-role 節點復用 ADR-0038 pipeline。分叉/靜默降級 bug 當場消失,零端點裁撤、零契約破壞。
-     階段 2(待辦):`roles` 集合遷移 + `has_role` helper;`organization` 以使用者自訂型別驗證。
-     階段 3(待辦):裁撤內部富寫入路由,前端改走核心。 -->
+     階段 2(已完成 2026-07-22):`node_types.roles` JSON 集合取代四個布林(Alembic
+       b8d0f2a4c6e9,render_as_batch,回填 + downgrade 皆備);`graph.has_role` + role-key
+       集合改寫所有讀取點;`*_type_keys` 與 `top_level_task_filter(db)` 改為 role 驅動。
+       模型保留 is_* 為衍生相容 property(可讀可寫,折入 roles),graph-types API 維持相容輸入。
+       `organization` 以純使用者自訂型別(roles={container,shareable,subscribable})驗證,
+       零特判即參與容器/分享/訂閱遍歷(驗收測試通過)。
+     階段 3(待辦):裁撤內部富寫入路由,前端改走核心;屆時移除 is_* 相容 property。 -->
 
 
 ## Date

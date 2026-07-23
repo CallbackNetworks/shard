@@ -245,7 +245,7 @@ async def _send_daily_summary(db: Session) -> None:
 
     in_progress = (
         db.query(Node)
-        .filter(Node.type == graph.NODE_TASK, Node.status == "in_progress", graph.top_level_task_filter())
+        .filter(Node.type == graph.NODE_TASK, Node.status == "in_progress", graph.top_level_task_filter(db))
         .all()
     )
 
@@ -356,7 +356,7 @@ async def _send_weekly_digest(db: Session) -> None:
         .filter(
             Node.type == graph.NODE_TASK,
             Node.created_at >= week_ago,
-            graph.top_level_task_filter(),
+            graph.top_level_task_filter(db),
         )
         .all()
     )

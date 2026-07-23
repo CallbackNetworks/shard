@@ -33,41 +33,68 @@ REL_IN_CYCLE = "in_cycle"  # task -> cycle
 REL_PART_OF = "part_of"  # project -> goal
 
 
-# --- Traversal roles (registry-driven; ADR-0033 A5) --------------------------
+# --- Capability roles (registry-driven; ADR-0033 A5, ADR-0040) ---------------
+
+# Role vocabulary carried by ``node_types.roles`` (ADR-0040). Nouns, no ``-like``.
+ROLE_CONTAINER = "container"  # plays the project/container role
+ROLE_TASK = "task"  # plays the task/subtask role
+ROLE_SHAREABLE = "shareable"  # can mint a public share facade
+ROLE_SUBSCRIBABLE = "subscribable"  # can expose an iCal feed
+
+# Legacy capability booleans -> role names. Kept for the compat input on the
+# graph-types API (frontend/tests still send ``is_container`` etc.); the DB stores
+# only ``roles`` now.
+LEGACY_ROLE_FLAGS = {
+    "is_container": ROLE_CONTAINER,
+    "is_task_like": ROLE_TASK,
+    "is_shareable": ROLE_SHAREABLE,
+    "is_subscribable": ROLE_SUBSCRIBABLE,
+}
+
+
+def has_role(db: Session, type_key: str, role: str) -> bool:
+    """Whether the node type ``type_key`` carries ``role`` (ADR-0040).
+
+    The single read helper replacing the scattered ``is_*`` boolean reads; the
+    ``*_type_keys`` sets below are its batch form for query filtering.
+    """
+    nt = db.get(NodeType, type_key)
+    return nt is not None and role in (nt.roles or [])
+
+
+def _type_keys_with_role(db: Session, role: str) -> set[str]:
+    """Keys of every node type carrying ``role`` (ADR-0040).
+
+    Filters in Python over the (tiny) node-type registry so the ``roles`` JSON set
+    needs no dialect-specific array/containment operator.
+    """
+    return {nt.key for nt in db.query(NodeType).all() if role in (nt.roles or [])}
 
 
 def container_type_keys(db: Session) -> set[str]:
     """Node-type keys that play the container role (seeded: ``project``).
 
-    Data-driven replacement for the hardcoded ``n.type == NODE_PROJECT`` checks;
-    a task's "projects" are its container-role ``contains`` parents.
+    A task's "projects" are its container-role ``contains`` parents.
     """
-    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_container.is_(True)).all()}
+    return _type_keys_with_role(db, ROLE_CONTAINER)
 
 
 def task_type_keys(db: Session) -> set[str]:
-    """Node-type keys that play the task/item role (seeded: ``task``).
-
-    Data-driven replacement for the hardcoded ``n.type == NODE_TASK`` checks.
-    """
-    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_task_like.is_(True)).all()}
+    """Node-type keys that play the task/item role (seeded: ``task``)."""
+    return _type_keys_with_role(db, ROLE_TASK)
 
 
 def shareable_type_keys(db: Session) -> set[str]:
     """Node-type keys that may mint a public share facade (seeded: identity, project).
 
-    Data-driven from ``node_types.is_shareable`` (ADR-0039); callers gate share
-    endpoints by capability instead of hardcoding identity/project.
+    Callers gate share endpoints by capability instead of hardcoding identity/project.
     """
-    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_shareable.is_(True)).all()}
+    return _type_keys_with_role(db, ROLE_SHAREABLE)
 
 
 def subscribable_type_keys(db: Session) -> set[str]:
-    """Node-type keys that may expose an iCal feed (seeded: identity, project).
-
-    Data-driven from ``node_types.is_subscribable`` (ADR-0039).
-    """
-    return {k for (k,) in db.query(NodeType.key).filter(NodeType.is_subscribable.is_(True)).all()}
+    """Node-type keys that may expose an iCal feed (seeded: identity, project)."""
+    return _type_keys_with_role(db, ROLE_SUBSCRIBABLE)
 
 
 def node_is_shareable(db: Session, node: Node) -> bool:
