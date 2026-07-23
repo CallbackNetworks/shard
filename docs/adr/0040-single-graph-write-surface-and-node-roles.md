@@ -1,7 +1,15 @@
 # ADR-0040: 收斂為通用圖 API 單一寫入面,節點能力改以 roles 集合表達
 
 ## Status
-Proposed
+Accepted
+
+<!-- 實作進度(分階段落地):
+     階段 1(已完成 2026-07-22):圖寫入核心的領域反應下沉至 role-driven dispatcher
+       (`services/graph_dispatch.py`);`/api/nodes` 的 create/update/delete 不再啞寫入,
+       task-role 節點復用 ADR-0038 pipeline。分叉/靜默降級 bug 當場消失,零端點裁撤、零契約破壞。
+     階段 2(待辦):`roles` 集合遷移 + `has_role` helper;`organization` 以使用者自訂型別驗證。
+     階段 3(待辦):裁撤內部富寫入路由,前端改走核心。 -->
+
 
 ## Date
 2026-07-22

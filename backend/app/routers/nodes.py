@@ -21,6 +21,8 @@ from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
 from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
 from app.services import graph
 from app.services.enrichment import enrich_task
+from app.services.graph_dispatch import dispatch_node_created, dispatch_node_deleted, dispatch_node_updated
+from app.services.task_mutations import AgentKeyError
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -95,14 +97,16 @@ def list_nodes(
 
 
 @router.post("", response_model=NodeOut, status_code=status.HTTP_201_CREATED)
-def create_node(body: NodeCreate, db: Session = Depends(get_db)):
+async def create_node(body: NodeCreate, db: Session = Depends(get_db)):
     if db.get(NodeType, body.type) is None:
         raise HTTPException(status_code=422, detail=f"unknown node type '{body.type}'")
     fields = body.model_dump(exclude={"type", "title", "data"}, exclude_none=True)
     if body.data:
         fields.update(body.data)
     node = graph.create_node(db, body.type, title=body.title, **fields)
-    db.commit()
+    # Role-driven reactions live below the endpoint now (ADR-0040): a task written
+    # here runs the same pipeline as one written via /projects/{id}/tasks.
+    await dispatch_node_created(db, node)
     db.refresh(node)
     return node
 
@@ -116,7 +120,7 @@ def get_node(node_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{node_id}", response_model=NodeOut)
-def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_db)):
+async def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_db)):
     node = db.get(Node, node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="node not found")
@@ -124,19 +128,20 @@ def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_db)):
     data = fields.pop("data", None)
     if data is not None:
         fields.update(data)
-    graph.update_node(db, node_id, **fields)
-    db.commit()
+    try:
+        node = await dispatch_node_updated(db, node, fields)
+    except AgentKeyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.refresh(node)
     return node
 
 
 @router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_node(node_id: str, db: Session = Depends(get_db)):
+async def delete_node(node_id: str, db: Session = Depends(get_db)):
     node = db.get(Node, node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="node not found")
-    graph.delete_node(db, node_id)
-    db.commit()
+    await dispatch_node_deleted(db, node)
 
 
 @router.get("/{node_id}/contained-tasks", response_model=list[TaskOut])

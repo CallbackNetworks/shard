@@ -247,3 +247,48 @@ def test_set_and_clear_pin_and_expiry(client, shareable_topic):
 
 def test_share_ops_404_on_missing_node(client):
     assert client.post("/api/nodes/nope/share/rotate-token").status_code == 404
+
+
+# --- Role-driven write surface (ADR-0040) -------------------------------------
+# The generic /api/nodes surface used to be a "dumb write": it inserted a Node and
+# returned, skipping notifications / rules / activity that the dedicated routers
+# fire. These tests pin that a task written through /api/nodes now runs the same
+# ADR-0038 pipeline (the silent-downgrade bug that motivated ADR-0040).
+
+
+def _activity_actions(db, task_id):
+    from app.models import ActivityLog
+
+    return {a.action for a in db.query(ActivityLog).filter(ActivityLog.task_id == task_id).all()}
+
+
+def test_task_created_via_nodes_runs_pipeline(client, db, sample_project):
+    r = client.post("/api/nodes", json={"type": "task", "title": "Ship it"})
+    assert r.status_code == 201
+    task_id = r.json()["id"]
+    # finalize_task_create logged task.created — proof the pipeline ran, not a dumb write.
+    assert "task.created" in _activity_actions(db, task_id)
+
+
+def test_task_status_change_via_nodes_fires_status_events(client, db):
+    task_id = client.post("/api/nodes", json={"type": "task", "title": "Do"}).json()["id"]
+    r = client.patch(f"/api/nodes/{task_id}", json={"status": "done"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "done"
+    # apply_task_update logged the transition (and fired task.status_changed /
+    # task.done notifications) — the reaction that /api/nodes used to silently drop.
+    assert "task.status_changed" in _activity_actions(db, task_id)
+
+
+def test_task_delete_via_nodes_cleans_subtree(client, db):
+    parent = client.post("/api/nodes", json={"type": "task", "title": "Parent"}).json()["id"]
+    child = client.post("/api/nodes", json={"type": "task", "title": "Child"}).json()["id"]
+    client.post(f"/api/nodes/{parent}/edges", json={"target_id": child, "rel_type": "contains"})
+
+    assert client.delete(f"/api/nodes/{parent}").status_code == 204
+    from app.models import Node
+
+    # delete_task_tree removed the subtask too (plain delete_node would have orphaned it).
+    assert db.get(Node, parent) is None
+    assert db.get(Node, child) is None
+    assert "task.deleted" in _activity_actions(db, parent)

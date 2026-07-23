@@ -29,6 +29,7 @@ _SOURCE_SUFFIX = {
     "bulk": " via bulk update",
     "webhook": " via webhook",
     "assistant": " via assistant",
+    "node": " via graph API",
 }
 
 
@@ -198,7 +199,7 @@ async def finalize_task_create(
     *,
     actor: str | None = None,
     source: str = "web",
-    project_id: str,
+    project_id: str | None,
     activity_meta: dict | None = None,
     commit: bool = True,
     broadcast: bool = True,
@@ -212,7 +213,9 @@ async def finalize_task_create(
     task = graph.get_task(db, task_id)
     if task is None:
         raise ValueError(f"Task {task_id} not found")
-    project = graph.get_project(db, project_id)
+    # A task created via the generic /api/nodes surface may have no container yet
+    # (ADR-0040): tolerate a null project rather than a NULL-PK lookup.
+    project = graph.get_project(db, project_id) if project_id else None
     suffix = _SOURCE_SUFFIX.get(source, "")
     in_project = f" in {project.name}" if project else ""
 
