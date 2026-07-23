@@ -1038,6 +1038,11 @@ class EdgeTypeOut(BaseModel):
 
 
 class NodeCreate(BaseModel):
+    # Extra fields are allowed and folded into ``data`` by the endpoint (ADR-0040):
+    # a task written here may carry description/assignee/... flat, like the retired
+    # TaskCreate surface, without enumerating every task-role field here.
+    model_config = ConfigDict(extra="allow")
+
     type: str
     title: str = ""
     status: str | None = None
@@ -1055,6 +1060,9 @@ class NodeCreate(BaseModel):
 
 
 class NodeUpdate(BaseModel):
+    # Extra fields fold into ``data`` (ADR-0040), mirroring NodeCreate.
+    model_config = ConfigDict(extra="allow")
+
     title: str | None = None
     status: str | None = None
     priority: str | None = None

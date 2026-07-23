@@ -61,11 +61,14 @@ export const getProject = (id) => api.get(`/projects/${id}`).then(r => r.data)
 export const getIcalToken = () => api.get('/settings/ical-token').then(r => r.data)
 export const rotateGlobalIcalToken = () => api.post('/settings/ical-token/rotate').then(r => r.data)
 
-// Tasks
+// Tasks. Writes go through the single graph write surface /nodes (ADR-0040):
+// container_id files the task under its project; parent_id (in data) nests a
+// subtask; the response is the enriched TaskOut shape. Reads and sub-resources
+// (reorder, memberships, external issue, ...) keep their dedicated routes.
 export const getTasks = (projectId) => api.get(`/projects/${projectId}/tasks`).then(r => r.data)
-export const createTask = (projectId, data) => api.post(`/projects/${projectId}/tasks`, data).then(r => r.data)
-export const updateTask = (projectId, taskId, data) => api.patch(`/projects/${projectId}/tasks/${taskId}`, data).then(r => r.data)
-export const deleteTask = (projectId, taskId) => api.delete(`/projects/${projectId}/tasks/${taskId}`)
+export const createTask = (projectId, data) => api.post('/nodes', { type: 'task', container_id: projectId, ...data }).then(r => r.data)
+export const updateTask = (projectId, taskId, data) => api.patch(`/nodes/${taskId}`, data).then(r => r.data)
+export const deleteTask = (projectId, taskId) => api.delete(`/nodes/${taskId}`)
 export const createExternalIssue = (projectId, taskId, provider) => api.post(`/projects/${projectId}/tasks/${taskId}/create-external-issue`, provider ? { provider } : {}).then(r => r.data)
 export const regenerateToken = (projectId, taskId) => api.post(`/projects/${projectId}/tasks/${taskId}/regenerate-token`).then(r => r.data)
 export const reorderTasks = (projectId, taskIds) => api.post(`/projects/${projectId}/tasks/reorder`, { task_ids: taskIds })
