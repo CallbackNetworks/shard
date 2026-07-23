@@ -13,7 +13,17 @@ Accepted
        模型保留 is_* 為衍生相容 property(可讀可寫,折入 roles),graph-types API 維持相容輸入。
        `organization` 以純使用者自訂型別(roles={container,shareable,subscribable})驗證,
        零特判即參與容器/分享/訂閱遍歷(驗收測試通過)。
-     階段 3(待辦):裁撤內部富寫入路由,前端改走核心;屆時移除 is_* 相容 property。 -->
+     階段 3(進行中):
+       3a(已完成 2026-07-22):前端節點型別能力 UI 改走 canonical `roles` 集合
+         (`frontend/src/constants/nodeRoles.js`:hasNodeRole/toggleNodeRole/NODE_ROLE_DEFS);
+         graph-types 表單送 roles、徽章與路由皆由 roles 推導。
+       3b(已完成 2026-07-22):移除後端 is_* 相容層——NodeType 僅存 `roles` 欄 + `has_role`,
+         schema/router 只認 roles,刪除 LEGACY_ROLE_FLAGS。roles 成為端到端唯一表面。
+       3c(待辦,本 ADR 最大且風險最高的剩項):裁撤內部富寫入路由
+         (`/api/projects/{id}/tasks` create/patch/delete、goals/identities/bulk/imports 寫入),
+         前端寫入改走 `/api/nodes` 核心。注意:分叉/靜默降級問題已於階段 1 消除,此步純為
+         表面收斂;需通用端點回傳 enriched TaskOut + 建立 containment 邊,並重寫大量前端寫入
+         呼叫與測試,應逐一路由、每步獨立驗證。 -->
 
 
 ## Date
