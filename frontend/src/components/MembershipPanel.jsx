@@ -8,6 +8,7 @@ import {
   getNodeTypes, getNode, getNodeEdges, getEdgeTypes, attachNodeEdge, detachNodeEdge,
 } from '../api/client'
 import NodeCombobox from './shared/NodeCombobox'
+import { hasNodeRole } from '../constants/nodeRoles'
 
 // Relations managed by dedicated panels/UI; everything else (custom edge
 // types) surfaces in the "other relations" section below (ADR-0037).
@@ -32,7 +33,7 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
 
   // Custom containers: container_ids minus project memberships (ADR-0034 keeps
   // compat project fields literal-project; custom containers only appear here).
-  const containerTypes = nodeTypes.filter(nt => nt.is_container && nt.key !== 'project')
+  const containerTypes = nodeTypes.filter(nt => hasNodeRole(nt, 'container') && nt.key !== 'project')
   const containerTypeKeys = new Set(containerTypes.map(nt => nt.key))
   const extraContainers = (task.container_ids || []).filter(cid => !memberships.includes(cid))
   const containerNodes = useQueries({

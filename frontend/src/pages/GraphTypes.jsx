@@ -7,6 +7,7 @@ import {
   getEdgeTypes, createEdgeType, deleteEdgeType,
 } from '../api/client'
 import { DARK } from '../constants/theme'
+import { NODE_ROLE_DEFS, hasNodeRole, toggleNodeRole } from '../constants/nodeRoles'
 
 function SectionTitle({ icon, title, hint }) {
   return (
@@ -78,16 +79,29 @@ function TypeRow({ item, onDelete, deleting, onEdit, children }) {
   )
 }
 
-// Inline editor for a custom node type: label, color, role flags (ADR-0037).
+// Checkbox toggles for a node type's capability roles set (ADR-0040).
+function RoleToggles({ roles, onChange }) {
+  const { t } = useTranslation()
+  return NODE_ROLE_DEFS.map(({ role, labelKey }) => (
+    <label key={role} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
+      <input
+        type="checkbox"
+        aria-label={t(labelKey)}
+        checked={(roles || []).includes(role)}
+        onChange={e => onChange(toggleNodeRole(roles, role, e.target.checked))}
+      />
+      {t(labelKey)}
+    </label>
+  ))
+}
+
+// Inline editor for a custom node type: label, color, capability roles (ADR-0040).
 function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState({
     label: item.label,
     color: item.color || '#818cf8',
-    is_container: !!item.is_container,
-    is_task_like: !!item.is_task_like,
-    is_shareable: !!item.is_shareable,
-    is_subscribable: !!item.is_subscribable,
+    roles: [...(item.roles || [])],
   })
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '9px 0', borderBottom: `1px solid ${DARK.border}` }}>
@@ -104,38 +118,7 @@ function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
         onChange={e => setDraft({ ...draft, color: e.target.value })}
         style={{ width: 34, height: 30, padding: 0, border: `1px solid ${DARK.border}`, background: 'none', cursor: 'pointer' }}
       />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={draft.is_container}
-          onChange={e => setDraft({ ...draft, is_container: e.target.checked })}
-        />
-        {t('graphTypes.roleContainer')}
-      </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={draft.is_task_like}
-          onChange={e => setDraft({ ...draft, is_task_like: e.target.checked })}
-        />
-        {t('graphTypes.roleTask')}
-      </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={draft.is_shareable}
-          onChange={e => setDraft({ ...draft, is_shareable: e.target.checked })}
-        />
-        {t('graphTypes.capShareable')}
-      </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={draft.is_subscribable}
-          onChange={e => setDraft({ ...draft, is_subscribable: e.target.checked })}
-        />
-        {t('graphTypes.capSubscribable')}
-      </label>
+      <RoleToggles roles={draft.roles} onChange={roles => setDraft({ ...draft, roles })} />
       <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
         <button
           className="kt-btn kt-btn-primary" aria-label="save"
@@ -159,13 +142,14 @@ export default function GraphTypes() {
   const { data: nodeTypes = [], isLoading: nodeLoading } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes })
   const { data: edgeTypes = [], isLoading: edgeLoading } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes })
 
-  const [nodeForm, setNodeForm] = useState({ key: '', label: '', color: '#818cf8', is_container: false, is_task_like: false, is_shareable: false, is_subscribable: false })
+  const emptyNodeForm = { key: '', label: '', color: '#818cf8', roles: [] }
+  const [nodeForm, setNodeForm] = useState(emptyNodeForm)
   const [edgeForm, setEdgeForm] = useState({ key: '', label: '', is_containment: false })
   const [editingKey, setEditingKey] = useState(null)
 
   const nodeCreate = useMutation({
     mutationFn: createNodeType,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setNodeForm({ key: '', label: '', color: '#818cf8', is_container: false, is_task_like: false, is_shareable: false, is_subscribable: false }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setNodeForm(emptyNodeForm) },
   })
   const nodeDelete = useMutation({
     mutationFn: deleteNodeType,
@@ -222,10 +206,9 @@ export default function GraphTypes() {
                   onDelete={(k) => confirmDelete(nodeDelete, k)} deleting={nodeDelete.isPending}
                   onEdit={(it) => setEditingKey(it.key)}
                 >
-                  {item.is_container && <RoleBadge label={t('graphTypes.roleContainer')} />}
-                  {item.is_task_like && <RoleBadge label={t('graphTypes.roleTask')} />}
-                  {item.is_shareable && <RoleBadge label={t('graphTypes.capShareable')} />}
-                  {item.is_subscribable && <RoleBadge label={t('graphTypes.capSubscribable')} />}
+                  {NODE_ROLE_DEFS.map(({ role, labelKey }) => (
+                    hasNodeRole(item, role) && <RoleBadge key={role} label={t(labelKey)} />
+                  ))}
                 </TypeRow>
               )
             ))
@@ -249,38 +232,7 @@ export default function GraphTypes() {
               onChange={e => setNodeForm({ ...nodeForm, color: e.target.value })}
               style={{ width: 34, height: 30, padding: 0, border: `1px solid ${DARK.border}`, background: 'none', cursor: 'pointer' }}
             />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={nodeForm.is_container}
-                onChange={e => setNodeForm({ ...nodeForm, is_container: e.target.checked })}
-              />
-              {t('graphTypes.roleContainer')}
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={nodeForm.is_task_like}
-                onChange={e => setNodeForm({ ...nodeForm, is_task_like: e.target.checked })}
-              />
-              {t('graphTypes.roleTask')}
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={nodeForm.is_shareable}
-                onChange={e => setNodeForm({ ...nodeForm, is_shareable: e.target.checked })}
-              />
-              {t('graphTypes.capShareable')}
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: DARK.textMid, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={nodeForm.is_subscribable}
-                onChange={e => setNodeForm({ ...nodeForm, is_subscribable: e.target.checked })}
-              />
-              {t('graphTypes.capSubscribable')}
-            </label>
+            <RoleToggles roles={nodeForm.roles} onChange={roles => setNodeForm({ ...nodeForm, roles })} />
             <button
               className="kt-btn kt-btn-primary"
               disabled={!nodeForm.key || !nodeForm.label || nodeCreate.isPending}

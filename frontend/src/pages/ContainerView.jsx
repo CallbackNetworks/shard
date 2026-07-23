@@ -6,6 +6,7 @@ import { Boxes, Link2, Search } from 'lucide-react'
 import { getNode, getNodeTypes, getContainedTasks, updateTask, deleteTask } from '../api/client'
 import NodeShareFacet from '../components/NodeShareFacet'
 import { DARK } from '../constants/theme'
+import { hasNodeRole } from '../constants/nodeRoles'
 import BoardView from '../components/BoardView'
 import TableView from '../components/TableView'
 import EmptyState from '../components/shared/EmptyState'
@@ -97,8 +98,8 @@ export default function ContainerView() {
         <Boxes size={22} color={color} />
       </div>
 
-      {typeMeta?.is_shareable && (
-        <NodeShareFacet node={node} subscribable={!!typeMeta?.is_subscribable} />
+      {hasNodeRole(typeMeta, 'shareable') && (
+        <NodeShareFacet node={node} subscribable={hasNodeRole(typeMeta, 'subscribable')} />
       )}
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>

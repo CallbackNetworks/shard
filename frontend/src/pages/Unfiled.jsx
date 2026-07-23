@@ -8,6 +8,7 @@ import {
   getNodeTypes, getEdgeTypes, getGraphMap,
 } from '../api/client'
 import { DARK } from '../constants/theme'
+import { hasNodeRole } from '../constants/nodeRoles'
 
 function TaskRow({ task, projects, onFile, filing }) {
   const { t } = useTranslation()
@@ -125,7 +126,7 @@ export default function Unfiled() {
             return (
               <Link
                 key={n.id}
-                to={nt?.is_container ? `/c/${n.id}` : `/n/${n.id}`}
+                to={hasNodeRole(nt, 'container') ? `/c/${n.id}` : `/n/${n.id}`}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
                   borderBottom: `1px solid ${DARK.border}`, textDecoration: 'none',

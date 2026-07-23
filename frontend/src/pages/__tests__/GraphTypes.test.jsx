@@ -31,9 +31,9 @@ vi.mock('../../api/client', () => ({
 import GraphTypes from '../GraphTypes'
 
 const nodeTypes = [
-  { key: 'project', label: 'Project', color: '#818cf8', is_builtin: true, is_container: true, is_task_like: false },
-  { key: 'task', label: 'Task', color: '#38bdf8', is_builtin: true, is_container: false, is_task_like: true },
-  { key: 'topic', label: 'Topic', color: '#abcdef', is_builtin: false, is_container: false, is_task_like: false, usage_count: 4 },
+  { key: 'project', label: 'Project', color: '#818cf8', is_builtin: true, roles: ['container'] },
+  { key: 'task', label: 'Task', color: '#38bdf8', is_builtin: true, roles: ['task'] },
+  { key: 'topic', label: 'Topic', color: '#abcdef', is_builtin: false, roles: [], usage_count: 4 },
 ]
 const edgeTypes = [
   { key: 'contains', label: 'Contains', is_builtin: true, is_containment: true, is_symmetric: false },
@@ -90,7 +90,7 @@ describe('GraphTypes', () => {
       .filter(Boolean)
     fireEvent.click(containerCheckboxes[0])
     fireEvent.click(screen.getAllByText('graphTypes.add')[0].closest('button'))
-    expect(lastMutations.arg).toMatchObject({ key: 'workspace', label: 'Workspace', is_container: true })
+    expect(lastMutations.arg).toMatchObject({ key: 'workspace', label: 'Workspace', roles: ['container'] })
   })
 
   it('lists edge types including custom ones', () => {
@@ -123,7 +123,7 @@ describe('GraphTypes', () => {
       .filter(Boolean)
     fireEvent.click(taskCheckboxes[0])
     fireEvent.click(screen.getAllByText('graphTypes.add')[0].closest('button'))
-    expect(lastMutations.arg).toMatchObject({ key: 'ticket', label: 'Ticket', is_task_like: true })
+    expect(lastMutations.arg).toMatchObject({ key: 'ticket', label: 'Ticket', roles: ['task'] })
   })
 
   it('shows usage counts for types in use (ADR-0037)', () => {

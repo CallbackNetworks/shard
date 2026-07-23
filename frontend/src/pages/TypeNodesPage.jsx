@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Plus } from 'lucide-react'
 import { getNodes, getNodeTypes, createNode } from '../api/client'
 import { DARK } from '../constants/theme'
+import { hasNodeRole } from '../constants/nodeRoles'
 import EmptyState from '../components/shared/EmptyState'
 
 // Thin per-type node listing (ADR-0037): the sidebar entry for a user-defined
@@ -20,7 +21,7 @@ export default function TypeNodesPage() {
 
   const typeMeta = nodeTypes.find(nt => nt.key === typeKey)
   const color = typeMeta?.color || '#818cf8'
-  const href = (n) => (typeMeta?.is_container ? `/c/${n.id}` : `/n/${n.id}`)
+  const href = (n) => (hasNodeRole(typeMeta, 'container') ? `/c/${n.id}` : `/n/${n.id}`)
 
   const createMut = useMutation({
     mutationFn: () => createNode({ type: typeKey, title: newTitle.trim() }),

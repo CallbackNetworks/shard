@@ -44,7 +44,7 @@ vi.mock('../../components/TableView', () => ({
 import ContainerView from '../ContainerView'
 
 const node = { id: 'c1', type: 'topic', title: 'Research' }
-const nodeTypes = [{ key: 'topic', label: 'Topic', is_container: true, color: '#f59e0b' }]
+const nodeTypes = [{ key: 'topic', label: 'Topic', roles: ['container'], color: '#f59e0b' }]
 const tasks = [
   { id: 't1', title: 'With project', status: 'todo', project_id: 'pA' },
   { id: 't2', title: 'Unfiled task', status: 'todo', project_id: null },

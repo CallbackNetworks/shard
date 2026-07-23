@@ -26,8 +26,8 @@ vi.mock('../../api/client', () => ({
 import NodeExplorer from '../NodeExplorer'
 
 const nodeTypes = [
-  { key: 'topic', label: 'Topic', is_builtin: false, is_container: false, is_task_like: false },
-  { key: 'project', label: 'Project', is_builtin: true, is_container: true, is_task_like: false },
+  { key: 'topic', label: 'Topic', is_builtin: false, roles: [] },
+  { key: 'project', label: 'Project', is_builtin: true, roles: ['container'] },
 ]
 const edgeTypes = [{ key: 'contains', label: 'Contains', is_builtin: true, is_containment: true, is_symmetric: false }]
 const topicNodes = [
