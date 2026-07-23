@@ -1,7 +1,7 @@
 # ADR-0041: goal 收為 container role、identity 寫入收斂,decision 維持 enhanced-label
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-07-23

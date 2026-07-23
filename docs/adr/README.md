@@ -42,4 +42,4 @@
 | [0038](0038-unified-task-mutation-pipeline.md) | Unified Task Mutation Pipeline — Single Post-Mutation Sequence Service | Accepted | 2026-07-19 |
 | [0039](0039-cross-cutting-capabilities-as-node-type-flags.md) | Cross-cutting Capabilities as Node-Type Flags — De-privileging Built-in Identity | Accepted | 2026-07-20 |
 | [0040](0040-single-graph-write-surface-and-node-roles.md) | Single Graph Write Surface and Node Capabilities as a Roles Set | Accepted | 2026-07-22 |
-| [0041](0041-goal-as-container-and-remaining-write-surface-collapse.md) | Goal as a Container Role, Identity Write Collapse, Decision Stays an Enhanced Label | Proposed | 2026-07-23 |
+| [0041](0041-goal-as-container-and-remaining-write-surface-collapse.md) | Goal as a Container Role, Identity Write Collapse, Decision Stays an Enhanced Label | Accepted | 2026-07-23 |
