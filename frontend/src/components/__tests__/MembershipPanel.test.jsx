@@ -112,7 +112,7 @@ describe('MembershipPanel', () => {
   })
 
   it('shows custom container chips and unlinks them via the node-edge API (ADR-0037)', () => {
-    mockQueries({ nodeTypes: [{ key: 'topic', label: 'Topic', is_container: true, color: '#f59e0b' }] })
+    mockQueries({ nodeTypes: [{ key: 'topic', label: 'Topic', roles: ['container'], color: '#f59e0b' }] })
     mocks.useQueries.mockReturnValue([{ data: { id: 'c1', type: 'topic', title: 'Research' } }])
     const withContainer = { ...task, container_ids: ['pA', 'pB', 'c1'] }
     renderPanel({ projectId: "pA", task: withContainer })

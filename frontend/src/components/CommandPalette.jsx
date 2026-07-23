@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash, Boxes } from 'lucide-react'
 import { getProjects, search, getNodes, getNodeTypes } from '../api/client'
 import { BRAND, DARK } from '../constants/theme'
+import { hasNodeRole } from '../constants/nodeRoles'
 
 const BACKDROP = 'rgba(0,0,0,0.8)'
 const PANEL_BG = DARK.surface
@@ -194,7 +195,7 @@ export default function CommandPalette({ open, onClose }) {
             section: 'Nodes',
             icon: <Boxes size={14}/>,
             meta: nt.label,
-            path: nt.is_container ? `/c/${n.id}` : `/n/${n.id}`,
+            path: hasNodeRole(nt, 'container') ? `/c/${n.id}` : `/n/${n.id}`,
           })
         })
       }

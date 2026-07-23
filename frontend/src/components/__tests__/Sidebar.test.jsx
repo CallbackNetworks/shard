@@ -76,9 +76,9 @@ describe('Sidebar', () => {
 
   it('shows a dynamic group entry per custom container type (ADR-0037)', () => {
     mockNodeTypes.data = [
-      { key: 'topic', label: 'Topics', is_container: true, is_builtin: false, color: '#f59e0b' },
-      { key: 'project', label: 'Project', is_container: true, is_builtin: true },
-      { key: 'note', label: 'Note', is_container: false, is_builtin: false },
+      { key: 'topic', label: 'Topics', roles: ['container'], is_builtin: false, color: '#f59e0b' },
+      { key: 'project', label: 'Project', roles: ['container'], is_builtin: true },
+      { key: 'note', label: 'Note', roles: [], is_builtin: false },
     ]
     setup()
     // Only the custom container type gets an entry — not built-ins, not plain types.

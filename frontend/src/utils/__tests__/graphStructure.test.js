@@ -2,14 +2,16 @@ import { describe, it, expect } from 'vitest'
 import { deriveGraphStructure, focusGraph } from '../graphStructure'
 
 const nodeTypes = [
-  { key: 'project', label: 'Project', is_builtin: true, is_container: true, is_task_like: false },
-  { key: 'task', label: 'Task', is_builtin: true, is_container: false, is_task_like: true },
-  { key: 'identity', label: 'Identity', is_builtin: true },
-  { key: 'goal', label: 'Goal', is_builtin: true },
-  { key: 'label', label: 'Label', is_builtin: true },
-  { key: 'topic', label: 'Topic', is_builtin: false, is_container: true, is_task_like: false, color: '#f59e0b' },
-  { key: 'ticket', label: 'Ticket', is_builtin: false, is_container: false, is_task_like: true, color: '#22d3ee' },
-  { key: 'note', label: 'Note', is_builtin: false, is_container: false, is_task_like: false, color: '#a3e635' },
+  // roles is the canonical capability surface (ADR-0040); NodeTypeOut no longer
+  // ships is_container/is_task_like booleans, so fixtures must use roles too.
+  { key: 'project', label: 'Project', is_builtin: true, roles: ['container', 'shareable', 'subscribable'] },
+  { key: 'task', label: 'Task', is_builtin: true, roles: ['task'] },
+  { key: 'identity', label: 'Identity', is_builtin: true, roles: ['shareable', 'subscribable'] },
+  { key: 'goal', label: 'Goal', is_builtin: true, roles: [] },
+  { key: 'label', label: 'Label', is_builtin: true, roles: [] },
+  { key: 'topic', label: 'Topic', is_builtin: false, roles: ['container'], color: '#f59e0b' },
+  { key: 'ticket', label: 'Ticket', is_builtin: false, roles: ['task'], color: '#22d3ee' },
+  { key: 'note', label: 'Note', is_builtin: false, roles: [], color: '#a3e635' },
 ]
 const edgeTypes = [
   { key: 'contains', label: 'Contains', is_builtin: true, is_containment: true },

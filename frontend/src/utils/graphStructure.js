@@ -1,5 +1,6 @@
 import { STATUS_COLOR } from '../constants/theme'
 import { taskRisk } from './structureMap'
+import { hasNodeRole } from '../constants/nodeRoles'
 
 // Full graph-native derivation for the structure map (ADR-0037): consumes the
 // raw /graph/map slice (with data) plus the type registries and produces the
@@ -19,8 +20,8 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
   const edges = slice?.edges || []
 
   const typeByKey = new Map(nodeTypes.map(nt => [nt.key, nt]))
-  const containerKeys = new Set(nodeTypes.filter(nt => nt.is_container).map(nt => nt.key))
-  const taskKeys = new Set(nodeTypes.filter(nt => nt.is_task_like).map(nt => nt.key))
+  const containerKeys = new Set(nodeTypes.filter(nt => hasNodeRole(nt, 'container')).map(nt => nt.key))
+  const taskKeys = new Set(nodeTypes.filter(nt => hasNodeRole(nt, 'task')).map(nt => nt.key))
   const containmentRels = new Set(edgeTypes.filter(et => et.is_containment).map(et => et.key))
   const customRels = new Map(
     edgeTypes

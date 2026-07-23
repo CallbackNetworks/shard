@@ -7,13 +7,14 @@ import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
 import { useUiPrefs } from '../utils/uiPrefs'
 import { getNodeTypes } from '../api/client'
+import { hasNodeRole } from '../constants/nodeRoles'
 
 // Registry-driven nav group (ADR-0037): one entry per user-defined container
 // type, landing on its node listing. Individual nodes never enter the rail.
 function ContainerTypesRail({ isActive }) {
   const { t } = useTranslation()
   const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
-  const containerTypes = nodeTypes.filter(nt => nt.is_container && !nt.is_builtin)
+  const containerTypes = nodeTypes.filter(nt => hasNodeRole(nt, 'container') && !nt.is_builtin)
   if (containerTypes.length === 0) return null
 
   return (

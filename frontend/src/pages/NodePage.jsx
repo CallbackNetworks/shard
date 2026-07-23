@@ -10,6 +10,7 @@ import {
 import { DARK, STATUS_COLOR } from '../constants/theme'
 import NodeCombobox from '../components/shared/NodeCombobox'
 import EmptyState from '../components/shared/EmptyState'
+import { hasNodeRole } from '../constants/nodeRoles'
 
 // Universal node page (ADR-0037): one URL per node, edges grouped by rel_type
 // and direction, neighbors navigable, provenance at the bottom.
@@ -18,7 +19,7 @@ function nodeHref(ref, typeByKey) {
   // Entity types with a richer dedicated page keep it; custom containers get
   // the container view; everything else lands on the node page.
   if (ref.type === 'project') return `/projects/${ref.id}`
-  if (typeByKey?.get(ref.type)?.is_container) return `/c/${ref.id}`
+  if (hasNodeRole(typeByKey?.get(ref.type), 'container')) return `/c/${ref.id}`
   return `/n/${ref.id}`
 }
 
@@ -207,7 +208,7 @@ export default function NodePage() {
               </button>
             </>
           )}
-          {typeMeta?.is_container && node.type !== 'project' && (
+          {hasNodeRole(typeMeta, 'container') && node.type !== 'project' && (
             <button
               className="kt-btn"
               onClick={() => navigate(`/c/${id}`)}
