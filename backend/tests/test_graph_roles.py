@@ -24,7 +24,7 @@ def test_role_key_helpers(db):
 
 def test_builtin_containment_unchanged(client, sample_project, db):
     # A task under a project resolves its project via the container role.
-    task = client.post(f"/api/projects/{sample_project.id}/tasks", json={"title": "T"}).json()
+    task = client.post("/api/nodes", json={"type": "task", "container_id": sample_project.id, "title": "T"}).json()
     assert sample_project.id in graph.member_project_ids(db, task["id"])
     assert task["id"] in graph.contained_task_ids(db, sample_project.id)
 

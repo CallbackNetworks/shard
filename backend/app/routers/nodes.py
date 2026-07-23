@@ -112,21 +112,26 @@ def _node_write_out(db: Session, node: Node):
 async def create_node(body: NodeCreate, db: Session = Depends(get_db)):
     if db.get(NodeType, body.type) is None:
         raise HTTPException(status_code=422, detail=f"unknown node type '{body.type}'")
+    container_id, parent_id = body.container_id, body.parent_id
+    # Validate containment hints before creating anything (a bogus id must not mint a
+    # phantom node / dangling edge). Mirrors the retired task route's 404 contract.
+    if container_id is not None and db.get(Node, container_id) is None:
+        raise HTTPException(status_code=404, detail="Container not found")
+    if parent_id is not None:
+        parent = graph.get_task(db, parent_id)
+        in_scope = container_id is None or parent_id in graph.contained_task_ids(db, container_id)
+        if parent is None or not in_scope:
+            raise HTTPException(status_code=404, detail="Parent task not found")
     fields = body.model_dump(exclude={"type", "title", "data", "container_id", "parent_id"}, exclude_none=True)
     if body.data:
         fields.update(body.data)
     node = graph.create_node(db, body.type, title=body.title, **fields)
     # Establish containment before dispatch so the task pipeline can resolve the
-    # node's project (nearest container ancestor) for activity/notifications.
-    for container_id in (body.container_id, body.parent_id):
-        if container_id is None:
-            continue
-        if db.get(Node, container_id) is None:
-            raise HTTPException(status_code=422, detail=f"container node '{container_id}' not found")
-        try:
-            graph.add_edge(db, container_id, node.id, graph.REL_CONTAINS)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # node's project (nearest container ancestor) for activity/notifications. A
+    # subtask gets both a container and a parent ``contains`` edge (ADR-0032).
+    for edge_source in (container_id, parent_id):
+        if edge_source is not None:
+            graph.add_edge(db, edge_source, node.id, graph.REL_CONTAINS)
     # Role-driven reactions live below the endpoint now (ADR-0040): a task written
     # here runs the same pipeline as one written via the retired /projects/{id}/tasks.
     await dispatch_node_created(db, node)
@@ -151,9 +156,14 @@ async def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_
     data = fields.pop("data", None)
     if data is not None:
         fields.update(data)
-    # Re-parenting is a graph move, not a column write (ADR-0032/0040).
+    # Re-parenting is a graph move, not a column write (ADR-0032/0040): the new parent
+    # must be a task in the same project (404) and must not close a cycle (400).
     new_parent_id = fields.pop("parent_id", None)
     if new_parent_id is not None and node.type in graph.task_type_keys(db):
+        project_id = graph.project_id_of_task(db, node_id)
+        parent = graph.get_task(db, new_parent_id)
+        if parent is None or (project_id and new_parent_id not in graph.contained_task_ids(db, project_id)):
+            raise HTTPException(status_code=404, detail="Parent task not found")
         try:
             graph.set_parent_task(db, node_id, new_parent_id)
         except ValueError as exc:

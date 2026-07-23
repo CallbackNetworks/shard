@@ -6,7 +6,7 @@ def _make_project(client, name):
 
 
 def _make_task(client, project_id, title):
-    return client.post(f"/api/projects/{project_id}/tasks", json={"title": title}).json()["id"]
+    return client.post("/api/nodes", json={"type": "task", "container_id": project_id, "title": title}).json()["id"]
 
 
 def test_add_membership_surfaces_task_in_both_projects(client):

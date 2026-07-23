@@ -298,9 +298,7 @@ def test_task_create_via_nodes_with_parent_is_subtask(client, sample_project, db
     parent = client.post(
         "/api/nodes", json={"type": "task", "title": "Parent", "container_id": sample_project.id}
     ).json()
-    child = client.post(
-        "/api/nodes", json={"type": "task", "title": "Child", "parent_id": parent["id"]}
-    ).json()
+    child = client.post("/api/nodes", json={"type": "task", "title": "Child", "parent_id": parent["id"]}).json()
     assert child["parent_id"] == parent["id"]
     assert child["id"] in graph.contained_task_ids(db, parent["id"])
 
@@ -313,9 +311,9 @@ def test_task_reparent_via_nodes_patch(client, sample_project):
     assert r.json()["parent_id"] == a["id"]
 
 
-def test_task_create_via_nodes_unknown_container_422(client):
+def test_task_create_via_nodes_unknown_container_404(client):
     r = client.post("/api/nodes", json={"type": "task", "title": "X", "container_id": "nope"})
-    assert r.status_code == 422
+    assert r.status_code == 404
 
 
 def test_task_delete_via_nodes_cleans_subtree(client, db):

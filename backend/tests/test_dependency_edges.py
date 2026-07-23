@@ -4,7 +4,7 @@ from app.services import graph
 
 
 def _task(client, pid, title):
-    return client.post(f"/api/projects/{pid}/tasks", json={"title": title}).json()["id"]
+    return client.post("/api/nodes", json={"type": "task", "container_id": pid, "title": title}).json()["id"]
 
 
 def test_dependency_creates_and_removes_edge(client, db, sample_project):

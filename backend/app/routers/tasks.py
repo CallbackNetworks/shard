@@ -6,14 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Node
-from app.routers.deps import get_parent_task_or_error, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
+from app.routers.deps import get_task_or_404
 from app.routers.issue_sync import create_external_issue_from_task
-from app.schemas import ReorderRequest, TaskCreate, TaskOut, TaskUpdate, TaskWithSubtasksOut
+from app.schemas import ReorderRequest, TaskOut, TaskWithSubtasksOut
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.enrichment import enrich_task
-from app.services.task_mutations import AgentKeyError, apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["tasks"])
@@ -72,53 +71,11 @@ def list_tasks(
     return result
 
 
-@router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
-async def create_task(project_id: str, body: TaskCreate, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    if body.parent_id is not None:
-        get_parent_task_or_error(db, project_id, body.parent_id)
-    task = graph.create_task(db, project_id=project_id, **body.model_dump())
-    task = await finalize_task_create(db, task.id, actor=body.assignee, source="web", project_id=project_id)
-    return enrich_task(task, db)
-
-
-@router.patch("/{task_id}", response_model=TaskOut)
-async def update_task(project_id: str, task_id: str, body: TaskUpdate, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    get_task_or_404(task_id, db, project_id=project_id)
-
-    changes = body.model_dump(exclude_none=True)
-
-    # Re-parenting is a graph move, not a column write (ADR-0032): swap the
-    # incoming task->task contains edge.
-    new_parent_id = changes.pop("parent_id", None)
-    if new_parent_id is not None:
-        get_parent_task_or_error(db, project_id, new_parent_id, child_id=task_id)
-        graph.set_parent_task(db, task_id, new_parent_id)
-
-    try:
-        task = await apply_task_update(db, task_id, changes, source="web", project_id=project_id)
-    except AgentKeyError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return enrich_task(task, db)
-
-
-@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(project_id: str, task_id: str, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    task = get_task_or_404(task_id, db, project_id=project_id)
-    log_activity(
-        db,
-        "task.deleted",
-        project_id=project_id,
-        task_id=task_id,
-        actor=task.assignee,
-        detail=f'Task "{task.title}" deleted',
-        meta={"title": task.title},
-    )
-    graph.delete_task_tree(db, task.id)
-    db.commit()
-    await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": task_id})
+# Task create/patch/delete are retired (ADR-0040 stage 3c): the single graph write
+# surface ``/api/nodes`` (POST with type="task" + container_id/parent_id; PATCH /{id};
+# DELETE /{id}) is now the canonical entry. This router keeps task *reads* and the
+# task-scoped *sub-resources* (dependencies, memberships, reorder, external issue,
+# regenerate-token, comments/labels/cycles/recurrence/attachments) below.
 
 
 class CreateExternalIssueBody(BaseModel):

@@ -17,7 +17,7 @@ def _project(client, name="P"):
 
 def test_bulk_remove_label_clears_labeled_edge(client, db):
     pid = _project(client)
-    tid = client.post(f"/api/projects/{pid}/tasks", json={"title": "t"}).json()["id"]
+    tid = client.post("/api/nodes", json={"type": "task", "container_id": pid, "title": "t"}).json()["id"]
     lid = client.post(f"/api/projects/{pid}/labels", json={"name": "bug"}).json()["id"]
 
     # Attach via bulk-update, then confirm the mirror edge exists.
@@ -46,7 +46,7 @@ def test_bulk_update_runs_workflow_rules(client, db):
     from app.models import ActivityLog, WorkflowRule
 
     pid = _project(client)
-    tid = client.post(f"/api/projects/{pid}/tasks", json={"title": "bulk rules"}).json()["id"]
+    tid = client.post("/api/nodes", json={"type": "task", "container_id": pid, "title": "bulk rules"}).json()["id"]
     db.add(
         WorkflowRule(
             name="Escalate done tasks",

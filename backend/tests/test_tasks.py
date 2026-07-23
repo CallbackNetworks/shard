@@ -2,12 +2,27 @@ def _url(project_id, suffix=""):
     return f"/api/projects/{project_id}/tasks{suffix}"
 
 
+# Task writes go through the single graph write surface /api/nodes (ADR-0040 stage 3c);
+# the dedicated /projects/{id}/tasks create/patch/delete routes were retired. Reads,
+# reorder, dependencies, and regenerate-token stay on the task router (via ``_url``).
+def _create(client, project_id, **fields):
+    return client.post("/api/nodes", json={"type": "task", "container_id": project_id, **fields})
+
+
+def _patch(client, task_id, **fields):
+    return client.patch(f"/api/nodes/{task_id}", json=fields)
+
+
+def _delete(client, task_id):
+    return client.delete(f"/api/nodes/{task_id}")
+
+
 # --- 1. Create a task ---
 
 
 def test_create_task(client, sample_project):
     pid = sample_project.id
-    resp = client.post(_url(pid), json={"title": "My task"})
+    resp = _create(client, pid, title="My task")
     assert resp.status_code == 201
     data = resp.json()
     assert data["title"] == "My task"
@@ -18,10 +33,7 @@ def test_create_task(client, sample_project):
 
 
 def test_create_task_with_priority(client, sample_project):
-    resp = client.post(
-        _url(sample_project.id),
-        json={"title": "Urgent", "priority": "high"},
-    )
+    resp = _create(client, sample_project.id, title="Urgent", priority="high")
     assert resp.status_code == 201
     assert resp.json()["priority"] == "high"
 
@@ -37,8 +49,8 @@ def test_list_tasks_empty(client, sample_project):
 
 def test_list_tasks_with_data(client, sample_project):
     pid = sample_project.id
-    client.post(_url(pid), json={"title": "Task A"})
-    client.post(_url(pid), json={"title": "Task B"})
+    _create(client, pid, title="Task A")
+    _create(client, pid, title="Task B")
     resp = client.get(_url(pid))
     assert resp.status_code == 200
     titles = [t["title"] for t in resp.json()]
@@ -51,10 +63,9 @@ def test_list_tasks_with_data(client, sample_project):
 
 def test_list_tasks_status_filter(client, sample_project):
     pid = sample_project.id
-    r1 = client.post(_url(pid), json={"title": "Todo task"})
-    tid = r1.json()["id"]
-    client.patch(_url(pid, f"/{tid}"), json={"status": "done"})
-    client.post(_url(pid), json={"title": "Still todo"})
+    tid = _create(client, pid, title="Todo task").json()["id"]
+    _patch(client, tid, status="done")
+    _create(client, pid, title="Still todo")
 
     resp = client.get(_url(pid), params={"status": "done"})
     assert resp.status_code == 200
@@ -68,26 +79,21 @@ def test_list_tasks_status_filter(client, sample_project):
 
 
 def test_update_task_status(client, sample_project):
-    pid = sample_project.id
-    tid = client.post(_url(pid), json={"title": "WIP"}).json()["id"]
-    resp = client.patch(_url(pid, f"/{tid}"), json={"status": "in_progress"})
+    tid = _create(client, sample_project.id, title="WIP").json()["id"]
+    resp = _patch(client, tid, status="in_progress")
     assert resp.status_code == 200
     assert resp.json()["status"] == "in_progress"
 
 
 def test_update_task_priority(client, sample_project):
-    pid = sample_project.id
-    tid = client.post(_url(pid), json={"title": "Low prio"}).json()["id"]
-    resp = client.patch(_url(pid, f"/{tid}"), json={"priority": "high"})
+    tid = _create(client, sample_project.id, title="Low prio").json()["id"]
+    resp = _patch(client, tid, priority="high")
     assert resp.status_code == 200
     assert resp.json()["priority"] == "high"
 
 
 def test_update_task_not_found(client, sample_project):
-    resp = client.patch(
-        _url(sample_project.id, "/nonexistent-id"),
-        json={"title": "Nope"},
-    )
+    resp = _patch(client, "nonexistent-id", title="Nope")
     assert resp.status_code == 404
 
 
@@ -96,8 +102,8 @@ def test_update_task_not_found(client, sample_project):
 
 def test_delete_task(client, sample_project):
     pid = sample_project.id
-    tid = client.post(_url(pid), json={"title": "To delete"}).json()["id"]
-    resp = client.delete(_url(pid, f"/{tid}"))
+    tid = _create(client, pid, title="To delete").json()["id"]
+    resp = _delete(client, tid)
     assert resp.status_code == 204
 
     # Confirm it is gone
@@ -106,7 +112,7 @@ def test_delete_task(client, sample_project):
 
 
 def test_delete_task_not_found(client, sample_project):
-    resp = client.delete(_url(sample_project.id, "/nonexistent-id"))
+    resp = _delete(client, "nonexistent-id")
     assert resp.status_code == 404
 
 
@@ -115,33 +121,30 @@ def test_delete_task_not_found(client, sample_project):
 
 def test_create_subtask(client, sample_project):
     pid = sample_project.id
-    parent_id = client.post(_url(pid), json={"title": "Parent"}).json()["id"]
-    resp = client.post(
-        _url(pid),
-        json={"title": "Child", "parent_id": parent_id},
-    )
+    parent_id = _create(client, pid, title="Parent").json()["id"]
+    resp = _create(client, pid, title="Child", parent_id=parent_id)
     assert resp.status_code == 201
     assert resp.json()["parent_id"] == parent_id
 
 
 def test_create_subtask_with_unknown_parent_rejected(client, sample_project):
-    resp = client.post(_url(sample_project.id), json={"title": "Orphan", "parent_id": "no-such-task"})
+    resp = _create(client, sample_project.id, title="Orphan", parent_id="no-such-task")
     assert resp.status_code == 404
 
 
 def test_reparent_task(client, sample_project):
     pid = sample_project.id
-    a = client.post(_url(pid), json={"title": "A"}).json()["id"]
-    b = client.post(_url(pid), json={"title": "B"}).json()["id"]
-    resp = client.patch(_url(pid, f"/{b}"), json={"parent_id": a})
+    a = _create(client, pid, title="A").json()["id"]
+    b = _create(client, pid, title="B").json()["id"]
+    resp = _patch(client, b, parent_id=a)
     assert resp.status_code == 200
     assert resp.json()["parent_id"] == a
 
 
 def test_reparent_to_unknown_parent_rejected(client, sample_project):
     pid = sample_project.id
-    a = client.post(_url(pid), json={"title": "A"}).json()["id"]
-    resp = client.patch(_url(pid, f"/{a}"), json={"parent_id": "no-such-task"})
+    a = _create(client, pid, title="A").json()["id"]
+    resp = _patch(client, a, parent_id="no-such-task")
     assert resp.status_code == 404
     # No dangling containment was left behind: the task is still top-level.
     listed = {t["id"]: t for t in client.get(_url(pid)).json()}
@@ -150,21 +153,21 @@ def test_reparent_to_unknown_parent_rejected(client, sample_project):
 
 def test_reparent_cycle_rejected(client, sample_project):
     pid = sample_project.id
-    a = client.post(_url(pid), json={"title": "A"}).json()["id"]
-    b = client.post(_url(pid), json={"title": "B", "parent_id": a}).json()["id"]
+    a = _create(client, pid, title="A").json()["id"]
+    b = _create(client, pid, title="B", parent_id=a).json()["id"]
     # A under its own subtask B would close a containment loop.
-    resp = client.patch(_url(pid, f"/{a}"), json={"parent_id": b})
+    resp = _patch(client, a, parent_id=b)
     assert resp.status_code == 400
     # Self-parenting is a cycle too.
-    resp = client.patch(_url(pid, f"/{a}"), json={"parent_id": a})
+    resp = _patch(client, a, parent_id=a)
     assert resp.status_code == 400
 
 
 def test_reparent_to_parent_in_other_project_rejected(client, sample_project):
     other = client.post("/api/projects", json={"name": "Other"}).json()["id"]
-    foreign_parent = client.post(_url(other), json={"title": "Foreign"}).json()["id"]
-    a = client.post(_url(sample_project.id), json={"title": "A"}).json()["id"]
-    resp = client.patch(_url(sample_project.id, f"/{a}"), json={"parent_id": foreign_parent})
+    foreign_parent = _create(client, other, title="Foreign").json()["id"]
+    a = _create(client, sample_project.id, title="A").json()["id"]
+    resp = _patch(client, a, parent_id=foreign_parent)
     assert resp.status_code == 404
 
 
@@ -173,8 +176,8 @@ def test_reparent_to_parent_in_other_project_rejected(client, sample_project):
 
 def test_add_and_remove_dependency(client, sample_project):
     pid = sample_project.id
-    t1 = client.post(_url(pid), json={"title": "Blocker"}).json()["id"]
-    t2 = client.post(_url(pid), json={"title": "Blocked"}).json()["id"]
+    t1 = _create(client, pid, title="Blocker").json()["id"]
+    t2 = _create(client, pid, title="Blocked").json()["id"]
 
     # Add dependency: t2 depends on t1
     resp = client.post(_url(pid, f"/{t2}/dependencies/{t1}"))
@@ -193,7 +196,7 @@ def test_add_and_remove_dependency(client, sample_project):
 
 def test_self_dependency_rejected(client, sample_project):
     pid = sample_project.id
-    tid = client.post(_url(pid), json={"title": "Self ref"}).json()["id"]
+    tid = _create(client, pid, title="Self ref").json()["id"]
     resp = client.post(_url(pid, f"/{tid}/dependencies/{tid}"))
     assert resp.status_code == 400
     assert "itself" in resp.json()["detail"].lower()
@@ -204,9 +207,9 @@ def test_self_dependency_rejected(client, sample_project):
 
 def test_reorder_tasks(client, sample_project):
     pid = sample_project.id
-    t1 = client.post(_url(pid), json={"title": "First"}).json()["id"]
-    t2 = client.post(_url(pid), json={"title": "Second"}).json()["id"]
-    t3 = client.post(_url(pid), json={"title": "Third"}).json()["id"]
+    t1 = _create(client, pid, title="First").json()["id"]
+    t2 = _create(client, pid, title="Second").json()["id"]
+    t3 = _create(client, pid, title="Third").json()["id"]
 
     # Reverse the order
     resp = client.post(_url(pid, "/reorder"), json={"task_ids": [t3, t2, t1]})
@@ -222,7 +225,7 @@ def test_reorder_tasks(client, sample_project):
 
 def test_regenerate_callback_token(client, sample_project):
     pid = sample_project.id
-    task = client.post(_url(pid), json={"title": "Token task"}).json()
+    task = _create(client, pid, title="Token task").json()
     old_token = task["callback_token"]
 
     resp = client.post(_url(pid, f"/{task['id']}/regenerate-token"))
@@ -245,8 +248,8 @@ def test_web_status_done_fires_status_events(client, sample_project, monkeypatch
 
     monkeypatch.setattr(task_mutations, "fire_notifications", fake_notify)
     pid = sample_project.id
-    tid = client.post(_url(pid), json={"title": "Only task"}).json()["id"]
-    resp = client.patch(_url(pid, f"/{tid}"), json={"status": "done"})
+    tid = _create(client, pid, title="Only task").json()["id"]
+    resp = _patch(client, tid, status="done")
     assert resp.status_code == 200
     assert "task.status_changed" in events
     assert "task.done" in events
@@ -254,8 +257,7 @@ def test_web_status_done_fires_status_events(client, sample_project, monkeypatch
 
 
 def test_web_update_rejects_bad_agent_key(client, sample_project):
-    pid = sample_project.id
-    tid = client.post(_url(pid), json={"title": "Agent task"}).json()["id"]
-    resp = client.patch(_url(pid, f"/{tid}"), json={"assigned_agent_key_id": "missing"})
+    tid = _create(client, sample_project.id, title="Agent task").json()["id"]
+    resp = _patch(client, tid, assigned_agent_key_id="missing")
     assert resp.status_code == 400
     assert "not found" in resp.json()["detail"]

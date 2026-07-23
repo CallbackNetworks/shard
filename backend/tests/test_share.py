@@ -199,7 +199,7 @@ def test_task_note_attributed_inside_share_scope(client, db, sample_project):
     db.add(other)
     db.commit()
     # The task originates in the unshared project, then is linked into the shared one.
-    tid = client.post(f"/api/projects/{other.id}/tasks", json={"title": "Cross"}).json()["id"]
+    tid = client.post("/api/nodes", json={"type": "task", "container_id": other.id, "title": "Cross"}).json()["id"]
     client.post(f"/api/projects/{other.id}/tasks/{tid}/memberships/{sample_project.id}")
 
     resp = client.post(

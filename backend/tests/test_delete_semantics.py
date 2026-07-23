@@ -14,10 +14,10 @@ def _project(client, name):
 
 
 def _task(client, project_id, title, parent_id=None):
-    body = {"title": title}
+    body = {"type": "task", "title": title, "container_id": project_id}
     if parent_id:
         body["parent_id"] = parent_id
-    return client.post(f"/api/projects/{project_id}/tasks", json=body).json()["id"]
+    return client.post("/api/nodes", json=body).json()["id"]
 
 
 def test_delete_task_cascades_subtasks(client, db):
@@ -26,7 +26,7 @@ def test_delete_task_cascades_subtasks(client, db):
     sub = _task(client, p, "sub", parent_id=parent)
     subsub = _task(client, p, "subsub", parent_id=sub)
 
-    assert client.delete(f"/api/projects/{p}/tasks/{parent}").status_code == 204
+    assert client.delete(f"/api/nodes/{parent}").status_code == 204
 
     # The whole subtree is gone.
     assert db.get(Node, parent) is None
@@ -108,7 +108,7 @@ def test_delete_task_keeps_subtask_shared_with_another_project(client, db):
     sub = _task(client, a, "sub", parent_id=parent)
     assert client.post(f"/api/projects/{a}/tasks/{sub}/memberships/{b}").status_code == 201
 
-    assert client.delete(f"/api/projects/{a}/tasks/{parent}").status_code == 204
+    assert client.delete(f"/api/nodes/{parent}").status_code == 204
 
     # The shared subtask survives in B and fully leaves the deleted tree's project.
     assert db.get(Node, parent) is None

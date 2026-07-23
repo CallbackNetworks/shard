@@ -136,7 +136,7 @@ def test_custom_container_surfaces_in_container_ids_not_project_ids(client, db, 
     # never leaks into project_ids (ADR-0034), so the frontend won't 404.
     client.post("/api/graph-types/nodes", json={"key": "workspace", "label": "Workspace", "roles": ["container"]})
     ws = graph.create_node(db, "workspace", title="WS")
-    task = client.post(f"/api/projects/{sample_project.id}/tasks", json={"title": "T"}).json()
+    task = client.post("/api/nodes", json={"type": "task", "container_id": sample_project.id, "title": "T"}).json()
     graph.add_edge(db, ws.id, task["id"], graph.REL_CONTAINS)
     db.commit()
 
