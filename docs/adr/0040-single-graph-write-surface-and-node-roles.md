@@ -19,11 +19,21 @@ Accepted
          graph-types 表單送 roles、徽章與路由皆由 roles 推導。
        3b(已完成 2026-07-22):移除後端 is_* 相容層——NodeType 僅存 `roles` 欄 + `has_role`,
          schema/router 只認 roles,刪除 LEGACY_ROLE_FLAGS。roles 成為端到端唯一表面。
-       3c(待辦,本 ADR 最大且風險最高的剩項):裁撤內部富寫入路由
-         (`/api/projects/{id}/tasks` create/patch/delete、goals/identities/bulk/imports 寫入),
-         前端寫入改走 `/api/nodes` 核心。注意:分叉/靜默降級問題已於階段 1 消除,此步純為
-         表面收斂;需通用端點回傳 enriched TaskOut + 建立 containment 邊,並重寫大量前端寫入
-         呼叫與測試,應逐一路由、每步獨立驗證。 -->
+       3c(進行中,逐一路由):
+         3c-1(已完成 2026-07-22):`/api/nodes` 擴為 task 寫入超集——create 收
+           container_id/parent_id(原子建立 containment 邊)、patch 收 parent_id(圖搬移),
+           task-role 節點回傳 enriched TaskOut。純加法,零破壞。
+         3c-2(已完成 2026-07-22):前端 createTask/updateTask/deleteTask 改走 `/api/nodes`
+           (簽名不變,8 個 caller 元件無需改)。NodeCreate/Update 接受額外欄位折入 data。
+         3c-3(已完成 2026-07-22):裁撤 `/api/projects/{id}/tasks` create/patch/delete
+           (parent/container 存在性 404、同專案 parent、cycle 400 守則已下沉至通用端點);
+           reads 與子資源(deps/memberships/reorder/external-issue/regenerate-token)保留;
+           遷移約 60 個後端測試呼叫點。live 煙測:舊路由 405、`/api/nodes` 回傳 enriched。
+         3c-4(改列入 ADR-0041):goals / identities / bulk / imports 寫入的裁撤,取決於各自
+           的**專屬建立邏輯**先行 role 化——goal 的 project↔goal `part_of` 連結與進度 enrich、
+           identity 的 share-facade 預設、bulk/imports 的批次語意,無法在不把實體知識塞進通用端點
+           或不損既有行為的前提下乾淨收斂。task 是 ADR 明定的「乾淨 node+role 範例」,已完成即
+           達成單一寫入面的核心目標;其餘實體隨 ADR-0041 的 goal/decision role 化一併處理。 -->
 
 
 ## Date
