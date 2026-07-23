@@ -161,8 +161,7 @@ def test_node_feed_serves_custom_subscribable_container(client, db):
     from app.models import NodeType
     from app.services import graph
 
-    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
-                    is_container=True, is_subscribable=True))
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False, roles=["container", "subscribable"]))
     db.commit()
     topic = graph.create_node(db, "topic", title="Launch", status="active", share_token="tok-cal")
     due = datetime.now(UTC) + timedelta(days=1)

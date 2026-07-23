@@ -963,15 +963,9 @@ class NodeTypeCreate(BaseModel):
     label: str
     icon: str | None = None
     color: str | None = None
-    # ADR-0040: capabilities are a roles set. The four booleans below are accepted as
-    # compat aliases (folded into ``roles`` by the router) so existing clients keep
-    # working; ``roles`` is canonical. container=ADR-0034, task=ADR-0035, shareable /
-    # subscribable=ADR-0039.
+    # ADR-0040: capabilities are a roles set (container/task/shareable/subscribable),
+    # replacing the four former booleans.
     roles: list[str] | None = None
-    is_container: bool = False
-    is_task_like: bool = False
-    is_shareable: bool = False
-    is_subscribable: bool = False
     data: dict | None = None
 
     @field_validator("key")
@@ -984,13 +978,9 @@ class NodeTypeUpdate(BaseModel):
     label: str | None = None
     icon: str | None = None
     color: str | None = None
-    # ADR-0040: ``roles`` replaces the set outright; the booleans (if sent) toggle a
-    # single role on/off. Built-in types reject container/task changes (router guard).
+    # ADR-0040: ``roles`` replaces the set outright. Built-in types reject container/
+    # task changes (router guard).
     roles: list[str] | None = None
-    is_container: bool | None = None
-    is_task_like: bool | None = None
-    is_shareable: bool | None = None
-    is_subscribable: bool | None = None
     data: dict | None = None
 
 
@@ -1002,13 +992,7 @@ class NodeTypeOut(BaseModel):
     icon: str | None = None
     color: str | None = None
     is_builtin: bool
-    # ADR-0040: ``roles`` is canonical; the booleans are derived compat views read off
-    # the model's properties (kept until the frontend migrates in ADR-0040 stage 3).
     roles: list[str] = []
-    is_container: bool = False
-    is_task_like: bool = False
-    is_shareable: bool = False
-    is_subscribable: bool = False
     data: dict | None = None
     usage_count: int = 0
 

@@ -29,32 +29,6 @@ router = APIRouter(prefix="/graph-types", tags=["graph-types"])
 _IMMUTABLE_BUILTIN_ROLES = {graph.ROLE_CONTAINER, graph.ROLE_TASK}
 
 
-def _create_roles(body: NodeTypeCreate) -> list[str]:
-    """Roles for a new type: explicit ``roles`` plus any legacy boolean set to True.
-
-    On create the compat booleans only *add* (a default ``False`` is a no-op), so an
-    explicit ``roles`` list is never clobbered by an unsent flag (ADR-0040).
-    """
-    roles = set(body.roles or [])
-    for flag, role in graph.LEGACY_ROLE_FLAGS.items():
-        if getattr(body, flag):
-            roles.add(role)
-    return sorted(roles)
-
-
-def _updated_roles(current: list | None, fields: dict) -> list[str]:
-    """Resolve the new role set from an update payload (ADR-0040).
-
-    ``roles`` (if sent) replaces outright; each sent boolean then toggles one role
-    on/off. ``fields`` is ``model_dump(exclude_unset=True)`` so only sent keys apply.
-    """
-    roles = set(fields["roles"]) if "roles" in fields else set(current or [])
-    for flag, role in graph.LEGACY_ROLE_FLAGS.items():
-        if flag in fields:
-            roles.add(role) if fields[flag] else roles.discard(role)
-    return sorted(roles)
-
-
 # --- Node types --------------------------------------------------------------
 
 
@@ -78,7 +52,7 @@ def create_node_type(body: NodeTypeCreate, db: Session = Depends(get_db)):
         icon=body.icon,
         color=body.color,
         data=body.data,
-        roles=_create_roles(body) or None,
+        roles=sorted(set(body.roles)) if body.roles else None,
     )
     db.add(nt)
     db.commit()
@@ -92,20 +66,18 @@ def update_node_type(key: str, body: NodeTypeUpdate, db: Session = Depends(get_d
     if nt is None:
         raise HTTPException(status_code=404, detail="node type not found")
     fields = body.model_dump(exclude_unset=True)
-    role_keys = {"roles", *graph.LEGACY_ROLE_FLAGS}
-    if role_keys & fields.keys():
-        new_roles = _updated_roles(nt.roles, fields)
+    if "roles" in fields:
+        new_roles = set(fields.pop("roles") or [])
         # Built-in container/task membership is immutable (ADR-0034/0035): reject a
-        # change to those roles, whether sent as `roles` or a legacy boolean.
+        # change to those roles.
         if nt.is_builtin and (
             {r for r in new_roles if r in _IMMUTABLE_BUILTIN_ROLES}
             != {r for r in (nt.roles or []) if r in _IMMUTABLE_BUILTIN_ROLES}
         ):
             raise HTTPException(status_code=400, detail="cannot change roles of a built-in node type")
-        nt.roles = new_roles or None
+        nt.roles = sorted(new_roles) or None
     for field, value in fields.items():
-        if field not in role_keys:
-            setattr(nt, field, value)
+        setattr(nt, field, value)
     db.commit()
     db.refresh(nt)
     return nt

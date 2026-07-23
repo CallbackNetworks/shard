@@ -109,7 +109,7 @@ def test_contained_tasks_for_custom_container(client, sample_project, db):
     """ADR-0037: a custom container lists its contained tasks enriched like a project."""
     from tests.factories import make_task
 
-    client.post("/api/graph-types/nodes", json={"key": "area", "label": "Area", "is_container": True})
+    client.post("/api/graph-types/nodes", json={"key": "area", "label": "Area", "roles": ["container"]})
     task = make_task(db, project_id=sample_project.id, title="In area")
     db.commit()
     area = client.post("/api/nodes", json={"type": "area", "title": "Q3"}).json()
@@ -216,7 +216,7 @@ def test_detach_edge(client, topic_type):
 def shareable_topic(client):
     client.post(
         "/api/graph-types/nodes",
-        json={"key": "topic", "label": "Topic", "is_container": True, "is_shareable": True},
+        json={"key": "topic", "label": "Topic", "roles": ["container", "shareable"]},
     )
     return client.post("/api/nodes", json={"type": "topic", "title": "Launch"}).json()
 

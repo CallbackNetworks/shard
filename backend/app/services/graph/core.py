@@ -41,16 +41,6 @@ ROLE_TASK = "task"  # plays the task/subtask role
 ROLE_SHAREABLE = "shareable"  # can mint a public share facade
 ROLE_SUBSCRIBABLE = "subscribable"  # can expose an iCal feed
 
-# Legacy capability booleans -> role names. Kept for the compat input on the
-# graph-types API (frontend/tests still send ``is_container`` etc.); the DB stores
-# only ``roles`` now.
-LEGACY_ROLE_FLAGS = {
-    "is_container": ROLE_CONTAINER,
-    "is_task_like": ROLE_TASK,
-    "is_shareable": ROLE_SHAREABLE,
-    "is_subscribable": ROLE_SUBSCRIBABLE,
-}
-
 
 def has_role(db: Session, type_key: str, role: str) -> bool:
     """Whether the node type ``type_key`` carries ``role`` (ADR-0040).

@@ -85,59 +85,56 @@ def test_delete_node_type_in_use_conflict(client, db):
 
 
 def test_create_custom_container_type(client):
-    # ADR-0034: is_container is now user-settable on custom types.
-    r = client.post("/api/graph-types/nodes", json={"key": "workspace", "label": "Workspace", "is_container": True})
+    # ADR-0034/0040: the container role is user-settable on custom types via roles.
+    r = client.post("/api/graph-types/nodes", json={"key": "workspace", "label": "Workspace", "roles": ["container"]})
     assert r.status_code == 201
-    assert r.json()["is_container"] is True
+    assert r.json()["roles"] == ["container"]
     assert graph.NODE_PROJECT not in (r.json()["key"],)  # sanity: it's the custom key
     listed = next(t for t in client.get("/api/graph-types/nodes").json() if t["key"] == "workspace")
-    assert listed["is_container"] is True
+    assert "container" in listed["roles"]
 
 
 def test_toggle_container_role_on_custom_type(client):
     client.post("/api/graph-types/nodes", json={"key": "workspace", "label": "Workspace"})
-    r = client.patch("/api/graph-types/nodes/workspace", json={"is_container": True})
+    r = client.patch("/api/graph-types/nodes/workspace", json={"roles": ["container"]})
     assert r.status_code == 200
-    assert r.json()["is_container"] is True
+    assert r.json()["roles"] == ["container"]
 
 
 def test_cannot_change_role_of_builtin_type(client):
-    # Flipping project's is_container off would break compat project_ids (ADR-0034).
-    r = client.patch(f"/api/graph-types/nodes/{graph.NODE_PROJECT}", json={"is_container": False})
+    # Dropping project's container role would break compat project_ids (ADR-0034).
+    r = client.patch(f"/api/graph-types/nodes/{graph.NODE_PROJECT}", json={"roles": ["shareable"]})
     assert r.status_code == 400
     # And it stays a container.
     proj = next(t for t in client.get("/api/graph-types/nodes").json() if t["key"] == graph.NODE_PROJECT)
-    assert proj["is_container"] is True
+    assert "container" in proj["roles"]
 
 
 def test_custom_type_can_opt_into_capabilities(client):
-    # ADR-0039: is_shareable/is_subscribable are settable on a custom type, so a
+    # ADR-0039/0040: shareable/subscribable roles are settable on a custom type, so a
     # user "topic" gets the same share-facade / iCal capability as identity.
     r = client.post(
         "/api/graph-types/nodes",
-        json={"key": "topic", "label": "Topic", "is_shareable": True, "is_subscribable": True},
+        json={"key": "topic", "label": "Topic", "roles": ["shareable", "subscribable"]},
     )
     assert r.status_code == 201
-    assert r.json()["is_shareable"] is True
-    assert r.json()["is_subscribable"] is True
+    assert set(r.json()["roles"]) == {"shareable", "subscribable"}
     listed = next(t for t in client.get("/api/graph-types/nodes").json() if t["key"] == "topic")
-    assert listed["is_shareable"] is True
-    assert listed["is_subscribable"] is True
+    assert set(listed["roles"]) == {"shareable", "subscribable"}
 
 
 def test_toggle_capability_on_custom_type(client):
-    # Unlike the traversal roles, capabilities are also settable via PATCH.
+    # Capabilities are set via the roles set on PATCH.
     client.post("/api/graph-types/nodes", json={"key": "topic", "label": "Topic"})
-    r = client.patch("/api/graph-types/nodes/topic", json={"is_shareable": True})
+    r = client.patch("/api/graph-types/nodes/topic", json={"roles": ["shareable"]})
     assert r.status_code == 200
-    assert r.json()["is_shareable"] is True
-    assert r.json()["is_subscribable"] is False
+    assert r.json()["roles"] == ["shareable"]
 
 
 def test_custom_container_surfaces_in_container_ids_not_project_ids(client, db, sample_project):
     # End-to-end: a task under a user-defined container appears in container_ids but
     # never leaks into project_ids (ADR-0034), so the frontend won't 404.
-    client.post("/api/graph-types/nodes", json={"key": "workspace", "label": "Workspace", "is_container": True})
+    client.post("/api/graph-types/nodes", json={"key": "workspace", "label": "Workspace", "roles": ["container"]})
     ws = graph.create_node(db, "workspace", title="WS")
     task = client.post(f"/api/projects/{sample_project.id}/tasks", json={"title": "T"}).json()
     graph.add_edge(db, ws.id, task["id"], graph.REL_CONTAINS)
@@ -151,27 +148,27 @@ def test_custom_container_surfaces_in_container_ids_not_project_ids(client, db, 
 
 
 def test_create_custom_task_like_type(client):
-    # ADR-0035: is_task_like is now user-settable on custom types.
-    r = client.post("/api/graph-types/nodes", json={"key": "ticket", "label": "Ticket", "is_task_like": True})
+    # ADR-0035/0040: the task role is user-settable on custom types via roles.
+    r = client.post("/api/graph-types/nodes", json={"key": "ticket", "label": "Ticket", "roles": ["task"]})
     assert r.status_code == 201
-    assert r.json()["is_task_like"] is True
+    assert r.json()["roles"] == ["task"]
     listed = next(t for t in client.get("/api/graph-types/nodes").json() if t["key"] == "ticket")
-    assert listed["is_task_like"] is True
+    assert "task" in listed["roles"]
 
 
 def test_toggle_task_like_role_on_custom_type(client):
     client.post("/api/graph-types/nodes", json={"key": "ticket", "label": "Ticket"})
-    r = client.patch("/api/graph-types/nodes/ticket", json={"is_task_like": True})
+    r = client.patch("/api/graph-types/nodes/ticket", json={"roles": ["task"]})
     assert r.status_code == 200
-    assert r.json()["is_task_like"] is True
+    assert r.json()["roles"] == ["task"]
 
 
 def test_cannot_change_task_like_of_builtin_task(client):
-    # Flipping the built-in task's role would break the enrichment pipeline (ADR-0035).
-    r = client.patch(f"/api/graph-types/nodes/{graph.NODE_TASK}", json={"is_task_like": False})
+    # Dropping the built-in task's role would break the enrichment pipeline (ADR-0035).
+    r = client.patch(f"/api/graph-types/nodes/{graph.NODE_TASK}", json={"roles": []})
     assert r.status_code == 400
     task = next(t for t in client.get("/api/graph-types/nodes").json() if t["key"] == graph.NODE_TASK)
-    assert task["is_task_like"] is True
+    assert "task" in task["roles"]
 
 
 def test_create_and_delete_custom_edge_type(client):

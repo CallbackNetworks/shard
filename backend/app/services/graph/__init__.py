@@ -13,7 +13,6 @@ reaches labels/cycles via deferred imports.
 
 from app.services.graph.core import (
     _TASK_DATA_SCALARS,
-    LEGACY_ROLE_FLAGS,
     NODE_CYCLE,
     NODE_GOAL,
     NODE_IDENTITY,

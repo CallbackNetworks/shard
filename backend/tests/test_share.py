@@ -341,8 +341,7 @@ def test_share_node_serves_custom_shareable_container(client, db):
     from app.models import NodeType
     from app.services import graph
 
-    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
-                    is_container=True, is_shareable=True))
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False, roles=["container", "shareable"]))
     db.commit()
     topic = graph.create_node(db, "topic", title="Launch", status="active", share_token="tok-topic")
     task = make_task(db, title="Ship it", status="todo")
@@ -380,11 +379,11 @@ def test_share_node_pin_gate_and_verify(client, db):
     from app.services import graph
     from app.services.pin_utils import hash_pin
 
-    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
-                    is_container=True, is_shareable=True))
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False, roles=["container", "shareable"]))
     db.commit()
-    graph.create_node(db, "topic", title="Locked", status="active",
-                      share_token="tok-pin", share_pin_hash=hash_pin("2468"))
+    graph.create_node(
+        db, "topic", title="Locked", status="active", share_token="tok-pin", share_pin_hash=hash_pin("2468")
+    )
     db.commit()
 
     gated = client.get("/share/n/tok-pin")
@@ -401,8 +400,7 @@ def test_share_node_verify_without_pin_400(client, db):
     from app.models import NodeType
     from app.services import graph
 
-    db.add(NodeType(key="topic", label="Topic", is_builtin=False,
-                    is_container=True, is_shareable=True))
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False, roles=["container", "shareable"]))
     db.commit()
     graph.create_node(db, "topic", title="Open", status="active", share_token="tok-nopin")
     db.commit()

@@ -50,13 +50,13 @@ def test_seed_marks_capability_flags(db):
 
     for key in (graph.NODE_IDENTITY, graph.NODE_PROJECT):
         nt = db.get(NodeType, key)
-        assert nt.is_shareable is True, key
-        assert nt.is_subscribable is True, key
+        assert nt.has_role("shareable") is True, key
+        assert nt.has_role("subscribable") is True, key
 
     for key in (graph.NODE_TASK, graph.NODE_GOAL, graph.NODE_CYCLE, graph.NODE_LABEL):
         nt = db.get(NodeType, key)
-        assert nt.is_shareable is False, key
-        assert nt.is_subscribable is False, key
+        assert nt.has_role("shareable") is False, key
+        assert nt.has_role("subscribable") is False, key
 
 
 def test_seed_is_idempotent(db):
@@ -91,7 +91,7 @@ def test_find_node_by_share_token_spans_shareable_types(db):
     # A custom "topic" type opts into shareable; a topic node with a share_token
     # is then resolvable by the generic lookup, exactly like identity/project.
     seed_builtin_types(db)
-    db.add(NodeType(key="topic", label="Topic", is_builtin=False, is_shareable=True))
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False, roles=["shareable"]))
     db.commit()
     node = graph.create_node(db, "topic", title="Launch", share_token="tok-123")
     db.commit()
@@ -106,7 +106,7 @@ def test_find_node_by_share_token_spans_shareable_types(db):
 def test_find_node_by_share_token_ignores_non_shareable_types(db):
     # A token sitting on a non-shareable type's node must not resolve.
     seed_builtin_types(db)
-    db.add(NodeType(key="note", label="Note", is_builtin=False, is_shareable=False))
+    db.add(NodeType(key="note", label="Note", is_builtin=False, roles=[]))
     db.commit()
     graph.create_node(db, "note", title="Secret", share_token="tok-x")
     db.commit()

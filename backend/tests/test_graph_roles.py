@@ -1,8 +1,8 @@
-"""Tests for registry-driven traversal roles (ADR-0033 A5).
+"""Tests for registry-driven capability roles (ADR-0033 A5, ADR-0040).
 
 The leaf helpers in graph.py no longer hardcode ``n.type == NODE_TASK/PROJECT``;
-they read the ``is_container`` / ``is_task_like`` roles from the node_types
-registry. Built-in roles are seeded to match the previous behavior exactly.
+they read the ``container`` / ``task`` roles from the node_types registry's
+``roles`` set. Built-in roles are seeded to match the previous behavior exactly.
 """
 
 from app.models import Node, NodeType
@@ -10,11 +10,11 @@ from app.services import graph
 
 
 def test_builtin_roles_seeded(db):
-    assert db.get(NodeType, graph.NODE_PROJECT).is_container is True
-    assert db.get(NodeType, graph.NODE_TASK).is_task_like is True
+    assert db.get(NodeType, graph.NODE_PROJECT).has_role("container") is True
+    assert db.get(NodeType, graph.NODE_TASK).has_role("task") is True
     # Others carry neither role.
-    assert db.get(NodeType, graph.NODE_LABEL).is_container is False
-    assert db.get(NodeType, graph.NODE_LABEL).is_task_like is False
+    assert db.get(NodeType, graph.NODE_LABEL).has_role("container") is False
+    assert db.get(NodeType, graph.NODE_LABEL).has_role("task") is False
 
 
 def test_role_key_helpers(db):
@@ -31,7 +31,7 @@ def test_builtin_containment_unchanged(client, sample_project, db):
 
 def test_custom_task_like_type_participates(db):
     # Marking a custom type task-like makes the subtask helpers treat it as a task.
-    db.add(NodeType(key="ticket", label="Ticket", is_task_like=True))
+    db.add(NodeType(key="ticket", label="Ticket", roles=["task"]))
     db.commit()
     assert "ticket" in graph.task_type_keys(db)
 
@@ -57,7 +57,7 @@ def test_non_task_like_custom_type_not_a_subtask(db):
 
 def _custom_container_with_task(db, sample_project):
     """A task filed under BOTH a real project and a custom container type."""
-    db.add(NodeType(key="workspace", label="Workspace", is_container=True))
+    db.add(NodeType(key="workspace", label="Workspace", roles=["container"]))
     db.commit()
     ws = graph.create_node(db, "workspace", title="My workspace")
     task = graph.create_task(db, title="T", project_id=sample_project.id)
@@ -98,7 +98,7 @@ def test_enrich_task_exposes_container_ids_without_leaking(db, sample_project):
 def test_task_only_in_custom_container_reads_unfiled_projectwise(db):
     # A task under only a custom container has no literal project -> compat fields empty
     # (frontend treats it as unfiled, never 404s), but container_ids still exposes it.
-    db.add(NodeType(key="workspace", label="Workspace", is_container=True))
+    db.add(NodeType(key="workspace", label="Workspace", roles=["container"]))
     db.commit()
     ws = graph.create_node(db, "workspace", title="WS")
     task = graph.create_task(db, title="orphan-of-project")
@@ -125,7 +125,7 @@ def test_delete_project_keeps_task_alive_under_custom_container(db, sample_proje
 
 def _custom_task_node(db, sample_project):
     """A node of a user-defined task-like type, filed under a project (ADR-0035)."""
-    db.add(NodeType(key="ticket", label="Ticket", is_task_like=True))
+    db.add(NodeType(key="ticket", label="Ticket", roles=["task"]))
     db.commit()
     node = graph.create_node(db, "ticket", title="A ticket")
     graph.add_edge(db, sample_project.id, node.id, graph.REL_CONTAINS)
@@ -134,7 +134,7 @@ def _custom_task_node(db, sample_project):
 
 
 def test_task_like_node_gets_callback_token_on_create(db):
-    db.add(NodeType(key="ticket", label="Ticket", is_task_like=True))
+    db.add(NodeType(key="ticket", label="Ticket", roles=["task"]))
     db.commit()
     node = graph.create_node(db, "ticket", title="T")
     db.commit()
@@ -184,8 +184,8 @@ def test_task_like_node_deleted_with_project(db, sample_project):
 
 def test_node_type_out_exposes_roles(client):
     types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
-    assert types[graph.NODE_PROJECT]["is_container"] is True
-    assert types[graph.NODE_TASK]["is_task_like"] is True
+    assert "container" in types[graph.NODE_PROJECT]["roles"]
+    assert types[graph.NODE_TASK]["roles"] == ["task"]
 
 
 def test_top_level_task_filter_uses_role(db, sample_project):
@@ -202,33 +202,29 @@ def test_top_level_task_filter_uses_role(db, sample_project):
 # --- Roles set (ADR-0040) -----------------------------------------------------
 
 
-def test_legacy_boolean_input_folds_to_roles(client):
-    # The graph-types API still accepts the four legacy booleans; they fold into the
-    # canonical roles set so existing clients keep working (ADR-0040 compat).
+def test_create_type_with_roles(client):
+    # The graph-types API takes the canonical roles set (ADR-0040).
     r = client.post(
         "/api/graph-types/nodes",
-        json={"key": "area", "label": "Area", "is_container": True, "is_shareable": True},
+        json={"key": "area", "label": "Area", "roles": ["container", "shareable"]},
     )
     assert r.status_code == 201
-    body = r.json()
-    assert set(body["roles"]) == {"container", "shareable"}
-    assert body["is_container"] is True and body["is_shareable"] is True
-    assert body["is_task_like"] is False and body["is_subscribable"] is False
+    assert set(r.json()["roles"]) == {"container", "shareable"}
 
 
 def test_builtin_container_role_immutable_via_roles(client):
     # Dropping project's container role (sent as a roles set) is rejected — a built-in
-    # traversal role is frozen (ADR-0034/0035), whether toggled by boolean or roles.
+    # traversal role is frozen (ADR-0034/0035).
     r = client.patch("/api/graph-types/nodes/project", json={"roles": ["shareable"]})
     assert r.status_code == 400
 
 
 def test_builtin_capability_role_toggle_allowed(client):
-    # A cross-cutting capability (not container/task) may be toggled on a built-in.
-    r = client.patch("/api/graph-types/nodes/identity", json={"is_subscribable": False})
+    # A cross-cutting capability (not container/task) may be toggled on a built-in:
+    # identity keeps its shareable role but drops subscribable.
+    r = client.patch("/api/graph-types/nodes/identity", json={"roles": ["shareable"]})
     assert r.status_code == 200
-    assert r.json()["is_subscribable"] is False
-    assert r.json()["is_shareable"] is True  # untouched
+    assert r.json()["roles"] == ["shareable"]
 
 
 def test_organization_user_defined_type_plays_all_roles(client, db):

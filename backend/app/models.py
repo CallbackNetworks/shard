@@ -425,50 +425,6 @@ class NodeType(Base):
     def has_role(self, role: str) -> bool:
         return role in (self.roles or [])
 
-    def _set_role(self, role: str, on: bool) -> None:
-        current = list(self.roles or [])
-        if on and role not in current:
-            current.append(role)
-        elif not on and role in current:
-            current.remove(role)
-        self.roles = current or None
-
-    # Backward-compatible boolean views over the canonical ``roles`` set (ADR-0040).
-    # They keep the graph-types API surface and older callers working while ``roles``
-    # is the single source of truth; being settable lets ``NodeType(is_task_like=True)``
-    # and ``setattr(nt, "is_container", ...)`` fold straight into ``roles``.
-    @property
-    def is_container(self) -> bool:
-        return self.has_role("container")
-
-    @is_container.setter
-    def is_container(self, value: bool) -> None:
-        self._set_role("container", bool(value))
-
-    @property
-    def is_task_like(self) -> bool:
-        return self.has_role("task")
-
-    @is_task_like.setter
-    def is_task_like(self, value: bool) -> None:
-        self._set_role("task", bool(value))
-
-    @property
-    def is_shareable(self) -> bool:
-        return self.has_role("shareable")
-
-    @is_shareable.setter
-    def is_shareable(self, value: bool) -> None:
-        self._set_role("shareable", bool(value))
-
-    @property
-    def is_subscribable(self) -> bool:
-        return self.has_role("subscribable")
-
-    @is_subscribable.setter
-    def is_subscribable(self, value: bool) -> None:
-        self._set_role("subscribable", bool(value))
-
 
 class EdgeType(Base):
     """Registry of relationship (edge) vocabulary, data-driven (see ADR-0033).
