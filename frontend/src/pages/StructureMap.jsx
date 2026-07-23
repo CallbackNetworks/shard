@@ -329,6 +329,9 @@ export default function StructureMap() {
   const containerHref = (containerId) => {
     const container = projectById.get(containerId)
     if (!container) return null
+    // A goal is a container card too (ADR-0041) but keeps its own Goals view; custom
+    // container types open the generic ContainerView; built-in projects open ProjectDetail.
+    if (container.typeKey === 'goal') return '/goals'
     return container.isCustomType ? `/c/${container.id}` : `/projects/${container.id}`
   }
 

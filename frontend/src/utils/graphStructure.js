@@ -13,7 +13,7 @@ import { hasNodeRole } from '../constants/nodeRoles'
 // Map-role `type` stays 'project'/'task'/… for the renderers; the real type
 // key travels alongside as `typeKey`/`typeLabel`/`typeColor`.
 
-const KNOWN_RELS = new Set(['member_of', 'part_of', 'depends_on', 'labeled', 'in_cycle', 'assigned_to'])
+const KNOWN_RELS = new Set(['member_of', 'depends_on', 'labeled', 'in_cycle', 'assigned_to'])
 
 export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now = new Date()) {
   const nodes = slice?.nodes || []
@@ -37,7 +37,6 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
   const parentsOf = new Map()   // child id -> [parent node, ...] via containment
   const childrenOf = new Map()  // parent id -> [child node, ...] via containment
   const memberOf = new Map()    // container id -> [identity id, ...]
-  const partOf = new Map()      // goal id -> [container id, ...]
   const blockedBy = new Map()   // task id -> [prerequisite task id, ...]
   const blocking = new Map()    // task id -> [dependent task id, ...]
   const customEdges = []
@@ -54,9 +53,6 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
     } else if (e.rel_type === 'member_of' && src.type === 'identity') {
       if (!memberOf.has(dst.id)) memberOf.set(dst.id, [])
       memberOf.get(dst.id).push(src.id)
-    } else if (e.rel_type === 'part_of' && dst.type === 'goal') {
-      if (!partOf.has(dst.id)) partOf.set(dst.id, [])
-      partOf.get(dst.id).push(src.id)
     } else if (e.rel_type === 'depends_on') {
       if (!blockedBy.has(src.id)) blockedBy.set(src.id, [])
       blockedBy.get(src.id).push(dst.id)
@@ -173,16 +169,11 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
       }
     })
 
-  // --- Goals (progress = mean of linked container progress)
-  const goalNodes = nodes
-    .filter(n => n.type === 'goal')
-    .map(n => {
-      const projectIds = (partOf.get(n.id) || []).filter(id => projectById.has(id))
-      const progress = projectIds.length
-        ? Math.round(projectIds.reduce((sum, id) => sum + (projectById.get(id)?.progress || 0), 0) / projectIds.length)
-        : 0
-      return { id: n.id, type: 'goal', name: n.title, status: n.status || 'active', progress, projectIds }
-    })
+  // --- Goals render as container cards (ADR-0041): a goal carries the container
+  // role, so it is already a "project" card above and its members are ordinary
+  // ``contains`` children. The dedicated goal-node derivation is retired; the map's
+  // goal rail/lane simply stays empty.
+  const goalNodes = []
 
   // --- Custom plain nodes (neither container nor task role, non-builtin type)
   const keyOf = (id) => {
@@ -191,7 +182,6 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
     if (projectById.has(id)) return `project:${id}`
     if (isTask(n)) return `task:${id}`
     if (n.type === 'identity') return `identity:${id}`
-    if (n.type === 'goal') return `goal:${id}`
     if (n.type === 'label') return `decision:${id}`
     return `custom:${id}`
   }
@@ -225,21 +215,20 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
   for (const task of taskNodes) {
     links.push({ from: `project:${task.projectId}`, to: `task:${task.id}`, type: task.risk })
   }
-  for (const goal of goalNodes) {
-    for (const projectId of goal.projectIds) {
-      links.push({ from: `goal:${goal.id}`, to: `project:${projectId}`, type: 'goal' })
-    }
-  }
   for (const decision of decisionNodes) {
     if (decision.projectId && projectById.has(decision.projectId)) {
       links.push({ from: `decision:${decision.id}`, to: `project:${decision.projectId}`, type: decision.status })
     }
   }
-  // Containment between two containers (nested layers): navigable structure.
+  // Containment between two containers (nested layers): navigable structure. A
+  // container may have several container parents (e.g. a project grouped under a
+  // goal *and* a topic), so draw a link for every container parent, not just the
+  // nearest one — this is how goal -> project relationships surface (ADR-0041).
   for (const p of projectNodes) {
-    const parent = containerParentOf(p.id)
-    if (parent && projectById.has(parent.id)) {
-      links.push({ from: `project:${parent.id}`, to: `project:${p.id}`, type: 'contains' })
+    for (const parent of (parentsOf.get(p.id) || []).filter(isContainer)) {
+      if (projectById.has(parent.id)) {
+        links.push({ from: `project:${parent.id}`, to: `project:${p.id}`, type: 'contains' })
+      }
     }
   }
   // Custom containment targets: a custom plain node contained by a container.
@@ -279,7 +268,7 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
     identities: identityNodes.length,
     projects: projectNodes.length,
     tasks: taskNodes.length,
-    goals: goalNodes.length,
+    goals: projectNodes.filter(p => p.typeKey === 'goal').length,
     decisions: decisionNodes.length,
     customNodes: customNodes.length,
     failedProjects: projectNodes.filter(p => p.failed > 0).length,
@@ -315,16 +304,14 @@ export function focusGraph(graph, focusId) {
   const dependencyTaskNodes = graph.dependencyTaskNodes.filter(t => keep.has(t.projectId))
   const keptTaskIds = new Set(dependencyTaskNodes.map(t => t.id))
   const identityNodes = graph.identityNodes.filter(i => i.id === focusId)
-  const goalNodes = graph.goalNodes
-    .map(g => ({ ...g, projectIds: g.projectIds.filter(id => keep.has(id)) }))
-    .filter(g => g.projectIds.length > 0)
+  // Goals render as container cards (ADR-0041); no dedicated goal-node set remains.
+  const goalNodes = []
   const decisionNodes = graph.decisionNodes.filter(d => d.projectId && keep.has(d.projectId))
   const customNodes = graph.customNodes.filter(n => n.parentProjectId && keep.has(n.parentProjectId))
   const keptKeys = new Set([
     ...projectNodes.map(p => `project:${p.id}`),
     ...taskNodes.map(t => `task:${t.id}`),
     ...identityNodes.map(i => `identity:${i.id}`),
-    ...goalNodes.map(g => `goal:${g.id}`),
     ...decisionNodes.map(d => `decision:${d.id}`),
     ...customNodes.map(n => `custom:${n.id}`),
   ])
@@ -349,7 +336,7 @@ export function focusGraph(graph, focusId) {
       identities: identityNodes.length,
       projects: projectNodes.length,
       tasks: taskNodes.length,
-      goals: goalNodes.length,
+      goals: projectNodes.filter(p => p.typeKey === 'goal').length,
       decisions: decisionNodes.length,
       customNodes: customNodes.length,
       failedProjects: projectNodes.filter(p => p.failed > 0).length,

@@ -7,7 +7,7 @@ const nodeTypes = [
   { key: 'project', label: 'Project', is_builtin: true, roles: ['container', 'shareable', 'subscribable'] },
   { key: 'task', label: 'Task', is_builtin: true, roles: ['task'] },
   { key: 'identity', label: 'Identity', is_builtin: true, roles: ['shareable', 'subscribable'] },
-  { key: 'goal', label: 'Goal', is_builtin: true, roles: [] },
+  { key: 'goal', label: 'Goal', is_builtin: true, roles: ['container'] },
   { key: 'label', label: 'Label', is_builtin: true, roles: [] },
   { key: 'topic', label: 'Topic', is_builtin: false, roles: ['container'], color: '#f59e0b' },
   { key: 'ticket', label: 'Ticket', is_builtin: false, roles: ['task'], color: '#22d3ee' },
@@ -16,7 +16,6 @@ const nodeTypes = [
 const edgeTypes = [
   { key: 'contains', label: 'Contains', is_builtin: true, is_containment: true },
   { key: 'member_of', label: 'Member of', is_builtin: true, is_containment: false },
-  { key: 'part_of', label: 'Part of', is_builtin: true, is_containment: false },
   { key: 'depends_on', label: 'Depends on', is_builtin: true, is_containment: false },
   { key: 'labeled', label: 'Labeled', is_builtin: true, is_containment: false },
   { key: 'references', label: 'References', is_builtin: false, is_containment: false },
@@ -47,7 +46,7 @@ function fixture() {
     { id: 'e8', source_id: 'p1', target_id: 'd1', rel_type: 'contains' },
     { id: 'e9', source_id: 'p1', target_id: 'l1', rel_type: 'contains' },
     { id: 'e10', source_id: 'p1', target_id: 'n1', rel_type: 'contains' },
-    { id: 'e11', source_id: 'p1', target_id: 'g1', rel_type: 'part_of' },
+    { id: 'e11', source_id: 'g1', target_id: 'p1', rel_type: 'contains' },
     { id: 'e12', source_id: 't1', target_id: 't2', rel_type: 'depends_on' },
     { id: 'e13', source_id: 't1', target_id: 'n1', rel_type: 'references' },
   ]
@@ -59,7 +58,7 @@ describe('deriveGraphStructure', () => {
 
   it('treats every container-role node as a project card, with registry metadata', () => {
     const ids = graph.projectNodes.map(p => p.id).sort()
-    expect(ids).toEqual(['c1', 'p1'])
+    expect(ids).toEqual(['c1', 'g1', 'p1']) // goal is a container card too (ADR-0041)
     const topic = graph.projectNodes.find(p => p.id === 'c1')
     expect(topic.type).toBe('project') // map role stays 'project' for the renderers
     expect(topic.isCustomType).toBe(true)
@@ -98,15 +97,18 @@ describe('deriveGraphStructure', () => {
     expect(graph.decisionNodes[0].projectId).toBe('p1')
   })
 
-  it('derives identities, goals, and their links from edges', () => {
+  it('renders goals as container cards and derives identity links from edges', () => {
     const me = graph.identityNodes[0]
     expect(me.projectIds).toEqual(['p1'])
     expect(me.shareActive).toBe(true)
-    const goal = graph.goalNodes[0]
-    expect(goal.projectIds).toEqual(['p1'])
-    expect(goal.progress).toBe(33) // mean of linked container progress
+    // ADR-0041: a goal is a container card, not a dedicated goal node.
+    expect(graph.goalNodes).toEqual([])
+    const goalCard = graph.projectNodes.find(p => p.id === 'g1')
+    expect(goalCard.typeKey).toBe('goal')
+    expect(graph.stats.goals).toBe(1)
     expect(graph.links).toContainEqual({ from: 'identity:i1', to: 'project:p1', type: 'owns' })
-    expect(graph.links).toContainEqual({ from: 'goal:g1', to: 'project:p1', type: 'goal' })
+    // goal -> project surfaces as an ordinary containment link.
+    expect(graph.links).toContainEqual({ from: 'project:g1', to: 'project:p1', type: 'contains' })
     expect(graph.links).toContainEqual({ from: 'project:c1', to: 'project:p1', type: 'contains' })
   })
 

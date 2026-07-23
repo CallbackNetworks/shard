@@ -2,12 +2,74 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
-import { getGoals, createGoal, updateGoal, deleteGoal, getProjects } from '../api/client'
-import { BRAND, DARK, GOAL_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
+import { getGoals, createGoal, updateGoal, deleteGoal, getProjects, getContainedTasks, createTask } from '../api/client'
+import { BRAND, DARK, GOAL_STATUS_COLORS as STATUS_COLORS, STATUS_COLOR } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import EmptyState from '../components/shared/EmptyState'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
+
+/* ── Directly-held tasks (ADR-0041: a goal contains tasks directly) ── */
+function GoalTasks({ goalId }) {
+  const { t } = useTranslation()
+  const [title, setTitle] = useState('')
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['contained-tasks', goalId],
+    queryFn: () => getContainedTasks(goalId),
+  })
+
+  const addMut = useInvalidatingMutation({
+    // A goal is a container (ADR-0041); createTask posts to /nodes with container_id.
+    mutationFn: (taskTitle) => createTask(goalId, { title: taskTitle }),
+    invalidateKeys: [['contained-tasks', goalId], ['goals']],
+    onSuccess: () => setTitle(''),
+  })
+
+  const submit = () => {
+    const value = title.trim()
+    if (value) addMut.mutate(value)
+  }
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {t('goals.tasks')}{tasks.length > 0 ? ` (${tasks.length})` : ''}
+      </div>
+      {tasks.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+          {tasks.map(task => (
+            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: DARK.textMid }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                background: STATUS_COLOR[task.status] || STATUS_COLOR.todo,
+              }} />
+              <span style={{
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                textDecoration: task.status === 'done' ? 'line-through' : 'none',
+                opacity: task.status === 'done' ? 0.6 : 1,
+              }}>
+                {task.title}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submit() }}
+          placeholder={t('goals.addTaskPlaceholder')}
+          className="kt-input"
+          style={{ flex: 1, fontSize: 12, padding: '4px 8px' }}
+        />
+        <button onClick={submit} disabled={!title.trim()} className="kt-btn" style={{ fontSize: 11, opacity: title.trim() ? 1 : 0.4 }}>
+          {t('goals.addTask')}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 /* ── Goal Form Modal ── */
 function GoalForm({ projects, initial, onSave, onClose }) {
@@ -219,6 +281,9 @@ function GoalCard({ goal, onEdit, onDelete }) {
               ))}
             </div>
           )}
+
+          {/* Tasks held directly by this goal (ADR-0041) */}
+          <GoalTasks goalId={goal.id} />
         </div>
 
         {/* Action buttons (visible on hover) */}
