@@ -43,3 +43,4 @@
 | [0039](0039-cross-cutting-capabilities-as-node-type-flags.md) | Cross-cutting Capabilities as Node-Type Flags — De-privileging Built-in Identity | Accepted | 2026-07-20 |
 | [0040](0040-single-graph-write-surface-and-node-roles.md) | Single Graph Write Surface and Node Capabilities as a Roles Set | Accepted | 2026-07-22 |
 | [0041](0041-goal-as-container-and-remaining-write-surface-collapse.md) | Goal as a Container Role, Identity Write Collapse, Decision Stays an Enhanced Label | Accepted | 2026-07-23 |
+| [0042](0042-external-api-graph-native-write-surface.md) | External API v1 Collapses to the Graph-Native Write Surface | Accepted | 2026-07-26 |

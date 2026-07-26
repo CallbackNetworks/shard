@@ -2,7 +2,7 @@
 External API v1 — Task CRUD and bulk operations.
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,10 +15,10 @@ from app.routers.external_api.auth import (
     _get_api_key,
     _require_scope,
 )
-from app.schemas import TaskCreate, TaskOut, TaskUpdate
+from app.schemas import TaskCreate, TaskOut
 from app.services import graph
 from app.services.enrichment import enrich_task
-from app.services.task_mutations import AgentKeyError, apply_task_update, finalize_task_create
+from app.services.task_mutations import apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
 
 sub_router = APIRouter()
@@ -69,101 +69,9 @@ def api_get_task(
     return enrich_task(task, db)
 
 
-@sub_router.post(
-    "/projects/{project_id}/tasks",
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a new task",
-    description="Creates a task in a project. The task gets a unique `callback_token` for CI/CD webhook integration. Requires `write` scope.",
-    response_model=TaskOut,
-    responses={**_auth_errors, 404: {"description": "Project not found"}},
-)
-async def api_create_task(
-    project_id: str,
-    body: TaskCreate,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-    x_agent_id: str | None = Header(None, alias="X-Agent-Id"),
-):
-    _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if body.parent_id is not None:
-        get_parent_task_or_error(db, project_id, body.parent_id)
-    task = graph.create_task(db, project_id=project_id, **body.model_dump())
-    task = await finalize_task_create(
-        db,
-        task.id,
-        actor=_build_actor(api_key, x_agent_id),
-        source="api",
-        project_id=project_id,
-        activity_meta={"api_key": api_key.name, "agent_id": x_agent_id},
-    )
-    return enrich_task(task, db)
-
-
-@sub_router.patch(
-    "/projects/{project_id}/tasks/{task_id}",
-    summary="Update a task",
-    description="Partially updates a task. When status changes, outbound notifications are fired to matching integrations. Requires `write` scope.",
-    response_model=TaskOut,
-    responses={**_auth_errors, 404: {"description": "Task not found"}},
-)
-async def api_update_task(
-    project_id: str,
-    task_id: str,
-    body: TaskUpdate,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-    x_agent_id: str | None = Header(None, alias="X-Agent-Id"),
-):
-    _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
-    task = graph.get_task(db, task_id)
-    if not task or task_id not in graph.contained_task_ids(db, project_id):
-        raise HTTPException(status_code=404, detail="Task not found")
-    changes = body.model_dump(exclude_none=True)
-    # Re-parenting is a graph move, not a column write (ADR-0032).
-    new_parent_id = changes.pop("parent_id", None)
-    if new_parent_id is not None:
-        get_parent_task_or_error(db, project_id, new_parent_id, child_id=task_id)
-        graph.set_parent_task(db, task_id, new_parent_id)
-    try:
-        task = await apply_task_update(
-            db,
-            task_id,
-            changes,
-            actor=_build_actor(api_key, x_agent_id),
-            source="api",
-            project_id=project_id,
-            activity_meta={"api_key": api_key.name, "agent_id": x_agent_id},
-        )
-    except AgentKeyError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return enrich_task(task, db)
-
-
-@sub_router.delete(
-    "/projects/{project_id}/tasks/{task_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a task",
-    description="Permanently deletes a task. Requires `write` scope.",
-    responses={**_auth_errors, 404: {"description": "Task not found"}},
-)
-def api_delete_task(
-    project_id: str,
-    task_id: str,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-):
-    _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
-    task = graph.get_task(db, task_id)
-    if not task or task_id not in graph.contained_task_ids(db, project_id):
-        raise HTTPException(status_code=404, detail="Task not found")
-    graph.delete_task_tree(db, task.id)
-    db.commit()
+# Single-task create/update/delete retired (ADR-0042): use the graph-native
+# write surface — POST/PATCH/DELETE /api/v1/nodes. Reads and the batch facades
+# below stay (bulk is a batch operation, not a second single-entity write path).
 
 
 # ── Bulk operations ───────────────────────────────────────────────

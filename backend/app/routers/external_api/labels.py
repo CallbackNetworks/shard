@@ -14,7 +14,7 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.routers.external_api.helpers import _get_task_or_404
-from app.schemas import LabelCreate, LabelOut
+from app.schemas import LabelOut
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.ws_manager import ws_manager
@@ -42,50 +42,9 @@ def api_list_labels(
     return graph.labels_in_project(db, project_id)
 
 
-@sub_router.post(
-    "/projects/{project_id}/labels",
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a label",
-    description="Creates a new label in a project. Labels can then be assigned to tasks. Requires `write` scope.",
-    response_model=LabelOut,
-    responses={**_auth_errors, 404: {"description": "Project not found"}},
-)
-def api_create_label(
-    project_id: str,
-    body: LabelCreate,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-):
-    _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    label = graph.create_label(db, project_id, **body.model_dump())
-    db.commit()
-    return label
-
-
-@sub_router.delete(
-    "/projects/{project_id}/labels/{label_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a label",
-    description="Permanently deletes a label and removes it from all tasks in the project. Requires `write` scope.",
-    responses={**_auth_errors, 404: {"description": "Label not found"}},
-)
-def api_delete_label(
-    project_id: str,
-    label_id: str,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-):
-    _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
-    label = graph.get_label(db, label_id, project_id=project_id)
-    if not label:
-        raise HTTPException(status_code=404, detail="Label not found")
-    graph.delete_label(db, label_id)
-    db.commit()
+# Label create/delete retired (ADR-0042): a label is a node — create it via
+# POST /api/v1/nodes (type "label") + a `contains` edge to the project, and delete
+# it via DELETE /api/v1/nodes/{id}. Listing and task↔label assignment stay here.
 
 
 @sub_router.post(

@@ -2,7 +2,7 @@
 External API v1 — Project CRUD endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -14,7 +14,6 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.routers.external_api.helpers import _enrich_project
-from app.schemas import ProjectCreate, ProjectUpdate
 from app.services import graph
 from app.services.enrichment import enrich_task_as_dict
 
@@ -62,64 +61,5 @@ def api_get_project(
     return result
 
 
-@sub_router.post(
-    "/projects",
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a new project",
-    description="Creates a new project. Requires `write` scope.",
-    responses=_auth_errors,
-)
-def api_create_project(
-    body: ProjectCreate,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-):
-    _require_scope(api_key, "write")
-    project = graph.create_project(db, **body.model_dump())
-    db.commit()
-    project = graph.get_project(db, project.id)
-    return _enrich_project(project, db)
-
-
-@sub_router.patch(
-    "/projects/{project_id}",
-    summary="Update a project",
-    description="Partially updates a project's name, description, or status. Requires `write` scope.",
-    responses={**_auth_errors, 404: {"description": "Project not found"}},
-)
-def api_update_project(
-    project_id: str,
-    body: ProjectUpdate,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-):
-    _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    project = graph.update_project(db, project_id, **body.model_dump(exclude_none=True))
-    db.commit()
-    project = graph.get_project(db, project_id)
-    return _enrich_project(project, db)
-
-
-@sub_router.delete(
-    "/projects/{project_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a project",
-    description="Permanently deletes a project and all its tasks. Requires `admin` scope.",
-    responses={**_auth_errors, 404: {"description": "Project not found"}},
-)
-def api_delete_project(
-    project_id: str,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(_get_api_key),
-):
-    _require_scope(api_key, "admin")
-    _check_project_access(api_key, project_id)
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    graph.delete_project_and_tasks(db, project)
-    db.commit()
+# Project create/update/delete retired (ADR-0042): use the graph-native write
+# surface — POST/PATCH/DELETE /api/v1/nodes with type "project". Reads stay here.

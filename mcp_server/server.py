@@ -105,7 +105,8 @@ async def _create_task(
         body["assignee"] = assignee
     if due_date:
         body["due_date"] = due_date
-    result = await _post(f"/projects/{project_id}/tasks", body)
+    # ADR-0042: task writes go through the graph-native node surface.
+    result = await _post("/nodes", {"type": "task", "container_id": project_id, **body})
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -113,15 +114,15 @@ async def _update_task(project_id: str, task_id: str, **kwargs) -> str:
     body = {k: v for k, v in kwargs.items() if v is not None}
     if not body:
         return "No fields to update"
-    result = await _patch(f"/projects/{project_id}/tasks/{task_id}", body)
+    result = await _patch(f"/nodes/{task_id}", body)
     return json.dumps(result) if not isinstance(result, str) else result
 
 
 async def _create_subtask(
     project_id: str, parent_task_id: str, title: str, priority: str = "medium"
 ) -> str:
-    body = {"title": title, "priority": priority, "parent_id": parent_task_id}
-    result = await _post(f"/projects/{project_id}/tasks", body)
+    body = {"type": "task", "container_id": project_id, "parent_id": parent_task_id, "title": title, "priority": priority}
+    result = await _post("/nodes", body)
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -265,15 +266,16 @@ async def _create_project(
     name: str,
     description: str | None = None,
 ) -> str:
-    body: dict = {"name": name}
+    # ADR-0042: a project is a node — create it through the graph-native surface.
+    body: dict = {"type": "project", "title": name}
     if description:
-        body["description"] = description
-    result = await _post("/projects", body)
+        body["data"] = {"description": description}
+    result = await _post("/nodes", body)
     return json.dumps(result) if not isinstance(result, str) else result
 
 
 async def _delete_task(project_id: str, task_id: str) -> str:
-    result = await _delete(f"/projects/{project_id}/tasks/{task_id}")
+    result = await _delete(f"/nodes/{task_id}")
     return json.dumps(result) if not isinstance(result, str) else result
 
 

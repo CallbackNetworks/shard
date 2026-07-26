@@ -123,8 +123,8 @@ class TestScopeEnforcement:
     def test_read_key_cannot_create_project(self, client, api_key_read):
         raw_key, _ = api_key_read
         r = client.post(
-            "/api/v1/projects",
-            json={"name": "New Project"},
+            "/api/v1/nodes",
+            json={"type": "project", "title": "New Project"},
             headers={"X-API-Key": raw_key},
         )
         assert r.status_code == 403
@@ -133,23 +133,24 @@ class TestScopeEnforcement:
     def test_write_key_can_create_project(self, client, api_key_write):
         raw_key, _ = api_key_write
         r = client.post(
-            "/api/v1/projects",
-            json={"name": "New Project"},
+            "/api/v1/nodes",
+            json={"type": "project", "title": "New Project"},
             headers={"X-API-Key": raw_key},
         )
         assert r.status_code == 201
 
     def test_write_key_cannot_delete_project(self, client, api_key_write, project_with_tasks):
+        # Deleting a container needs admin (ADR-0042); a write key is refused.
         raw_key, _ = api_key_write
         p, _, _ = project_with_tasks
-        r = client.delete(f"/api/v1/projects/{p.id}", headers={"X-API-Key": raw_key})
+        r = client.delete(f"/api/v1/nodes/{p.id}", headers={"X-API-Key": raw_key})
         assert r.status_code == 403
         assert "admin" in r.json()["detail"]
 
     def test_admin_key_can_delete_project(self, client, api_key_admin, project_with_tasks):
         raw_key, _ = api_key_admin
         p, _, _ = project_with_tasks
-        r = client.delete(f"/api/v1/projects/{p.id}", headers={"X-API-Key": raw_key})
+        r = client.delete(f"/api/v1/nodes/{p.id}", headers={"X-API-Key": raw_key})
         assert r.status_code == 204
 
 
@@ -235,13 +236,14 @@ class TestProjectsCrud:
     def test_update_project(self, client, api_key_write, project_with_tasks):
         raw_key, _ = api_key_write
         p, _, _ = project_with_tasks
+        # A project is a node: rename via the node surface (NodeOut carries `title`).
         r = client.patch(
-            f"/api/v1/projects/{p.id}",
-            json={"name": "Updated Name"},
+            f"/api/v1/nodes/{p.id}",
+            json={"title": "Updated Name"},
             headers={"X-API-Key": raw_key},
         )
         assert r.status_code == 200
-        assert r.json()["name"] == "Updated Name"
+        assert r.json()["title"] == "Updated Name"
 
 
 # ── Tasks CRUD ───────────────────────────────────────────────────────────
@@ -268,8 +270,8 @@ class TestTasksCrud:
         raw_key, _ = api_key_write
         p, _, _ = project_with_tasks
         r = client.post(
-            f"/api/v1/projects/{p.id}/tasks",
-            json={"title": "New Task", "priority": "medium"},
+            "/api/v1/nodes",
+            json={"type": "task", "container_id": p.id, "title": "New Task", "priority": "medium"},
             headers={"X-API-Key": raw_key},
         )
         assert r.status_code == 201
@@ -291,14 +293,14 @@ class TestTasksCrud:
     def test_delete_task(self, client, api_key_admin, project_with_tasks):
         raw_key, _ = api_key_admin
         p, t1, _ = project_with_tasks
-        r = client.delete(f"/api/v1/projects/{p.id}/tasks/{t1.id}", headers={"X-API-Key": raw_key})
+        r = client.delete(f"/api/v1/nodes/{t1.id}", headers={"X-API-Key": raw_key})
         assert r.status_code == 204
 
     def test_update_task_reparents_via_graph(self, client, api_key_write, project_with_tasks):
         raw_key, _ = api_key_write
         p, t1, t2 = project_with_tasks
         r = client.patch(
-            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            f"/api/v1/nodes/{t2.id}",
             json={"parent_id": t1.id},
             headers={"X-API-Key": raw_key},
         )
@@ -309,7 +311,7 @@ class TestTasksCrud:
         raw_key, _ = api_key_write
         p, t1, _ = project_with_tasks
         r = client.patch(
-            f"/api/v1/projects/{p.id}/tasks/{t1.id}",
+            f"/api/v1/nodes/{t1.id}",
             json={"parent_id": "no-such-task"},
             headers={"X-API-Key": raw_key},
         )
@@ -319,8 +321,8 @@ class TestTasksCrud:
         raw_key, _ = api_key_write
         p, _, _ = project_with_tasks
         r = client.post(
-            f"/api/v1/projects/{p.id}/tasks",
-            json={"title": "Orphan", "parent_id": "no-such-task"},
+            "/api/v1/nodes",
+            json={"type": "task", "container_id": p.id, "title": "Orphan", "parent_id": "no-such-task"},
             headers={"X-API-Key": raw_key},
         )
         assert r.status_code == 404
@@ -360,8 +362,8 @@ class TestAgentIdTracking:
         raw_key, _ = api_key_write
         p, _, _ = project_with_tasks
         r = client.post(
-            f"/api/v1/projects/{p.id}/tasks",
-            json={"title": "Agent Task", "priority": "medium"},
+            "/api/v1/nodes",
+            json={"type": "task", "container_id": p.id, "title": "Agent Task", "priority": "medium"},
             headers={"X-API-Key": raw_key, "X-Agent-Id": "claude-code-session-123"},
         )
         assert r.status_code == 201
@@ -381,8 +383,8 @@ class TestAgentIdTracking:
         raw_key, key = api_key_write
         p, _, _ = project_with_tasks
         r = client.post(
-            f"/api/v1/projects/{p.id}/tasks",
-            json={"title": "Normal Task", "priority": "low"},
+            "/api/v1/nodes",
+            json={"type": "task", "container_id": p.id, "title": "Normal Task", "priority": "low"},
             headers={"X-API-Key": raw_key},
         )
         assert r.status_code == 201
@@ -483,7 +485,7 @@ class TestExternalApiMutationPipeline:
         db.commit()
 
         r = client.patch(
-            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            f"/api/v1/nodes/{t2.id}",
             json={"status": "done"},
             headers={"X-API-Key": raw_key},
         )
@@ -494,7 +496,7 @@ class TestExternalApiMutationPipeline:
         raw_key, _ = api_key_write
         p, _, t2 = project_with_tasks
         r = client.patch(
-            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            f"/api/v1/nodes/{t2.id}",
             json={"assigned_agent_key_id": "missing"},
             headers={"X-API-Key": raw_key},
         )
@@ -532,7 +534,7 @@ class TestExternalApiMutationPipeline:
         graph.update_task(db, t2.id, external_provider="github", external_id="7")
         db.commit()
         r = client.patch(
-            f"/api/v1/projects/{p.id}/tasks/{t2.id}",
+            f"/api/v1/nodes/{t2.id}",
             json={"title": "Synced title"},
             headers={"X-API-Key": raw_key},
         )
@@ -551,8 +553,8 @@ class TestExternalApiMutationPipeline:
         raw_key, _ = api_key_write
         p, _, _ = project_with_tasks
         r = client.post(
-            f"/api/v1/projects/{p.id}/tasks",
-            json={"title": "API created"},
+            "/api/v1/nodes",
+            json={"type": "task", "container_id": p.id, "title": "API created"},
             headers={"X-API-Key": raw_key},
         )
         assert r.status_code == 201

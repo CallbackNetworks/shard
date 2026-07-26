@@ -412,8 +412,10 @@ async def test_create_project():
     with _patch_client("post", _mock_response(json_data=project)) as mock_cls:
         text = await _call("create_project", {"name": "Gamma", "description": "New project"})
         body = mock_cls.return_value.post.call_args[1]["json"]
-        assert body["name"] == "Gamma"
-        assert body["description"] == "New project"
+        # ADR-0042: create_project goes through the node surface (type/title/data).
+        assert body["type"] == "project"
+        assert body["title"] == "Gamma"
+        assert body["data"]["description"] == "New project"
     parsed = json.loads(text)
     assert parsed["name"] == "Gamma"
 
@@ -424,7 +426,8 @@ async def test_create_project_minimal():
     with _patch_client("post", _mock_response(json_data=project)) as mock_cls:
         text = await _call("create_project", {"name": "Delta"})
         body = mock_cls.return_value.post.call_args[1]["json"]
-        assert "description" not in body
+        assert body["title"] == "Delta"
+        assert "data" not in body
 
 
 # ── Tool: delete_task (new) ────────────────────────────────────────
@@ -435,7 +438,7 @@ async def test_delete_task():
     with _patch_client("delete", _mock_response(status_code=204)) as mock_cls:
         text = await _call("delete_task", {"project_id": "p1", "task_id": "t1"})
         url = mock_cls.return_value.delete.call_args[0][0]
-        assert "/projects/p1/tasks/t1" in url
+        assert "/nodes/t1" in url
     parsed = json.loads(text)
     assert parsed["status"] == "deleted"
 
