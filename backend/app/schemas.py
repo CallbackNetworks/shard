@@ -7,21 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # --- Identity ---
 
 
-class IdentityCreate(BaseModel):
-    name: str
-    color: str = "#5e6ad2"
-    description: str | None = None
-    avatar: str | None = None
-
-
-class IdentityUpdate(BaseModel):
-    name: str | None = None
-    color: str | None = None
-    description: str | None = None
-    avatar: str | None = None
-    allow_guest_notes: bool | None = None
-
-
 class IdentityOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -819,21 +804,6 @@ class SavedFilterOut(BaseModel):
 
 
 # --- Goals / OKR ---
-
-
-class GoalCreate(BaseModel):
-    title: str
-    description: str | None = None
-    target_date: datetime | None = None
-    project_ids: list[str] = []
-
-
-class GoalUpdate(BaseModel):
-    title: str | None = None
-    description: str | None = None
-    status: Literal["active", "completed", "cancelled"] | None = None
-    target_date: datetime | None = None
-    project_ids: list[str] | None = None
 
 
 class GoalOut(BaseModel):
