@@ -97,13 +97,19 @@ def api_agent_context(
             "priorities": ["low", "medium", "high"],
             "naming": "Use clear, actionable task titles in imperative form",
             "progress": "Use POST .../progress to report intermediate progress (0-100%)",
+            "write_surface": (
+                "Every entity (task, project, label, cycle, goal, identity) is a node: create with "
+                "POST /api/v1/nodes {type, title, container_id}, update with PATCH /api/v1/nodes/{id}, "
+                "delete with DELETE /api/v1/nodes/{id}. Relationships are edges."
+            ),
         },
         projects=project_infos,
         quick_start=(
             "1. Call GET /api/v1/agent-context (this endpoint) to understand the platform. "
             "2. Call GET /api/v1/summary for current state of all projects and tasks. "
-            "3. Use POST /api/v1/projects/{id}/tasks to create tasks. "
-            "4. Use PATCH /api/v1/projects/{id}/tasks/{id} to update task status/fields. "
+            '3. Create a task with POST /api/v1/nodes {"type": "task", "title": "...", '
+            '"container_id": "<project id>"}. '
+            '4. Update it with PATCH /api/v1/nodes/{node_id} {"status": "in_progress"}. '
             "5. Use POST /api/v1/projects/{id}/tasks/{id}/progress to report progress."
         ),
     )

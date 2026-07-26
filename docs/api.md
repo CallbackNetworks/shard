@@ -2,16 +2,44 @@
 
 The platform exposes two APIs:
 
-- **Internal API** — used by the web UI, protected by the session Bearer token
-- **External API v1** — for scripts and AI agents, authenticated via `X-API-Key` header
+- **Internal API** — used by the web UI, protected by the session Bearer token. Mounted under the `/api` prefix (ADR-0036)
+- **External API v1** — for scripts and AI agents, authenticated via `X-API-Key` header. Mounted under `/api/v1`
 
 Interactive docs (Swagger UI) are always available at `http://localhost:8000/docs`.
+
+## The single write surface
+
+Every first-class entity — task, project, label, cycle, goal, identity, and any user-defined
+type — is a **node** in one graph; relationships between them are **edges** (ADR-0032/0033).
+Consequently there is exactly one way to create, update, or delete an entity on each API,
+and it is the same shape on both:
+
+| | Internal | External v1 |
+|---|---|---|
+| Create | `POST /api/nodes` | `POST /api/v1/nodes` |
+| Update | `PATCH /api/nodes/{id}` | `PATCH /api/v1/nodes/{id}` |
+| Delete | `DELETE /api/nodes/{id}` | `DELETE /api/v1/nodes/{id}` |
+| Link/unlink | `POST`/`DELETE /api/nodes/{id}/edges` | `POST`/`DELETE /api/v1/nodes/{id}/edges` |
+
+The per-entity write routes that used to exist (`POST /projects`, `POST /projects/{pid}/tasks`,
+`POST /projects/{pid}/labels`, `POST /identities`, …) were retired across ADR-0040 → ADR-0043
+and now return **405**. What remains under `/projects/{pid}/...` is **reads**, **relationship
+sub-resources** (labels, dependencies, memberships, cycle assignment, recurrence, attachments,
+comments), and **operations** (reorder, bulk-update, import/export, regenerate-token).
+
+Writes are dispatched by the target node's **roles** rather than by URL (ADR-0040), so a task
+created through `/api/nodes` fires exactly the same activity log, workflow rules, outbound
+notifications, and WebSocket broadcast as one created any other way.
 
 ---
 
 ## Internal API
 
-All endpoints require `Authorization: Bearer {token}` when `AUTH_PASSWORD` is set. Token is obtained via `POST /auth/login`.
+All endpoints require `Authorization: Bearer {token}` when `AUTH_PASSWORD` is set. Token is obtained via `POST /api/auth/login`.
+
+All paths in this section are relative to the `/api` prefix — `GET /projects` means
+`GET /api/projects`. Root-level paths (`/webhook`, `/share`, `/ical`, `/ws`, `/health`,
+`/api/v1`) are external contracts and are documented with their full path.
 
 ### Auth
 
@@ -41,6 +69,9 @@ Verify current token. No body.
 { "detail": "Unauthorized" }
 ```
 
+#### `POST /auth/logout`
+Invalidate the current session token.
+
 ---
 
 ### Projects
@@ -65,22 +96,24 @@ Returns all projects with computed fields.
 ]
 ```
 
-#### `POST /projects`
-```json
-// Request
-{ "name": "string", "description": "string (optional)" }
-```
-
 #### `GET /projects/{id}`
 Returns project with full task list including subtasks, labels, and cycle assignments.
 
-#### `PATCH /projects/{id}`
-```json
-{ "name": "string (optional)", "description": "string (optional)", "status": "active | archived (optional)" }
-```
+#### Creating / updating / deleting a project
+Use the node surface — a project is `Node(type="project")`:
 
-#### `DELETE /projects/{id}`
-Cascades to all tasks, labels, cycles, and activity logs.
+```json
+// POST /nodes
+{ "type": "project", "title": "string", "data": { "description": "string (optional)" } }
+
+// PATCH /nodes/{id}
+{ "title": "string (optional)", "status": "active | archived (optional)" }
+
+// DELETE /nodes/{id}
+// Container-role cascade (ADR-0043): deletes exclusively-owned tasks and the
+// project's labels and cycles. A task also linked into another project is only
+// unlinked from this one.
+```
 
 ---
 
@@ -89,32 +122,45 @@ Cascades to all tasks, labels, cycles, and activity logs.
 #### `GET /projects/{pid}/tasks`
 Returns all tasks in the project including subtasks and assigned labels.
 
-#### `POST /projects/{pid}/tasks`
+#### `GET /tasks/unfiled`
+Tasks belonging to no project (ADR-0032/0033) — the unfiled bucket.
+
+#### Creating / updating / deleting a task
+Use the node surface — a task is `Node(type="task")`. `container_id` files it under a project
+(or any container-role node: goal, custom container); `parent_id` makes it a subtask.
+
 ```json
-// Request
+// POST /nodes
 {
+  "type": "task",
   "title": "string",
-  "description": "string (optional, markdown)",
+  "container_id": "uuid (project/goal/custom container)",
+  "parent_id": "uuid (optional, for subtasks)",
   "status": "todo | in_progress | done | failed (default: todo)",
   "priority": "low | medium | high (default: medium)",
   "assignee": "string (optional)",
   "start_date": "ISO 8601 (optional)",
   "due_date": "ISO 8601 (optional)",
-  "parent_id": "uuid (optional, for subtasks)"
+  "data": { "description": "string (optional, markdown)" }
 }
 
-// Response 200
+// Response 201 — enriched TaskOut, same shape the retired task route returned
 {
   "id": "uuid",
   "callback_token": "uuid",  // use this for the webhook URL
+  "project_id": "uuid | null",
+  "subtask_count": 0,
+  "comment_count": 0,
+  "blocked_by": [], "blocking": [],
   ...
 }
 ```
 
-#### `PATCH /projects/{pid}/tasks/{tid}`
-Same fields as POST, all optional. Status changes are logged to the activity trail.
+`PATCH /nodes/{id}` takes the same fields, all optional; passing `parent_id` re-parents the
+task (a graph move — 404 if the new parent is outside the project, 400 if it would create a
+containment cycle). `DELETE /nodes/{id}` tears down the subtask tree and peripheral rows.
 
-#### `DELETE /projects/{pid}/tasks/{tid}`
+Status changes fire the activity trail, workflow rules, and outbound notifications.
 
 #### `POST /projects/{pid}/tasks/{tid}/regenerate-token`
 Generates a new `callback_token`. The old webhook URL stops working immediately.
@@ -123,16 +169,53 @@ Generates a new `callback_token`. The old webhook URL stops working immediately.
 { "callback_token": "new_uuid" }
 ```
 
+#### `POST /projects/{pid}/tasks/{tid}/create-external-issue`
+Create a GitHub/GitLab/Gitea issue from this task and link it (ADR-0026). Provider is
+auto-detected from the project's `repo_url` when omitted.
+
+```json
+{ "provider": "github | gitlab (optional)" }
+```
+
+---
+
+### Task Relationships
+
+Dependencies and multi-project membership are graph edges; these are the task-scoped
+conveniences over them.
+
+#### `POST /projects/{pid}/tasks/{tid}/dependencies/{depends_on_id}`
+#### `DELETE /projects/{pid}/tasks/{tid}/dependencies/{depends_on_id}`
+Adds/removes a `depends_on` edge. Rejected (400) if it would create a dependency cycle.
+
+#### `POST /projects/{pid}/tasks/{tid}/memberships/{target_pid}`
+#### `DELETE /projects/{pid}/tasks/{tid}/memberships/{target_pid}`
+Links a task into an additional project (ADR-0032). Memberships are symmetric — there is no
+primary project — and a task may legally reach zero, becoming *unfiled*.
+
+#### `POST /tasks/{tid}/memberships/{pid}`
+The unscoped form: files a task into a project without requiring a source project. This is
+how an unfiled task gets its first project. Idempotent.
+
 ---
 
 ### Labels
 
 #### `GET /projects/{pid}/labels`
-#### `POST /projects/{pid}/labels`
+
+#### Creating / deleting a label
+A label is `Node(type="label")` scoped to its project by a `contains` edge:
+
 ```json
-{ "name": "string", "color": "#hex (optional, default #5e6ad2)" }
+// POST /nodes
+{ "type": "label", "title": "string", "container_id": "<project id>",
+  "data": { "color": "#hex (optional, default #5e6ad2)" } }
+
+// DELETE /nodes/{label_id}
 ```
-#### `DELETE /projects/{pid}/labels/{lid}`
+
+A **decision record** is the same node with `data.type = "decision"` and a `decision_status`
+(ADR-0004/ADR-0041) — it reuses the whole label mechanism, including the `#` quick-link UX.
 
 #### `POST /projects/{pid}/tasks/{tid}/labels/{lid}`
 Assigns a label to a task.
@@ -144,26 +227,34 @@ Assigns a label to a task.
 ### Cycles
 
 #### `GET /projects/{pid}/cycles`
-#### `POST /projects/{pid}/cycles`
-```json
-{
-  "name": "string",
-  "description": "string (optional)",
-  "start_date": "ISO 8601 (optional)",
-  "end_date": "ISO 8601 (optional)",
-  "status": "draft | active | completed (default: draft)"
-}
-```
 #### `GET /projects/{pid}/cycles/{cid}`
 Returns cycle with its task list.
 
-#### `PATCH /projects/{pid}/cycles/{cid}`
-#### `DELETE /projects/{pid}/cycles/{cid}`
+#### `GET /projects/{pid}/cycles/{cid}/compare?compare_with={cid2}`
+Side-by-side stats for two cycles.
+
+#### Creating / updating / deleting a cycle
+A cycle is `Node(type="cycle")` scoped to its project by a `contains` edge. `end_date` maps
+to the node's `due_date`:
+
+```json
+// POST /nodes
+{ "type": "cycle", "title": "string", "container_id": "<project id>",
+  "status": "draft | active | completed (default: draft)",
+  "start_date": "ISO 8601 (optional)",
+  "due_date": "ISO 8601 (optional, the cycle end date)",
+  "data": { "description": "string (optional)" } }
+
+// PATCH /nodes/{cycle_id}    // DELETE /nodes/{cycle_id}
+```
 
 #### `POST /projects/{pid}/cycles/{cid}/tasks/{tid}`
 Adds a task to a cycle.
 
 #### `DELETE /projects/{pid}/cycles/{cid}/tasks/{tid}`
+
+#### `POST /projects/{pid}/cycles/{cid}/duplicate`
+Clones the cycle as a new draft, with its tasks re-created as fresh `todo` tasks.
 
 ---
 
@@ -191,25 +282,50 @@ Adds a task to a cycle.
 #### `POST /integrations/{id}/test`
 Fires a test notification. Returns `{ "ok": true }` or error detail.
 
+#### `GET /integrations/templates` · `GET /integrations/templates/{id}`
+Pre-built integration configurations (Slack, Discord, …) to start from.
+
+#### `GET /integrations/{id}/health`
+Delivery success rate and recent failure summary for one integration.
+
+#### `POST /integrations/{id}/retry-all`
+Re-queue every failed delivery for this integration.
+
 ---
 
 ### Identities
 
 #### `GET /identities`
-#### `POST /identities`
+#### `GET /identities/hub-stats`
+Aggregate per-identity workload stats for the identity hub.
+
+#### Creating / updating / deleting an identity
+An identity is a top-level `Node(type="identity")` — no container. Creation seeds a
+`share_token` automatically (every shareable-role type does, ADR-0041):
+
 ```json
-{ "name": "string", "color": "#hex", "description": "string (optional)", "avatar": "emoji or char (optional)" }
+// POST /nodes
+{ "type": "identity", "title": "string",
+  "data": { "color": "#hex", "description": "string (optional)", "avatar": "emoji or char (optional)" } }
+
+// PATCH /nodes/{identity_id}    // DELETE /nodes/{identity_id}
 ```
-#### `PATCH /identities/{id}`
-#### `DELETE /identities/{id}`
 
-#### `POST /identities/{id}/projects/{pid}`
-Links a project to an identity.
+#### Linking a project to an identity
+Membership is a `member_of` edge from the project to the identity:
 
-#### `DELETE /identities/{id}/projects/{pid}`
+```json
+// POST /nodes/{project_id}/edges
+{ "target_id": "<identity id>", "rel_type": "member_of" }
+
+// DELETE /nodes/{project_id}/edges?target_id=<identity id>&rel_type=member_of
+```
 
 #### `GET /identities/{id}/projects`
 Returns projects linked to the identity (used by the public status page).
+
+#### `GET /identities/{id}/share-views`
+Share-page access audit for the identity (ADR-0025).
 
 ---
 
@@ -231,6 +347,9 @@ The `key` field (`tdp_...`) is only returned on creation. Store it securely.
 { "name": "string (optional)", "active": true/false, "scopes": [...] }
 ```
 #### `DELETE /api-keys/{id}`
+
+#### `GET /api-keys/agents/summary`
+Per-agent-key activity summary: what each agent key has been assigned and touched.
 
 ---
 
@@ -509,6 +628,18 @@ Query parameters:
 ]
 ```
 
+#### `GET /analytics/critical-path/{project_id}`
+Longest dependency chain through the project — the tasks that actually gate completion.
+
+#### `GET /analytics/estimation-calibration`
+How past estimates compared with actual time spent.
+
+#### `GET /analytics/estimate-suggestion?title=&label_ids=`
+Suggested time estimate for a new task, derived from comparable finished tasks (ADR-0028).
+
+#### `GET /analytics/usage` · `DELETE /analytics/usage`
+API usage tracking per key/endpoint, and purge.
+
 ---
 
 ### Task Templates
@@ -544,6 +675,7 @@ Query parameters:
 }
 ```
 
+#### `PATCH /templates/{id}`
 #### `DELETE /templates/{id}`
 
 ---
@@ -634,6 +766,9 @@ Query parameters:
 ]
 ```
 
+#### `GET /deliveries`
+All deliveries across every integration; same query parameters as above.
+
 #### `GET /deliveries/{id}`
 Get a single delivery record with full details.
 
@@ -716,7 +851,10 @@ If the share link has expired, returns `410 Gone`.
 }
 ```
 
-#### `POST /share/identity/{share_token}/verify`
+#### `GET /share/project/{share_token}` · `GET /share/n/{share_token}`
+The project share page, and the generic share page for any shareable-role node.
+
+#### `POST /share/identity/{share_token}/verify` · `POST /share/n/{token}/verify`
 Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL).
 
 ```json
@@ -727,20 +865,164 @@ Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL)
 // Response 403 — invalid PIN
 ```
 
+#### `POST /share/{scope}/{token}/notes`
+#### `POST /share/{scope}/{token}/tasks/{tid}/notes`
+Guest notes from share-page visitors (ADR-0016), when `allow_guest_notes` is on. `scope` is
+`project` or `identity`. Rate-limited.
+
+```json
+{ "guest_name": "string", "body": "string" }
+```
+
 ---
 
-### Identity Share Management (Internal API)
+### iCal Feeds (Public)
 
-These endpoints manage share settings for identities (require auth).
+Read-only, unauthenticated at the middleware layer — each is gated by an unguessable token
+(ADR-0021/0022/0023). Calendar clients cannot log in, hence the token.
 
-#### `POST /identities/{id}/rotate-share-token`
+#### `GET /ical/all/{token}.ics`
+Every project (global token, rotate via `POST /settings/ical-token/rotate`).
+
+#### `GET /ical/identity/{token}.ics`
+Everything under one identity — reuses that identity's `share_token`.
+
+#### `GET /ical/project/{token}.ics`
+A single project — reuses that project's `share_token`.
+
+#### `GET /ical/node/{token}.ics`
+The `contains` subtree of any node whose type carries the `subscribable` role (ADR-0039).
+
+---
+
+### Notifications
+
+#### `GET /notifications?unread_only=` · `GET /notifications/unread-count`
+#### `PATCH /notifications/{id}/read`
+#### `POST /notifications/mark-all-read`
+#### `DELETE /notifications/{id}`
+
+---
+
+### Saved Filters
+
+Persisted filter/view configurations for task lists.
+
+#### `GET /saved-filters?project_id=` · `GET /saved-filters/{id}`
+#### `POST /saved-filters`
+```json
+{ "name": "string", "project_id": "uuid | null (null = global)",
+  "filters": { "status": "...", "priority": "...", "label_ids": [] } }
+```
+#### `PATCH /saved-filters/{id}` · `DELETE /saved-filters/{id}`
+
+---
+
+### Decisions
+
+A decision record is a label node with `data.type = "decision"` (ADR-0004, reaffirmed in
+ADR-0041), so it is **written** through `POST /nodes` like any other label. These are the
+decision-specific read views:
+
+#### `GET /decisions?project_id=&status=` · `GET /decisions/{id}`
+#### `GET /decisions/{id}/export`
+Plain-text export of the decision record.
+
+---
+
+### Goals
+
+A goal is a container-role node (ADR-0041) — written through `POST /nodes` with
+`"type": "goal"`, and it may `contains` both projects and tasks directly. Progress is
+task-weighted across the whole subtree.
+
+#### `GET /goals?status=` · `GET /goals/{id}`
+Returns per-project breakdown plus subtree progress.
+
+---
+
+### Bulk, Import & Export
+
+#### `POST /projects/{pid}/tasks/bulk-update`
+Multi-select status/priority/assignee/pin and label add/remove in one request (500 max).
+Each task runs the full mutation pipeline; one aggregate `task.bulk_updated` broadcast.
+
+#### `POST /projects/{pid}/tasks/import`
+Import a nested task tree (JSON). Subtasks recurse via `subtasks[]`.
+
+#### `GET /projects/{pid}/tasks/export?format=json|csv`
+
+#### `POST /projects/{pid}/import/github` · `POST /projects/{pid}/import/linear` · `POST /projects/{pid}/import/trello`
+Import issues/cards from an external tool into the project.
+
+#### `POST /projects/{pid}/tasks/reorder`
+```json
+{ "task_ids": ["uuid", "..."] }
+```
+
+---
+
+### CI/CD Triggers (Outbound)
+
+Trigger a build on an external CI/CD system.
+
+#### `POST /cicd/trigger/github`
+#### `POST /cicd/trigger/gitlab`
+#### `POST /cicd/trigger/jenkins`
+#### `POST /cicd/trigger/generic`
+
+---
+
+### Settings
+
+#### `GET /settings`
+Current non-sensitive system settings.
+
+#### `PUT /settings/system`
+Runtime-adjustable scheduler settings — persisted, no restart needed (ADR-0011).
+
+```json
+{ "backup_enabled": true, "backup_hour": 3, "backup_keep": 7 }
+```
+
+#### `GET /settings/ical-token` · `POST /settings/ical-token/rotate`
+#### `POST /settings/change-password`
+#### `GET /settings/dashboard-widgets`
+#### `GET`/`PUT /settings/preferences/{key}`
+
+---
+
+### Backup
+
+Full-data backup and restore (ADR-0013/0024).
+
+#### `GET /backup/status`
+#### `POST /backup/run`
+Create a server-side archive now and apply retention.
+
+#### `GET /backup/export`
+Stream a freshly built archive; nothing stored server-side.
+
+#### `GET /backup/download/{filename}`
+#### `POST /backup/restore` (multipart upload) · `POST /backup/restore/{filename}`
+**Replaces all data.** Requires a `confirm` form field.
+
+---
+
+### Share Management (Internal API)
+
+Share settings for **any shareable-role node** — identity, project, or a user-defined
+shareable type (ADR-0039/0041). These replaced the identity-specific endpoints; the node id
+is whatever you want to share.
+
+#### `POST /nodes/{id}/share/rotate-token`
 Generate a new share token. The old share URL stops working.
 
 ```json
 { "share_token": "new-uuid" }
 ```
 
-#### `POST /identities/{id}/set-pin`
+#### `POST /nodes/{id}/share/set-pin`
 Set a 4–6 digit PIN to protect the share link.
 
 ```json
@@ -748,10 +1030,10 @@ Set a 4–6 digit PIN to protect the share link.
 { "pin": "1234" }
 ```
 
-#### `DELETE /identities/{id}/pin`
+#### `DELETE /nodes/{id}/share/pin`
 Remove PIN protection from the share link.
 
-#### `POST /identities/{id}/set-expiry`
+#### `POST /nodes/{id}/share/set-expiry`
 Set an expiration date for the share link.
 
 ```json
@@ -759,12 +1041,42 @@ Set an expiration date for the share link.
 { "expires_at": "ISO 8601 | null" }
 ```
 
-#### `GET /identities/{id}/share-views`
-Get the total view count for the identity's share page.
+400 if the node's type does not carry the `shareable` role.
+
+#### `GET /identities/{id}/share-views` · `GET /projects/{id}/share-views`
+Share-page access audit (ADR-0025).
+
+#### `POST /projects/{id}/set-expiry`
+Legacy project-only alias for `POST /nodes/{id}/share/set-expiry`. Prefer the node form —
+it works for every shareable-role node, not just projects.
+
+---
+
+### Graph
+
+#### `GET /graph/map?types=&include=data&limit=`
+One-shot `{nodes, edges}` slice of the whole graph (ADR-0037), used by the structure map.
+
+#### `GET /nodes?type=&query=&limit=` · `GET /nodes/{id}`
+#### `GET /nodes/{id}/edges` · `GET /nodes/{id}/contained-tasks`
+#### `GET /nodes/{id}/events`
+Provenance: every graph event touching this node, newest first (ADR-0033).
+
+#### `GET /graph-types/nodes` · `POST /graph-types/nodes`
+#### `PATCH /graph-types/nodes/{key}` · `DELETE /graph-types/nodes/{key}`
+The node-type vocabulary. A type carries a `roles` set — `container`, `task`, `shareable`,
+`subscribable` (ADR-0040) — and that set is what drives write dispatch. Granting a capability
+is a data edit, not a schema change. Built-in types cannot be deleted.
 
 ```json
-{ "view_count": 42 }
+{ "key": "topic", "label": "Topic", "icon": "◆", "color": "#hex",
+  "roles": ["container", "shareable"] }
 ```
+
+#### `GET /graph-types/edges` · `POST /graph-types/edges`
+#### `PATCH /graph-types/edges/{key}` · `DELETE /graph-types/edges/{key}`
+The relationship vocabulary. `is_containment` marks relations that participate in `contains`
+-style traversal; `is_symmetric` marks undirected ones.
 
 ---
 
@@ -774,8 +1086,9 @@ Get the total view count for the identity's share page.
 Real-time event stream. No authentication required (relies on same-origin).
 
 Events broadcast after mutations:
-- `task.created`, `task.updated`, `task.deleted`
-- `project.created`, `project.updated`, `project.deleted`
+- `task.created`, `task.updated`, `task.deleted`, `task.bulk_updated`, `task.imported`
+- `node.created`, `node.updated`, `node.deleted` — non-task node types (project, label,
+  cycle, goal, identity, custom), emitted by the role dispatcher
 
 Message format:
 ```json
@@ -800,6 +1113,24 @@ No authentication required. `callback_token` is the task's unique webhook identi
 { "detail": "Task not found" }
 ```
 
+#### `GET /webhook/events/{task_id}`
+Build history for a task — every inbound CI/CD event received, newest first.
+
+#### `POST /webhook/issues/{project_id}`
+Inbound issue/PR sync from GitHub, Gitea, or GitLab (ADR-0014/0017). The provider is
+auto-detected from the request headers.
+
+---
+
+### Health
+
+#### `GET /health`
+Liveness probe. Never authenticated.
+
+```json
+{ "status": "ok", "scheduler": { "last_tick": "ISO 8601", "ticks": 42 } }
+```
+
 ---
 
 ## External API v1
@@ -810,10 +1141,55 @@ Base path: `/api/v1`
 
 **Scopes**:
 - `read` — GET endpoints
-- `write` — POST, PATCH, DELETE on tasks; send email
-- `admin` — all of the above + DELETE projects
+- `write` — create/update/delete nodes and edges; send email
+- `admin` — all of the above + deleting a container-role node (project/goal/custom container)
 
-A project-scoped key only accesses tasks within that project.
+A project-scoped key only accesses nodes governed by that project, and cannot create a
+top-level project, goal, or identity (ADR-0042).
+
+---
+
+### Nodes — the write surface
+
+#### `GET /api/v1/nodes?type=&query=&limit=`
+Lists nodes visible to the key.
+
+#### `GET /api/v1/nodes/{id}`
+
+#### `POST /api/v1/nodes` — requires `write`
+Creates a node of any registered type. `container_id` / `parent_id` file it under a
+container / parent as `contains` edges. Task-role nodes return an enriched task and fire the
+full reaction pipeline (activity, workflow rules, notifications, broadcast).
+
+```json
+// Request
+{ "type": "task", "title": "Ship the thing", "container_id": "<project id>",
+  "priority": "high", "due_date": "2026-08-01T00:00:00Z",
+  "data": { "description": "markdown" } }
+```
+
+404 if `container_id`/`parent_id` does not exist, 422 for an unknown node type.
+
+#### `PATCH /api/v1/nodes/{id}` — requires `write`
+Partial update. Status changes on a task fire outbound notifications.
+
+#### `DELETE /api/v1/nodes/{id}` — requires `write` (`admin` for containers)
+Task-role nodes tear down their subtree. Container-role nodes cascade their exclusively-owned
+tasks and their labels/cycles (ADR-0043); a task also linked into another container is only
+unlinked.
+
+#### `POST /api/v1/nodes/{id}/edges` — requires `write`
+```json
+{ "target_id": "uuid", "rel_type": "contains | member_of | assigned_to | depends_on | labeled | in_cycle",
+  "position": 0, "data": null }
+```
+
+#### `DELETE /api/v1/nodes/{id}/edges?target_id=&rel_type=` — requires `write`
+
+#### Share facade
+`POST /api/v1/nodes/{id}/share/rotate-token` · `POST /api/v1/nodes/{id}/share/set-pin` ·
+`POST /api/v1/nodes/{id}/share/set-expiry` · `DELETE /api/v1/nodes/{id}/share/pin`
+Available on any node whose type carries the `shareable` role.
 
 ---
 
@@ -825,9 +1201,7 @@ Returns projects accessible to the API key.
 #### `GET /api/v1/projects/{id}`
 Returns project with full task list.
 
-#### `POST /api/v1/projects` — requires `write`
-#### `PATCH /api/v1/projects/{id}` — requires `write`
-#### `DELETE /api/v1/projects/{id}` — requires `admin`
+Project **writes** go through `/api/v1/nodes` with `"type": "project"` — see above.
 
 ---
 
@@ -840,12 +1214,9 @@ Query parameters:
 
 #### `GET /api/v1/projects/{pid}/tasks/{tid}`
 
-#### `POST /api/v1/projects/{pid}/tasks` — requires `write`
-Same schema as internal API. Status changes fire outbound notifications.
-
-#### `PATCH /api/v1/projects/{pid}/tasks/{tid}` — requires `write`
-
-#### `DELETE /api/v1/projects/{pid}/tasks/{tid}` — requires `write`
+Single-task **writes** go through `/api/v1/nodes` — see above. The two batch endpoints below
+are kept because their value is batch semantics (one request, one aggregate broadcast), not a
+second write path: they call the same mutation pipeline per task.
 
 #### `POST /api/v1/projects/{pid}/tasks/bulk` — requires `write`
 ```json
@@ -938,6 +1309,76 @@ High-level platform snapshot optimized for AI agents.
 
 #### `GET /api/v1/activity`
 Query parameters: `project_id`, `limit` (default 50)
+
+---
+
+### Agent Onboarding
+
+#### `GET /api/v1/agent-context` — requires `read`
+**The first endpoint an AI agent should call.** Returns platform capabilities, conventions
+(including the node write surface), per-project `agent_instructions`, each project's top
+active tasks, and a quick-start sequence. Global instructions come from the
+`AGENT_CONTEXT_INSTRUCTIONS` environment variable.
+
+#### `GET /api/v1/tools-schema` — requires `read`
+Machine-readable tool definitions for LLM function calling / tool use.
+
+---
+
+### Graph (External API)
+
+#### `GET /api/v1/graph/map?types=&include=data&limit=`
+One-shot `{nodes, edges}` slice of the graph, filtered to what the key can see.
+
+#### `GET /api/v1/nodes/{id}/edges` · `GET /api/v1/nodes/{id}/contained-tasks`
+#### `GET /api/v1/nodes/{id}/events`
+Provenance/audit trail for the node.
+
+---
+
+### Task Sub-resources (External API)
+
+Relationships and threads on an existing task. All require `write` unless noted.
+
+#### `GET`/`POST /api/v1/projects/{pid}/tasks/{tid}/comments`
+#### `PATCH`/`DELETE /api/v1/projects/{pid}/tasks/{tid}/comments/{cid}`
+#### `GET /api/v1/projects/{pid}/tasks/{tid}/dependencies`
+#### `POST`/`DELETE /api/v1/projects/{pid}/tasks/{tid}/dependencies/{depends_on_id}`
+#### `POST`/`DELETE /api/v1/projects/{pid}/tasks/{tid}/labels/{label_id}`
+#### `GET /api/v1/projects/{pid}/labels`
+
+#### `POST /api/v1/projects/{pid}/tasks/{tid}/progress`
+Agent progress reporting — percentage, notes, and an optional comment in one call.
+
+```json
+{ "progress_pct": 60, "agent_notes": "string (optional)", "comment": "string (optional)" }
+```
+
+Send `X-Agent-Id` alongside the API key to attribute the update to a specific agent.
+
+---
+
+### Subscriptions & Notifications (External API)
+
+#### `GET /api/v1/subscriptions/events`
+The event vocabulary available to subscribe to.
+
+#### `GET`/`POST /api/v1/subscriptions`
+#### `PATCH`/`DELETE /api/v1/subscriptions/{id}`
+Manage outbound webhook/email subscriptions programmatically.
+
+#### `GET /api/v1/notifications` · `GET /api/v1/notifications/unread-count`
+#### `PATCH /api/v1/notifications/{id}/read`
+
+---
+
+### Search & Analytics (External API)
+
+#### `GET /api/v1/search?q=`
+#### `GET /api/v1/analytics/overview`
+#### `GET /api/v1/analytics/velocity`
+#### `GET /api/v1/analytics/heatmap`
+#### `GET /api/v1/analytics/status-trend`
 
 ---
 

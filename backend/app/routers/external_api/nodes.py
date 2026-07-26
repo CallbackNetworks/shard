@@ -225,8 +225,9 @@ async def api_update_node(
     "/nodes/{node_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a node",
-    description="Deletes a node. Task-role nodes tear down their subtree; other types drop the node and "
-    "its edges (contained nodes are orphaned, not cascaded). Requires `write` scope.",
+    description="Deletes a node. Task-role nodes tear down their subtree; container-role nodes cascade "
+    "their exclusively-owned tasks and scoped labels/cycles (ADR-0043); other types drop the node and "
+    "its edges. Deleting a container requires `admin`, anything else `write`.",
     responses={**_auth_errors, 404: {"description": "Node not found"}},
 )
 async def api_delete_node(
