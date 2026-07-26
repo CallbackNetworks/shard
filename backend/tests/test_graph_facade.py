@@ -142,7 +142,6 @@ EXPECTED_NAMES = [
     "find_task_by_callback_token",
     "find_task_by_external",
     "delete_task_tree",
-    "delete_project_and_tasks",
     "set_parent_task",
     "project_id_of_task",
     "project_of_task",

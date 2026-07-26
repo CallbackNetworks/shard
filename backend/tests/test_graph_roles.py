@@ -118,7 +118,7 @@ def test_delete_project_keeps_task_alive_under_custom_container(db, sample_proje
     # Delete-orphan uses the generic container set: a task also held by a custom
     # container survives its project's deletion (ADR-0034).
     ws, task = _custom_container_with_task(db, sample_project)
-    graph.delete_project_and_tasks(db, graph.get_project(db, sample_project.id))
+    graph.delete_container(db, sample_project.id)
     db.commit()
     surviving = graph.get_task(db, task.id)
     assert surviving is not None
@@ -178,7 +178,7 @@ def test_task_like_node_deleted_with_project(db, sample_project):
     from app.models import Node
 
     node = _custom_task_node(db, sample_project)
-    graph.delete_project_and_tasks(db, graph.get_project(db, sample_project.id))
+    graph.delete_container(db, sample_project.id)
     db.commit()
     assert graph.get_task(db, node.id) is None
     assert db.get(Node, node.id) is None

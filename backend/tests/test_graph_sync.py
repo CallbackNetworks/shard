@@ -125,7 +125,7 @@ def test_entity_delete_removes_node(db):
     p = _project(db)
     t = _task(db, p.id)
     tid = t.id
-    graph.delete_project_and_tasks(db, p)
+    graph.delete_container(db, p.id)
     db.commit()
 
     assert db.get(Node, p.id) is None

@@ -7,7 +7,7 @@ unchanged. Private helpers consumed across modules or by tests (``_project_view`
 ``_log_event``, ...) are re-exported deliberately.
 
 Internal dependency order (acyclic): core <- projects <- tasks <- cycles;
-labels/identities/goals build on core (+ projects). ``tasks.delete_project_and_tasks``
+labels/identities/goals build on core (+ projects). ``tasks.delete_container``
 reaches labels/cycles via deferred imports.
 """
 
@@ -150,7 +150,6 @@ from app.services.graph.tasks import (
     container_ids_map,
     create_task,
     delete_container,
-    delete_project_and_tasks,
     delete_task_tree,
     find_task_by_callback_token,
     find_task_by_external,

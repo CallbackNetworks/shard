@@ -303,11 +303,6 @@ def delete_container(db: Session, container_id: str) -> None:
     delete_node(db, container_id)
 
 
-def delete_project_and_tasks(db: Session, project) -> None:
-    """Back-compat wrapper over ``delete_container`` for the ``ProjectView`` surface."""
-    delete_container(db, project.id)
-
-
 def set_parent_task(db: Session, task_id: str, parent_id: str) -> None:
     """Re-parent a task under another task: swap the incoming task->task ``contains`` edge.
 
