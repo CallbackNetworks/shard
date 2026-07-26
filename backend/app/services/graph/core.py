@@ -218,6 +218,13 @@ def create_node(
     # TaskViews and enrich exactly like built-in tasks.
     if node_type in task_type_keys(db):
         node.data = _apply_task_data_defaults(dict(node.data or {}))
+    # Any shareable-role type gets a share_token seeded at creation (ADR-0041 B), so a
+    # node written through the generic surface is immediately shareable — no per-type
+    # create code. An explicit token in ``fields`` wins (setdefault).
+    if node_type in shareable_type_keys(db):
+        data = dict(node.data or {})
+        data.setdefault("share_token", str(uuid.uuid4()))
+        node.data = data
     db.add(node)
     db.flush()
     _log_event(db, "node_created", node_id=node.id, actor=actor, data={"type": node_type})

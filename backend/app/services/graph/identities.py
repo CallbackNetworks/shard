@@ -9,7 +9,6 @@ datetime stored as an ISO string in JSON. ``IdentityView`` exposes the historica
 ``Identity`` attribute surface so ``IdentityOut.model_validate`` keeps working.
 """
 
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -104,7 +103,11 @@ def create_identity(
     avatar: str | None = None,
     actor: str | None = None,
 ) -> IdentityView:
-    """Create a top-level identity node (projects attach via ``member_of``)."""
+    """Create a top-level identity node (projects attach via ``member_of``).
+
+    ``share_token`` is seeded by the write core for any shareable-role type
+    (ADR-0041 B); the remaining share fields default to absent (read as None/False).
+    """
     node = create_node(
         db,
         NODE_IDENTITY,
@@ -113,9 +116,6 @@ def create_identity(
         color=color,
         description=description,
         avatar=avatar,
-        share_token=str(uuid.uuid4()),
-        share_pin_hash=None,
-        share_expires_at=None,
         allow_guest_notes=False,
     )
     return _identity_view(node)

@@ -116,14 +116,22 @@ export const updateApiKey = (id, data) => api.patch(`/api-keys/${id}`, data).the
 export const deleteApiKey = (id) => api.delete(`/api-keys/${id}`)
 export const getAgentSummary = () => api.get('/api-keys/agents/summary').then(r => r.data)
 
-// Identities
+// Identities — reads stay on /identities (enriched: project_count, share state,
+// hub stats); writes go through the generic node/edge surface (ADR-0041 B). An
+// identity is a shareable node; the write core seeds its share_token on create,
+// and project links are `identity -> project` `member_of` edges.
 export const getIdentities = () => api.get('/identities').then(r => r.data)
-export const createIdentity = (data) => api.post('/identities', data).then(r => r.data)
-export const updateIdentity = (id, data) => api.patch(`/identities/${id}`, data).then(r => r.data)
-export const deleteIdentity = (id) => api.delete(`/identities/${id}`)
+export const createIdentity = ({ name, ...rest }) => createNode({ type: 'identity', title: name, data: rest })
+export const updateIdentity = (id, { name, ...rest }) => {
+  const patch = {}
+  if (name !== undefined) patch.title = name
+  if (Object.keys(rest).length) patch.data = rest
+  return updateNode(id, patch)
+}
+export const deleteIdentity = (id) => deleteNode(id)
 export const getIdentityProjects = (identityId) => api.get(`/identities/${identityId}/projects`).then(r => r.data)
-export const linkProjectIdentity = (identityId, projectId) => api.post(`/identities/${identityId}/projects/${projectId}`).then(r => r.data)
-export const unlinkProjectIdentity = (identityId, projectId) => api.delete(`/identities/${identityId}/projects/${projectId}`)
+export const linkProjectIdentity = (identityId, projectId) => attachNodeEdge(identityId, { target_id: projectId, rel_type: 'member_of' })
+export const unlinkProjectIdentity = (identityId, projectId) => detachNodeEdge(identityId, projectId, 'member_of')
 export const getIdentityHubStats = () => api.get('/identities/hub-stats').then(r => r.data)
 
 // Activity
@@ -329,12 +337,13 @@ export const postShareProjectNote = (scope, token, payload) =>
   axios.post(`/share/${scope}/${token}/notes`, payload, { withCredentials: true }).then(r => r.data)
 export const postShareTaskNote = (scope, token, taskId, payload) =>
   axios.post(`/share/${scope}/${token}/tasks/${taskId}/notes`, payload, { withCredentials: true }).then(r => r.data)
-export const rotateShareToken = (identityId) => api.post(`/identities/${identityId}/rotate-share-token`).then(r => r.data)
+// Identity share facade → generic shareable-node endpoints (ADR-0041 B).
+export const rotateShareToken = (identityId) => api.post(`/nodes/${identityId}/share/rotate-token`).then(r => r.data)
 
 // Share PIN & expiry management (authenticated)
-export const setSharePin = (identityId, pin) => api.post(`/identities/${identityId}/set-pin`, { pin }).then(r => r.data)
-export const clearSharePin = (identityId) => api.delete(`/identities/${identityId}/pin`).then(r => r.data)
-export const setShareExpiry = (identityId, expiresAt) => api.post(`/identities/${identityId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
+export const setSharePin = (identityId, pin) => api.post(`/nodes/${identityId}/share/set-pin`, { pin }).then(r => r.data)
+export const clearSharePin = (identityId) => api.delete(`/nodes/${identityId}/share/pin`).then(r => r.data)
+export const setShareExpiry = (identityId, expiresAt) => api.post(`/nodes/${identityId}/share/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
 export const getShareViewCount = (identityId) => api.get(`/identities/${identityId}/share-views`).then(r => r.data)
 export const setProjectShareExpiry = (projectId, expiresAt) => api.post(`/projects/${projectId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
 export const getProjectShareViewCount = (projectId) => api.get(`/projects/${projectId}/share-views`).then(r => r.data)

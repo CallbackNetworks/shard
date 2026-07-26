@@ -18,7 +18,9 @@ def test_create_and_get_node(db):
 
 
 def test_create_node_folds_unknown_fields_into_data(db):
-    node = graph.create_node(db, graph.NODE_PROJECT, title="Shard", description="a tool", repo_url="http://x")
+    # A plain no-role type (label): no task-data defaults and no seeded share_token
+    # (a shareable type like project would also carry a share_token — see ADR-0041 B).
+    node = graph.create_node(db, graph.NODE_LABEL, title="Shard", description="a tool", repo_url="http://x")
     db.commit()
     assert node.data == {"description": "a tool", "repo_url": "http://x"}
     assert node.title == "Shard"
@@ -28,6 +30,26 @@ def test_create_node_with_explicit_id(db):
     node = graph.create_node(db, graph.NODE_LABEL, id="fixed-id", title="bug")
     db.commit()
     assert node.id == "fixed-id"
+
+
+def test_create_node_seeds_share_token_for_shareable_types(db):
+    # ADR-0041 B: the write core seeds a share_token for any shareable-role type
+    # (project/identity/custom), so a node written generically is immediately shareable.
+    project = graph.create_node(db, graph.NODE_PROJECT, title="Shard")
+    identity = graph.create_node(db, graph.NODE_IDENTITY, title="Me")
+    label = graph.create_node(db, graph.NODE_LABEL, title="bug")
+    db.commit()
+    assert (project.data or {}).get("share_token")
+    assert (identity.data or {}).get("share_token")
+    # A plain no-role type gets no token.
+    assert "share_token" not in (label.data or {})
+
+
+def test_create_node_respects_explicit_share_token(db):
+    # An explicit token wins over the seeded default (setdefault).
+    node = graph.create_node(db, graph.NODE_PROJECT, title="Shard", share_token="mine")
+    db.commit()
+    assert node.data["share_token"] == "mine"
 
 
 def test_update_node_splits_columns_and_data(db):

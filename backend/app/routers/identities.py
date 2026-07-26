@@ -1,17 +1,21 @@
-import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog
-from app.routers.deps import get_identity_or_404, get_project_or_404
-from app.schemas import IdentityCreate, IdentityHubOut, IdentityOut, IdentityUpdate
+from app.routers.deps import get_identity_or_404
+from app.schemas import IdentityHubOut, IdentityOut
 from app.services import graph
 
+# Reads only. An identity is a ``shareable``/``subscribable`` node whose create/update/
+# delete go through the single graph write surface ``/api/nodes`` (ADR-0041 B — the write
+# core seeds the ``share_token`` for any shareable type); project links are ``member_of``
+# edges via ``/api/nodes/{id}/edges``, and the share facade (rotate-token/PIN/expiry) uses
+# the generic ``/api/nodes/{id}/share/*`` endpoints. This router keeps the enriched identity
+# reads (list, hub stats, linked projects, share-view count) that ``IdentityOut`` callers need.
 router = APIRouter(prefix="/identities", tags=["identities"])
 
 
@@ -93,56 +97,7 @@ def get_hub_stats(db: Session = Depends(get_db)):
     return {"identities": result, "totals": totals}
 
 
-@router.post("", response_model=IdentityOut, status_code=status.HTTP_201_CREATED)
-def create_identity(body: IdentityCreate, db: Session = Depends(get_db)):
-    identity = graph.create_identity(db, **body.model_dump())
-    db.commit()
-    return _enrich(identity, db)
-
-
-@router.patch("/{identity_id}", response_model=IdentityOut)
-def update_identity(identity_id: str, body: IdentityUpdate, db: Session = Depends(get_db)):
-    get_identity_or_404(identity_id, db)
-    identity = graph.update_identity(db, identity_id, **body.model_dump(exclude_none=True))
-    db.commit()
-    return _enrich(identity, db)
-
-
-@router.post("/{identity_id}/rotate-share-token")
-def rotate_share_token(identity_id: str, db: Session = Depends(get_db)):
-    get_identity_or_404(identity_id, db)
-    token = str(uuid.uuid4())
-    graph.update_identity(db, identity_id, share_token=token)
-    db.commit()
-    return {"share_token": token}
-
-
-@router.delete("/{identity_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_identity(identity_id: str, db: Session = Depends(get_db)):
-    get_identity_or_404(identity_id, db)
-    graph.delete_identity(db, identity_id)
-    db.commit()
-
-
-# ── Project ↔ Identity linking ────────────────────────────────────
-
-
-@router.post("/{identity_id}/projects/{project_id}", status_code=status.HTTP_201_CREATED)
-def link_project(identity_id: str, project_id: str, db: Session = Depends(get_db)):
-    get_identity_or_404(identity_id, db)
-    get_project_or_404(project_id, db)
-    if project_id in graph.project_ids_for_identity(db, identity_id):
-        return {"status": "already linked"}
-    graph.link_membership(db, identity_id, project_id)
-    db.commit()
-    return {"status": "linked"}
-
-
-@router.delete("/{identity_id}/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def unlink_project(identity_id: str, project_id: str, db: Session = Depends(get_db)):
-    if not graph.unlink_membership(db, identity_id, project_id):
-        raise HTTPException(status_code=404, detail="Link not found")
-    db.commit()
+# ── Reads: linked projects ────────────────────────────────────────
 
 
 @router.get("/{identity_id}/projects")
@@ -151,49 +106,7 @@ def get_identity_projects(identity_id: str, db: Session = Depends(get_db)):
     return [{"id": p.id, "name": p.name, "status": p.status} for p in graph.projects_for_identity(db, identity_id)]
 
 
-# ── Share PIN management ─────────────────────────────────────────
-
-
-class SetPinBody(BaseModel):
-    pin: str
-
-
-@router.post("/{identity_id}/set-pin")
-def set_identity_pin(identity_id: str, body: SetPinBody, db: Session = Depends(get_db)):
-    from app.services.pin_utils import hash_pin
-
-    get_identity_or_404(identity_id, db)
-    if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
-    graph.update_identity(db, identity_id, share_pin_hash=hash_pin(body.pin))
-    db.commit()
-    return {"ok": True}
-
-
-@router.delete("/{identity_id}/pin")
-def clear_identity_pin(identity_id: str, db: Session = Depends(get_db)):
-    get_identity_or_404(identity_id, db)
-    graph.update_identity(db, identity_id, share_pin_hash=None)
-    db.commit()
-    return {"ok": True}
-
-
-# ── Share expiry management ────────���─────────────────────────────
-
-
-class SetExpiryBody(BaseModel):
-    expires_at: datetime | None
-
-
-@router.post("/{identity_id}/set-expiry")
-def set_identity_expiry(identity_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
-    get_identity_or_404(identity_id, db)
-    graph.update_identity(db, identity_id, share_expires_at=body.expires_at)
-    db.commit()
-    return {"ok": True}
-
-
-# ── Share view count ─────────────────────────────────────────────
+# ── Reads: share-view count ───────────────────────────────────────
 
 
 @router.get("/{identity_id}/share-views")
