@@ -15,6 +15,7 @@ from app.routers.external_api.auth import (
 )
 from app.routers.external_api.helpers import _get_task_or_404
 from app.services import graph
+from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 
 sub_router = APIRouter()
 
@@ -58,7 +59,7 @@ def api_get_dependencies(
         404: {"description": "Task not found"},
     },
 )
-def api_add_dependency(
+async def api_add_dependency(
     project_id: str,
     task_id: str,
     depends_on_id: str,
@@ -76,7 +77,7 @@ def api_add_dependency(
     graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
     graph.ensure_node(db, depends_on_id, graph.NODE_TASK, title=blocker.title)
     graph.add_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON)
-    db.commit()
+    await dispatch_edge_added(db, task_id, depends_on_id, graph.REL_DEPENDS_ON, actor=f"api:{api_key.name}")
     return {"task_id": task_id, "depends_on_id": depends_on_id}
 
 
@@ -87,7 +88,7 @@ def api_add_dependency(
     description="Removes the blocked-by relationship between two tasks. Requires `write` scope.",
     responses={**_auth_errors, 404: {"description": "Dependency not found"}},
 )
-def api_remove_dependency(
+async def api_remove_dependency(
     project_id: str,
     task_id: str,
     depends_on_id: str,
@@ -98,4 +99,4 @@ def api_remove_dependency(
     _check_project_access(api_key, project_id)
     if not graph.remove_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON):
         raise HTTPException(status_code=404, detail="Dependency not found")
-    db.commit()
+    await dispatch_edge_removed(db, task_id, depends_on_id, graph.REL_DEPENDS_ON, actor=f"api:{api_key.name}")

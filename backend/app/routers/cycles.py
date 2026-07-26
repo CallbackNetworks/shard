@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
-from app.routers.issue_sync import sync_task_milestone_to_external
 from app.schemas import CycleOut
 from app.services import graph
+from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.task_mutations import finalize_task_create
 from app.services.ws_manager import ws_manager
 
@@ -50,12 +50,10 @@ def get_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
 async def add_task_to_cycle(project_id: str, cycle_id: str, task_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
     get_cycle_or_404(cycle_id, db, project_id=project_id)
-    task = get_task_or_404(task_id, db, project_id=project_id)
+    get_task_or_404(task_id, db, project_id=project_id)
     if task_id not in graph.task_ids_in_cycle(db, cycle_id):
         graph.add_to_cycle(db, cycle_id, task_id)
-        db.commit()
-        if task.external_provider:
-            await sync_task_milestone_to_external(task, db)
+        await dispatch_edge_added(db, task_id, cycle_id, graph.REL_IN_CYCLE)
     return {"cycle_id": cycle_id, "task_id": task_id}
 
 
@@ -64,10 +62,7 @@ async def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, d
     _get_project_or_404(project_id, db)
     if not graph.remove_from_cycle(db, cycle_id, task_id):
         raise HTTPException(status_code=404, detail="Task not in cycle")
-    db.commit()
-    task = graph.get_task(db, task_id)
-    if task and task.external_provider:
-        await sync_task_milestone_to_external(task, db)
+    await dispatch_edge_removed(db, task_id, cycle_id, graph.REL_IN_CYCLE)
 
 
 @router.post("/{cycle_id}/duplicate", response_model=CycleOut, status_code=status.HTTP_201_CREATED)

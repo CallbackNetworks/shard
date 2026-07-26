@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ActivityLog, Comment, Node, WorkflowRule
 from app.services import graph
+from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.task_mutations import apply_task_update, finalize_task_create
 
 TOOLS = [
@@ -241,7 +242,7 @@ async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
         elif tool_name == "create_subtask":
             return await _tool_create_subtask(db, **tool_input)
         elif tool_name == "manage_labels":
-            return _tool_manage_labels(db, **tool_input)
+            return await _tool_manage_labels(db, **tool_input)
         elif tool_name == "analyze_workload":
             return _tool_analyze_workload(db, tool_input.get("project_id"))
         elif tool_name == "search":
@@ -253,7 +254,7 @@ async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
         elif tool_name == "create_decision":
             return _tool_create_decision(db, **tool_input)
         elif tool_name == "tag_task_with_decision":
-            return _tool_tag_task_with_decision(db, **tool_input)
+            return await _tool_tag_task_with_decision(db, **tool_input)
         elif tool_name == "batch_create_tasks":
             return await _tool_batch_create_tasks(db, **tool_input)
         else:
@@ -396,7 +397,7 @@ async def _tool_create_subtask(db: Session, parent_task_id: str, title: str, pri
     return json.dumps({"id": task.id, "title": task.title, "parent_id": parent_task_id})
 
 
-def _tool_manage_labels(
+async def _tool_manage_labels(
     db: Session, action: str, project_id: str | None = None, task_id: str | None = None, label_id: str | None = None
 ) -> str:
     if action == "list":
@@ -410,13 +411,13 @@ def _tool_manage_labels(
         if label_id in graph.label_ids_for_task(db, task_id):
             return "Label already assigned"
         graph.set_label(db, task_id, label_id)
-        db.commit()
+        await dispatch_edge_added(db, task_id, label_id, graph.REL_LABELED, actor="assistant")
         return json.dumps({"status": "added", "task_id": task_id, "label_id": label_id})
     elif action == "remove":
         if not task_id or not label_id:
             return "task_id and label_id required for remove action"
         if graph.unset_label(db, task_id, label_id):
-            db.commit()
+            await dispatch_edge_removed(db, task_id, label_id, graph.REL_LABELED, actor="assistant")
         return json.dumps({"status": "removed", "task_id": task_id, "label_id": label_id})
     return f"Unknown label action: {action}"
 
@@ -617,7 +618,7 @@ def _tool_create_decision(db: Session, project_id: str, name: str, description: 
     return json.dumps({"id": label.id, "name": label.name, "status": "proposed", "source": "ai"})
 
 
-def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: str, reason: str) -> str:
+async def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: str, reason: str) -> str:
     import uuid
 
     task = graph.get_task(db, task_id)
@@ -629,6 +630,7 @@ def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: s
         return f"Decision label {decision_label_id} not found"
 
     # Add label to task if not already attached (idempotent)
+    newly_tagged = decision_label_id not in graph.label_ids_for_task(db, task_id)
     graph.set_label(db, task_id, decision_label_id)
 
     # Add comment explaining the relevance
@@ -639,7 +641,10 @@ def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: s
         author="AI Assistant",
     )
     db.add(comment)
-    db.commit()
+    if newly_tagged:
+        await dispatch_edge_added(db, task_id, decision_label_id, graph.REL_LABELED, actor="assistant")
+    else:
+        db.commit()
     return json.dumps({"status": "tagged", "task_id": task_id, "decision": label.name, "reason": reason})
 
 

@@ -28,7 +28,13 @@ from app.routers.external_api.auth import (
 from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
 from app.services import graph
 from app.services.enrichment import enrich_task
-from app.services.graph_dispatch import dispatch_node_created, dispatch_node_deleted, dispatch_node_updated
+from app.services.graph_dispatch import (
+    dispatch_edge_added,
+    dispatch_edge_removed,
+    dispatch_node_created,
+    dispatch_node_deleted,
+    dispatch_node_updated,
+)
 from app.services.task_mutations import AgentKeyError
 
 sub_router = APIRouter()
@@ -298,7 +304,7 @@ def api_list_edges(
     response_model=EdgeOut,
     responses={**_auth_errors, 404: {"description": "Node not found"}, 422: {}},
 )
-def api_attach_edge(
+async def api_attach_edge(
     node_id: str,
     body: EdgeCreate,
     db: Session = Depends(get_db),
@@ -317,7 +323,7 @@ def api_attach_edge(
         edge = graph.add_edge(db, node_id, body.target_id, body.rel_type, position=body.position, data=body.data)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    db.commit()
+    await dispatch_edge_added(db, node_id, body.target_id, body.rel_type, actor=f"api:{api_key.name}")
     db.refresh(edge)
     return edge
 
@@ -328,7 +334,7 @@ def api_attach_edge(
     summary="Detach an edge",
     responses={**_auth_errors, 404: {"description": "Edge not found"}},
 )
-def api_detach_edge(
+async def api_detach_edge(
     node_id: str,
     target_id: str = Query(...),
     rel_type: str = Query(...),
@@ -340,7 +346,7 @@ def api_detach_edge(
     _check_node_access(api_key, db, source)
     if not graph.remove_edge(db, node_id, target_id, rel_type):
         raise HTTPException(status_code=404, detail="edge not found")
-    db.commit()
+    await dispatch_edge_removed(db, node_id, target_id, rel_type, actor=f"api:{api_key.name}")
 
 
 @sub_router.get(

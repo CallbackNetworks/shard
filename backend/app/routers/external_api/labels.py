@@ -16,8 +16,7 @@ from app.routers.external_api.auth import (
 from app.routers.external_api.helpers import _get_task_or_404
 from app.schemas import LabelOut
 from app.services import graph
-from app.services.activity import log_activity
-from app.services.ws_manager import ws_manager
+from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 
 sub_router = APIRouter()
 
@@ -64,23 +63,13 @@ async def api_add_label_to_task(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    task = _get_task_or_404(project_id, task_id, db)
+    _get_task_or_404(project_id, task_id, db)
     label = graph.get_label(db, label_id, project_id=project_id)
     if not label:
         raise HTTPException(status_code=404, detail="Label not found")
     if label_id not in graph.label_ids_for_task(db, task_id):
         graph.set_label(db, task_id, label_id)
-        log_activity(
-            db,
-            "task.label_added",
-            project_id=project_id,
-            task_id=task_id,
-            actor=f"api:{api_key.name}",
-            detail=f'Label "{label.name}" added to task "{task.title}" via API',
-            meta={"label_id": label_id, "label_name": label.name, "api_key": api_key.name},
-        )
-        db.commit()
-        await ws_manager.broadcast("task.updated", {"project_id": project_id, "task_id": task_id})
+        await dispatch_edge_added(db, task_id, label_id, graph.REL_LABELED, actor=f"api:{api_key.name}")
     return label
 
 
@@ -91,7 +80,7 @@ async def api_add_label_to_task(
     description="Removes a label assignment from a task. Requires `write` scope.",
     responses={**_auth_errors, 404: {"description": "Label not assigned to task"}},
 )
-def api_remove_label_from_task(
+async def api_remove_label_from_task(
     project_id: str,
     task_id: str,
     label_id: str,
@@ -102,4 +91,4 @@ def api_remove_label_from_task(
     _check_project_access(api_key, project_id)
     if not graph.unset_label(db, task_id, label_id):
         raise HTTPException(status_code=404, detail="Label not assigned to task")
-    db.commit()
+    await dispatch_edge_removed(db, task_id, label_id, graph.REL_LABELED, actor=f"api:{api_key.name}")

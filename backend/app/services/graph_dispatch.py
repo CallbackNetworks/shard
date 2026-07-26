@@ -16,10 +16,14 @@ pipeline (ADR-0038: ``finalize_task_create`` / ``apply_task_update``) so a task
 written through ``/api/nodes`` behaves exactly like one written through
 ``/api/projects/{id}/tasks``.
 
-Roles are still read from the ``node_types`` capability booleans here (via
-``graph.task_type_keys`` / ``graph.container_type_keys``). ADR-0040 stage 2
-migrates those to a ``roles`` set; at that point ``_has_task_role`` becomes a
-``has_role`` lookup with no change to the dispatch logic below.
+Roles are read from the ``node_types`` ``roles`` set (ADR-0040 stage 2) via
+``graph.task_type_keys`` / ``graph.container_type_keys``.
+
+``dispatch_edge_added`` / ``dispatch_edge_removed`` below apply the same idea to
+relationships (ADR-0045): a ``labeled`` edge means the same thing whether it was
+written through ``/api/projects/{p}/tasks/{t}/labels/{l}`` or through the generic
+``/api/nodes/{id}/edges``, so the reaction is keyed by ``rel_type`` and the
+endpoints' roles rather than by the route that happened to be called.
 """
 
 from sqlalchemy.orm import Session
@@ -27,6 +31,7 @@ from sqlalchemy.orm import Session
 from app.models import Node
 from app.services import graph
 from app.services.activity import log_activity
+from app.services.rules_engine import run_rules
 from app.services.task_mutations import apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
 
@@ -141,3 +146,172 @@ async def dispatch_node_deleted(db: Session, node: Node, *, actor: str | None = 
         graph.delete_node(db, node_id, actor=actor)
     db.commit()
     await ws_manager.broadcast("node.deleted", {"node_id": node_id, "type": node_type})
+
+
+# ── Edge dispatch (ADR-0045) ─────────────────────────────────────────────────
+# Relationship writes had the same defect nodes had before ADR-0040: the named
+# sub-resources (labels, cycle assignment, dependencies, memberships) each fired
+# their own ad-hoc subset of reactions, while the generic /nodes/{id}/edges
+# surface fired none. Adding the same edge two different ways produced two
+# different sets of side-effects, and three of the four named routes never
+# broadcast at all, so a label added in one browser tab never reached another.
+
+
+async def _sync_task_labels(db: Session, task_id: str) -> None:
+    """Push a task's label set outward when it is linked to an external issue."""
+    # Deferred import: issue_sync's router module imports this layer's siblings
+    # at load time; same pattern as task_mutations.
+    from app.routers.issue_sync import sync_labels_to_external
+
+    task = graph.get_task(db, task_id)
+    if task and task.external_provider:
+        await sync_labels_to_external(task, db)
+
+
+async def _sync_task_milestone(db: Session, task_id: str) -> None:
+    """Mirror a task's cycle membership onto the external issue's milestone."""
+    from app.routers.issue_sync import sync_task_milestone_to_external
+
+    task = graph.get_task(db, task_id)
+    if task and task.external_provider:
+        await sync_task_milestone_to_external(task, db)
+
+
+async def _broadcast_task_touched(db: Session, enabled: bool, *task_ids: str) -> None:
+    """Tell listeners the given tasks changed shape, deduplicated."""
+    if not enabled:
+        return
+    for task_id in dict.fromkeys(task_ids):
+        await ws_manager.broadcast(
+            "task.updated",
+            {"task_id": task_id, "project_id": graph.project_id_of_task(db, task_id)},
+        )
+
+
+def _log_label_change(db: Session, task_id: str, label_id: str, *, added: bool, actor: str | None) -> None:
+    """Record a label assignment in the activity feed."""
+    task = graph.get_task(db, task_id)
+    label = db.get(Node, label_id)
+    if task is None or label is None:
+        return
+    verb = "added to" if added else "removed from"
+    log_activity(
+        db,
+        "task.label_added" if added else "task.label_removed",
+        project_id=graph.project_id_of_task(db, task_id),
+        task_id=task_id,
+        actor=actor,
+        detail=f'Label "{label.title}" {verb} task "{task.title}"',
+        meta={"label_id": label_id, "label_name": label.title},
+    )
+
+
+async def _dispatch_edge(
+    db: Session,
+    source_id: str,
+    target_id: str,
+    rel_type: str,
+    *,
+    added: bool,
+    actor: str | None,
+    commit: bool,
+    broadcast: bool,
+) -> None:
+    """Shared body for edge add/remove: same reactions, different activity verb.
+
+    Activity is written first so it lands in the caller's transaction, then the
+    single optional commit, then the out-of-transaction reactions (rules,
+    outbound sync, broadcast).
+    """
+    target = db.get(Node, target_id)
+
+    if rel_type == graph.REL_LABELED:
+        # task -> label
+        _log_label_change(db, source_id, target_id, added=added, actor=actor)
+    elif rel_type == graph.REL_CONTAINS and target is not None and _has_task_role(db, target.type):
+        # container -> task: a membership change is user-visible enough to earn
+        # an activity entry of its own.
+        log_activity(
+            db,
+            "task.membership_added" if added else "task.membership_removed",
+            project_id=source_id,
+            task_id=target_id,
+            actor=actor or "api",
+            detail=f"Task {'linked into' if added else 'unlinked from'} container {source_id}",
+            meta={"container_id": source_id},
+        )
+
+    if commit:
+        db.commit()
+
+    if rel_type == graph.REL_LABELED:
+        if added:
+            # "task.label_added" is an advertised workflow trigger; before edge
+            # dispatch existed no write path ever fired it (ADR-0045).
+            task = graph.get_task(db, source_id)
+            if task is not None:
+                await run_rules(db, "task.label_added", task, {"label_id": target_id})
+                if commit:
+                    db.commit()
+        await _sync_task_labels(db, source_id)
+        await _broadcast_task_touched(db, broadcast, source_id)
+        return
+
+    if rel_type == graph.REL_IN_CYCLE:
+        # task -> cycle
+        await _sync_task_milestone(db, source_id)
+        await _broadcast_task_touched(db, broadcast, source_id)
+        return
+
+    if rel_type == graph.REL_DEPENDS_ON:
+        # blocked task -> prerequisite task; both ends change their blocked/blocking view
+        await _broadcast_task_touched(db, broadcast, source_id, target_id)
+        return
+
+    if rel_type == graph.REL_CONTAINS and target is not None and _has_task_role(db, target.type):
+        await _broadcast_task_touched(db, broadcast, target_id)
+        return
+
+    if broadcast:
+        await ws_manager.broadcast(
+            "node.linked" if added else "node.unlinked",
+            {"source_id": source_id, "target_id": target_id, "rel_type": rel_type},
+        )
+
+
+async def dispatch_edge_added(
+    db: Session,
+    source_id: str,
+    target_id: str,
+    rel_type: str,
+    *,
+    actor: str | None = None,
+    commit: bool = True,
+    broadcast: bool = True,
+) -> None:
+    """Fire the reactions for a newly added edge, keyed by ``rel_type``.
+
+    The edge must already be written and flushed. With ``commit=False`` the
+    caller owns the transaction (batch loops); reactions still run.
+    ``broadcast=False`` suppresses the per-edge WebSocket event for callers that
+    emit one aggregate event instead.
+    """
+    await _dispatch_edge(
+        db, source_id, target_id, rel_type, added=True, actor=actor, commit=commit, broadcast=broadcast
+    )
+
+
+async def dispatch_edge_removed(
+    db: Session,
+    source_id: str,
+    target_id: str,
+    rel_type: str,
+    *,
+    actor: str | None = None,
+    commit: bool = True,
+    broadcast: bool = True,
+) -> None:
+    """Fire the reactions for a removed edge, keyed by ``rel_type``."""
+    await _dispatch_edge(
+        db, source_id, target_id, rel_type, added=False, actor=actor, commit=commit, broadcast=broadcast
+    )

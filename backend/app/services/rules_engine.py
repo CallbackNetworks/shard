@@ -22,7 +22,21 @@ SUPPORTED_TRIGGERS = {
 }
 
 
-def _eval_condition(cond: dict, task: "graph.TaskView", context: dict) -> bool:
+def _session_of(task) -> Session | None:
+    """Best-effort session for a task.
+
+    ``run_rules`` is handed a ``TaskView`` (node-only model, ADR-0033), which is
+    not a mapped instance, so ``object_session`` raises on it; callers therefore
+    pass ``db`` explicitly. The fallback keeps direct calls with a mapped ``Node``
+    working.
+    """
+    try:
+        return object_session(task)
+    except Exception:
+        return None
+
+
+def _eval_condition(cond: dict, task: "graph.TaskView", context: dict, db: Session | None = None) -> bool:
     field = cond.get("field", "")
     op = cond.get("op", "eq")
     value = cond.get("value", "")
@@ -36,8 +50,8 @@ def _eval_condition(cond: dict, task: "graph.TaskView", context: dict) -> bool:
     elif field == "title_contains":
         return (value.lower() in task.title.lower()) if op != "neq" else (value.lower() not in task.title.lower())
     elif field == "has_label":
-        db = object_session(task)
-        label_names = [lb.name for lb in graph.labels_for_task(db, task.id)] if db is not None else []
+        session = db if db is not None else _session_of(task)
+        label_names = [lb.name for lb in graph.labels_for_task(session, task.id)] if session is not None else []
         return value in label_names
     else:
         return False
@@ -128,7 +142,7 @@ async def run_rules(
 
         try:
             # Evaluate conditions (AND logic)
-            all_match = all(_eval_condition(c, task, context) for c in (rule.conditions or []))
+            all_match = all(_eval_condition(c, task, context, db) for c in (rule.conditions or []))
             if not all_match:
                 continue
 

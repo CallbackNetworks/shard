@@ -20,6 +20,7 @@ from app.schemas import (
 )
 from app.services import graph
 from app.services.activity import log_activity
+from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.ical_token import verify_global_ical_token
 from app.services.task_mutations import apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
@@ -119,9 +120,16 @@ async def bulk_update_tasks(
     updated_ids: list[str] = []
     for tid in ids:
         for label_id in body.add_label_ids:
-            graph.set_label(db, tid, label_id)
+            if label_id not in graph.label_ids_for_task(db, tid):
+                graph.set_label(db, tid, label_id)
+                await dispatch_edge_added(
+                    db, tid, label_id, graph.REL_LABELED, actor="bulk", commit=False, broadcast=False
+                )
         for label_id in body.remove_label_ids:
-            graph.unset_label(db, tid, label_id)
+            if graph.unset_label(db, tid, label_id):
+                await dispatch_edge_removed(
+                    db, tid, label_id, graph.REL_LABELED, actor="bulk", commit=False, broadcast=False
+                )
         if field_changes:
             # Full pipeline per task (rules, notifications, activity); the
             # aggregate broadcast below replaces per-task ws events.

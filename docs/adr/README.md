@@ -46,3 +46,4 @@
 | [0042](0042-external-api-graph-native-write-surface.md) | External API v1 Collapses to the Graph-Native Write Surface | Accepted | 2026-07-26 |
 | [0043](0043-collapse-container-scoped-writes-to-nodes.md) | Internal project/label/cycle Writes Collapse to /api/nodes (container-delete cascade role) | Accepted | 2026-07-26 |
 | [0044](0044-close-the-task-pipeline-bypasses.md) | 關閉 Task Pipeline 的旁路，並以 guard test 固定此不變式 | Accepted | 2026-07-26 |
+| [0045](0045-edge-dispatch-and-relationship-write-collapse.md) | 關係寫入收斂到 edge dispatcher，並讓 `task.label_added` 真正生效 | Accepted | 2026-07-26 |

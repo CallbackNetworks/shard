@@ -13,6 +13,7 @@ from app.schemas import ReorderRequest, TaskOut, TaskWithSubtasksOut
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.enrichment import enrich_task
+from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["tasks"])
@@ -104,7 +105,7 @@ async def create_external_issue(
 
 
 @router.post("/{task_id}/dependencies/{depends_on_id}", status_code=status.HTTP_201_CREATED)
-def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
+async def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
     """Mark task_id as blocked by depends_on_id (depends_on must complete first)."""
     _get_project_or_404(project_id, db)
     task = get_task_or_404(task_id, db, project_id=project_id)
@@ -117,17 +118,17 @@ def add_dependency(project_id: str, task_id: str, depends_on_id: str, db: Sessio
     graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
     graph.ensure_node(db, depends_on_id, graph.NODE_TASK, title=blocker.title)
     graph.add_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON)
-    db.commit()
+    await dispatch_edge_added(db, task_id, depends_on_id, graph.REL_DEPENDS_ON)
     return {"task_id": task_id, "depends_on_id": depends_on_id}
 
 
 @router.delete("/{task_id}/dependencies/{depends_on_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
+async def remove_dependency(project_id: str, task_id: str, depends_on_id: str, db: Session = Depends(get_db)):
     """Remove the blocked-by dependency between task_id and depends_on_id."""
     _get_project_or_404(project_id, db)
     if not graph.remove_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON):
         raise HTTPException(status_code=404, detail="Dependency not found")
-    db.commit()
+    await dispatch_edge_removed(db, task_id, depends_on_id, graph.REL_DEPENDS_ON)
 
 
 @router.post("/{task_id}/memberships/{target_project_id}", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
@@ -146,16 +147,7 @@ async def add_membership(project_id: str, task_id: str, target_project_id: str, 
     graph.ensure_node(db, target_project_id, graph.NODE_PROJECT)
     graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
     graph.add_edge(db, target_project_id, task_id, graph.REL_CONTAINS)
-    log_activity(
-        db,
-        "task.membership_added",
-        project_id=target_project_id,
-        task_id=task_id,
-        actor="api",
-        detail=f"Task linked into project {target_project_id}",
-    )
-    db.commit()
-    await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": target_project_id})
+    await dispatch_edge_added(db, target_project_id, task_id, graph.REL_CONTAINS, actor="api")
     return enrich_task(graph.get_task(db, task_id), db)
 
 
@@ -172,16 +164,7 @@ async def remove_membership(project_id: str, task_id: str, target_project_id: st
     if target_project_id not in member_ids:
         raise HTTPException(status_code=404, detail="Membership not found")
     graph.remove_edge(db, target_project_id, task_id, graph.REL_CONTAINS)
-    log_activity(
-        db,
-        "task.membership_removed",
-        project_id=target_project_id,
-        task_id=task_id,
-        actor="api",
-        detail=f"Task unlinked from project {target_project_id}",
-    )
-    db.commit()
-    await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": target_project_id})
+    await dispatch_edge_removed(db, target_project_id, task_id, graph.REL_CONTAINS, actor="api")
 
 
 @router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
@@ -252,14 +235,5 @@ async def file_task_into_project(task_id: str, project_id: str, db: Session = De
     graph.ensure_node(db, project_id, graph.NODE_PROJECT)
     graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
     graph.add_edge(db, project_id, task_id, graph.REL_CONTAINS)
-    log_activity(
-        db,
-        "task.membership_added",
-        project_id=project_id,
-        task_id=task_id,
-        actor="api",
-        detail=f"Task filed into project {project_id}",
-    )
-    db.commit()
-    await ws_manager.broadcast("task.updated", {"task_id": task_id, "project_id": project_id})
+    await dispatch_edge_added(db, project_id, task_id, graph.REL_CONTAINS, actor="api")
     return enrich_task(graph.get_task(db, task_id), db)

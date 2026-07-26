@@ -44,7 +44,10 @@ Two consequences shape the whole backend:
    *means* from the target's roles. Creating a `container`-role node seeds its share token;
    deleting one cascades its owned tasks. Because the reaction hangs off the state
    transition rather than the endpoint, a node cannot be created through a "generic" path
-   and silently skip the behaviour its type implies.
+   and silently skip the behaviour its type implies. Relationships work the same way
+   (ADR-0045): `dispatch_edge_added` / `_removed` key the reaction off the edge's
+   `rel_type` and its endpoints' roles, so a `labeled` edge behaves identically whether
+   it was written through `/tasks/{t}/labels/{l}` or through `/nodes/{id}/edges`.
 
 ## Backend (`backend/app/`)
 
@@ -132,7 +135,12 @@ so the rest of the codebase reads as if the old tables still existed.
 / `_updated` / `_deleted` look up the target type's roles and run the matching domain
 behaviour: task-role nodes go through the task pipeline, container-role nodes seed share
 tokens on create and cascade on delete (`graph.delete_container`), everything else gets a
-plain node write.
+plain node write. `dispatch_edge_added` / `dispatch_edge_removed` do the same for
+relationships: `labeled` fires the label activity, the `task.label_added` workflow trigger
+and outbound label sync; `in_cycle` fires milestone sync; `depends_on` broadcasts both
+endpoints; `contains` onto a task-role node logs a membership change. Both take
+`commit=False` / `broadcast=False` for batch callers that own the transaction and emit one
+aggregate event.
 
 **`task_mutations.py`** — the single post-mutation sequence for tasks (ADR-0038).
 `finalize_task_create` and `apply_task_update` run, in order: activity log → workflow rules →
@@ -467,6 +475,8 @@ POST /api/nodes { type, title, container_id?, parent_id?, ... }
 ```
 
 `PATCH` follows the same shape through `dispatch_node_updated` → `apply_task_update`.
+Edge writes follow the parallel path: `graph.add_edge` / `set_label` / `add_to_cycle`
+→ `dispatch_edge_added()` → reaction chosen by `rel_type`.
 `DELETE` routes container-role nodes to `graph.delete_container()`, which removes the
 container, its exclusively-owned tasks, and its scoped labels and cycles, while unlinking
 tasks that also live in another container (ADR-0043).

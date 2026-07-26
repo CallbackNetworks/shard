@@ -1,4 +1,4 @@
-"""Guard: every task create/update path runs the unified pipeline (ADR-0038/0044).
+"""Guard: task and edge writes run their dispatchers (ADR-0038/0044/0045).
 
 ``graph.create_task`` and ``graph.update_task`` write the node and nothing else.
 The activity log, workflow rules, outbound notifications, external issue sync and
@@ -11,6 +11,11 @@ This test enumerates the direct call sites and fails when a new one appears
 without an accompanying pipeline call. Adding a genuinely field-only write (one
 that cannot trigger a rule or a notification) means adding it to ``ALLOWED``
 with the reason spelled out.
+
+``services/graph_dispatch`` plays the same role for relationships (ADR-0045):
+writing a ``labeled``/``in_cycle``/``depends_on``/``contains`` edge without
+dispatching it skips the outbound sync, the activity entry and the broadcast,
+so the second guard below holds edge writers to the same standard.
 """
 
 import re
@@ -20,6 +25,21 @@ APP_DIR = Path(__file__).resolve().parent.parent / "app"
 
 DIRECT_WRITE = re.compile(r"graph\.(create_task|update_task)\(")
 PIPELINE_CALL = re.compile(r"(finalize_task_create|apply_task_update)\(")
+
+EDGE_WRITE = re.compile(r"graph\.(set_label|unset_label|add_to_cycle|remove_from_cycle|add_edge|remove_edge)\(")
+EDGE_DISPATCH = re.compile(r"dispatch_edge_(added|removed)\(")
+
+# Files that write edges but legitimately never dispatch, with the reason.
+EDGE_ALLOWED = {
+    # Rule actions run inside a dispatch already in flight; re-dispatching would recurse.
+    "services/rules_engine.py": "executes rule actions from within a dispatch",
+    # Inbound direction of the external sync: dispatching would push the same
+    # change straight back out to the provider it just came from (ADR-0014).
+    "routers/issue_sync.py": "applies inbound provider state; must not echo it back",
+    # Labels are attached before the task exists as far as listeners are
+    # concerned; finalize_task_create then announces the finished task.
+    "routers/imports.py": "importer attaches labels before finalize_task_create",
+}
 
 # Files exempt from needing a pipeline call, with the reason they are exempt.
 ALLOWED = {
@@ -67,8 +87,36 @@ def test_allowed_entries_are_not_stale():
     assert not stale, f"ALLOWED lists files with no direct task write any more: {stale}"
 
 
-def test_run_rules_is_only_called_from_the_pipeline():
-    """Rule evaluation must have exactly one home, or triggers drift per-caller."""
+def test_direct_edge_writes_are_paired_with_the_dispatcher():
+    offenders = []
+    for path in _source_files():
+        rel = path.relative_to(APP_DIR).as_posix()
+        if rel in EDGE_ALLOWED:
+            continue
+        text = path.read_text()
+        if EDGE_WRITE.search(text) and not EDGE_DISPATCH.search(text):
+            offenders.append(rel)
+
+    assert not offenders, (
+        "These modules write relationship edges without dispatching them, so outbound "
+        f"sync, activity and broadcasts are silently skipped: {offenders}. Call "
+        "services/graph_dispatch.dispatch_edge_added/removed, or add the file to "
+        "EDGE_ALLOWED with the reason."
+    )
+
+
+def test_edge_allowed_entries_are_not_stale():
+    """An exemption is dead weight once the file stops writing edges — or starts dispatching."""
+    stale = []
+    for rel in EDGE_ALLOWED:
+        text = (APP_DIR / rel).read_text()
+        if not EDGE_WRITE.search(text) or EDGE_DISPATCH.search(text):
+            stale.append(rel)
+    assert not stale, f"EDGE_ALLOWED lists files that no longer need the exemption: {stale}"
+
+
+def test_run_rules_is_only_called_from_a_dispatcher():
+    """Rule evaluation must live in the dispatchers, or triggers drift per-caller."""
     callers = set()
     for path in _source_files():
         rel = path.relative_to(APP_DIR).as_posix()
@@ -77,6 +125,9 @@ def test_run_rules_is_only_called_from_the_pipeline():
         if re.search(r"\brun_rules\(", path.read_text()):
             callers.add(rel)
 
-    assert callers == {"services/task_mutations.py"}, (
-        f"run_rules must only be called from the task pipeline, but found: {sorted(callers)}"
-    )
+    # task_mutations owns the node triggers; graph_dispatch owns task.label_added,
+    # which is an edge transition and has no node-level equivalent (ADR-0045).
+    assert callers == {
+        "services/task_mutations.py",
+        "services/graph_dispatch.py",
+    }, f"run_rules must only be called from a dispatcher, but found: {sorted(callers)}"

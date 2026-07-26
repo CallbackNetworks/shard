@@ -21,7 +21,13 @@ from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
 from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
 from app.services import graph
 from app.services.enrichment import enrich_task
-from app.services.graph_dispatch import dispatch_node_created, dispatch_node_deleted, dispatch_node_updated
+from app.services.graph_dispatch import (
+    dispatch_edge_added,
+    dispatch_edge_removed,
+    dispatch_node_created,
+    dispatch_node_deleted,
+    dispatch_node_updated,
+)
 from app.services.task_mutations import AgentKeyError
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
@@ -216,7 +222,7 @@ def list_node_edges(node_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{node_id}/edges", response_model=EdgeOut, status_code=status.HTTP_201_CREATED)
-def attach_edge(node_id: str, body: EdgeCreate, db: Session = Depends(get_db)):
+async def attach_edge(node_id: str, body: EdgeCreate, db: Session = Depends(get_db)):
     if db.get(Node, node_id) is None:
         raise HTTPException(status_code=404, detail="source node not found")
     if db.get(Node, body.target_id) is None:
@@ -227,7 +233,9 @@ def attach_edge(node_id: str, body: EdgeCreate, db: Session = Depends(get_db)):
         edge = graph.add_edge(db, node_id, body.target_id, body.rel_type, position=body.position, data=body.data)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    db.commit()
+    # Dispatch, not a bare commit: an edge written here must have the same
+    # consequences as the same edge written through a named sub-resource (ADR-0045).
+    await dispatch_edge_added(db, node_id, body.target_id, body.rel_type)
     db.refresh(edge)
     return edge
 
@@ -245,7 +253,7 @@ def list_node_events(node_id: str, limit: int = Query(default=100, le=500), db: 
 
 
 @router.delete("/{node_id}/edges", status_code=status.HTTP_204_NO_CONTENT)
-def detach_edge(
+async def detach_edge(
     node_id: str,
     target_id: str = Query(...),
     rel_type: str = Query(...),
@@ -254,7 +262,7 @@ def detach_edge(
     removed = graph.remove_edge(db, node_id, target_id, rel_type)
     if not removed:
         raise HTTPException(status_code=404, detail="edge not found")
-    db.commit()
+    await dispatch_edge_removed(db, node_id, target_id, rel_type)
 
 
 # ── Share facade management (ADR-0039) ───────────────────────────────────────
