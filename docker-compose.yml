@@ -2,7 +2,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app            # host source → container (hot-reload)
       - backend_venv:/app/.venv   # named volume protects the installed venv
@@ -20,12 +20,17 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - AUTH_TOKEN_TTL=${AUTH_TOKEN_TTL:-604800}
+      - AUTH_MAX_ATTEMPTS=${AUTH_MAX_ATTEMPTS:-5}
+      - AUTH_LOCKOUT_SECONDS=${AUTH_LOCKOUT_SECONDS:-300}
+      - AUTH_PROXY_HEADER=${AUTH_PROXY_HEADER:-}
       - SECRET_KEY=${SECRET_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:4173}
       - LLM_PROVIDER=${LLM_PROVIDER:-stub}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
       - SUMMARY_HOUR=${SUMMARY_HOUR:-8}
+      - DIGEST_DAY=${DIGEST_DAY:-1}
       - AGENT_CONTEXT_INSTRUCTIONS=${AGENT_CONTEXT_INSTRUCTIONS:-}
       - BACKUP_ENABLED=${BACKUP_ENABLED:-1}
       - BACKUP_HOUR=${BACKUP_HOUR:-3}
@@ -44,12 +49,15 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "5173:5173"
+      - "${FRONTEND_DEV_PORT:-5173}:5173"
     volumes:
       - ./frontend:/app                    # host source → container (hot-reload)
       - frontend_modules:/app/node_modules # named volume protects installed packages
     environment:
-      - BACKEND_URL=http://backend:8000    # vite proxy target (internal Docker network)
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8000}  # vite proxy target (internal Docker network)
+      # Vite rejects Host headers it does not know; the e2e container reaches the
+      # dev server as http://frontend:5173, so that name has to be allowed.
+      - VITE_ALLOWED_HOSTS=${VITE_ALLOWED_HOSTS:-frontend}
     depends_on:
       backend:
         condition: service_healthy
@@ -135,8 +143,8 @@ services:
       - backend
       - frontend
     environment:
-      - BASE_URL=http://frontend:80
-      - API_URL=http://backend:8000
+      - BASE_URL=${E2E_BASE_URL:-http://frontend:5173}
+      - API_URL=${E2E_API_URL:-http://backend:8000}
       - API_KEY=${API_KEY:-}
     networks:
       - app-network
