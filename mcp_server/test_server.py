@@ -512,7 +512,7 @@ async def test_patch_error_response():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.list_tools()
-    assert len(tools) == 18  # 15 original + 3 new
+    assert len(tools) == 20
 
 
 @pytest.mark.asyncio
@@ -525,6 +525,7 @@ async def test_list_tools_names():
         "add_comment", "list_comments", "manage_dependencies", "get_notifications",
         "get_agent_context", "report_progress",
         "list_projects", "create_project", "delete_task",
+        "get_project_detail", "bulk_update_tasks",
     }
     assert names == expected
 
@@ -615,14 +616,17 @@ async def test_get_prompt_unknown():
     assert "Unknown prompt" in result.messages[0].content.text
 
 
-# ── URL builder ─────────────────────────────────────────────────────
+# ── HTTP client config ──────────────────────────────────────────────
+# The client bakes in the /api/v1 base URL and auth/content headers, so relative
+# tool paths ("/projects", "/nodes/{id}") resolve against it.
 
 
-def test_api_url_builder():
-    assert mcp_server._api_url("/projects") == f"{mcp_server.API_BASE_URL}/api/v1/projects"
+def test_client_base_url():
+    client = mcp_server._get_client()
+    assert str(client.base_url).rstrip("/") == f"{mcp_server.API_BASE_URL}/api/v1"
 
 
-def test_headers_include_api_key():
-    headers = mcp_server._headers()
-    assert "X-API-Key" in headers
-    assert headers["Content-Type"] == "application/json"
+def test_client_headers_include_api_key():
+    client = mcp_server._get_client()
+    assert "X-API-Key" in client.headers
+    assert client.headers["Content-Type"] == "application/json"
