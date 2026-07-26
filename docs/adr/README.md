@@ -44,3 +44,4 @@
 | [0040](0040-single-graph-write-surface-and-node-roles.md) | Single Graph Write Surface and Node Capabilities as a Roles Set | Accepted | 2026-07-22 |
 | [0041](0041-goal-as-container-and-remaining-write-surface-collapse.md) | Goal as a Container Role, Identity Write Collapse, Decision Stays an Enhanced Label | Accepted | 2026-07-23 |
 | [0042](0042-external-api-graph-native-write-surface.md) | External API v1 Collapses to the Graph-Native Write Surface | Accepted | 2026-07-26 |
+| [0043](0043-collapse-container-scoped-writes-to-nodes.md) | Internal project/label/cycle Writes Collapse to /api/nodes (container-delete cascade role) | Accepted | 2026-07-26 |

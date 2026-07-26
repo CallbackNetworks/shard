@@ -2,7 +2,7 @@
 
 
 def _make_project(client, name):
-    return client.post("/api/projects", json={"name": name}).json()["id"]
+    return client.post("/api/nodes", json={"type": "project", "title": name}).json()["id"]
 
 
 def _make_task(client, project_id, title):

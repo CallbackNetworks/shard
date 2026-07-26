@@ -273,36 +273,39 @@ def _delete_task_node(db: Session, task_id: str) -> None:
     delete_node(db, task_id)
 
 
-def delete_project_and_tasks(db: Session, project) -> None:
-    """Delete a project, its exclusively-owned task trees, and unlink shared tasks.
+def delete_container(db: Session, container_id: str) -> None:
+    """Delete a container node, its exclusively-owned task trees + scoped entities.
 
-    Replaces the ``project_id`` FK ``ondelete CASCADE`` (ADR-0032, no primary): a
-    top-level task belonging only to this project is deleted with its subtask tree;
-    a task also linked into another project is merely unlinked from this one. The
-    project node itself and its touching edges are dropped by ``delete_node``.
+    The role-generic teardown (ADR-0043) for any container-role node (project, goal,
+    custom container): a contained top-level task belonging only to this container is
+    deleted with its subtask tree; a task also linked into another container is merely
+    unlinked from this one (``member_container_ids``). Contained node-only project-
+    scoped entities (labels, cycles: ADR-0033 Phase B) have no ORM cascade, so their
+    nodes are deleted too. Finally ``delete_node`` drops the container and its edges.
     """
     # Deferred imports: labels/cycles sit above tasks in the package dependency
     # order (cycles imports tasks), so importing them at module load would cycle.
     from app.services.graph.cycles import cycles_in_project
     from app.services.graph.labels import labels_in_project
 
-    contained = contained_task_ids(db, project.id)
+    contained = contained_task_ids(db, container_id)
     subtasks_set = subtask_ids_among(db, contained)
     for tid in contained:
         if tid in subtasks_set:
             continue  # a subtask is removed together with its parent's tree
-        others = [pid for pid in member_container_ids(db, tid) if pid != project.id]
+        others = [cid for cid in member_container_ids(db, tid) if cid != container_id]
         if others:
-            remove_edge(db, project.id, tid, REL_CONTAINS)
+            remove_edge(db, container_id, tid, REL_CONTAINS)
         else:
             delete_task_tree(db, tid)
-    # Node-only project-scoped entities (labels, cycles: ADR-0033 Phase B) have no
-    # ORM cascade; delete the nodes this project contains so they don't orphan.
-    for entity in labels_in_project(db, project.id) + cycles_in_project(db, project.id):
+    for entity in labels_in_project(db, container_id) + cycles_in_project(db, container_id):
         delete_node(db, entity.id)
-    # The project itself is node-only (ADR-0033 Phase B, B6): delete_node drops the
-    # node and every touching edge (contains/member_of).
-    delete_node(db, project.id)
+    delete_node(db, container_id)
+
+
+def delete_project_and_tasks(db: Session, project) -> None:
+    """Back-compat wrapper over ``delete_container`` for the ``ProjectView`` surface."""
+    delete_container(db, project.id)
 
 
 def set_parent_task(db: Session, task_id: str, parent_id: str) -> None:

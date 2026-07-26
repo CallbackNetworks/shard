@@ -26,22 +26,6 @@ class IdentityOut(BaseModel):
 # --- Label ---
 
 
-class LabelCreate(BaseModel):
-    name: str
-    color: str = "#5e6ad2"
-    type: Literal["label", "decision"] = "label"
-    description: str | None = None
-    decision_status: Literal["proposed", "accepted", "deprecated", "superseded"] | None = None
-    source: Literal["manual", "ai"] | None = None
-
-
-class LabelUpdate(BaseModel):
-    name: str | None = None
-    color: str | None = None
-    description: str | None = None
-    decision_status: Literal["proposed", "accepted", "deprecated", "superseded"] | None = None
-
-
 class LabelOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,24 +41,6 @@ class LabelOut(BaseModel):
 
 
 # --- Project ---
-
-
-class ProjectCreate(BaseModel):
-    name: str = Field(description="Project name")
-    description: str | None = Field(None, description="Optional project description")
-    agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
-    repo_url: str | None = Field(None, description="Repository URL linked to this project")
-    wip_limits: dict | None = Field(None, description='WIP limits per status column, e.g. {"in_progress": 3}')
-
-
-class ProjectUpdate(BaseModel):
-    name: str | None = Field(None, description="New project name")
-    description: str | None = Field(None, description="New project description")
-    status: Literal["active", "archived"] | None = Field(None, description="Project status: 'active' or 'archived'")
-    agent_instructions: str | None = Field(None, description="Instructions for AI agents working on this project")
-    repo_url: str | None = Field(None, description="Repository URL linked to this project")
-    wip_limits: dict | None = Field(None, description="WIP limits per status column")
-    allow_guest_notes: bool | None = Field(None, description="Allow share-link visitors to leave guest notes")
 
 
 class ProjectOut(BaseModel):
@@ -212,22 +178,6 @@ class TaskProgressUpdate(BaseModel):
 
 
 # --- Cycle ---
-
-
-class CycleCreate(BaseModel):
-    name: str
-    description: str | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
-    status: Literal["draft", "active", "completed"] = "draft"
-
-
-class CycleUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
-    status: Literal["draft", "active", "completed"] | None = None
 
 
 class CycleOut(BaseModel):

@@ -12,13 +12,13 @@ def _edge(db, source_id, target_id, rel_type):
 
 
 def _project(client, name="P"):
-    return client.post("/api/projects", json={"name": name}).json()["id"]
+    return client.post("/api/nodes", json={"type": "project", "title": name}).json()["id"]
 
 
 def test_bulk_remove_label_clears_labeled_edge(client, db):
     pid = _project(client)
     tid = client.post("/api/nodes", json={"type": "task", "container_id": pid, "title": "t"}).json()["id"]
-    lid = client.post(f"/api/projects/{pid}/labels", json={"name": "bug"}).json()["id"]
+    lid = client.post("/api/nodes", json={"type": "label", "container_id": pid, "title": "bug"}).json()["id"]
 
     # Attach via bulk-update, then confirm the mirror edge exists.
     client.post(f"/api/projects/{pid}/tasks/bulk-update", json={"task_ids": [tid], "add_label_ids": [lid]})

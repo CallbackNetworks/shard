@@ -10,7 +10,7 @@ from app.services import graph
 
 
 def _project(client, name):
-    return client.post("/api/projects", json={"name": name}).json()["id"]
+    return client.post("/api/nodes", json={"type": "project", "title": name}).json()["id"]
 
 
 def _task(client, project_id, title, parent_id=None):
@@ -39,7 +39,7 @@ def test_delete_project_deletes_its_tasks(client, db):
     parent = _task(client, p, "parent")
     sub = _task(client, p, "sub", parent_id=parent)
 
-    assert client.delete(f"/api/projects/{p}").status_code == 204
+    assert client.delete(f"/api/nodes/{p}").status_code == 204
 
     assert db.get(Node, parent) is None
     assert db.get(Node, sub) is None
@@ -51,7 +51,7 @@ def test_delete_project_keeps_task_shared_with_another(client, db):
     t = _task(client, a, "shared")
     assert client.post(f"/api/projects/{a}/tasks/{t}/memberships/{b}").status_code == 201
 
-    assert client.delete(f"/api/projects/{a}").status_code == 204
+    assert client.delete(f"/api/nodes/{a}").status_code == 204
 
     # The task survives because it is still linked into project B.
     assert db.get(Node, t) is not None
@@ -67,7 +67,7 @@ def test_delete_project_keeps_subtask_shared_with_another(client, db):
     subsub = _task(client, a, "subsub", parent_id=sub)
     assert client.post(f"/api/projects/{a}/tasks/{sub}/memberships/{b}").status_code == 201
 
-    assert client.delete(f"/api/projects/{a}").status_code == 204
+    assert client.delete(f"/api/nodes/{a}").status_code == 204
 
     # The exclusively-owned parent dies; the shared subtask survives with its own subtree.
     assert db.get(Node, parent) is None
@@ -85,13 +85,14 @@ def test_delete_project_deletes_its_labels_and_cycles(client, db):
     # Labels and cycles are node-only (ADR-0033 Phase B) with no ORM cascade;
     # deleting a project must delete the label/cycle nodes it contains.
     p = _project(client, "P")
-    label = client.post(f"/api/projects/{p}/labels", json={"name": "bug"}).json()["id"]
-    cycle = client.post(f"/api/projects/{p}/cycles", json={"name": "Sprint 1"}).json()["id"]
+    label = client.post("/api/nodes", json={"type": "label", "container_id": p, "title": "bug"}).json()["id"]
+    cycle = client.post("/api/nodes", json={"type": "cycle", "container_id": p, "title": "Sprint 1"}).json()["id"]
 
     assert db.get(Node, label) is not None
     assert db.get(Node, cycle) is not None
 
-    assert client.delete(f"/api/projects/{p}").status_code == 204
+    # ADR-0043: deleting a container node cascades its tasks + scoped labels/cycles.
+    assert client.delete(f"/api/nodes/{p}").status_code == 204
     db.expire_all()
 
     assert db.get(Node, label) is None

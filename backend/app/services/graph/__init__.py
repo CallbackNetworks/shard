@@ -149,6 +149,7 @@ from app.services.graph.tasks import (
     child_task_ids_map,
     container_ids_map,
     create_task,
+    delete_container,
     delete_project_and_tasks,
     delete_task_tree,
     find_task_by_callback_token,

@@ -9,7 +9,7 @@ single graph write surface ``/api/nodes`` (+ ``/edges`` for project links); the
 
 
 def _project(client, name="P"):
-    return client.post("/api/projects", json={"name": name}).json()["id"]
+    return client.post("/api/nodes", json={"type": "project", "title": name}).json()["id"]
 
 
 def _goal(client, title="G", project_ids=()):

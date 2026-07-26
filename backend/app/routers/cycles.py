@@ -7,7 +7,7 @@ from app.database import get_db
 from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import sync_task_milestone_to_external
-from app.schemas import CycleCreate, CycleOut, CycleUpdate
+from app.schemas import CycleOut
 from app.services import graph
 
 router = APIRouter(prefix="/projects/{project_id}/cycles", tags=["cycles"])
@@ -31,14 +31,6 @@ def list_cycles(project_id: str, db: Session = Depends(get_db)):
     return [_enrich_cycle(c, db) for c in graph.cycles_in_project(db, project_id)]
 
 
-@router.post("", response_model=CycleOut, status_code=status.HTTP_201_CREATED)
-def create_cycle(project_id: str, body: CycleCreate, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    cycle = graph.create_cycle(db, project_id, **body.model_dump())
-    db.commit()
-    return _enrich_cycle(cycle, db)
-
-
 @router.get("/{cycle_id}", response_model=CycleOut)
 def get_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     _get_project_or_404(project_id, db)
@@ -46,21 +38,10 @@ def get_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     return _enrich_cycle(cycle, db)
 
 
-@router.patch("/{cycle_id}", response_model=CycleOut)
-def update_cycle(project_id: str, cycle_id: str, body: CycleUpdate, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    get_cycle_or_404(cycle_id, db, project_id=project_id)
-    cycle = graph.update_cycle(db, cycle_id, **body.model_dump(exclude_none=True))
-    db.commit()
-    return _enrich_cycle(cycle, db)
-
-
-@router.delete("/{cycle_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    get_cycle_or_404(cycle_id, db, project_id=project_id)
-    graph.delete_cycle(db, cycle_id)
-    db.commit()
+# Cycle create/update/delete retired (ADR-0043): a cycle is a container-scoped node —
+# create via POST /api/nodes (type "cycle", container_id = project; end_date -> due_date)
+# + update/delete via /api/nodes/{id}. Reads, task↔cycle linking, duplicate, and compare
+# stay (duplicate/compare are transforms/reads, not a second single-entity write path).
 
 
 @router.post("/{cycle_id}/tasks/{task_id}", status_code=status.HTTP_201_CREATED)

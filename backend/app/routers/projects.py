@@ -1,16 +1,14 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog
-from app.schemas import ProjectCreate, ProjectOut, ProjectUpdate
+from app.schemas import ProjectOut
 from app.services import graph
-from app.services.activity import log_activity
 from app.services.enrichment import enrich_project
-from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -21,21 +19,6 @@ def list_projects(db: Session = Depends(get_db)):
     return [enrich_project(p, db) for p in projects]
 
 
-@router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
-async def create_project(body: ProjectCreate, db: Session = Depends(get_db)):
-    project = graph.create_project(db, **body.model_dump())
-    log_activity(
-        db,
-        "project.created",
-        project_id=project.id,
-        detail=f'Project "{project.name}" created',
-    )
-    db.commit()
-    project = graph.get_project(db, project.id)
-    await ws_manager.broadcast("project.created", {"project_id": project.id})
-    return enrich_project(project, db)
-
-
 @router.get("/{project_id}", response_model=ProjectOut)
 def get_project(project_id: str, db: Session = Depends(get_db)):
     project = graph.get_project(db, project_id)
@@ -44,42 +27,10 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
     return enrich_project(project, db)
 
 
-@router.patch("/{project_id}", response_model=ProjectOut)
-async def update_project(project_id: str, body: ProjectUpdate, db: Session = Depends(get_db)):
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    changes = body.model_dump(exclude_none=True)
-    old_status = project.status
-    project = graph.update_project(db, project_id, **changes)
-    if "status" in changes and changes["status"] != old_status:
-        log_activity(
-            db,
-            f"project.{changes['status']}",
-            project_id=project_id,
-            detail=f'Project "{project.name}" changed to {changes["status"]}',
-            meta={"old_status": old_status, "new_status": changes["status"]},
-        )
-    db.commit()
-    project = graph.get_project(db, project_id)
-    await ws_manager.broadcast("project.updated", {"project_id": project_id})
-    return enrich_project(project, db)
-
-
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_project(project_id: str, db: Session = Depends(get_db)):
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    log_activity(
-        db,
-        "project.deleted",
-        project_id=project_id,
-        detail=f'Project "{project.name}" deleted',
-    )
-    graph.delete_project_and_tasks(db, project)
-    db.commit()
-    await ws_manager.broadcast("project.deleted", {"project_id": project_id})
+# Project create/update/delete retired (ADR-0043): a project is a container node —
+# create/update via POST/PATCH /api/nodes (type "project"), delete via DELETE
+# /api/nodes/{id} (the dispatcher cascades its tasks/labels/cycles). Reads + the
+# share controls below stay.
 
 
 # ── Share link expiry and access audit ───────────────────────────

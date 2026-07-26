@@ -2,26 +2,31 @@ from tests.factories import make_task
 
 
 def test_create_project(client):
-    resp = client.post("/api/projects", json={"name": "My Project", "description": "A test project"})
+    # ADR-0043: a project is a container node — created through /api/nodes.
+    resp = client.post(
+        "/api/nodes",
+        json={"type": "project", "title": "My Project", "status": "active", "data": {"description": "A test project"}},
+    )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["name"] == "My Project"
-    assert data["description"] == "A test project"
+    assert data["title"] == "My Project"
+    assert data["data"]["description"] == "A test project"
     assert data["status"] == "active"
-    assert data["progress"] == 0.0
-    assert data["total_tasks"] == 0
-    assert data["done_tasks"] == 0
-    assert data["tasks"] == []
-    assert data["labels"] == []
     assert data["id"] is not None
+    # The enriched project read still exposes progress/task aggregates.
+    detail = client.get(f"/api/projects/{data['id']}").json()
+    assert detail["progress"] == 0.0
+    assert detail["total_tasks"] == 0
+    assert detail["tasks"] == []
+    assert detail["labels"] == []
 
 
 def test_create_project_minimal(client):
-    resp = client.post("/api/projects", json={"name": "Minimal"})
+    resp = client.post("/api/nodes", json={"type": "project", "title": "Minimal"})
     assert resp.status_code == 201
     data = resp.json()
-    assert data["name"] == "Minimal"
-    assert data["description"] is None
+    assert data["title"] == "Minimal"
+    assert (data["data"] or {}).get("description") is None
 
 
 def test_list_projects_empty(client):
@@ -54,31 +59,24 @@ def test_get_project_not_found(client):
 
 
 def test_update_project_name(client, sample_project):
-    resp = client.patch(
-        f"/api/projects/{sample_project.id}",
-        json={"name": "Renamed Project"},
-    )
+    resp = client.patch(f"/api/nodes/{sample_project.id}", json={"title": "Renamed Project"})
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["name"] == "Renamed Project"
+    assert resp.json()["title"] == "Renamed Project"
 
 
 def test_update_project_status_archived(client, sample_project):
-    resp = client.patch(
-        f"/api/projects/{sample_project.id}",
-        json={"status": "archived"},
-    )
+    resp = client.patch(f"/api/nodes/{sample_project.id}", json={"status": "archived"})
     assert resp.status_code == 200
     assert resp.json()["status"] == "archived"
 
 
 def test_update_project_not_found(client):
-    resp = client.patch("/api/projects/nonexistent-id", json={"name": "X"})
+    resp = client.patch("/api/nodes/nonexistent-id", json={"title": "X"})
     assert resp.status_code == 404
 
 
 def test_delete_project(client, sample_project):
-    resp = client.delete(f"/api/projects/{sample_project.id}")
+    resp = client.delete(f"/api/nodes/{sample_project.id}")
     assert resp.status_code == 204
 
     resp = client.get(f"/api/projects/{sample_project.id}")
@@ -86,7 +84,7 @@ def test_delete_project(client, sample_project):
 
 
 def test_delete_project_not_found(client):
-    resp = client.delete("/api/projects/nonexistent-id")
+    resp = client.delete("/api/nodes/nonexistent-id")
     assert resp.status_code == 404
 
 

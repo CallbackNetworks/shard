@@ -133,6 +133,11 @@ async def dispatch_node_deleted(db: Session, node: Node, *, actor: str | None = 
         detail=f'{node_type} "{title}" deleted',
         meta={"type": node_type, "node_id": node_id},
     )
-    graph.delete_node(db, node_id, actor=actor)
+    # Container-role nodes (project/goal/custom) cascade their exclusively-owned tasks
+    # and scoped labels/cycles (ADR-0043); other types just drop the node and its edges.
+    if node_type in graph.container_type_keys(db):
+        graph.delete_container(db, node_id)
+    else:
+        graph.delete_node(db, node_id, actor=actor)
     db.commit()
     await ws_manager.broadcast("node.deleted", {"node_id": node_id, "type": node_type})

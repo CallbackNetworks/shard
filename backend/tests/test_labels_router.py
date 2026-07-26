@@ -37,31 +37,31 @@ def test_list_labels_empty(client, sample_project):
 
 
 def test_create_label(client, sample_project):
+    # ADR-0043: a label is a container-scoped node — created through /api/nodes.
     r = client.post(
-        _label_url(sample_project.id),
-        json={"name": "Bug", "color": "#e5484d"},
+        "/api/nodes",
+        json={"type": "label", "container_id": sample_project.id, "title": "Bug", "data": {"color": "#e5484d"}},
     )
     assert r.status_code == 201
     data = r.json()
-    assert data["name"] == "Bug"
-    assert data["color"] == "#e5484d"
-    assert data["project_id"] == sample_project.id
-    assert "id" in data
+    assert data["title"] == "Bug"
+    assert data["data"]["color"] == "#e5484d"
+    # The enriched label read exposes the project scope.
+    labels = client.get(_label_url(sample_project.id)).json()
+    assert any(x["id"] == data["id"] and x["project_id"] == sample_project.id for x in labels)
 
 
 # --- 3. Create a label with default color ---
 
 
 def test_create_label_with_defaults(client, sample_project):
-    r = client.post(
-        _label_url(sample_project.id),
-        json={"name": "Feature"},
-    )
+    r = client.post("/api/nodes", json={"type": "label", "container_id": sample_project.id, "title": "Feature"})
     assert r.status_code == 201
-    data = r.json()
-    assert data["name"] == "Feature"
-    assert data["color"] == "#5e6ad2"  # default color
-    assert data["type"] == "label"  # default type
+    lid = r.json()["id"]
+    label = next(x for x in client.get(_label_url(sample_project.id)).json() if x["id"] == lid)
+    assert label["name"] == "Feature"
+    assert label["color"] == "#5e6ad2"  # default color (read-side)
+    assert label["type"] == "label"  # default type
 
 
 # --- 4. Update a label ---
@@ -70,14 +70,11 @@ def test_create_label_with_defaults(client, sample_project):
 def test_update_label(client, db, sample_project):
     label = _make_label(db, sample_project.id, name="Old Name", color="#aaaaaa")
 
-    r = client.patch(
-        _label_url(sample_project.id, f"/{label.id}"),
-        json={"name": "New Name", "color": "#bbbbbb"},
-    )
+    r = client.patch(f"/api/nodes/{label.id}", json={"title": "New Name", "data": {"color": "#bbbbbb"}})
     assert r.status_code == 200
     data = r.json()
-    assert data["name"] == "New Name"
-    assert data["color"] == "#bbbbbb"
+    assert data["title"] == "New Name"
+    assert data["data"]["color"] == "#bbbbbb"
 
 
 # --- 5. Delete a label ---
@@ -86,7 +83,7 @@ def test_update_label(client, db, sample_project):
 def test_delete_label(client, db, sample_project):
     label = _make_label(db, sample_project.id)
 
-    r = client.delete(_label_url(sample_project.id, f"/{label.id}"))
+    r = client.delete(f"/api/nodes/{label.id}")
     assert r.status_code == 204
 
     listing = client.get(_label_url(sample_project.id))
@@ -139,7 +136,7 @@ def test_delete_label_cascades(client, db, sample_project):
     assert label.id in graph.label_ids_for_task(db, task.id)
 
     # Delete the label itself
-    r = client.delete(_label_url(sample_project.id, f"/{label.id}"))
+    r = client.delete(f"/api/nodes/{label.id}")
     assert r.status_code == 204
 
     # The task-label association should be gone too

@@ -52,11 +52,18 @@ api.interceptors.response.use(null, err => {
 // Helper to mark background requests (used by React Query refetch)
 export const markBackground = (config) => ({ ...config, _isBackgroundRefetch: true })
 
-// Projects
+// Projects — reads stay on /projects (enriched); writes go through the node surface
+// (ADR-0043): a project is a container node. name -> title; the rest folds into data.
 export const getProjects = () => api.get('/projects').then(r => r.data)
-export const createProject = (data) => api.post('/projects', data).then(r => r.data)
-export const updateProject = (id, data) => api.patch(`/projects/${id}`, data).then(r => r.data)
-export const deleteProject = (id) => api.delete(`/projects/${id}`)
+export const createProject = ({ name, status = 'active', ...rest }) =>
+  createNode({ type: 'project', title: name, status, data: rest })
+export const updateProject = (id, { name, status, ...rest }) =>
+  updateNode(id, {
+    ...(name !== undefined ? { title: name } : {}),
+    ...(status !== undefined ? { status } : {}),
+    ...(Object.keys(rest).length ? { data: rest } : {}),
+  })
+export const deleteProject = (id) => deleteNode(id)
 export const getProject = (id) => api.get(`/projects/${id}`).then(r => r.data)
 export const getIcalToken = () => api.get('/settings/ical-token').then(r => r.data)
 export const rotateGlobalIcalToken = () => api.post('/settings/ical-token/rotate').then(r => r.data)
@@ -78,21 +85,41 @@ export const addTaskMembership = (projectId, taskId, targetProjectId) =>
 export const removeTaskMembership = (projectId, taskId, targetProjectId) =>
   api.delete(`/projects/${projectId}/tasks/${taskId}/memberships/${targetProjectId}`)
 
-// Labels
+// Labels — reads/assignment stay on /projects; label entity writes go through the
+// node surface (ADR-0043): a label is a container-scoped node (project contains label).
 export const getLabels = (projectId) => api.get(`/projects/${projectId}/labels`).then(r => r.data)
-export const createLabel = (projectId, data) => api.post(`/projects/${projectId}/labels`, data).then(r => r.data)
-export const updateLabel = (projectId, labelId, data) => api.patch(`/projects/${projectId}/labels/${labelId}`, data).then(r => r.data)
-export const deleteLabel = (projectId, labelId) => api.delete(`/projects/${projectId}/labels/${labelId}`)
+export const createLabel = (projectId, { name, ...rest }) =>
+  createNode({ type: 'label', container_id: projectId, title: name, data: rest })
+export const updateLabel = (projectId, labelId, { name, ...rest }) =>
+  updateNode(labelId, {
+    ...(name !== undefined ? { title: name } : {}),
+    ...(Object.keys(rest).length ? { data: rest } : {}),
+  })
+export const deleteLabel = (projectId, labelId) => deleteNode(labelId)
 export const addLabelToTask = (projectId, taskId, labelId) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/labels/${labelId}`).then(r => r.data)
 export const removeLabelFromTask = (projectId, taskId, labelId) =>
   api.delete(`/projects/${projectId}/tasks/${taskId}/labels/${labelId}`)
 
-// Cycles
+// Cycles — reads/linking/duplicate stay on /projects; cycle entity writes go through
+// the node surface (ADR-0043): a cycle is a container-scoped node; end_date -> due_date.
 export const getCycles = (projectId) => api.get(`/projects/${projectId}/cycles`).then(r => r.data)
-export const createCycle = (projectId, data) => api.post(`/projects/${projectId}/cycles`, data).then(r => r.data)
-export const updateCycle = (projectId, cycleId, data) => api.patch(`/projects/${projectId}/cycles/${cycleId}`, data).then(r => r.data)
-export const deleteCycle = (projectId, cycleId) => api.delete(`/projects/${projectId}/cycles/${cycleId}`)
+export const createCycle = (projectId, { name, status = 'draft', start_date, end_date, ...rest }) =>
+  createNode({
+    type: 'cycle', container_id: projectId, title: name, status,
+    ...(start_date !== undefined ? { start_date } : {}),
+    ...(end_date !== undefined ? { due_date: end_date } : {}),
+    data: rest,
+  })
+export const updateCycle = (projectId, cycleId, { name, status, start_date, end_date, ...rest }) =>
+  updateNode(cycleId, {
+    ...(name !== undefined ? { title: name } : {}),
+    ...(status !== undefined ? { status } : {}),
+    ...(start_date !== undefined ? { start_date } : {}),
+    ...(end_date !== undefined ? { due_date: end_date } : {}),
+    ...(Object.keys(rest).length ? { data: rest } : {}),
+  })
+export const deleteCycle = (projectId, cycleId) => deleteNode(cycleId)
 export const addTaskToCycle = (projectId, cycleId, taskId) =>
   api.post(`/projects/${projectId}/cycles/${cycleId}/tasks/${taskId}`).then(r => r.data)
 export const removeTaskFromCycle = (projectId, cycleId, taskId) =>

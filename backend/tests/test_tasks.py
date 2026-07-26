@@ -164,7 +164,7 @@ def test_reparent_cycle_rejected(client, sample_project):
 
 
 def test_reparent_to_parent_in_other_project_rejected(client, sample_project):
-    other = client.post("/api/projects", json={"name": "Other"}).json()["id"]
+    other = client.post("/api/nodes", json={"type": "project", "title": "Other"}).json()["id"]
     foreign_parent = _create(client, other, title="Foreign").json()["id"]
     a = _create(client, sample_project.id, title="A").json()["id"]
     resp = _patch(client, a, parent_id=foreign_parent)
