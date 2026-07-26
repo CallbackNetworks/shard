@@ -92,25 +92,6 @@ class TaskCreate(_TaskTitleMixin, BaseModel):
     is_pinned: bool = False
 
 
-class TaskUpdate(_TaskTitleMixin, BaseModel):
-    title: str | None = Field(None, min_length=1, max_length=500, description="New task title")
-    description: str | None = Field(None, description="New task description")
-    status: Literal["todo", "in_progress", "done", "failed"] | None = Field(
-        None, description="Task status: todo, in_progress, done, or failed"
-    )
-    priority: Literal["low", "medium", "high"] | None = Field(None, description="Task priority: low, medium, or high")
-    assignee: str | None = Field(None, description="Name of the person assigned to this task")
-    assigned_agent_key_id: str | None = Field(
-        None, description="API key ID of the agent to assign this task to (null to unassign)"
-    )
-    start_date: datetime | None = Field(None, description="Task start date (ISO 8601)")
-    due_date: datetime | None = Field(None, description="Task due date (ISO 8601)")
-    parent_id: str | None = Field(None, description="Parent task ID for subtasks")
-    time_estimate: int | None = Field(None, ge=0, description="Estimated time in minutes")
-    time_spent: int | None = Field(None, ge=0, description="Time spent in minutes")
-    is_pinned: bool | None = None
-
-
 class TaskPullRequestOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -198,11 +179,6 @@ class CycleOut(BaseModel):
 
 
 # --- Webhook callback ---
-
-
-class WebhookCallback(BaseModel):
-    status: Literal["todo", "in_progress", "done", "failed"] = Field(description="New task status from CI/CD pipeline")
-    message: str | None = Field(None, description="Optional status message from CI/CD pipeline")
 
 
 class WebhookEventOut(BaseModel):
