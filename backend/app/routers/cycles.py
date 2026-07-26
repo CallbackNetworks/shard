@@ -9,6 +9,8 @@ from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.issue_sync import sync_task_milestone_to_external
 from app.schemas import CycleOut
 from app.services import graph
+from app.services.task_mutations import finalize_task_create
+from app.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/projects/{project_id}/cycles", tags=["cycles"])
 
@@ -69,7 +71,7 @@ async def remove_task_from_cycle(project_id: str, cycle_id: str, task_id: str, d
 
 
 @router.post("/{cycle_id}/duplicate", response_model=CycleOut, status_code=status.HTTP_201_CREATED)
-def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
+async def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
     """Create a new draft cycle with cloned tasks from an existing cycle (cycle template)."""
     _get_project_or_404(project_id, db)
     source = get_cycle_or_404(cycle_id, db, project_id=project_id)
@@ -84,6 +86,7 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
     )
 
     # Clone tasks as new todo tasks and link to new cycle
+    created_ids: list[str] = []
     for src_task in graph.tasks_in_cycle(db, source.id):
         new_task = graph.create_task(
             db,
@@ -98,8 +101,25 @@ def duplicate_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db
             time_estimate=src_task.time_estimate,
         )
         graph.add_to_cycle(db, new_cycle.id, new_task.id)
+        # Cycle membership is linked first so cycle-scoped workflow rules see
+        # the clone where it actually belongs.
+        await finalize_task_create(
+            db,
+            new_task.id,
+            actor="system",
+            source="duplicate",
+            project_id=project_id,
+            activity_meta={"cycle_id": new_cycle.id, "source_task_id": src_task.id},
+            commit=False,
+            broadcast=False,
+        )
+        created_ids.append(new_task.id)
 
     db.commit()
+    await ws_manager.broadcast(
+        "task.imported",
+        {"project_id": project_id, "task_ids": created_ids, "cycle_id": new_cycle.id},
+    )
     return _enrich_cycle(new_cycle, db)
 
 

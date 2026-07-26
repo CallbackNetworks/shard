@@ -54,6 +54,7 @@ from app.services.issue_sync import (
     update_gitlab_issue_fields,
     update_gitlab_issue_note,
 )
+from app.services.task_mutations import apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -188,9 +189,25 @@ async def receive_issue_webhook(
             changes["assignee"] = normalized["assignee"]
         if "due_date" in normalized:
             changes["due_date"] = normalized["due_date"]
-        existing = graph.update_task(db, existing.id, **changes)
+        # Labels and milestone are applied first so rules triggered by the field
+        # update evaluate the task in its final inbound shape.
         _apply_external_labels(existing, normalized.get("labels", []), db)
         apply_inbound_milestone_cycle(existing, normalized.get("milestone"), db)
+        # sync_external=False: this change came from the provider, so echoing it
+        # back would loop. apply_task_update logs the status_changed/assigned
+        # entries; the task.updated entry below stays for the sync itself.
+        existing = await apply_task_update(
+            db,
+            existing.id,
+            changes,
+            actor=f"issue-sync:{provider}",
+            source="issue-sync",
+            project_id=project_id,
+            activity_meta={"external_url": normalized["external_url"], "external_id": ext_id},
+            sync_external=False,
+            commit=False,
+            broadcast=False,
+        )
 
         log_activity(
             db,
@@ -221,17 +238,14 @@ async def receive_issue_webhook(
     _apply_external_labels(task, normalized.get("labels", []), db)
     apply_inbound_milestone_cycle(task, normalized.get("milestone"), db)
 
-    log_activity(
+    await finalize_task_create(
         db,
-        "task.created",
-        project_id=project_id,
-        task_id=task.id,
+        task.id,
         actor=f"issue-sync:{provider}",
-        detail=f'Task "{task.title}" created from {provider} issue #{ext_id}',
-        meta={"external_url": normalized["external_url"]},
+        source="issue-sync",
+        project_id=project_id,
+        activity_meta={"external_url": normalized["external_url"], "external_id": ext_id},
     )
-    db.commit()
-    await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task.id})
     return {"ok": True, "action": "created", "task_id": task.id}
 
 
@@ -397,17 +411,21 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         for task in tasks:
             _upsert_pr_link(db, task, pr_data, "open")
             if action in ("opened", "reopened") and task.status == "todo":
-                graph.update_task(db, task.id, status="in_progress")
-                task.status = "in_progress"
-                log_activity(
+                # sync_external=False: the change originated on GitHub, so pushing
+                # it back would echo. commit/broadcast are owned by this loop.
+                await apply_task_update(
                     db,
-                    "task.status_changed",
-                    project_id=project_id,
-                    task_id=task.id,
+                    task.id,
+                    {"status": "in_progress"},
                     actor="pr-sync:github",
-                    detail=f'Task "{task.title}" moved to in_progress by PR #{pr_number}',
-                    meta={"pr_url": pr_url, "old_status": "todo", "new_status": "in_progress"},
+                    source="pr",
+                    project_id=project_id,
+                    activity_meta={"pr_url": pr_url, "pr_number": pr_number},
+                    sync_external=False,
+                    commit=False,
+                    broadcast=False,
                 )
+                task.status = "in_progress"
             else:
                 log_activity(
                     db,
@@ -448,17 +466,19 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         for task in tasks:
             _upsert_pr_link(db, task, pr_data, "merged")
             if task.status != "done":
-                graph.update_task(db, task.id, status="done")
-                task.status = "done"
-                log_activity(
+                await apply_task_update(
                     db,
-                    "task.completed",
-                    project_id=project_id,
-                    task_id=task.id,
+                    task.id,
+                    {"status": "done"},
                     actor="pr-sync:github",
-                    detail=f'Task "{task.title}" completed by merged PR #{pr_number}',
-                    meta={"pr_url": pr_url},
+                    source="pr",
+                    project_id=project_id,
+                    activity_meta={"pr_url": pr_url, "pr_number": pr_number, "merged": True},
+                    sync_external=False,
+                    commit=False,
+                    broadcast=False,
                 )
+                task.status = "done"
             affected_task_ids.append(task.id)
 
         # Legacy fallback: tasks whose description contains this PR URL
@@ -475,17 +495,19 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         ]
         for task in tasks_with_pr_url:
             if task.id not in affected_task_ids:
-                graph.update_task(db, task.id, status="done")
-                task.status = "done"
-                log_activity(
+                await apply_task_update(
                     db,
-                    "task.completed",
-                    project_id=project_id,
-                    task_id=task.id,
+                    task.id,
+                    {"status": "done"},
                     actor="pr-sync:github",
-                    detail=f'Task "{task.title}" completed by merged PR #{pr_number}',
-                    meta={"pr_url": pr_url},
+                    source="pr",
+                    project_id=project_id,
+                    activity_meta={"pr_url": pr_url, "pr_number": pr_number, "merged": True, "legacy_link": True},
+                    sync_external=False,
+                    commit=False,
+                    broadcast=False,
                 )
+                task.status = "done"
                 affected_task_ids.append(task.id)
 
         db.commit()

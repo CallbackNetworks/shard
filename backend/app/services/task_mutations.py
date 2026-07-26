@@ -30,6 +30,11 @@ _SOURCE_SUFFIX = {
     "webhook": " via webhook",
     "assistant": " via assistant",
     "node": " via graph API",
+    "import": " via import",
+    "pr": " by pull request",
+    "issue-sync": " via issue sync",
+    "recurrence": " by recurrence",
+    "duplicate": " by cycle duplication",
 }
 
 

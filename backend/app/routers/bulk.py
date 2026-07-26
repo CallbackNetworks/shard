@@ -21,7 +21,7 @@ from app.schemas import (
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.ical_token import verify_global_ical_token
-from app.services.task_mutations import apply_task_update
+from app.services.task_mutations import apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
 
 router = APIRouter()
@@ -224,7 +224,7 @@ def export_tasks(
 # ---------------------------------------------------------------------------
 
 
-def _create_task_recursive(
+async def _create_task_recursive(
     db: Session,
     project_id: str,
     item: TaskImportItem,
@@ -246,10 +246,21 @@ def _create_task_recursive(
         time_estimate=item.time_estimate,
         time_spent=item.time_spent,
     )
+    # The caller owns the commit and emits one aggregate task.imported event,
+    # so the whole tree lands as a single transaction and a single broadcast.
+    await finalize_task_create(
+        db,
+        task.id,
+        source="import",
+        project_id=project_id,
+        activity_meta={"source": "json"},
+        commit=False,
+        broadcast=False,
+    )
     created_ids.append(task.id)
 
     for sub in item.subtasks:
-        _create_task_recursive(db, project_id, sub, task.id, created_ids)
+        await _create_task_recursive(db, project_id, sub, task.id, created_ids)
 
 
 @router.post(
@@ -266,7 +277,7 @@ async def import_tasks(
 
     created_ids: list[str] = []
     for item in body.tasks:
-        _create_task_recursive(db, project_id, item, None, created_ids)
+        await _create_task_recursive(db, project_id, item, None, created_ids)
 
     log_activity(
         db,

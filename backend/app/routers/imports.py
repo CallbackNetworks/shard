@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services import graph
 from app.services.activity import log_activity
+from app.services.task_mutations import finalize_task_create
+from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -107,13 +109,37 @@ def _validate_project(db: Session, project_id: str) -> graph.ProjectView:
     return project
 
 
+async def _finish_import(db: Session, project_id: str, source: str, task_ids: list[str], skipped: int) -> None:
+    """Log the import summary and emit one aggregate event for the whole batch.
+
+    Per-task pipeline runs already happened with commit=False/broadcast=False,
+    so the batch lands in a single transaction and a single broadcast.
+    """
+    if task_ids:
+        log_activity(
+            db,
+            action=f"import.{source}",
+            project_id=project_id,
+            actor="import",
+            detail=f"Imported {len(task_ids)} tasks from {_SOURCE_LABELS[source]}",
+            meta={"source": source, "imported": len(task_ids), "skipped": skipped},
+        )
+
+    db.commit()
+    if task_ids:
+        await ws_manager.broadcast("task.imported", {"project_id": project_id, "task_ids": task_ids})
+
+
+_SOURCE_LABELS = {"trello": "Trello", "linear": "Linear", "github": "GitHub Issues"}
+
+
 # ── Trello ──────────────────────────────────────────────────────────────
 
 
 @router.post("/projects/{project_id}/import/trello", response_model=ImportResult)
-def import_trello(project_id: str, body: TrelloImport, db: Session = Depends(get_db)):
+async def import_trello(project_id: str, body: TrelloImport, db: Session = Depends(get_db)):
     _validate_project(db, project_id)
-    imported = 0
+    imported: list[str] = []
     skipped = 0
     errors: list[str] = []
 
@@ -150,23 +176,25 @@ def import_trello(project_id: str, body: TrelloImport, db: Session = Depends(get
                     if label:
                         graph.set_label(db, task.id, label.id)
 
-            imported += 1
+            # Labels are attached before finalizing so label-based workflow
+            # rules see the task in its finished shape.
+            await finalize_task_create(
+                db,
+                task.id,
+                actor="import",
+                source="import",
+                project_id=project_id,
+                activity_meta={"source": "trello"},
+                commit=False,
+                broadcast=False,
+            )
+            imported.append(task.id)
         except Exception as exc:
             errors.append(f"Card '{card.name}': {exc}")
             skipped += 1
 
-    if imported > 0:
-        log_activity(
-            db,
-            action="import.trello",
-            project_id=project_id,
-            actor="import",
-            detail=f"Imported {imported} tasks from Trello",
-            meta={"source": "trello", "imported": imported, "skipped": skipped},
-        )
-
-    db.commit()
-    return ImportResult(imported=imported, skipped=skipped, errors=errors)
+    await _finish_import(db, project_id, "trello", imported, skipped)
+    return ImportResult(imported=len(imported), skipped=skipped, errors=errors)
 
 
 # ── Linear ──────────────────────────────────────────────────────────────
@@ -196,9 +224,9 @@ def _map_linear_priority(priority: int | None) -> str:
 
 
 @router.post("/projects/{project_id}/import/linear", response_model=ImportResult)
-def import_linear(project_id: str, body: LinearImport, db: Session = Depends(get_db)):
+async def import_linear(project_id: str, body: LinearImport, db: Session = Depends(get_db)):
     _validate_project(db, project_id)
-    imported = 0
+    imported: list[str] = []
     skipped = 0
     errors: list[str] = []
 
@@ -226,32 +254,32 @@ def import_linear(project_id: str, body: LinearImport, db: Session = Depends(get
                     if label:
                         graph.set_label(db, task.id, label.id)
 
-            imported += 1
+            await finalize_task_create(
+                db,
+                task.id,
+                actor="import",
+                source="import",
+                project_id=project_id,
+                activity_meta={"source": "linear"},
+                commit=False,
+                broadcast=False,
+            )
+            imported.append(task.id)
         except Exception as exc:
             errors.append(f"Issue '{issue.title}': {exc}")
             skipped += 1
 
-    if imported > 0:
-        log_activity(
-            db,
-            action="import.linear",
-            project_id=project_id,
-            actor="import",
-            detail=f"Imported {imported} tasks from Linear",
-            meta={"source": "linear", "imported": imported, "skipped": skipped},
-        )
-
-    db.commit()
-    return ImportResult(imported=imported, skipped=skipped, errors=errors)
+    await _finish_import(db, project_id, "linear", imported, skipped)
+    return ImportResult(imported=len(imported), skipped=skipped, errors=errors)
 
 
 # ── GitHub Issues ───────────────────────────────────────────────────────
 
 
 @router.post("/projects/{project_id}/import/github", response_model=ImportResult)
-def import_github(project_id: str, body: GitHubImport, db: Session = Depends(get_db)):
+async def import_github(project_id: str, body: GitHubImport, db: Session = Depends(get_db)):
     _validate_project(db, project_id)
-    imported = 0
+    imported: list[str] = []
     skipped = 0
     errors: list[str] = []
 
@@ -285,20 +313,22 @@ def import_github(project_id: str, body: GitHubImport, db: Session = Depends(get
                     if label:
                         graph.set_label(db, task.id, label.id)
 
-            imported += 1
+            # sync_external is not a concern here: finalize_task_create does not
+            # push outward, so importing a GitHub issue cannot echo back to GitHub.
+            await finalize_task_create(
+                db,
+                task.id,
+                actor="import",
+                source="import",
+                project_id=project_id,
+                activity_meta={"source": "github"},
+                commit=False,
+                broadcast=False,
+            )
+            imported.append(task.id)
         except Exception as exc:
             errors.append(f"Issue '{issue.title}': {exc}")
             skipped += 1
 
-    if imported > 0:
-        log_activity(
-            db,
-            action="import.github",
-            project_id=project_id,
-            actor="import",
-            detail=f"Imported {imported} tasks from GitHub Issues",
-            meta={"source": "github", "imported": imported, "skipped": skipped},
-        )
-
-    db.commit()
-    return ImportResult(imported=imported, skipped=skipped, errors=errors)
+    await _finish_import(db, project_id, "github", imported, skipped)
+    return ImportResult(imported=len(imported), skipped=skipped, errors=errors)

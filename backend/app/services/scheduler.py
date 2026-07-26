@@ -18,6 +18,7 @@ from app.services import email_sender, graph
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications, retry_delivery
 from app.services.runtime_settings import get_system_settings
+from app.services.task_mutations import finalize_task_create
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,6 @@ async def _check_recurring(db: Session) -> None:
 
             rule.last_run_at = now
             rule.next_run_at = _compute_next_run(rule, now)
-            db.commit()
 
             log_activity(
                 db,
@@ -160,6 +160,17 @@ async def _check_recurring(db: Session) -> None:
                 actor="scheduler",
                 detail=f"Recurring task created from template '{template.title}'",
                 meta={"template_task_id": template.id, "rule_id": rule.id},
+            )
+            # A recurring task is a task like any other: it must run the same
+            # pipeline (rules, notifications, broadcast) as a hand-created one.
+            # This also commits the rule advance and the task.recurred entry.
+            await finalize_task_create(
+                db,
+                new_task.id,
+                actor="scheduler",
+                source="recurrence",
+                project_id=template_project_id,
+                activity_meta={"template_task_id": template.id, "rule_id": rule.id},
             )
             logger.info("Created recurring task '%s' from template %s", new_task.title, template.id)
         except Exception as exc:

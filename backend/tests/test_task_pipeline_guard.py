@@ -1,0 +1,82 @@
+"""Guard: every task create/update path runs the unified pipeline (ADR-0038/0044).
+
+``graph.create_task`` and ``graph.update_task`` write the node and nothing else.
+The activity log, workflow rules, outbound notifications, external issue sync and
+WebSocket broadcast live in ``services/task_mutations``. A caller that writes the
+node directly and skips the pipeline produces a task that exists but that no rule
+ever saw and no integration was ever told about — a silent behaviour fork, not a
+crash, so no functional test catches it.
+
+This test enumerates the direct call sites and fails when a new one appears
+without an accompanying pipeline call. Adding a genuinely field-only write (one
+that cannot trigger a rule or a notification) means adding it to ``ALLOWED``
+with the reason spelled out.
+"""
+
+import re
+from pathlib import Path
+
+APP_DIR = Path(__file__).resolve().parent.parent / "app"
+
+DIRECT_WRITE = re.compile(r"graph\.(create_task|update_task)\(")
+PIPELINE_CALL = re.compile(r"(finalize_task_create|apply_task_update)\(")
+
+# Files exempt from needing a pipeline call, with the reason they are exempt.
+ALLOWED = {
+    # The pipeline itself.
+    "services/task_mutations.py": "is the pipeline",
+    # Runs inside the pipeline's rule phase; its writes are the rule actions.
+    "services/rules_engine.py": "executes rule actions from within the pipeline",
+    # Writes only bookkeeping fields that no rule or notification keys off:
+    # reminder_sent_at, callback_token, external_* linkage, progress fields.
+    "services/scheduler.py": "reminder_sent_at bookkeeping (recurrence uses the pipeline)",
+    "routers/tasks.py": "callback_token regeneration only",
+    "routers/issue_sync.py": "external_* linkage (inbound events use the pipeline)",
+    "routers/external_api/progress.py": "progress_pct/agent_notes only",
+}
+
+
+def _source_files():
+    for path in sorted(APP_DIR.rglob("*.py")):
+        if "__pycache__" in path.parts or path.parts[-2:-1] == ("graph",):
+            continue
+        yield path
+
+
+def test_direct_task_writes_are_paired_with_the_pipeline():
+    offenders = []
+    for path in _source_files():
+        rel = path.relative_to(APP_DIR).as_posix()
+        if rel in ALLOWED:
+            continue
+        text = path.read_text()
+        if DIRECT_WRITE.search(text) and not PIPELINE_CALL.search(text):
+            offenders.append(rel)
+
+    assert not offenders, (
+        "These modules write tasks directly without running the task pipeline, so "
+        "workflow rules, notifications and broadcasts are silently skipped: "
+        f"{offenders}. Route the write through services/task_mutations, or add the "
+        "file to ALLOWED with the reason it cannot trigger a rule."
+    )
+
+
+def test_allowed_entries_are_not_stale():
+    """An exemption that no longer has a direct write is dead weight — drop it."""
+    stale = [rel for rel in ALLOWED if not DIRECT_WRITE.search((APP_DIR / rel).read_text())]
+    assert not stale, f"ALLOWED lists files with no direct task write any more: {stale}"
+
+
+def test_run_rules_is_only_called_from_the_pipeline():
+    """Rule evaluation must have exactly one home, or triggers drift per-caller."""
+    callers = set()
+    for path in _source_files():
+        rel = path.relative_to(APP_DIR).as_posix()
+        if rel == "services/rules_engine.py":
+            continue
+        if re.search(r"\brun_rules\(", path.read_text()):
+            callers.add(rel)
+
+    assert callers == {"services/task_mutations.py"}, (
+        f"run_rules must only be called from the task pipeline, but found: {sorted(callers)}"
+    )
