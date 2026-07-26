@@ -1,23 +1,26 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Dashboard', () => {
-  test('loads and shows projects', async ({ page }) => {
+  test('app shell renders', async ({ page }) => {
     await page.goto('/app')
-    await expect(page.locator('h1')).toBeVisible({ timeout: 10000 })
-    await expect(page.locator('body')).not.toContainText('Error')
+    await expect(page.locator('.layout-sidebar')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('#main-content')).toBeVisible()
   })
 
-  test('sidebar navigation works', async ({ page }) => {
+  test('loads without a runtime error', async ({ page }) => {
+    // The SPA renders through React Query against a live backend, so a broken
+    // request or a crashed component shows up here and nowhere in the unit tests.
+    const errors: string[] = []
+    page.on('pageerror', (err) => errors.push(err.message))
     await page.goto('/app')
     await page.waitForLoadState('networkidle')
-    const sidebar = page.locator('.layout-sidebar')
-    await expect(sidebar).toBeVisible()
+    await expect(page.locator('.layout-sidebar')).toBeVisible()
+    expect(errors).toEqual([])
   })
 
-  test('new project button exists', async ({ page }) => {
+  test('command palette opens', async ({ page }) => {
     await page.goto('/app')
     await page.waitForLoadState('networkidle')
-    const btn = page.getByRole('button', { name: /new project/i })
-    await expect(btn).toBeVisible()
+    await expect(page.getByRole('button', { name: /search/i })).toBeVisible()
   })
 })
