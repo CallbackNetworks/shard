@@ -170,7 +170,7 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh databas
 
 **`ws_manager`** (`services/ws_manager.py`): singleton `ConnectionManager` for WebSocket broadcast. Call `await ws_manager.broadcast(event, data)` after mutations in routers. Frontend auto-reconnects and invalidates React Query caches on events.
 
-**`_enrich_task(task, db=None)`** in `routers/projects.py`: the single aggregation point for `TaskOut`. Computes `labels`, `subtask_count`, `comment_count`, `blocked_by[]`, `blocking[]`, and `recurrence`. Always pass `db` when recurrence data is needed. Called by `_enrich(project, db)` which also computes progress, cycle stats, and identities.
+**`enrich_task(task, db=None)`** in `services/enrichment.py`: the single aggregation point for `TaskOut`. Computes `labels`, `subtask_count`, `comment_count`, `blocked_by[]`, `blocking[]`, and `recurrence`. Always pass `db` when recurrence data is needed. Called by `enrich_project(project, db)` which also computes progress, cycle stats, and identities.
 
 **`log_activity(db, action, *, project_id, task_id, actor, detail, meta)`** in `services/activity.py`: call after every meaningful mutation; does `db.flush()` not `db.commit()`.
 
@@ -178,13 +178,13 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh databas
 
 **`run_rules(db, trigger, task, context)`** in `services/rules_engine.py`: evaluates active `WorkflowRule` rows. Called from `tasks.py` after create (`task.created`) and after status/priority changes. Pass `_rule_depth=1` in context from rule-triggered updates to prevent infinite loops (max depth 2).
 
-**Scheduler** (`services/scheduler.py`): asyncio loop, ticks every 3600 s. Runs four checks: due-date reminders (`task.due_soon`/`task.overdue`), recurring task generation, failed webhook retries, and daily summary email (sent once per day at `SUMMARY_HOUR` UTC to all email-type integrations).
+**Scheduler** (`services/scheduler.py`): asyncio loop, ticks every 3600 s. `_run_tick` runs seven checks, each isolated in its own try/except so one failure cannot starve the rest: due-date reminders (`task.due_soon`/`task.overdue`), recurring task generation, failed webhook retries, daily summary email (once per day at `SUMMARY_HOUR` UTC to all email-type integrations), weekly digest (`DIGEST_DAY`), SLA aging, and the daily backup.
 
 **LLM assistant** (`services/llm.py` + `services/assistant_tools.py`): provider-agnostic. `get_provider()` reads `LLM_PROVIDER` env var and returns `ClaudeProvider`, `OpenAIProvider`, or `StubProvider`. Tools: `get_summary`, `list_tasks`, `create_task`, `update_task`, `create_subtask`, `manage_labels`, `analyze_workload`, `search`, `get_activity`.
 
 **CI/CD adapters** (`services/cicd_adapters.py`): auto-detects CI/CD provider from request headers (GitHub, GitLab, Jenkins, Drone, Bitbucket) and normalizes payloads to a common format. Used by `webhooks.py` for inbound callbacks.
 
-**MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio and Streamable HTTP transport. Provides 15 tools, 4 resources, 1 resource template, and 4 prompts.
+**MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio and Streamable HTTP transport. Provides 20 tools, 4 resources, 1 resource template, and 4 prompts.
 
 ## Frontend architecture (`frontend/src/`)
 
