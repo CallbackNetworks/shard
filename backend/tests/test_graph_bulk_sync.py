@@ -29,19 +29,6 @@ def test_bulk_remove_label_clears_labeled_edge(client, db):
     assert _edge(db, tid, lid, "labeled") is None
 
 
-def test_goal_project_replacement_clears_stale_contains_edges(client, db):
-    a = _project(client, "A")
-    b = _project(client, "B")
-    goal_id = client.post("/api/goals", json={"title": "G", "project_ids": [a]}).json()["id"]
-    # ADR-0041: a goal contains its projects (goal -> project), not the retired part_of.
-    assert _edge(db, goal_id, a, "contains") is not None
-
-    # Replace linked projects with only B; A's contains edge must be gone.
-    client.patch(f"/api/goals/{goal_id}", json={"project_ids": [b]})
-    assert _edge(db, goal_id, a, "contains") is None
-    assert _edge(db, goal_id, b, "contains") is not None
-
-
 def test_bulk_update_runs_workflow_rules(client, db):
     """SPA bulk status changes now trigger workflow rules (ADR-0038)."""
     from app.models import ActivityLog, WorkflowRule

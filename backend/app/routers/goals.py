@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Node
 from app.routers.deps import get_goal_or_404
-from app.schemas import GoalCreate, GoalOut, GoalProjectOut, GoalUpdate
+from app.schemas import GoalOut, GoalProjectOut
 from app.services import graph
-from app.services.activity import log_activity
-from app.services.ws_manager import ws_manager
 
+# Reads only. A goal is a ``container``-role node (ADR-0041), so its create/update/
+# delete go through the single graph write surface ``/api/nodes`` (+ the role-driven
+# dispatcher) exactly like any other node; project links are ``contains`` edges managed
+# via ``/api/nodes/{id}/edges``. This router keeps the enriched goal read shape
+# (per-project breakdown + task-weighted subtree progress) that ``GoalOut`` callers rely on.
 router = APIRouter(prefix="/goals", tags=["goals"])
 
 
@@ -51,69 +54,3 @@ def list_goals(
 def get_goal(goal_id: str, db: Session = Depends(get_db)):
     goal = get_goal_or_404(goal_id, db)
     return _enrich_goal(goal, db)
-
-
-@router.post("", response_model=GoalOut, status_code=status.HTTP_201_CREATED)
-async def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
-    goal = graph.create_goal(
-        db,
-        title=body.title,
-        description=body.description,
-        target_date=body.target_date,
-    )
-
-    for pid in body.project_ids:
-        if not graph.get_project(db, pid):
-            raise HTTPException(status_code=404, detail=f"Project {pid} not found")
-        graph.link_goal_project(db, goal.id, pid)
-
-    log_activity(
-        db,
-        "goal.created",
-        detail=f'Goal "{goal.title}" created',
-    )
-    db.commit()
-    await ws_manager.broadcast("goal.created", {"goal_id": goal.id})
-    return _enrich_goal(goal, db)
-
-
-@router.patch("/{goal_id}", response_model=GoalOut)
-async def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_db)):
-    get_goal_or_404(goal_id, db)
-
-    changes = body.model_dump(exclude_none=True)
-    project_ids = changes.pop("project_ids", None)
-
-    goal = graph.update_goal(db, goal_id, **changes)
-
-    if project_ids is not None:
-        # Replace linked projects: drop only the goal -> project ``contains`` edges (leaving
-        # any tasks the goal holds directly untouched), then re-add the requested projects.
-        for pid in graph.project_ids_for_goal(db, goal_id):
-            graph.remove_edge(db, goal_id, pid, graph.REL_CONTAINS)
-        for pid in project_ids:
-            if not graph.get_project(db, pid):
-                raise HTTPException(status_code=404, detail=f"Project {pid} not found")
-            graph.link_goal_project(db, goal_id, pid)
-
-    log_activity(
-        db,
-        "goal.updated",
-        detail=f'Goal "{goal.title}" updated',
-    )
-    db.commit()
-    await ws_manager.broadcast("goal.updated", {"goal_id": goal_id})
-    return _enrich_goal(goal, db)
-
-
-@router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_goal(goal_id: str, db: Session = Depends(get_db)):
-    goal = get_goal_or_404(goal_id, db)
-    log_activity(
-        db,
-        "goal.deleted",
-        detail=f'Goal "{goal.title}" deleted',
-    )
-    graph.delete_goal(db, goal_id)
-    db.commit()
-    await ws_manager.broadcast("goal.deleted", {"goal_id": goal_id})

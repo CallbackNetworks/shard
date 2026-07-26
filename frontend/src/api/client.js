@@ -232,12 +232,42 @@ export const getDecisions = (params = {}) => api.get('/decisions', { params }).t
 export const getDecision = (id) => api.get(`/decisions/${id}`).then(r => r.data)
 export const exportDecision = (id) => api.get(`/decisions/${id}/export`).then(r => r.data)
 
-// Goals
+// Goals — reads stay on /goals (enriched: per-project breakdown + subtree progress);
+// writes go through the generic node/edge surface (ADR-0041 step c). A goal is a
+// container node, and its linked projects are `goal -> project` `contains` edges.
 export const getGoals = (params = {}) => api.get('/goals', { params }).then(r => r.data)
 export const getGoal = (id) => api.get(`/goals/${id}`).then(r => r.data)
-export const createGoal = (data) => api.post('/goals', data).then(r => r.data)
-export const updateGoal = (id, data) => api.patch(`/goals/${id}`, data).then(r => r.data)
-export const deleteGoal = (id) => api.delete(`/goals/${id}`)
+
+// Current project links of a goal: outgoing `contains` edges whose target is a project.
+const goalProjectIds = async (goalId) =>
+  (await getNodeEdges(goalId))
+    .filter(e => e.source_id === goalId && e.rel_type === 'contains' && e.target?.type === 'project')
+    .map(e => e.target_id)
+
+export const createGoal = async ({ title, description = null, target_date = null, project_ids = [] }) => {
+  const node = await createNode({ type: 'goal', title, status: 'active', due_date: target_date, data: { description } })
+  for (const pid of project_ids) await attachNodeEdge(node.id, { target_id: pid, rel_type: 'contains' })
+  return node
+}
+
+export const updateGoal = async (id, { project_ids, target_date, description, ...rest }) => {
+  const patch = { ...rest }
+  if (target_date !== undefined) patch.due_date = target_date
+  if (description !== undefined) patch.data = { description }
+  const node = Object.keys(patch).length ? await updateNode(id, patch) : null
+  if (project_ids !== undefined) {
+    // Reconcile the goal -> project `contains` edges to match the requested set,
+    // leaving any tasks the goal holds directly untouched.
+    const current = await goalProjectIds(id)
+    const next = new Set(project_ids)
+    const currentSet = new Set(current)
+    for (const pid of current) if (!next.has(pid)) await detachNodeEdge(id, pid, 'contains')
+    for (const pid of project_ids) if (!currentSet.has(pid)) await attachNodeEdge(id, { target_id: pid, rel_type: 'contains' })
+  }
+  return node
+}
+
+export const deleteGoal = (id) => deleteNode(id)
 
 // Saved Filters
 export const getSavedFilters = (projectId) =>

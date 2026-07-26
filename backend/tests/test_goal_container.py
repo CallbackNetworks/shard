@@ -2,12 +2,22 @@
 
 A goal carries the ``container`` role: projects it groups are ``goal -> project``
 ``contains`` edges, it can hold tasks directly (``goal -> task``), and its
-progress is task-weighted over the whole subtree.
+progress is task-weighted over the whole subtree. Goal writes go through the
+single graph write surface ``/api/nodes`` (+ ``/edges`` for project links); the
+``/goals`` router is read-only (ADR-0041 step c).
 """
 
 
 def _project(client, name="P"):
     return client.post("/api/projects", json={"name": name}).json()["id"]
+
+
+def _goal(client, title="G", project_ids=()):
+    """Create a goal via the generic node surface and link projects as contains edges."""
+    goal_id = client.post("/api/nodes", json={"type": "goal", "title": title, "status": "active"}).json()["id"]
+    for pid in project_ids:
+        client.post(f"/api/nodes/{goal_id}/edges", json={"target_id": pid, "rel_type": "contains"})
+    return goal_id
 
 
 def _task(client, container_id, title, status="todo"):
@@ -25,7 +35,7 @@ def test_goal_links_project_via_contains(client, db):
     from app.services import graph
 
     pid = _project(client, "A")
-    goal_id = client.post("/api/goals", json={"title": "G", "project_ids": [pid]}).json()["id"]
+    goal_id = _goal(client, "G", project_ids=[pid])
 
     # The link is a goal -> project ``contains`` edge, and the project reads back.
     assert graph.project_ids_for_goal(db, goal_id) == [pid]
@@ -35,7 +45,7 @@ def test_goal_links_project_via_contains(client, db):
 def test_goal_holds_task_directly_without_project(client, db):
     from app.services import graph
 
-    goal_id = client.post("/api/goals", json={"title": "G"}).json()["id"]
+    goal_id = _goal(client, "G")
     task = _task(client, goal_id, "orphan-for-goal")
 
     # ADR-0034 compat: no literal project, but the goal shows up as a container.
@@ -49,7 +59,7 @@ def test_goal_holds_task_directly_without_project(client, db):
 
 def test_goal_progress_is_task_weighted_over_subtree(client):
     pid = _project(client, "P")
-    goal_id = client.post("/api/goals", json={"title": "G", "project_ids": [pid]}).json()["id"]
+    goal_id = _goal(client, "G", project_ids=[pid])
 
     # Two tasks nested in the project (one done) + one task held directly by the goal (done).
     _task(client, pid, "p1", status="done")
@@ -70,10 +80,13 @@ def test_goal_project_replacement_keeps_direct_tasks(client, db):
 
     a = _project(client, "A")
     b = _project(client, "B")
-    goal_id = client.post("/api/goals", json={"title": "G", "project_ids": [a]}).json()["id"]
+    goal_id = _goal(client, "G", project_ids=[a])
     direct = _task(client, goal_id, "kept")
 
-    client.patch(f"/api/goals/{goal_id}", json={"project_ids": [b]})
+    # Replace the linked project via the generic edge surface (what the frontend client
+    # now does): detach goal -> A, attach goal -> B. The direct task edge is untouched.
+    client.delete(f"/api/nodes/{goal_id}/edges", params={"target_id": a, "rel_type": "contains"})
+    client.post(f"/api/nodes/{goal_id}/edges", json={"target_id": b, "rel_type": "contains"})
 
     assert graph.project_ids_for_goal(db, goal_id) == [b]
     # The directly-held task survives the project swap.
