@@ -49,9 +49,6 @@ api.interceptors.response.use(null, err => {
   return Promise.reject(err)
 })
 
-// Helper to mark background requests (used by React Query refetch)
-export const markBackground = (config) => ({ ...config, _isBackgroundRefetch: true })
-
 // Projects — reads stay on /projects (enriched); writes go through the node surface
 // (ADR-0043): a project is a container node. name -> title; the rest folds into data.
 export const getProjects = () => api.get('/projects').then(r => r.data)
@@ -72,7 +69,6 @@ export const rotateGlobalIcalToken = () => api.post('/settings/ical-token/rotate
 // container_id files the task under its project; parent_id (in data) nests a
 // subtask; the response is the enriched TaskOut shape. Reads and sub-resources
 // (reorder, memberships, external issue, ...) keep their dedicated routes.
-export const getTasks = (projectId) => api.get(`/projects/${projectId}/tasks`).then(r => r.data)
 export const createTask = (projectId, data) => api.post('/nodes', { type: 'task', container_id: projectId, ...data }).then(r => r.data)
 export const updateTask = (projectId, taskId, data) => api.patch(`/nodes/${taskId}`, data).then(r => r.data)
 export const deleteTask = (projectId, taskId) => api.delete(`/nodes/${taskId}`)
@@ -87,7 +83,6 @@ export const removeTaskMembership = (projectId, taskId, targetProjectId) =>
 
 // Labels — reads/assignment stay on /projects; label entity writes go through the
 // node surface (ADR-0043): a label is a container-scoped node (project contains label).
-export const getLabels = (projectId) => api.get(`/projects/${projectId}/labels`).then(r => r.data)
 export const createLabel = (projectId, { name, ...rest }) =>
   createNode({ type: 'label', container_id: projectId, title: name, data: rest })
 export const updateLabel = (projectId, labelId, { name, ...rest }) =>
@@ -98,8 +93,6 @@ export const updateLabel = (projectId, labelId, { name, ...rest }) =>
 export const deleteLabel = (projectId, labelId) => deleteNode(labelId)
 export const addLabelToTask = (projectId, taskId, labelId) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/labels/${labelId}`).then(r => r.data)
-export const removeLabelFromTask = (projectId, taskId, labelId) =>
-  api.delete(`/projects/${projectId}/tasks/${taskId}/labels/${labelId}`)
 
 // Cycles — reads/linking/duplicate stay on /projects; cycle entity writes go through
 // the node surface (ADR-0043): a cycle is a container-scoped node; end_date -> due_date.
@@ -156,7 +149,6 @@ export const updateIdentity = (id, { name, ...rest }) => {
   return updateNode(id, patch)
 }
 export const deleteIdentity = (id) => deleteNode(id)
-export const getIdentityProjects = (identityId) => api.get(`/identities/${identityId}/projects`).then(r => r.data)
 export const linkProjectIdentity = (identityId, projectId) => attachNodeEdge(identityId, { target_id: projectId, rel_type: 'member_of' })
 export const unlinkProjectIdentity = (identityId, projectId) => detachNodeEdge(identityId, projectId, 'member_of')
 export const getIdentityHubStats = () => api.get('/identities/hub-stats').then(r => r.data)
@@ -169,8 +161,6 @@ export const getComments = (projectId, taskId) =>
   api.get(`/projects/${projectId}/tasks/${taskId}/comments`).then(r => r.data)
 export const createComment = (projectId, taskId, data) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/comments`, data).then(r => r.data)
-export const updateComment = (projectId, taskId, commentId, data) =>
-  api.patch(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`, data).then(r => r.data)
 export const deleteComment = (projectId, taskId, commentId) =>
   api.delete(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`)
 
@@ -205,8 +195,6 @@ export const getAllDeliveries = (params = {}) =>
   api.get('/deliveries', { params }).then(r => r.data)
 export const getDeliveries = (integrationId, params = {}) =>
   api.get(`/integrations/${integrationId}/deliveries`, { params }).then(r => r.data)
-export const getDelivery = (deliveryId) =>
-  api.get(`/deliveries/${deliveryId}`).then(r => r.data)
 export const retryDelivery = (deliveryId) =>
   api.post(`/deliveries/${deliveryId}/retry`).then(r => r.data)
 export const purgeDeliveries = (olderThanDays = 30) =>
@@ -227,14 +215,8 @@ export const getWebhookEvents = (taskId, params = {}) =>
   api.get(`/webhook/events/${taskId}`, { params }).then(r => r.data)
 
 // CI/CD pipeline triggers
-export const triggerGitHubWorkflow = (data) => api.post('/cicd/trigger/github', data).then(r => r.data)
-export const triggerGitLabPipeline = (data) => api.post('/cicd/trigger/gitlab', data).then(r => r.data)
-export const triggerJenkinsBuild = (data) => api.post('/cicd/trigger/jenkins', data).then(r => r.data)
-export const triggerGenericPipeline = (data) => api.post('/cicd/trigger/generic', data).then(r => r.data)
 
 // Recurrence
-export const getRecurrence = (projectId, taskId) =>
-  api.get(`/projects/${projectId}/tasks/${taskId}/recurrence`).then(r => r.data)
 export const setRecurrence = (projectId, taskId, data) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/recurrence`, data).then(r => r.data)
 export const updateRecurrence = (projectId, taskId, data) =>
@@ -264,14 +246,12 @@ export const deleteTemplate = (id) => api.delete(`/templates/${id}`)
 
 // Decisions
 export const getDecisions = (params = {}) => api.get('/decisions', { params }).then(r => r.data)
-export const getDecision = (id) => api.get(`/decisions/${id}`).then(r => r.data)
 export const exportDecision = (id) => api.get(`/decisions/${id}/export`).then(r => r.data)
 
 // Goals — reads stay on /goals (enriched: per-project breakdown + subtree progress);
 // writes go through the generic node/edge surface (ADR-0041 step c). A goal is a
 // container node, and its linked projects are `goal -> project` `contains` edges.
 export const getGoals = (params = {}) => api.get('/goals', { params }).then(r => r.data)
-export const getGoal = (id) => api.get(`/goals/${id}`).then(r => r.data)
 
 // Current project links of a goal: outgoing `contains` edges whose target is a project.
 const goalProjectIds = async (goalId) =>
@@ -308,8 +288,6 @@ export const deleteGoal = (id) => deleteNode(id)
 export const getSavedFilters = (projectId) =>
   api.get('/saved-filters', { params: projectId ? { project_id: projectId } : {} }).then(r => r.data)
 export const createSavedFilter = (data) => api.post('/saved-filters', data).then(r => r.data)
-export const updateSavedFilter = (id, data) => api.patch(`/saved-filters/${id}`, data).then(r => r.data)
-export const deleteSavedFilter = (id) => api.delete(`/saved-filters/${id}`)
 
 // Bulk Operations
 export const bulkUpdateTasks = (projectId, data) =>
@@ -318,8 +296,6 @@ export const bulkUpdateTasks = (projectId, data) =>
 // Import / Export
 export const exportTasks = (projectId, format = 'json') =>
   api.get(`/projects/${projectId}/tasks/export`, { params: { format } }).then(r => r.data)
-export const exportTasksCsv = (projectId) =>
-  api.get(`/projects/${projectId}/tasks/export`, { params: { format: 'csv' }, responseType: 'blob' })
 export const importTasks = (projectId, data) =>
   api.post(`/projects/${projectId}/tasks/import`, data).then(r => r.data)
 
@@ -327,7 +303,6 @@ export const importTasks = (projectId, data) =>
 export const getSettings = () => api.get('/settings').then(r => r.data)
 export const updateSystemSettings = (data) => api.put('/settings/system', data).then(r => r.data)
 export const changePassword = (data) => api.post('/settings/change-password', data).then(r => r.data)
-export const getDashboardWidgets = () => api.get('/settings/dashboard-widgets').then(r => r.data)
 export const getPreference = (key) => api.get(`/settings/preferences/${key}`).then(r => r.data)
 export const setPreference = (key, value) => api.put(`/settings/preferences/${key}`, { value }).then(r => r.data)
 
@@ -388,7 +363,6 @@ export const clearNodeSharePin = (id) => api.delete(`/nodes/${id}/share/pin`).th
 export const setNodeShareExpiry = (id, expires_at) => api.post(`/nodes/${id}/share/set-expiry`, { expires_at }).then(r => r.data)
 export const getEdgeTypes = () => api.get('/graph-types/edges').then(r => r.data)
 export const createEdgeType = (data) => api.post('/graph-types/edges', data).then(r => r.data)
-export const updateEdgeType = (key, data) => api.patch(`/graph-types/edges/${key}`, data).then(r => r.data)
 export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)
 
 // Generic graph nodes (ADR-0033)
