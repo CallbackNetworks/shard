@@ -58,6 +58,28 @@ Every agent session should begin with:
 3. Start working on tasks
 ```
 
+## The write surface: everything is a node
+
+Every first-class entity — task, project, label, cycle, goal, identity, and any
+user-defined type — is a **node**, and relationships between them are **edges**. So there is
+exactly one way to create, update, or delete anything:
+
+| Operation | Endpoint |
+|---|---|
+| Create | `POST /api/v1/nodes` |
+| Update | `PATCH /api/v1/nodes/{node_id}` |
+| Delete | `DELETE /api/v1/nodes/{node_id}` |
+| Link / unlink | `POST` / `DELETE /api/v1/nodes/{node_id}/edges` |
+
+The old per-entity write routes (`POST /api/v1/projects`, `POST /api/v1/projects/{pid}/tasks`,
+`PATCH /api/v1/projects/{pid}/tasks/{tid}`, …) were retired and now return **405**. What
+remains under `/api/v1/projects/...` is reads, relationship sub-resources (labels,
+dependencies, comments), and operations (progress, bulk).
+
+Scopes still apply, and containers are treated as higher-risk: a project-scoped API key
+cannot create a top-level project, goal, or identity, and deleting a container-role node
+requires the `admin` scope because it cascades.
+
 ## Task Lifecycle
 
 ```
@@ -98,12 +120,17 @@ GET /api/v1/projects/{project_id}
 
 ### Create a task
 
+`container_id` is the project (or any container-role node) the task belongs to; omit it and
+the task lands in the unfiled inbox. Use `parent_id` instead to create a subtask.
+
 ```
-POST /api/v1/projects/{project_id}/tasks
+POST /api/v1/nodes
 Content-Type: application/json
 
 {
+  "type": "task",
   "title": "Implement user authentication",
+  "container_id": "{project_id}",
   "priority": "high",
   "description": "Add JWT-based auth flow",
   "assignee": "agent:claude-code",
@@ -114,11 +141,32 @@ Content-Type: application/json
 ### Update task status
 
 ```
-PATCH /api/v1/projects/{project_id}/tasks/{task_id}
+PATCH /api/v1/nodes/{task_id}
 Content-Type: application/json
 
 {"status": "in_progress"}
 ```
+
+### Create a project
+
+```
+POST /api/v1/nodes
+Content-Type: application/json
+
+{"type": "project", "title": "Billing rewrite", "description": "Q3 migration"}
+```
+
+Requires an unscoped key — a project-scoped key cannot create top-level containers.
+
+### Delete a node
+
+```
+DELETE /api/v1/nodes/{node_id}
+```
+
+Deleting a task tears down its subtree. Deleting a container cascades its exclusively-owned
+tasks and its scoped labels and cycles, so it requires the `admin` scope. Tasks that also
+belong to another container are unlinked rather than deleted.
 
 ### Report progress
 
@@ -133,7 +181,20 @@ Content-Type: application/json
 }
 ```
 
-### Bulk update tasks
+### Bulk create / update tasks
+
+Bulk endpoints are kept alongside the node surface because they are batch operations, not a
+second single-entity write path. Each item still runs the full mutation pipeline.
+
+```
+POST /api/v1/projects/{project_id}/tasks/bulk
+Content-Type: application/json
+
+[
+  {"title": "Write migration"},
+  {"title": "Backfill rows", "priority": "high"}
+]
+```
 
 ```
 POST /api/v1/projects/{project_id}/tasks/bulk-update
@@ -167,6 +228,30 @@ Content-Type: application/json
 
 ```
 POST /api/v1/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}
+```
+
+### Link nodes directly
+
+Anything the named sub-resources do not cover is an edge. `rel_type` is one of `contains`,
+`member_of`, `assigned_to`, `depends_on`, `labeled`, `in_cycle`, or any type registered in
+the edge-type vocabulary.
+
+```
+POST /api/v1/nodes/{node_id}/edges
+Content-Type: application/json
+
+{"target_id": "{other_node_id}", "rel_type": "contains"}
+```
+
+Use `DELETE /api/v1/nodes/{node_id}/edges?target_id=...&rel_type=...` to unlink.
+
+### Explore the graph
+
+```
+GET /api/v1/nodes?type=task&query=auth&limit=50
+GET /api/v1/nodes/{node_id}/edges
+GET /api/v1/nodes/{node_id}/contained-tasks
+GET /api/v1/graph/map?types=project,task&include=data&limit=500
 ```
 
 ## Tool Schema Discovery
@@ -225,11 +310,10 @@ GET /api/v1/projects/{project_id}/labels
 
 ### Workflow rules
 
-The platform has automated workflow rules (e.g., "when all subtasks are done, mark parent as done"). Check existing rules before adding automation:
-
-```
-GET /api/v1/projects/{project_id}/workflow-rules
-```
+The platform has automated workflow rules (e.g., "when all subtasks are done, mark parent as
+done"). They are user-configured and are not exposed on the External API — a status you write
+may be changed again by a rule immediately afterwards, so re-read the task if the exact final
+state matters.
 
 ## Agent Configuration
 
@@ -344,7 +428,8 @@ The MCP server exposes these tools:
 
 ## Safety Guidelines
 
-- **Do not delete projects** without explicit user confirmation
+- **Do not delete containers** (projects, goals, or any container-role node) without explicit
+  user confirmation — the delete cascades to their tasks, labels, and cycles
 - **Do not bulk-reassign** tasks without checking current assignees
 - **Do not change workflow rules** — these are user-configured automation
 - **Report progress** regularly so the user can track your work
