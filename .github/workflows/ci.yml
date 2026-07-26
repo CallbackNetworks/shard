@@ -158,6 +158,14 @@ jobs:
           docker compose -f docker-compose.ci.yml -p ci-integration --profile integration exec frontend-prod \
             wget -qO- http://127.0.0.1/ > /dev/null
 
+      - name: Build e2e image
+        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration build e2e
+
+      - name: Run Playwright e2e suite
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration \
+            run --rm --no-deps e2e npx playwright test --reporter=line
+
       - name: Cleanup
         if: always()
         run: |

@@ -75,5 +75,20 @@ services:
     networks:
       - ci-network
 
+  # Runs against the prod images above rather than a stack of its own, so the
+  # integration job pays for one build instead of two.
+  e2e:
+    profiles: [integration]
+    build: ./e2e
+    depends_on:
+      frontend-prod:
+        condition: service_healthy
+    environment:
+      - BASE_URL=${E2E_BASE_URL:-http://frontend-prod:80}
+      - API_URL=${E2E_API_URL:-http://backend:8000}
+      - API_KEY=${API_KEY:-}
+    networks:
+      - ci-network
+
 networks:
   ci-network:
