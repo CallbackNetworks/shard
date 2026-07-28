@@ -490,30 +490,77 @@ class TaskTemplateOut(BaseModel):
 # --- Workflow Rules ---
 
 
+def _reject_unknown(name: str, value: str, allowed: set[str]) -> str:
+    if value not in allowed:
+        raise ValueError(f"unknown {name} {value!r}; expected one of {', '.join(sorted(allowed))}")
+    return value
+
+
 class WorkflowCondition(BaseModel):
-    field: str  # priority, status, title_contains, has_label, assignee
-    op: str  # eq, neq, contains, in
+    field: str
+    op: str
     value: str | list[str]
+
+    # The engine treats an unknown field or op as "condition not met" and says nothing,
+    # so a typo produces a rule that looks fine and never fires. Reject it on write.
+    # Imported lazily: the engine pulls in the service layer, which imports this module.
+    @field_validator("field")
+    @classmethod
+    def _known_field(cls, v: str) -> str:
+        from app.services.rules_engine import CONDITION_FIELDS
+
+        return _reject_unknown("condition field", v, CONDITION_FIELDS)
+
+    @field_validator("op")
+    @classmethod
+    def _known_op(cls, v: str) -> str:
+        from app.services.rules_engine import CONDITION_OPS
+
+        return _reject_unknown("condition op", v, CONDITION_OPS)
 
 
 class WorkflowAction(BaseModel):
-    type: str  # set_status, set_priority, set_assignee, add_label, remove_label, add_comment, fire_event
+    type: str
     value: str
+
+    @field_validator("type")
+    @classmethod
+    def _known_type(cls, v: str) -> str:
+        from app.services.rules_engine import ACTION_TYPES
+
+        return _reject_unknown("action type", v, ACTION_TYPES)
+
+
+def _check_trigger(v: str | None) -> str | None:
+    from app.services.rules_engine import SUPPORTED_TRIGGERS
+
+    return v if v is None else _reject_unknown("trigger", v, SUPPORTED_TRIGGERS)
 
 
 class WorkflowRuleCreate(BaseModel):
     name: str
     project_id: str | None = None
-    trigger: Literal["task.created", "task.status_changed", "task.label_added", "task.priority_changed"]
+    trigger: str
     conditions: list[WorkflowCondition] = []
     actions: list[WorkflowAction] = Field(min_length=1)
     active: bool = True
+
+    @field_validator("trigger")
+    @classmethod
+    def _known_trigger(cls, v: str) -> str:
+        return _check_trigger(v)
 
 
 class WorkflowRuleUpdate(BaseModel):
     name: str | None = None
     project_id: str | None = None
     trigger: str | None = None
+
+    @field_validator("trigger")
+    @classmethod
+    def _known_trigger(cls, v: str | None) -> str | None:
+        return _check_trigger(v)
+
     conditions: list[WorkflowCondition] | None = None
     actions: list[WorkflowAction] | None = None
     active: bool | None = None

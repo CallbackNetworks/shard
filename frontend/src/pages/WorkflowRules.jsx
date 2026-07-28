@@ -22,8 +22,8 @@ const ACTION_TYPES = [
   { value: 'set_status', label: 'Set Status' },
   { value: 'set_priority', label: 'Set Priority' },
   { value: 'set_assignee', label: 'Set Assignee' },
-  { value: 'add_label', label: 'Add Label (by ID)' },
-  { value: 'remove_label', label: 'Remove Label (by ID)' },
+  { value: 'add_label', label: 'Add Label (name or ID)' },
+  { value: 'remove_label', label: 'Remove Label (name or ID)' },
   { value: 'add_comment', label: 'Add Comment' },
   { value: 'fire_event', label: 'Fire Integration Event' },
 ]

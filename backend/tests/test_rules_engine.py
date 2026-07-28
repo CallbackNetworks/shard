@@ -1,9 +1,12 @@
 """Tests for the workflow rules engine."""
 
+import re
+from pathlib import Path
+
 import pytest
 
 from app.models import Comment, WorkflowRule
-from app.services import graph
+from app.services import graph, rules_engine
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
 from tests.factories import make_project, make_task
 
@@ -352,3 +355,67 @@ class TestRunRules:
 
         await run_rules(db, "task.status_changed", task, {})
         assert task.assignee == "bot"
+
+
+class TestLabelActionsAcceptNames:
+    """Rules are usually global, so a label id pins the action to one project."""
+
+    @pytest.fixture
+    def project_and_task(self, db):
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        task = make_task(db, project_id=project.id, title="T")
+        db.add(task)
+        db.flush()
+        return project, graph.get_task(db, task.id)
+
+    def test_add_label_by_name(self, db, project_and_task):
+        project, task = project_and_task
+        label = graph.create_label(db, project.id, name="urgent", color="#ff0000")
+
+        _exec_action(db, {"type": "add_label", "value": "urgent"}, task)
+        db.flush()
+
+        assert label.id in graph.label_ids_for_task(db, task.id)
+
+    def test_remove_label_by_name(self, db, project_and_task):
+        project, task = project_and_task
+        label = graph.create_label(db, project.id, name="stale", color="#aaa")
+        graph.set_label(db, task.id, label.id)
+        db.flush()
+
+        _exec_action(db, {"type": "remove_label", "value": "stale"}, task)
+        db.flush()
+
+        assert label.id not in graph.label_ids_for_task(db, task.id)
+
+    def test_unknown_label_is_a_no_op(self, db, project_and_task):
+        _, task = project_and_task
+        _exec_action(db, {"type": "add_label", "value": "nope"}, task)
+        db.flush()
+
+        assert graph.label_ids_for_task(db, task.id) == []
+
+
+class TestVocabularyMatchesTheEngine:
+    """The schema layer rejects anything outside these sets, so a set that drifts
+    away from the engine's branches would either block a working value or let a
+    dead one through. Scanned from source because the branches are if/elif chains
+    with no runtime registry to inspect."""
+
+    @pytest.fixture
+    def source(self):
+        return Path(rules_engine.__file__).read_text()
+
+    def _handled(self, source: str, variable: str) -> set[str]:
+        return set(re.findall(rf'\b{variable} == "([^"]+)"', source))
+
+    def test_condition_fields(self, source):
+        assert self._handled(source, "field") == rules_engine.CONDITION_FIELDS
+
+    def test_condition_ops(self, source):
+        assert self._handled(source, "op") == rules_engine.CONDITION_OPS
+
+    def test_action_types(self, source):
+        assert self._handled(source, "atype") == rules_engine.ACTION_TYPES

@@ -81,9 +81,12 @@ async def test_rule(rule_id: str, task_id: str | None = Query(None), db: Session
 
     from app.services.rules_engine import _eval_condition
 
-    all_match = all(_eval_condition(c, task, {}) for c in (rule.conditions or []))
+    # ``db`` is required for has_label: a TaskView is not a mapped instance, so the
+    # engine cannot recover a session from it and would report every label condition
+    # as unmet (ADR-0045).
+    met = [_eval_condition(c, task, {}, db) for c in (rule.conditions or [])]
     return {
-        "would_fire": all_match,
-        "conditions_met": [_eval_condition(c, task, {}) for c in (rule.conditions or [])],
-        "actions": rule.actions if all_match else [],
+        "would_fire": all(met),
+        "conditions_met": met,
+        "actions": rule.actions if all(met) else [],
     }

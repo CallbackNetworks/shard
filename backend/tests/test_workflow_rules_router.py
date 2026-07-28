@@ -1,3 +1,6 @@
+import pytest
+
+from app.services import graph
 from tests.factories import make_task
 
 
@@ -229,3 +232,64 @@ def test_dry_run_rule(client, db, sample_project):
     assert len(data["actions"]) == 1
     assert data["actions"][0]["type"] == "set_priority"
     assert data["actions"][0]["value"] == "high"
+
+
+# --- Vocabulary validation (a typo used to save a rule that silently never fired) ---
+
+
+def _rule_body(**overrides):
+    body = {
+        "name": "R",
+        "trigger": "task.created",
+        "conditions": [{"field": "status", "op": "eq", "value": "todo"}],
+        "actions": [{"type": "set_priority", "value": "high"}],
+    }
+    body.update(overrides)
+    return body
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _rule_body(conditions=[{"field": "title", "op": "contains", "value": "x"}]),
+        _rule_body(conditions=[{"field": "status", "op": "equals", "value": "todo"}]),
+        _rule_body(actions=[{"type": "set_field", "value": "high"}]),
+        _rule_body(trigger="task.exploded"),
+    ],
+    ids=["unknown-field", "unknown-op", "unknown-action", "unknown-trigger"],
+)
+def test_create_rejects_unknown_vocabulary(client, body):
+    assert client.post("/api/workflow-rules", json=body).status_code == 422
+
+
+def test_patch_rejects_unknown_vocabulary(client):
+    rule_id = client.post("/api/workflow-rules", json=_rule_body()).json()["id"]
+
+    r = client.patch(
+        f"/api/workflow-rules/{rule_id}",
+        json={"conditions": [{"field": "label", "op": "eq", "value": "x"}]},
+    )
+    assert r.status_code == 422
+
+
+def test_error_names_the_allowed_values(client):
+    r = client.post("/api/workflow-rules", json=_rule_body(actions=[{"type": "set_field", "value": "high"}]))
+    assert "set_priority" in r.text
+
+
+def test_dry_run_sees_labels(client, db, sample_project):
+    # has_label needs a session the engine cannot get from a TaskView, so the dry-run
+    # used to report every label condition as unmet (ADR-0045).
+    task = _make_task(db, sample_project.id)
+    label = graph.create_label(db, sample_project.id, name="urgent", color="#f00")
+    graph.set_label(db, task.id, label.id)
+    db.commit()
+
+    rule_id = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(conditions=[{"field": "has_label", "op": "eq", "value": "urgent"}]),
+    ).json()["id"]
+
+    data = client.post(f"/api/workflow-rules/{rule_id}/test?task_id={task.id}").json()
+    assert data["conditions_met"] == [True]
+    assert data["would_fire"] is True

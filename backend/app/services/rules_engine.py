@@ -21,6 +21,23 @@ SUPPORTED_TRIGGERS = {
     "task.priority_changed",
 }
 
+# The vocabulary the engine understands. An unrecognised field, op or action type
+# evaluates to "no match" / "do nothing" *silently*, so a rule saved with a near-miss
+# spelling (``title`` for ``title_contains``, ``equals`` for ``eq``) sits in the list
+# looking healthy while never firing. These sets are the source of truth the schema
+# layer validates against, so such a rule is rejected at write time instead.
+CONDITION_FIELDS = {"status", "priority", "assignee", "title_contains", "has_label"}
+CONDITION_OPS = {"eq", "neq", "contains", "in"}
+ACTION_TYPES = {
+    "set_status",
+    "set_priority",
+    "set_assignee",
+    "add_label",
+    "remove_label",
+    "add_comment",
+    "fire_event",
+}
+
 
 def _session_of(task) -> Session | None:
     """Best-effort session for a task.
@@ -67,6 +84,25 @@ def _eval_condition(cond: dict, task: "graph.TaskView", context: dict, db: Sessi
     return False
 
 
+def _resolve_label(db: Session, task: "graph.TaskView", value: str) -> "graph.LabelView | None":
+    """Resolve a label action value, which may be a label id or a label name.
+
+    Labels are project-scoped but rules are usually global, so an id pins the rule to
+    one project and is useless anywhere else; a name resolves per task. Ids still work
+    for rules written before names were accepted.
+    """
+    project_id = graph.project_id_of_task(db, task.id)
+    label = graph.get_label(db, value, project_id=project_id)
+    if label is not None:
+        return label
+    if project_id is not None:
+        for candidate in graph.labels_in_project(db, project_id):
+            if candidate.name == value:
+                return candidate
+    logger.warning("workflow action label %r not found for task %s", value, task.id)
+    return None
+
+
 def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> None:
     atype = action.get("type", "")
     value = action.get("value", "")
@@ -85,11 +121,13 @@ def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> None:
         graph.update_task(db, task.id, assignee=value or None)
         task.assignee = value or None
     elif atype == "add_label":
-        label = graph.get_label(db, value, project_id=graph.project_id_of_task(db, task.id))
-        if label:
+        label = _resolve_label(db, task, value)
+        if label is not None:
             graph.set_label(db, task.id, label.id)
     elif atype == "remove_label":
-        graph.unset_label(db, task.id, value)
+        label = _resolve_label(db, task, value)
+        if label is not None:
+            graph.unset_label(db, task.id, label.id)
     elif atype == "add_comment":
         comment = Comment(
             task_id=task.id,
