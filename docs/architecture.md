@@ -148,16 +148,29 @@ outbound notifications → external issue sync → WebSocket broadcast. **Any ne
 creates or updates a task must go through these two functions**; hand-rolling the sequence is
 how rules and notifications get silently skipped.
 
-**`notifier.py`** — fires outbound notifications after task status changes or project completion:
-1. Query integrations whose `events` array contains the event type
+**`notifier.py`** — fires outbound notifications so external systems learn about internal
+changes. `NOTIFICATION_EVENTS` is the **only** copy of the event vocabulary: the UI fetches it
+from `GET /integrations/events`, `/api/v1/subscriptions/events` returns the same object, and
+the schema layer rejects a subscription to anything outside it (ADR-0047). A test scans the
+source and fails if an advertised event has no fire site, or a fire site uses an unadvertised
+event.
+1. Select integrations scoped to the project **or** unscoped (`project_id IS NULL`, meaning
+   all projects) whose `events` array contains the event type
 2. Webhook integrations: async `httpx.post` with JSON payload + HMAC-SHA256 signature
 3. Email integrations: HTML template via SMTP
 4. If all project tasks are `done`: also fire `project.complete`
 5. Creates a `WebhookDelivery` log row per attempt
 
+`fire_notifications(db, task, event)` is task-scoped; `fire_project_notifications(db, project,
+event)` covers `project.created` / `project.archived`, which have no task and therefore omit
+the `task` key from the payload entirely.
+
 **`rules_engine.py`** — evaluates `WorkflowRule` rows on task create/update. Conditions on
 status, priority, labels, assignee. Actions: set status/priority/assignee, add/remove label,
-add comment, fire event. Max recursion depth 2.
+add comment, fire event. Max recursion depth 2. `CONDITION_FIELDS` / `CONDITION_OPS` /
+`ACTION_TYPES` / `ACTION_VALUE_ENUMS` are the engine's vocabulary and the schema layer
+validates writes against them, because an unrecognised value evaluates to "no match" / "do
+nothing" silently (ADR-0046, ADR-0047). A successful rule run fires `rule.triggered`.
 
 **`scheduler.py`** — asyncio background loop, ticks every 3600 seconds. Seven jobs:
 1. Due-date reminders (`task.due_soon` / `task.overdue`)

@@ -61,7 +61,9 @@ def test_create_rule_with_project_scope(client, sample_project):
             "project_id": sample_project.id,
             "trigger": "task.status_changed",
             "conditions": [],
-            "actions": [{"type": "set_priority", "value": "urgent"}],
+            # Was "urgent" before ADR-0047 — no such priority exists, so the rule was
+            # accepted and then did nothing; the value enum now rejects it at write time.
+            "actions": [{"type": "set_priority", "value": "high"}],
         },
     )
     assert r.status_code == 201

@@ -6,13 +6,23 @@ from app.models import Integration
 from app.schemas import IntegrationCreate, IntegrationOut, IntegrationUpdate
 from app.services.email_sender import is_configured as smtp_configured
 from app.services.integration_templates import get_all_templates, get_template
-from app.services.notifier import fire_test_notification
+from app.services.notifier import NOTIFICATION_EVENTS, fire_test_notification
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
 SMTP_WARNING = (
     "SMTP is not configured. Emails will not be sent until SMTP_HOST and SMTP_FROM environment variables are set."
 )
+
+
+@router.get("/events")
+def list_events():
+    """Event types an integration can subscribe to.
+
+    Served rather than hardcoded in the UI so the checkbox list cannot drift from the
+    events the notifier actually delivers (ADR-0047).
+    """
+    return NOTIFICATION_EVENTS
 
 
 @router.get("/templates")

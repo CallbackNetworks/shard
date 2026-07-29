@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { X, Zap, Plus, Trash2, BookOpen } from 'lucide-react'
 import {
   getIntegrations, createIntegration, updateIntegration, deleteIntegration,
-  testIntegration, getIntegrationTemplates, getIntegrationTemplate,
+  testIntegration, getIntegrationTemplates, getIntegrationTemplate, getIntegrationEvents,
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
@@ -20,13 +20,20 @@ const TYPE_ICONS = {
   jenkins: '⚙️', drone: '🚁', generic: '🔗', email: '📧', webhook: '🪝',
   github: '', gitlab: '🦊', bitbucket: '🪣', circleci: '⭕',
 }
-const EVENT_GROUPS = {
-  task: ['task.created', 'task.status_changed', 'task.done', 'task.failed', 'task.in_progress', 'task.assigned', 'task.deleted', 'task.due_soon', 'task.overdue'],
-  project: ['project.created', 'project.complete', 'project.archived'],
-  other: ['comment.created', 'rule.triggered'],
-}
-const ALL_EVENTS = [...EVENT_GROUPS.task, ...EVENT_GROUPS.project, ...EVENT_GROUPS.other]
 const CRITICAL_EVENTS = ['task.done', 'task.failed', 'task.overdue', 'project.complete']
+const EVENT_GROUP_ORDER = ['task', 'project', 'other']
+
+// The event list is served by the backend (ADR-0047) rather than kept here, so the
+// checkboxes cannot drift from the events the notifier actually delivers. Grouping is
+// presentation only: the prefix picks the heading, anything else falls under "other".
+function groupEvents(events) {
+  const groups = { task: [], project: [], other: [] }
+  for (const ev of events) {
+    const prefix = ev.split('.')[0]
+    groups[prefix in groups ? prefix : 'other'].push(ev)
+  }
+  return EVENT_GROUP_ORDER.filter(g => groups[g].length).map(g => [g, groups[g]])
+}
 
 /* ── Template Selector ── */
 function TemplatePicker({ onSelect, onClose }) {
@@ -148,7 +155,12 @@ function IntegrationModal({ initial, onSave, onClose }) {
     auth_type: 'bearer', auth_config: {}, custom_headers: {}, template_id: null,
   })
   const [showSetup, setShowSetup] = useState(null)
+  const { data: allEvents = [] } = useQuery({
+    queryKey: ['integration-events'],
+    queryFn: getIntegrationEvents,
+  })
 
+  const allSelected = allEvents.length > 0 && form.events.length === allEvents.length
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
   const toggleEvent = (ev) => set('events', form.events.includes(ev) ? form.events.filter(e => e !== ev) : [...form.events, ev])
 
@@ -262,8 +274,8 @@ function IntegrationModal({ initial, onSave, onClose }) {
           <div className={s.labelStyle}>{t('integrations.events')}
             {/* Quick presets */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, marginTop: 4 }}>
-              <button type="button" onClick={() => set('events', [...ALL_EVENTS])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: form.events.length === ALL_EVENTS.length ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: form.events.length === ALL_EVENTS.length ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+              <button type="button" onClick={() => set('events', [...allEvents])}
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: allSelected ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: allSelected ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.allEvents')}
               </button>
               <button type="button" onClick={() => set('events', [...CRITICAL_EVENTS])}
@@ -276,7 +288,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
               </button>
             </div>
             {/* Grouped events */}
-            {Object.entries(EVENT_GROUPS).map(([group, events]) => (
+            {groupEvents(allEvents).map(([group, events]) => (
               <div key={group} style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(var(--kt-ink-rgb), 0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   {t(`integrations.eventGroup.${group}`)}

@@ -38,6 +38,13 @@ ACTION_TYPES = {
     "fire_event",
 }
 
+# Actions whose value is a closed enum. The others take free text (an assignee name,
+# a label name, a comment body) and cannot be checked ahead of time.
+ACTION_VALUE_ENUMS = {
+    "set_status": {"todo", "in_progress", "done", "failed"},
+    "set_priority": {"low", "medium", "high"},
+}
+
 
 def _session_of(task) -> Session | None:
     """Best-effort session for a task.
@@ -202,6 +209,12 @@ async def run_rules(
                 meta={"rule_id": rule.id, "trigger": trigger},
             )
             logger.info("Rule '%s' executed for task '%s'", rule.name, task.title)
+
+            # Deferred import: notifier does not import this module, but the
+            # fire_event action already reaches into it the same way.
+            from app.services.notifier import fire_notifications
+
+            await fire_notifications(db, task, "rule.triggered")
 
         except Exception as exc:
             logger.warning("Rule %s failed for task %s: %s", rule.id, task.id, exc)

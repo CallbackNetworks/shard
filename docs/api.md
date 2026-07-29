@@ -261,6 +261,12 @@ Clones the cycle as a new draft, with its tasks re-created as fresh `todo` tasks
 ### Integrations
 
 #### `GET /integrations`
+
+#### `GET /integrations/events`
+The event vocabulary that can be subscribed to. Served rather than hardcoded in the UI so
+the checkbox list cannot drift from what the notifier delivers (ADR-0047). See
+[Events Reference](#events-reference).
+
 #### `POST /integrations`
 ```json
 {
@@ -268,8 +274,9 @@ Clones the cycle as a new draft, with its tasks re-created as fresh `todo` tasks
   "type": "jenkins | drone | generic | email",
   "url": "string (webhook URL; empty for email type)",
   "secret": "string (optional, sent as Bearer token)",
-  "project_id": "uuid (optional, null = global)",
+  "project_id": "uuid (optional, null = global — receives events from every project)",
   "events": ["task.done", "task.failed", "task.in_progress", "project.complete"],
+  // An event outside GET /integrations/events is rejected with 422
   "active": true,
   // Email-specific:
   "email_to": "a@example.com,b@example.com",
@@ -1384,17 +1391,30 @@ Manage outbound webhook/email subscriptions programmatically.
 
 ## Events Reference
 
+The full list is served by `GET /integrations/events` and `GET /api/v1/subscriptions/events`;
+both return `NOTIFICATION_EVENTS` from `services/notifier.py`, which is the only copy.
+Subscribing to anything outside it is rejected with 422. Every event below has a real fire
+site, pinned by a test (ADR-0047).
+
 | Event | Fired when |
 |---|---|
-| `task.done` | Task status changes to `done` |
-| `task.failed` | Task status changes to `failed` |
-| `task.in_progress` | Task status changes to `in_progress` |
 | `task.created` | New task created |
+| `task.status_changed` | Task status changes (any transition) |
+| `task.todo` · `task.in_progress` · `task.done` · `task.failed` | Task status changes to that value |
+| `task.assigned` | Task assignee set or changed |
+| `task.deleted` | Task deleted (fired before the subtree teardown) |
+| `task.due_soon` | Scheduler finds a task due within `DUE_SOON_WINDOW_HOURS` |
+| `task.overdue` | Scheduler finds a task past its due date, or SLA aging trips |
+| `comment.created` | Comment posted (internal UI or `/api/v1`) |
+| `rule.triggered` | A workflow rule matched and executed |
+| `project.created` | Project node created |
 | `project.complete` | All tasks in a project reach `done` |
+| `project.archived` | Project status set to `archived` |
 
 ## Notification Payload
 
-Sent to all matching active integrations:
+Sent to all matching active integrations — those scoped to the project, plus every
+integration with `project_id: null`, which listens to all projects.
 
 ```json
 {
@@ -1416,6 +1436,9 @@ Sent to all matching active integrations:
   "timestamp": "2026-03-21T10:00:00Z"
 }
 ```
+
+`project.created` and `project.archived` have no task to hang off, so the `task` key is
+**absent** from their payload rather than filled with a placeholder — treat it as optional.
 
 Additional headers per integration type:
 - Drone: `X-Drone-Event: custom`

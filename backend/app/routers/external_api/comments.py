@@ -16,6 +16,7 @@ from app.routers.external_api.auth import (
 from app.routers.external_api.helpers import _get_task_or_404
 from app.schemas import CommentCreate, CommentOut, CommentUpdate
 from app.services.activity import log_activity
+from app.services.notifier import fire_notifications
 from app.services.ws_manager import ws_manager
 
 sub_router = APIRouter()
@@ -59,7 +60,7 @@ async def api_create_comment(
 ):
     _require_scope(api_key, "write")
     _check_project_access(api_key, project_id)
-    _get_task_or_404(project_id, task_id, db)
+    task = _get_task_or_404(project_id, task_id, db)
 
     data = body.model_dump()
     if not data.get("author"):
@@ -79,6 +80,7 @@ async def api_create_comment(
     )
     db.commit()
     db.refresh(comment)
+    await fire_notifications(db, task, "comment.created")
     await ws_manager.broadcast("comment.created", {"project_id": project_id, "task_id": task_id})
     return comment
 

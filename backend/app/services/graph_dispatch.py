@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 from app.models import Node
 from app.services import graph
 from app.services.activity import log_activity
+from app.services.notifier import fire_notifications, fire_project_notifications
 from app.services.rules_engine import run_rules
 from app.services.task_mutations import apply_task_update, finalize_task_create
 from app.services.ws_manager import ws_manager
@@ -49,6 +50,19 @@ def _generic_scope(db: Session, node: Node) -> str | None:
     other node types have no dedicated feed yet, so the id lives only in ``meta``.
     """
     return node.id if node.type in graph.container_type_keys(db) else None
+
+
+async def _fire_project_event(db: Session, node: Node, event: str) -> None:
+    """Notify subscribers of a literal-project lifecycle event (ADR-0047).
+
+    Scoped to the built-in project type rather than the container role: a custom
+    container is not what a ``project.*`` subscriber asked for.
+    """
+    if node.type != graph.NODE_PROJECT:
+        return
+    project = graph.get_project(db, node.id)
+    if project is not None:
+        await fire_project_notifications(db, project, event)
 
 
 async def dispatch_node_created(db: Session, node: Node, *, actor: str | None = None, source: str = "node") -> None:
@@ -71,6 +85,7 @@ async def dispatch_node_created(db: Session, node: Node, *, actor: str | None = 
         meta={"type": node.type, "node_id": node.id},
     )
     db.commit()
+    await _fire_project_event(db, node, "project.created")
     await ws_manager.broadcast("node.created", {"node_id": node.id, "type": node.type})
 
 
@@ -98,6 +113,8 @@ async def dispatch_node_updated(
         meta={"type": node.type, "node_id": node.id, "fields": sorted(changes)},
     )
     db.commit()
+    if changes.get("status") == "archived":
+        await _fire_project_event(db, node, "project.archived")
     await ws_manager.broadcast("node.updated", {"node_id": node.id, "type": node.type})
     return db.get(Node, node.id)
 
@@ -125,6 +142,11 @@ async def dispatch_node_deleted(db: Session, node: Node, *, actor: str | None = 
             detail=f'Task "{title}" deleted',
             meta={"title": title},
         )
+        # Notify before the teardown: fire_notifications resolves the project from
+        # the task, which is impossible once delete_task_tree has run.
+        task = graph.get_task(db, node_id)
+        if task is not None:
+            await fire_notifications(db, task, "task.deleted")
         graph.delete_task_tree(db, node_id)
         db.commit()
         await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": node_id})

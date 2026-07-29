@@ -2,7 +2,14 @@ import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+def _reject_unknown(name: str, value: str, allowed: set[str]) -> str:
+    if value not in allowed:
+        raise ValueError(f"unknown {name} {value!r}; expected one of {', '.join(sorted(allowed))}")
+    return value
+
 
 # --- Identity ---
 
@@ -203,6 +210,16 @@ class WebhookEventOut(BaseModel):
 # --- Integration ---
 
 
+def _check_events(v: list[str] | None) -> list[str] | None:
+    """Reject subscribing to an event nobody fires — it is a checkbox that does nothing."""
+    from app.services.notifier import NOTIFICATION_EVENTS
+
+    if v is not None:
+        for event in v:
+            _reject_unknown("event", event, set(NOTIFICATION_EVENTS))
+    return v
+
+
 class IntegrationCreate(BaseModel):
     name: str
     type: Literal["jenkins", "drone", "generic", "email", "webhook", "github", "gitlab", "bitbucket", "circleci"]
@@ -217,6 +234,11 @@ class IntegrationCreate(BaseModel):
     auth_type: Literal["bearer", "basic", "api_key", "none"] | None = "bearer"
     auth_config: dict | None = None
     template_id: str | None = None
+
+    @field_validator("events")
+    @classmethod
+    def _known_events(cls, v: list[str]) -> list[str]:
+        return _check_events(v)
 
 
 class IntegrationUpdate(BaseModel):
@@ -235,6 +257,11 @@ class IntegrationUpdate(BaseModel):
     auth_type: Literal["bearer", "basic", "api_key", "none"] | None = None
     auth_config: dict | None = None
     template_id: str | None = None
+
+    @field_validator("events")
+    @classmethod
+    def _known_events(cls, v: list[str] | None) -> list[str] | None:
+        return _check_events(v)
 
 
 class IntegrationOut(BaseModel):
@@ -490,12 +517,6 @@ class TaskTemplateOut(BaseModel):
 # --- Workflow Rules ---
 
 
-def _reject_unknown(name: str, value: str, allowed: set[str]) -> str:
-    if value not in allowed:
-        raise ValueError(f"unknown {name} {value!r}; expected one of {', '.join(sorted(allowed))}")
-    return value
-
-
 class WorkflowCondition(BaseModel):
     field: str
     op: str
@@ -529,6 +550,17 @@ class WorkflowAction(BaseModel):
         from app.services.rules_engine import ACTION_TYPES
 
         return _reject_unknown("action type", v, ACTION_TYPES)
+
+    # Actions that write a closed enum drop an out-of-range value on the floor at
+    # run time, which is the same silent no-op as an unknown action type.
+    @model_validator(mode="after")
+    def _known_value(self):
+        from app.services.rules_engine import ACTION_VALUE_ENUMS
+
+        allowed = ACTION_VALUE_ENUMS.get(self.type)
+        if allowed is not None:
+            _reject_unknown(f"{self.type} value", self.value, allowed)
+        return self
 
 
 def _check_trigger(v: str | None) -> str | None:

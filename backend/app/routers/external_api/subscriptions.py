@@ -19,25 +19,13 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.services.activity import log_activity
+from app.services.notifier import NOTIFICATION_EVENTS
 
 sub_router = APIRouter()
 
-ALL_EVENTS = [
-    "task.created",
-    "task.status_changed",
-    "task.done",
-    "task.failed",
-    "task.in_progress",
-    "task.assigned",
-    "task.deleted",
-    "task.due_soon",
-    "task.overdue",
-    "project.created",
-    "project.complete",
-    "project.archived",
-    "comment.created",
-    "rule.triggered",
-]
+# Advertised to agents deciding what to subscribe to, so it has to be the list the
+# notifier actually delivers rather than a hand-kept copy of it (ADR-0047).
+ALL_EVENTS = NOTIFICATION_EVENTS
 
 
 class SubscriptionCreate(BaseModel):

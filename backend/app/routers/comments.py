@@ -11,6 +11,7 @@ from app.routers.issue_sync import (
 )
 from app.schemas import CommentCreate, CommentOut, CommentUpdate
 from app.services import graph
+from app.services.notifier import fire_notifications
 
 router = APIRouter(prefix="/projects/{project_id}/tasks/{task_id}/comments", tags=["comments"])
 
@@ -33,6 +34,7 @@ async def create_comment(project_id: str, task_id: str, body: CommentCreate, db:
     db.add(comment)
     db.commit()
     db.refresh(comment)
+    await fire_notifications(db, task, "comment.created")
     if task.external_provider:
         await sync_comment_to_external(comment, task, db)
     return comment

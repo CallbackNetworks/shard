@@ -48,3 +48,4 @@
 | [0044](0044-close-the-task-pipeline-bypasses.md) | 關閉 Task Pipeline 的旁路，並以 guard test 固定此不變式 | Accepted | 2026-07-26 |
 | [0045](0045-edge-dispatch-and-relationship-write-collapse.md) | 關係寫入收斂到 edge dispatcher，並讓 `task.label_added` 真正生效 | Accepted | 2026-07-26 |
 | [0046](0046-validate-workflow-rule-vocabulary.md) | 工作流程規則的詞彙在寫入時驗證，標籤動作接受名稱 | Accepted | 2026-07-28 |
+| [0047](0047-notification-events-single-list.md) | 通知事件收斂成單一清單，並讓每個事件真的送得出去 | Accepted | 2026-07-28 |

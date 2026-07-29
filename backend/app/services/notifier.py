@@ -6,6 +6,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 import httpx
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import Integration, Notification, WebhookDelivery
@@ -19,6 +20,29 @@ logger = logging.getLogger(__name__)
 # Retry backoff in minutes: attempt 1→2, 2→3, 3→4, 4→5 retries
 RETRY_BACKOFF_MINUTES = [1, 5, 30, 120, 360]
 MAX_ATTEMPTS = len(RETRY_BACKOFF_MINUTES)
+
+# Every event that is actually delivered. Subscribing is a plain membership test
+# against this set, so an event nobody fires is a checkbox that does nothing and
+# never says so — this is the one list the UI, the schemas and the external
+# /api/v1/events endpoint all derive from, and a test pins each entry to a real
+# fire site (ADR-0047).
+NOTIFICATION_EVENTS = [
+    "task.created",
+    "task.status_changed",
+    "task.todo",
+    "task.in_progress",
+    "task.done",
+    "task.failed",
+    "task.assigned",
+    "task.deleted",
+    "task.due_soon",
+    "task.overdue",
+    "comment.created",
+    "rule.triggered",
+    "project.created",
+    "project.complete",
+    "project.archived",
+]
 
 
 def _compute_progress(project: "graph.ProjectView", db: Session) -> tuple[int, int, float]:
@@ -224,9 +248,24 @@ async def _send_webhook_inline(
 
 
 async def fire_notifications(db: Session, task: "graph.TaskView", event: str) -> None:
+    """Fire a task-scoped event to every integration subscribed to it."""
     project: graph.ProjectView | None = graph.project_of_task(db, task.id)
     if project is None:
         return
+    await _deliver(db, project, event, task=task)
+
+
+async def fire_project_notifications(db: Session, project: "graph.ProjectView", event: str) -> None:
+    """Fire an event that belongs to the project itself and has no task.
+
+    ``project.created`` and ``project.archived`` have no task to hang off, so the
+    payload omits the ``task`` key entirely rather than inventing a placeholder;
+    consumers must treat it as optional (ADR-0047).
+    """
+    await _deliver(db, project, event, task=None)
+
+
+async def _deliver(db: Session, project: "graph.ProjectView", event: str, *, task: "graph.TaskView | None") -> None:
     total, done, progress = _compute_progress(project, db)
 
     payload = {
@@ -239,20 +278,24 @@ async def fire_notifications(db: Session, task: "graph.TaskView", event: str) ->
             "total_tasks": total,
             "done_tasks": done,
         },
-        "task": {
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+    if task is not None:
+        payload["task"] = {
             "id": task.id,
             "title": task.title,
             "status": task.status,
             "priority": task.priority,
-        },
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
+        }
 
+    # An unscoped integration (project_id NULL) listens to every project. It has to be
+    # matched with IS NULL: ``project_id IN (:id, NULL)`` is never true for a NULL row,
+    # so the previous form silently delivered nothing to global integrations (ADR-0047).
     integrations = (
         db.query(Integration)
         .filter(
             Integration.active == True,
-            Integration.project_id.in_([project.id, None]),
+            or_(Integration.project_id == project.id, Integration.project_id.is_(None)),
         )
         .all()
     )
@@ -287,11 +330,16 @@ _EVENT_MESSAGES = {
     "task.failed": lambda t, p: (f'Task "{t.title}" failed in {p.name}', f"/projects/{p.id}"),
     "task.due_soon": lambda t, p: (f'Task "{t.title}" is due soon', f"/projects/{p.id}"),
     "task.overdue": lambda t, p: (f'Task "{t.title}" is overdue', f"/projects/{p.id}"),
+    "task.deleted": lambda t, p: (f'Task "{t.title}" was deleted from {p.name}', f"/projects/{p.id}"),
+    "comment.created": lambda t, p: (f'New comment on "{t.title}"', f"/projects/{p.id}"),
+    "rule.triggered": lambda t, p: (f'Automation ran on "{t.title}"', f"/projects/{p.id}"),
     "project.complete": lambda t, p: (f'All tasks in "{p.name}" are done!', f"/projects/{p.id}"),
+    "project.created": lambda t, p: (f'Project "{p.name}" was created', f"/projects/{p.id}"),
+    "project.archived": lambda t, p: (f'Project "{p.name}" was archived', f"/projects/{p.id}"),
 }
 
 
-def _create_notification(db: Session, event: str, task: "graph.TaskView", project: "graph.ProjectView") -> None:
+def _create_notification(db: Session, event: str, task: "graph.TaskView | None", project: "graph.ProjectView") -> None:
     factory = _EVENT_MESSAGES.get(event)
     if not factory:
         return
@@ -301,7 +349,7 @@ def _create_notification(db: Session, event: str, task: "graph.TaskView", projec
         message=message,
         link=link,
         project_id=project.id,
-        task_id=task.id,
+        task_id=task.id if task is not None else None,
     )
     db.add(notif)
     db.commit()

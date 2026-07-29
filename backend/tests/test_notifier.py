@@ -15,6 +15,7 @@ from app.services.notifier import (
     _create_notification,
     _dispatch_webhook,
     fire_notifications,
+    fire_project_notifications,
     retry_delivery,
 )
 from tests.factories import make_project, make_task
@@ -290,6 +291,67 @@ class TestFireNotifications:
             await fire_notifications(db, t, "task.done")
 
         mock_dispatch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_unscoped_integration_gets_called(self, db, setup):
+        # An integration with no project_id listens to every project. Every other test
+        # here pins project_id, which is how `project_id IN (:id, NULL)` — never true for
+        # a NULL row — went unnoticed and left global integrations dark (ADR-0047).
+        p, t = setup
+        integ = Integration(
+            name="Global", type="webhook", url="https://hook.test", events=["task.done"], active=True, project_id=None
+        )
+        db.add(integ)
+        db.flush()
+
+        with patch("app.services.notifier._dispatch_webhook", new_callable=AsyncMock) as mock_dispatch:
+            mock_dispatch.return_value = True
+            await fire_notifications(db, t, "task.done")
+
+        mock_dispatch.assert_called_once()
+        assert mock_dispatch.call_args[0][1] == integ
+
+    @pytest.mark.asyncio
+    async def test_other_project_integration_not_called(self, db, setup):
+        p, t = setup
+        other = make_project(db, name="Other")
+        db.add(other)
+        db.flush()
+        integ = Integration(
+            name="I", type="webhook", url="https://hook.test", events=["task.done"], active=True, project_id=other.id
+        )
+        db.add(integ)
+        db.flush()
+
+        with patch("app.services.notifier._dispatch_webhook", new_callable=AsyncMock) as mock_dispatch:
+            await fire_notifications(db, t, "task.done")
+
+        mock_dispatch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_project_event_payload_has_no_task(self, db, setup):
+        # project.created / project.archived have no task to hang off; the payload omits
+        # the key rather than inventing a placeholder (ADR-0047).
+        p, _ = setup
+        integ = Integration(
+            name="I",
+            type="webhook",
+            url="https://hook.test",
+            events=["project.created"],
+            active=True,
+            project_id=p.id,
+        )
+        db.add(integ)
+        db.flush()
+
+        with patch("app.services.notifier._dispatch_webhook", new_callable=AsyncMock) as mock_dispatch:
+            mock_dispatch.return_value = True
+            await fire_project_notifications(db, p, "project.created")
+
+        payload = mock_dispatch.call_args[0][3]
+        assert payload["event"] == "project.created"
+        assert payload["project"]["id"] == p.id
+        assert "task" not in payload
 
     @pytest.mark.asyncio
     async def test_creates_in_app_notification(self, db, setup):

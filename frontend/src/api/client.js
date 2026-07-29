@@ -204,6 +204,10 @@ export const bulkRetryDeliveries = (integrationId) =>
 export const getIntegrationHealth = (integrationId) =>
   api.get(`/integrations/${integrationId}/health`).then(r => r.data)
 
+// Subscribable event types, served by the notifier so the UI keeps no copy (ADR-0047)
+export const getIntegrationEvents = () =>
+  api.get('/integrations/events').then(r => r.data)
+
 // Integration templates
 export const getIntegrationTemplates = () =>
   api.get('/integrations/templates').then(r => r.data)
