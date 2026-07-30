@@ -44,6 +44,57 @@ NOTIFICATION_EVENTS = [
     "project.archived",
 ]
 
+# What caused the change, as opposed to what happened. The same ``task.done`` means
+# something different when a person ticked it off, when a rule flipped it, and when the
+# scheduler aged it out; an integration that only wants human activity has no way to tell
+# them apart from the event name alone. Sources are carried in the payload and each
+# integration may narrow to a subset (ADR-0048).
+NOTIFICATION_SOURCES = [
+    "user",  # a person acting in the SPA
+    "api",  # an external API key or the MCP server
+    "rule",  # a workflow rule's own action
+    "scheduler",  # the background loop (due dates, recurrence, digests)
+    "webhook",  # an inbound CI/CD callback or issue-sync echo
+    "assistant",  # the LLM assistant's tools
+]
+DEFAULT_SOURCE = "user"
+
+# Pipeline sources (``_SOURCE_SUFFIX`` in task_mutations) are finer-grained than what a
+# subscriber cares about: "bulk" and "node" are still a person clicking, "import" and
+# "duplicate" are still that person's API call. Anything unmapped falls back to the
+# default rather than inventing a source a subscriber cannot have selected.
+_SOURCE_ALIASES = {
+    "web": "user",
+    "bulk": "user",
+    "node": "user",
+    "import": "api",
+    "duplicate": "api",
+    "pr": "webhook",
+    "issue-sync": "webhook",
+    "recurrence": "scheduler",
+}
+
+
+def normalize_source(source: str | None) -> str:
+    """Map a pipeline source onto the subscribable vocabulary."""
+    if not source:
+        return DEFAULT_SOURCE
+    if source in _SOURCE_ALIASES:
+        return _SOURCE_ALIASES[source]
+    return source if source in NOTIFICATION_SOURCES else DEFAULT_SOURCE
+
+
+def _wants_source(integration: Integration, source: str) -> bool:
+    """Whether an integration accepts this source.
+
+    An empty or absent ``sources`` means "every source" — the pre-ADR-0048 behaviour, so
+    existing integrations keep receiving exactly what they received before.
+    """
+    selected = getattr(integration, "sources", None)
+    if not selected:
+        return True
+    return source in selected
+
 
 def _compute_progress(project: "graph.ProjectView", db: Session) -> tuple[int, int, float]:
     tasks = graph.tasks_in_project(db, project.id)
@@ -247,26 +298,54 @@ async def _send_webhook_inline(
         return False
 
 
-async def fire_notifications(db: Session, task: "graph.TaskView", event: str) -> None:
-    """Fire a task-scoped event to every integration subscribed to it."""
+async def fire_notifications(
+    db: Session,
+    task: "graph.TaskView",
+    event: str,
+    *,
+    source: str = DEFAULT_SOURCE,
+    actor: str | None = None,
+) -> None:
+    """Fire a task-scoped event to every integration subscribed to it.
+
+    ``source`` says what caused the change — a person, an API client, a rule, the
+    scheduler. Subscribers can filter on it, so "notify me about task.done, but not the
+    ones a rule did" is a subscription setting rather than a hardcoded policy (ADR-0048).
+    """
     project: graph.ProjectView | None = graph.project_of_task(db, task.id)
     if project is None:
         return
-    await _deliver(db, project, event, task=task)
+    await _deliver(db, project, event, task=task, source=source, actor=actor)
 
 
-async def fire_project_notifications(db: Session, project: "graph.ProjectView", event: str) -> None:
+async def fire_project_notifications(
+    db: Session,
+    project: "graph.ProjectView",
+    event: str,
+    *,
+    source: str = DEFAULT_SOURCE,
+    actor: str | None = None,
+) -> None:
     """Fire an event that belongs to the project itself and has no task.
 
     ``project.created`` and ``project.archived`` have no task to hang off, so the
     payload omits the ``task`` key entirely rather than inventing a placeholder;
     consumers must treat it as optional (ADR-0047).
     """
-    await _deliver(db, project, event, task=None)
+    await _deliver(db, project, event, task=None, source=source, actor=actor)
 
 
-async def _deliver(db: Session, project: "graph.ProjectView", event: str, *, task: "graph.TaskView | None") -> None:
+async def _deliver(
+    db: Session,
+    project: "graph.ProjectView",
+    event: str,
+    *,
+    task: "graph.TaskView | None",
+    source: str = DEFAULT_SOURCE,
+    actor: str | None = None,
+) -> None:
     total, done, progress = _compute_progress(project, db)
+    source = normalize_source(source)
 
     payload = {
         "event": event,
@@ -278,6 +357,8 @@ async def _deliver(db: Session, project: "graph.ProjectView", event: str, *, tas
             "total_tasks": total,
             "done_tasks": done,
         },
+        "source": source,
+        "actor": actor,
         "timestamp": datetime.now(UTC).isoformat(),
     }
     if task is not None:
@@ -300,7 +381,7 @@ async def _deliver(db: Session, project: "graph.ProjectView", event: str, *, tas
         .all()
     )
 
-    matching = [i for i in integrations if event in i.events]
+    matching = [i for i in integrations if event in i.events and _wants_source(i, source)]
     if not matching:
         return
 
@@ -390,6 +471,8 @@ async def fire_test_notification(integration: Integration, db: Session | None = 
         "integration": {"id": integration.id, "name": integration.name, "type": integration.type},
         "project": {"name": "Test Project", "progress": 75.0, "total_tasks": 4, "done_tasks": 3},
         "task": {"title": "Test Task", "status": "done", "priority": "high"},
+        "source": "test",
+        "actor": None,
         "timestamp": datetime.now(UTC).isoformat(),
     }
 

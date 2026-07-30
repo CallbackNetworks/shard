@@ -110,32 +110,48 @@ def _resolve_label(db: Session, task: "graph.TaskView", value: str) -> "graph.La
     return None
 
 
-def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> None:
+async def _apply_fields(db: Session, task: "graph.TaskView", changes: dict) -> "graph.TaskView":
+    """Write a rule's field change through the task pipeline (ADR-0048).
+
+    A rule-made change is as real as a human-made one: it earns the same activity entry
+    and the same notifications. ``trigger_rules=False`` because a rule must not trigger
+    another rule; ``sync_external=False`` keeps rule-made changes out of third-party
+    issue trackers, where they could echo back in as inbound events (ADR-0014).
+    The caller owns the commit and the aggregate broadcast.
+    """
+    from app.services.task_mutations import apply_task_update
+
+    return await apply_task_update(
+        db,
+        task.id,
+        changes,
+        actor="workflow",
+        source="rule",
+        trigger_rules=False,
+        sync_external=False,
+        commit=False,
+        broadcast=False,
+    )
+
+
+async def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> "graph.TaskView":
+    """Execute one rule action, returning the task refreshed if the action changed it."""
     atype = action.get("type", "")
     value = action.get("value", "")
 
-    # Task is node-only (ADR-0033): persist via graph.update_task and mirror onto
-    # the in-memory view so later conditions in this run see the new value.
     if atype == "set_status":
-        if value in ("todo", "in_progress", "done", "failed"):
-            graph.update_task(db, task.id, status=value)
-            task.status = value
+        if value in ACTION_VALUE_ENUMS["set_status"]:
+            return await _apply_fields(db, task, {"status": value})
     elif atype == "set_priority":
-        if value in ("low", "medium", "high"):
-            graph.update_task(db, task.id, priority=value)
-            task.priority = value
+        if value in ACTION_VALUE_ENUMS["set_priority"]:
+            return await _apply_fields(db, task, {"priority": value})
     elif atype == "set_assignee":
-        graph.update_task(db, task.id, assignee=value or None)
-        task.assignee = value or None
-    elif atype == "add_label":
-        label = _resolve_label(db, task, value)
-        if label is not None:
-            graph.set_label(db, task.id, label.id)
-    elif atype == "remove_label":
-        label = _resolve_label(db, task, value)
-        if label is not None:
-            graph.unset_label(db, task.id, label.id)
+        return await _apply_fields(db, task, {"assignee": value or None})
+    elif atype in ("add_label", "remove_label"):
+        await _apply_label(db, task, value, added=atype == "add_label")
     elif atype == "add_comment":
+        from app.services.notifier import fire_notifications
+
         comment = Comment(
             task_id=task.id,
             project_id=graph.project_id_of_task(db, task.id),
@@ -143,6 +159,8 @@ def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> None:
             body=value,
         )
         db.add(comment)
+        db.flush()
+        await fire_notifications(db, task, "comment.created", source="rule", actor="workflow")
     elif atype == "fire_event":
         # Deferred import to avoid circular
         import asyncio
@@ -152,9 +170,33 @@ def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> None:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                loop.create_task(fire_notifications(db, task, value))
+                loop.create_task(fire_notifications(db, task, value, source="rule", actor="workflow"))
         except Exception as exc:
             logger.warning("fire_event action failed: %s", exc)
+    return task
+
+
+async def _apply_label(db: Session, task: "graph.TaskView", value: str, *, added: bool) -> None:
+    """Attach or detach a label through the edge dispatcher, without triggering rules."""
+    from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
+
+    label = _resolve_label(db, task, value)
+    if label is None:
+        return
+    # Same arguments either way: the caller owns the commit and the aggregate broadcast,
+    # and trigger_rules=False stops task.label_added from re-entering the engine.
+    opts = dict(actor="workflow", commit=False, broadcast=False, trigger_rules=False)
+    if added:
+        if label.id in graph.label_ids_for_task(db, task.id):
+            return
+        graph.set_label(db, task.id, label.id)
+        db.flush()
+        await dispatch_edge_added(db, task.id, label.id, graph.REL_LABELED, **opts)
+    else:
+        if not graph.unset_label(db, task.id, label.id):
+            return
+        db.flush()
+        await dispatch_edge_removed(db, task.id, label.id, graph.REL_LABELED, **opts)
 
 
 async def run_rules(
@@ -163,13 +205,13 @@ async def run_rules(
     task: "graph.TaskView",
     context: dict,
 ) -> None:
-    """
-    Evaluate all active rules matching the trigger and execute matching ones.
-    context dict may include _rule_depth (int) to prevent recursion.
-    """
-    if context.get("_rule_depth", 0) >= 2:
-        return
+    """Evaluate all active rules matching the trigger and execute matching ones.
 
+    Rules never chain: every write a rule makes is dispatched with ``trigger_rules=False``,
+    so this function is never re-entered from its own actions (ADR-0048). The depth
+    counter this used to carry was dead — nothing ever incremented it, because actions
+    wrote to the database directly instead of going back through a write surface.
+    """
     rules = (
         db.query(WorkflowRule)
         .filter(
@@ -191,9 +233,10 @@ async def run_rules(
             if not all_match:
                 continue
 
-            # Execute actions
+            # Execute actions. Each returns the task, refreshed when it changed it, so
+            # a later action in the same rule sees the earlier one's result.
             for action in rule.actions or []:
-                _exec_action(db, action, task)
+                task = await _exec_action(db, action, task)
 
             rule.run_count = (rule.run_count or 0) + 1
             rule.last_run_at = datetime.now(UTC)
@@ -214,7 +257,7 @@ async def run_rules(
             # fire_event action already reaches into it the same way.
             from app.services.notifier import fire_notifications
 
-            await fire_notifications(db, task, "rule.triggered")
+            await fire_notifications(db, task, "rule.triggered", source="rule", actor="workflow")
 
         except Exception as exc:
             logger.warning("Rule %s failed for task %s: %s", rule.id, task.id, exc)

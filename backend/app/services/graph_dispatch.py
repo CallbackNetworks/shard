@@ -52,7 +52,7 @@ def _generic_scope(db: Session, node: Node) -> str | None:
     return node.id if node.type in graph.container_type_keys(db) else None
 
 
-async def _fire_project_event(db: Session, node: Node, event: str) -> None:
+async def _fire_project_event(db: Session, node: Node, event: str, *, source: str, actor: str | None) -> None:
     """Notify subscribers of a literal-project lifecycle event (ADR-0047).
 
     Scoped to the built-in project type rather than the container role: a custom
@@ -62,7 +62,7 @@ async def _fire_project_event(db: Session, node: Node, event: str) -> None:
         return
     project = graph.get_project(db, node.id)
     if project is not None:
-        await fire_project_notifications(db, project, event)
+        await fire_project_notifications(db, project, event, source=source, actor=actor)
 
 
 async def dispatch_node_created(db: Session, node: Node, *, actor: str | None = None, source: str = "node") -> None:
@@ -85,7 +85,7 @@ async def dispatch_node_created(db: Session, node: Node, *, actor: str | None = 
         meta={"type": node.type, "node_id": node.id},
     )
     db.commit()
-    await _fire_project_event(db, node, "project.created")
+    await _fire_project_event(db, node, "project.created", source=source, actor=actor)
     await ws_manager.broadcast("node.created", {"node_id": node.id, "type": node.type})
 
 
@@ -114,7 +114,7 @@ async def dispatch_node_updated(
     )
     db.commit()
     if changes.get("status") == "archived":
-        await _fire_project_event(db, node, "project.archived")
+        await _fire_project_event(db, node, "project.archived", source=source, actor=actor)
     await ws_manager.broadcast("node.updated", {"node_id": node.id, "type": node.type})
     return db.get(Node, node.id)
 
@@ -146,7 +146,7 @@ async def dispatch_node_deleted(db: Session, node: Node, *, actor: str | None = 
         # the task, which is impossible once delete_task_tree has run.
         task = graph.get_task(db, node_id)
         if task is not None:
-            await fire_notifications(db, task, "task.deleted")
+            await fire_notifications(db, task, "task.deleted", source=source, actor=actor)
         graph.delete_task_tree(db, node_id)
         db.commit()
         await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": node_id})
@@ -238,6 +238,7 @@ async def _dispatch_edge(
     actor: str | None,
     commit: bool,
     broadcast: bool,
+    trigger_rules: bool,
 ) -> None:
     """Shared body for edge add/remove: same reactions, different activity verb.
 
@@ -270,7 +271,7 @@ async def _dispatch_edge(
         if added:
             # "task.label_added" is an advertised workflow trigger; before edge
             # dispatch existed no write path ever fired it (ADR-0045).
-            task = graph.get_task(db, source_id)
+            task = graph.get_task(db, source_id) if trigger_rules else None
             if task is not None:
                 await run_rules(db, "task.label_added", task, {"label_id": target_id})
                 if commit:
@@ -310,16 +311,27 @@ async def dispatch_edge_added(
     actor: str | None = None,
     commit: bool = True,
     broadcast: bool = True,
+    trigger_rules: bool = True,
 ) -> None:
     """Fire the reactions for a newly added edge, keyed by ``rel_type``.
 
     The edge must already be written and flushed. With ``commit=False`` the
     caller owns the transaction (batch loops); reactions still run.
     ``broadcast=False`` suppresses the per-edge WebSocket event for callers that
-    emit one aggregate event instead.
+    emit one aggregate event instead. ``trigger_rules=False`` is for edges a rule wrote:
+    the activity entry and outbound sync still happen, but a rule must not trigger
+    another rule (ADR-0048).
     """
     await _dispatch_edge(
-        db, source_id, target_id, rel_type, added=True, actor=actor, commit=commit, broadcast=broadcast
+        db,
+        source_id,
+        target_id,
+        rel_type,
+        added=True,
+        actor=actor,
+        commit=commit,
+        broadcast=broadcast,
+        trigger_rules=trigger_rules,
     )
 
 
@@ -332,8 +344,17 @@ async def dispatch_edge_removed(
     actor: str | None = None,
     commit: bool = True,
     broadcast: bool = True,
+    trigger_rules: bool = True,
 ) -> None:
     """Fire the reactions for a removed edge, keyed by ``rel_type``."""
     await _dispatch_edge(
-        db, source_id, target_id, rel_type, added=False, actor=actor, commit=commit, broadcast=broadcast
+        db,
+        source_id,
+        target_id,
+        rel_type,
+        added=False,
+        actor=actor,
+        commit=commit,
+        broadcast=broadcast,
+        trigger_rules=trigger_rules,
     )

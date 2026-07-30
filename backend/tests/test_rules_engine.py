@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from app.models import Comment, WorkflowRule
-from app.services import graph, rules_engine
+from app.models import ActivityLog, Comment, WorkflowRule
+from app.services import graph, rules_engine, task_mutations
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
 from tests.factories import make_project, make_task
 
@@ -90,71 +90,85 @@ class TestExecAction:
         db.flush()
         return project, t
 
-    def test_set_status(self, db, project_and_task):
+    # _exec_action returns the task, refreshed when the action changed it: field writes
+    # go through apply_task_update, which rebuilds the TaskView, so the view handed in is
+    # stale afterwards (ADR-0048).
+
+    @pytest.mark.asyncio
+    async def test_set_status(self, db, project_and_task):
         _, task = project_and_task
-        _exec_action(db, {"type": "set_status", "value": "done"}, task)
+        task = await _exec_action(db, {"type": "set_status", "value": "done"}, task)
         assert task.status == "done"
 
-    def test_set_status_invalid_ignored(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_set_status_invalid_ignored(self, db, project_and_task):
         _, task = project_and_task
-        _exec_action(db, {"type": "set_status", "value": "invalid"}, task)
+        task = await _exec_action(db, {"type": "set_status", "value": "invalid"}, task)
         assert task.status == "todo"
 
-    def test_set_priority(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_set_priority(self, db, project_and_task):
         _, task = project_and_task
-        _exec_action(db, {"type": "set_priority", "value": "high"}, task)
+        task = await _exec_action(db, {"type": "set_priority", "value": "high"}, task)
         assert task.priority == "high"
 
-    def test_set_priority_invalid_ignored(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_set_priority_invalid_ignored(self, db, project_and_task):
         _, task = project_and_task
-        _exec_action(db, {"type": "set_priority", "value": "critical"}, task)
+        task = await _exec_action(db, {"type": "set_priority", "value": "critical"}, task)
         assert task.priority == "low"
 
-    def test_set_assignee(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_set_assignee(self, db, project_and_task):
         _, task = project_and_task
-        _exec_action(db, {"type": "set_assignee", "value": "bob"}, task)
+        task = await _exec_action(db, {"type": "set_assignee", "value": "bob"}, task)
         assert task.assignee == "bob"
 
-    def test_set_assignee_empty_clears(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_set_assignee_empty_clears(self, db, project_and_task):
         _, task = project_and_task
-        task.assignee = "alice"
-        _exec_action(db, {"type": "set_assignee", "value": ""}, task)
+        task = await _exec_action(db, {"type": "set_assignee", "value": "alice"}, task)
+        task = await _exec_action(db, {"type": "set_assignee", "value": ""}, task)
         assert task.assignee is None
 
-    def test_add_label(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_add_label(self, db, project_and_task):
         project, task = project_and_task
         label = graph.create_label(db, project.id, name="urgent", color="#ff0000")
 
-        _exec_action(db, {"type": "add_label", "value": label.id}, task)
+        await _exec_action(db, {"type": "add_label", "value": label.id}, task)
         db.flush()
 
         assert label.id in graph.label_ids_for_task(db, task.id)
 
-    def test_add_label_no_duplicate(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_add_label_no_duplicate(self, db, project_and_task):
         project, task = project_and_task
         label = graph.create_label(db, project.id, name="urgent", color="#ff0000")
         graph.set_label(db, task.id, label.id)
         db.flush()
 
-        _exec_action(db, {"type": "add_label", "value": label.id}, task)
+        await _exec_action(db, {"type": "add_label", "value": label.id}, task)
         db.flush()
 
         assert graph.label_ids_for_task(db, task.id).count(label.id) == 1
 
-    def test_remove_label(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_remove_label(self, db, project_and_task):
         project, task = project_and_task
         label = graph.create_label(db, project.id, name="old", color="#aaa")
         graph.set_label(db, task.id, label.id)
         db.flush()
 
-        _exec_action(db, {"type": "remove_label", "value": label.id}, task)
+        await _exec_action(db, {"type": "remove_label", "value": label.id}, task)
         db.flush()
 
         assert label.id not in graph.label_ids_for_task(db, task.id)
 
-    def test_add_comment(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_add_comment(self, db, project_and_task):
         _, task = project_and_task
-        _exec_action(db, {"type": "add_comment", "value": "Auto-comment from rule"}, task)
+        await _exec_action(db, {"type": "add_comment", "value": "Auto-comment from rule"}, task)
         db.flush()
 
         c = db.query(Comment).filter(Comment.task_id == task.id).first()
@@ -277,21 +291,41 @@ class TestRunRules:
         assert task.priority == "high"
 
     @pytest.mark.asyncio
-    async def test_recursion_depth_guard(self, db, setup):
+    async def test_rules_do_not_chain(self, db, setup):
+        """Rule A's change must not trigger rule B (ADR-0048).
+
+        Rule actions now run through the task pipeline, so they produce the same events a
+        human-made change produces — which is precisely what would let two rules ping-pong.
+        The pipeline is called with ``trigger_rules=False`` to cut it off at the source.
+        """
         project, task = setup
-        rule = WorkflowRule(
-            name="Would recurse",
+        db.add(
+            WorkflowRule(
+                name="A: start work",
+                trigger="task.created",
+                conditions=[],
+                actions=[{"type": "set_status", "value": "in_progress"}],
+                active=True,
+                run_count=0,
+            )
+        )
+        chained = WorkflowRule(
+            name="B: reacts to status changes",
             trigger="task.status_changed",
             conditions=[],
             actions=[{"type": "set_priority", "value": "low"}],
             active=True,
             run_count=0,
         )
-        db.add(rule)
+        db.add(chained)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {"_rule_depth": 2})
-        assert task.priority == "high"  # action should NOT have executed
+        await run_rules(db, "task.created", task, {})
+
+        assert graph.get_task(db, task.id).status == "in_progress"  # A ran
+        db.refresh(chained)
+        assert chained.run_count == 0  # B did not
+        assert graph.get_task(db, task.id).priority == "high"
 
     @pytest.mark.asyncio
     async def test_multiple_conditions_and_logic(self, db, setup):
@@ -354,7 +388,7 @@ class TestRunRules:
         db.flush()
 
         await run_rules(db, "task.status_changed", task, {})
-        assert task.assignee == "bot"
+        assert graph.get_task(db, task.id).assignee == "bot"
 
 
 class TestLabelActionsAcceptNames:
@@ -370,29 +404,32 @@ class TestLabelActionsAcceptNames:
         db.flush()
         return project, graph.get_task(db, task.id)
 
-    def test_add_label_by_name(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_add_label_by_name(self, db, project_and_task):
         project, task = project_and_task
         label = graph.create_label(db, project.id, name="urgent", color="#ff0000")
 
-        _exec_action(db, {"type": "add_label", "value": "urgent"}, task)
+        await _exec_action(db, {"type": "add_label", "value": "urgent"}, task)
         db.flush()
 
         assert label.id in graph.label_ids_for_task(db, task.id)
 
-    def test_remove_label_by_name(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_remove_label_by_name(self, db, project_and_task):
         project, task = project_and_task
         label = graph.create_label(db, project.id, name="stale", color="#aaa")
         graph.set_label(db, task.id, label.id)
         db.flush()
 
-        _exec_action(db, {"type": "remove_label", "value": "stale"}, task)
+        await _exec_action(db, {"type": "remove_label", "value": "stale"}, task)
         db.flush()
 
         assert label.id not in graph.label_ids_for_task(db, task.id)
 
-    def test_unknown_label_is_a_no_op(self, db, project_and_task):
+    @pytest.mark.asyncio
+    async def test_unknown_label_is_a_no_op(self, db, project_and_task):
         _, task = project_and_task
-        _exec_action(db, {"type": "add_label", "value": "nope"}, task)
+        await _exec_action(db, {"type": "add_label", "value": "nope"}, task)
         db.flush()
 
         assert graph.label_ids_for_task(db, task.id) == []
@@ -409,7 +446,11 @@ class TestVocabularyMatchesTheEngine:
         return Path(rules_engine.__file__).read_text()
 
     def _handled(self, source: str, variable: str) -> set[str]:
-        return set(re.findall(rf'\b{variable} == "([^"]+)"', source))
+        """Values the engine branches on, whether the branch is ``== "x"`` or ``in (...)``."""
+        handled = set(re.findall(rf'\b{variable} == "([^"]+)"', source))
+        for group in re.findall(rf"\b{variable} in \(([^)]*)\)", source):
+            handled.update(re.findall(r'"([^"]+)"', group))
+        return handled
 
     def test_condition_fields(self, source):
         assert self._handled(source, "field") == rules_engine.CONDITION_FIELDS
@@ -419,3 +460,73 @@ class TestVocabularyMatchesTheEngine:
 
     def test_action_types(self, source):
         assert self._handled(source, "atype") == rules_engine.ACTION_TYPES
+
+
+class TestRuleChangesAreVisible:
+    """A rule-made change earns the same activity entry and notifications a person's does.
+
+    Before ADR-0048 the actions wrote fields straight through ``graph.update_task``, so a
+    rule flipping a task to done produced no ``task.done``, no ``task.status_changed``,
+    and no status-change activity entry — only a ``rule.executed`` line. The automation
+    was invisible to exactly the integrations it was supposed to drive.
+    """
+
+    @pytest.fixture()
+    def setup(self, db):
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        task = make_task(db, project_id=project.id, title="T", status="todo", priority="high")
+        db.add(task)
+        db.flush()
+        return project, graph.get_task(db, task.id)
+
+    @staticmethod
+    def _rule(db, actions):
+        rule = WorkflowRule(
+            name="R", trigger="task.status_changed", conditions=[], actions=actions, active=True, run_count=0
+        )
+        db.add(rule)
+        db.flush()
+        return rule
+
+    @pytest.mark.asyncio
+    async def test_status_action_fires_the_status_events(self, db, setup, monkeypatch):
+        _, task = setup
+        self._rule(db, [{"type": "set_status", "value": "done"}])
+        fired = []
+
+        async def fake_fire(db_, task_, event, **kwargs):
+            fired.append((event, kwargs.get("source")))
+
+        monkeypatch.setattr(task_mutations, "fire_notifications", fake_fire)
+        await run_rules(db, "task.status_changed", task, {})
+
+        assert ("task.status_changed", "rule") in fired
+        assert ("task.done", "rule") in fired
+
+    @pytest.mark.asyncio
+    async def test_status_action_logs_the_change(self, db, setup):
+        project, task = setup
+        self._rule(db, [{"type": "set_status", "value": "done"}])
+
+        await run_rules(db, "task.status_changed", task, {})
+
+        actions = [a.action for a in db.query(ActivityLog).filter(ActivityLog.task_id == task.id).all()]
+        assert "task.status_changed" in actions
+        assert "rule.executed" in actions
+
+    @pytest.mark.asyncio
+    async def test_rule_changes_are_not_synced_to_external_trackers(self, db, setup, monkeypatch):
+        """A rule's change must not be pushed to the provider it may have come from (ADR-0014)."""
+        _, task = setup
+        self._rule(db, [{"type": "set_status", "value": "done"}])
+        called = []
+        monkeypatch.setattr(
+            "app.routers.issue_sync.sync_task_closure_to_external",
+            lambda *a, **k: called.append(True),
+        )
+
+        await run_rules(db, "task.status_changed", task, {})
+
+        assert called == []

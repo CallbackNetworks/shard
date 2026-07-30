@@ -34,6 +34,7 @@ _SOURCE_SUFFIX = {
     "pr": " by pull request",
     "issue-sync": " via issue sync",
     "recurrence": " by recurrence",
+    "rule": " by workflow rule",
     "duplicate": " by cycle duplication",
 }
 
@@ -52,14 +53,22 @@ def validate_agent_key(db: Session, key_id: str) -> ApiKey:
     return key
 
 
-async def _fire_status_events(db: Session, task: "graph.TaskView", new_status: str, project_id: str | None) -> None:
+async def _fire_status_events(
+    db: Session,
+    task: "graph.TaskView",
+    new_status: str,
+    project_id: str | None,
+    *,
+    source: str,
+    actor: str | None,
+) -> None:
     """Fire the status-change notification pair, plus project.complete when applicable."""
-    await fire_notifications(db, task, "task.status_changed")
-    await fire_notifications(db, task, f"task.{new_status}")
+    await fire_notifications(db, task, "task.status_changed", source=source, actor=actor)
+    await fire_notifications(db, task, f"task.{new_status}", source=source, actor=actor)
     if new_status == "done" and project_id is not None:
         project_tasks = graph.tasks_in_project(db, project_id)
         if project_tasks and all(t.status == "done" for t in project_tasks):
-            await fire_notifications(db, task, "project.complete")
+            await fire_notifications(db, task, "project.complete", source=source, actor=actor)
 
 
 async def apply_task_update(
@@ -71,7 +80,7 @@ async def apply_task_update(
     source: str = "web",
     project_id: str | None = None,
     activity_meta: dict | None = None,
-    rule_depth: int = 1,
+    trigger_rules: bool = True,
     sync_external: bool = True,
     commit: bool = True,
     broadcast: bool = True,
@@ -82,7 +91,9 @@ async def apply_task_update(
     handled by the caller (ADR-0032). When ``commit`` is False the caller owns
     the final commit; notifications and rules still run on flushed state.
     ``sync_external=False`` is for changes that originated externally
-    (webhook callbacks) to avoid echo loops.
+    (webhook callbacks) to avoid echo loops. ``trigger_rules=False`` is for changes a
+    rule itself made: they still notify and log, but must not trigger another rule
+    (ADR-0048).
     """
     task = graph.get_task(db, task_id)
     if task is None:
@@ -154,9 +165,9 @@ async def apply_task_update(
     task = graph.get_task(db, task_id)
 
     if status_changed:
-        await _fire_status_events(db, task, changes["status"], project_id)
+        await _fire_status_events(db, task, changes["status"], project_id, source=source, actor=actor)
     if "assignee" in changes and changes["assignee"] != old_assignee:
-        await fire_notifications(db, task, "task.assigned")
+        await fire_notifications(db, task, "task.assigned", source=source, actor=actor)
 
     if sync_external:
         # Deferred import: issue_sync lives in routers (imports this layer's
@@ -186,8 +197,10 @@ async def apply_task_update(
             if changed_fields:
                 await sync_task_fields_to_external(task, db, changed_fields)
 
+    if not trigger_rules:
+        triggered_rules = []
     for trigger, ctx in triggered_rules:
-        await run_rules(db, trigger, task, {"_rule_depth": rule_depth, **ctx})
+        await run_rules(db, trigger, task, ctx)
     if triggered_rules:
         if commit:
             db.commit()
@@ -244,7 +257,7 @@ async def finalize_task_create(
         db.commit()
     task = graph.get_task(db, task_id)
 
-    await fire_notifications(db, task, "task.created")
+    await fire_notifications(db, task, "task.created", source=source, actor=actor)
     if broadcast:
         await ws_manager.broadcast("task.created", {"project_id": project_id, "task_id": task_id})
     return task

@@ -243,7 +243,7 @@ def test_web_status_done_fires_status_events(client, sample_project, monkeypatch
 
     events = []
 
-    async def fake_notify(db, task, event):
+    async def fake_notify(db, task, event, **kwargs):
         events.append(event)
 
     monkeypatch.setattr(task_mutations, "fire_notifications", fake_notify)

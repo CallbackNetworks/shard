@@ -19,13 +19,21 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.services.activity import log_activity
-from app.services.notifier import NOTIFICATION_EVENTS
+from app.services.event_catalog import subscribable_events, validate_events
 
 sub_router = APIRouter()
 
-# Advertised to agents deciding what to subscribe to, so it has to be the list the
-# notifier actually delivers rather than a hand-kept copy of it (ADR-0047).
-ALL_EVENTS = NOTIFICATION_EVENTS
+
+def _validate_events_or_422(db: Session, events: list[str]) -> None:
+    """422 on an event nothing delivers.
+
+    The vocabulary is the notifier's own list plus the events the user's active rules
+    emit, so an agent can subscribe to a custom event a rule fires (ADR-0047, ADR-0048).
+    """
+    try:
+        validate_events(db, events)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 class SubscriptionCreate(BaseModel):
@@ -61,10 +69,11 @@ class SubscriptionUpdate(BaseModel):
     responses=_auth_errors,
 )
 def api_list_events(
+    db: Session = Depends(get_db),
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    return ALL_EVENTS
+    return subscribable_events(db)
 
 
 @sub_router.get(
@@ -120,9 +129,7 @@ def api_create_subscription(
     if body.project_id:
         _check_project_access(api_key, body.project_id)
 
-    invalid = [e for e in body.events if e not in ALL_EVENTS]
-    if invalid:
-        raise HTTPException(status_code=422, detail=f"Unknown events: {', '.join(invalid)}")
+    _validate_events_or_422(db, body.events)
 
     agent_suffix = x_agent_id or "default"
     integration = Integration(
@@ -184,9 +191,7 @@ def api_update_subscription(
         raise HTTPException(status_code=404, detail="Subscription not found")
 
     if body.events is not None:
-        invalid = [e for e in body.events if e not in ALL_EVENTS]
-        if invalid:
-            raise HTTPException(status_code=422, detail=f"Unknown events: {', '.join(invalid)}")
+        _validate_events_or_422(db, body.events)
         integration.events = body.events
     if body.callback_url is not None:
         integration.url = body.callback_url

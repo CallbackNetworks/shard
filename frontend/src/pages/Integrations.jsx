@@ -5,6 +5,7 @@ import { X, Zap, Plus, Trash2, BookOpen } from 'lucide-react'
 import {
   getIntegrations, createIntegration, updateIntegration, deleteIntegration,
   testIntegration, getIntegrationTemplates, getIntegrationTemplate, getIntegrationEvents,
+  getIntegrationSources,
 } from '../api/client'
 import { globalAddToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
@@ -150,7 +151,7 @@ function IntegrationModal({ initial, onSave, onClose }) {
   const { t } = useTranslation()
   const [form, setForm] = useState(initial || {
     name: '', type: 'generic', url: '', secret: '', project_id: '',
-    events: ['task.done', 'task.failed', 'project.complete'], active: true,
+    events: ['task.done', 'task.failed', 'project.complete'], sources: [], active: true,
     email_to: '', email_subject_prefix: '[Shard]',
     auth_type: 'bearer', auth_config: {}, custom_headers: {}, template_id: null,
   })
@@ -159,10 +160,17 @@ function IntegrationModal({ initial, onSave, onClose }) {
     queryKey: ['integration-events'],
     queryFn: getIntegrationEvents,
   })
+  const { data: allSources = [] } = useQuery({
+    queryKey: ['integration-sources'],
+    queryFn: getIntegrationSources,
+  })
 
   const allSelected = allEvents.length > 0 && form.events.length === allEvents.length
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
   const toggleEvent = (ev) => set('events', form.events.includes(ev) ? form.events.filter(e => e !== ev) : [...form.events, ev])
+  // An empty selection means every source, so there is no "all" checkbox to keep in sync.
+  const selectedSources = form.sources || []
+  const toggleSource = (src) => set('sources', selectedSources.includes(src) ? selectedSources.filter(x => x !== src) : [...selectedSources, src])
 
   const typeLabels = {
     jenkins: t('integrations.typeJenkins'), drone: t('integrations.typeDrone'),
@@ -297,12 +305,27 @@ function IntegrationModal({ initial, onSave, onClose }) {
                   {events.map(ev => (
                     <label key={ev} className={form.events.includes(ev) ? s.eventChipActive : s.eventChipInactive}>
                       <input type="checkbox" checked={form.events.includes(ev)} onChange={() => toggleEvent(ev)} style={{ cursor: 'pointer' }} />
-                      {ev.split('.').pop()}
+                      {group === 'other' ? ev : ev.split('.').pop()}
                     </label>
                   ))}
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Sources — who caused the change (ADR-0048) */}
+          <div className={s.labelStyle}>{t('integrations.sources')}
+            <div style={{ fontSize: 10, color: DARK.textDim, marginBottom: 6, marginTop: 2 }}>
+              {t('integrations.sourcesHint')}
+            </div>
+            <div className={s.eventsGrid}>
+              {allSources.map(src => (
+                <label key={src} className={selectedSources.includes(src) ? s.eventChipActive : s.eventChipInactive}>
+                  <input type="checkbox" checked={selectedSources.includes(src)} onChange={() => toggleSource(src)} style={{ cursor: 'pointer' }} />
+                  {t(`integrations.source.${src}`)}
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Active */}

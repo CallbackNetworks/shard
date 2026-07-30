@@ -34,7 +34,7 @@ async def create_comment(project_id: str, task_id: str, body: CommentCreate, db:
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    await fire_notifications(db, task, "comment.created")
+    await fire_notifications(db, task, "comment.created", actor=comment.author)
     if task.external_provider:
         await sync_comment_to_external(comment, task, db)
     return comment

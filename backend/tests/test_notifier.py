@@ -468,3 +468,89 @@ class TestRetryDelivery:
         assert result is False
         assert delivery.status == "dead"
         assert "no longer exists" in delivery.error
+
+
+class TestSourceFiltering:
+    """Who caused a change is part of the payload, and part of what you can subscribe to.
+
+    Rule actions now go through the task pipeline, so a rule flipping a task to done
+    produces the same ``task.done`` a person would. That is the point, but it means an
+    integration needs a way to say "not the automated ones" — a subscription setting
+    rather than a policy baked into the notifier (ADR-0048).
+    """
+
+    @pytest.fixture()
+    def setup(self, db):
+        p = make_project(db, name="Proj")
+        db.add(p)
+        db.flush()
+        t = make_task(db, project_id=p.id, title="Task1", status="done", priority="high")
+        db.add(t)
+        db.flush()
+        db.refresh(p)
+        return p, t
+
+    @staticmethod
+    def _integration(db, project_id, sources):
+        integ = Integration(
+            name="I",
+            type="webhook",
+            url="https://hook.test",
+            events=["task.done"],
+            sources=sources,
+            active=True,
+            project_id=project_id,
+        )
+        db.add(integ)
+        db.flush()
+        return integ
+
+    async def _fire(self, db, task, source):
+        with patch("app.services.notifier._dispatch_webhook", new_callable=AsyncMock) as mock_dispatch:
+            mock_dispatch.return_value = True
+            await fire_notifications(db, task, "task.done", source=source)
+        return mock_dispatch
+
+    @pytest.mark.asyncio
+    async def test_no_sources_means_every_source(self, db, setup):
+        # Pre-ADR-0048 rows have sources NULL and must keep receiving everything.
+        p, t = setup
+        self._integration(db, p.id, None)
+        assert (await self._fire(db, t, "rule")).call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_empty_sources_means_every_source(self, db, setup):
+        p, t = setup
+        self._integration(db, p.id, [])
+        assert (await self._fire(db, t, "rule")).call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_selected_source_is_delivered(self, db, setup):
+        p, t = setup
+        self._integration(db, p.id, ["rule"])
+        assert (await self._fire(db, t, "rule")).call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_unselected_source_is_filtered_out(self, db, setup):
+        p, t = setup
+        self._integration(db, p.id, ["user"])
+        (await self._fire(db, t, "rule")).assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_payload_carries_source_and_actor(self, db, setup):
+        p, t = setup
+        self._integration(db, p.id, None)
+        with patch("app.services.notifier._dispatch_webhook", new_callable=AsyncMock) as mock_dispatch:
+            mock_dispatch.return_value = True
+            await fire_notifications(db, t, "task.done", source="rule", actor="workflow")
+        payload = mock_dispatch.call_args[0][3]
+        assert payload["source"] == "rule"
+        assert payload["actor"] == "workflow"
+
+    @pytest.mark.asyncio
+    async def test_pipeline_source_is_normalized(self, db, setup):
+        # The pipeline's own vocabulary is finer-grained than what a subscriber picks
+        # from: "bulk" is still a person clicking, so it must arrive as "user".
+        p, t = setup
+        self._integration(db, p.id, ["user"])
+        assert (await self._fire(db, t, "bulk")).call_count == 1

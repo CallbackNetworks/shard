@@ -83,7 +83,7 @@ async def _check_and_fire(db: Session) -> None:
     for task in tasks:
         event = "task.overdue" if _ensure_aware(task.due_date) < now else "task.due_soon"
         try:
-            await fire_notifications(db, task, event)
+            await fire_notifications(db, task, event, source="scheduler")
             graph.update_task(db, task.id, reminder_sent_at=now)
             db.commit()
             logger.info("Sent %s reminder for task '%s'", event, task.title)
@@ -549,7 +549,7 @@ async def _check_sla_aging(db: Session) -> None:
             db.commit()
 
             try:
-                await fire_notifications(db, graph.task_view(task, db), "task.overdue")
+                await fire_notifications(db, graph.task_view(task, db), "task.overdue", source="scheduler")
                 logger.info("SLA overdue notification fired for task '%s' (%d days stuck)", task.title, days_stuck)
             except Exception as exc:
                 logger.warning("Failed to fire SLA notification for task %s: %s", task.id, exc)

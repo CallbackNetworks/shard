@@ -149,11 +149,15 @@ creates or updates a task must go through these two functions**; hand-rolling th
 how rules and notifications get silently skipped.
 
 **`notifier.py`** — fires outbound notifications so external systems learn about internal
-changes. `NOTIFICATION_EVENTS` is the **only** copy of the event vocabulary: the UI fetches it
-from `GET /integrations/events`, `/api/v1/subscriptions/events` returns the same object, and
-the schema layer rejects a subscription to anything outside it (ADR-0047). A test scans the
-source and fails if an advertised event has no fire site, or a fire site uses an unadvertised
-event.
+changes. `NOTIFICATION_EVENTS` is the **only** copy of the built-in event vocabulary: the UI
+fetches it from `GET /integrations/events` and `/api/v1/subscriptions/events` serves the same
+list (ADR-0047). A test scans the source and fails if an advertised event has no fire site, or
+a fire site uses an unadvertised event.
+
+What you may *subscribe* to is wider than what is built in: `services/event_catalog.py` adds
+every event name an **active** workflow rule emits via `fire_event`, derived at read time from
+the rules themselves rather than stored (ADR-0048). Event validation therefore needs a session
+and lives in the routers; source validation is a closed set and stays in the schema layer.
 1. Select integrations scoped to the project **or** unscoped (`project_id IS NULL`, meaning
    all projects) whose `events` array contains the event type
 2. Webhook integrations: async `httpx.post` with JSON payload + HMAC-SHA256 signature
@@ -165,12 +169,26 @@ event.
 event)` covers `project.created` / `project.archived`, which have no task and therefore omit
 the `task` key from the payload entirely.
 
+Both take `source` (who caused it — `user` / `api` / `rule` / `scheduler` / `webhook` /
+`assistant`) and `actor`, which land in the payload. `Integration.sources` narrows delivery to
+a subset; null or empty means every source, so pre-existing rows are unaffected. This is what
+makes "notify me about task.done, but not the ones a rule did" a subscription setting rather
+than a policy compiled into the notifier (ADR-0048).
+
 **`rules_engine.py`** — evaluates `WorkflowRule` rows on task create/update. Conditions on
 status, priority, labels, assignee. Actions: set status/priority/assignee, add/remove label,
-add comment, fire event. Max recursion depth 2. `CONDITION_FIELDS` / `CONDITION_OPS` /
-`ACTION_TYPES` / `ACTION_VALUE_ENUMS` are the engine's vocabulary and the schema layer
-validates writes against them, because an unrecognised value evaluates to "no match" / "do
-nothing" silently (ADR-0046, ADR-0047). A successful rule run fires `rule.triggered`.
+add comment, fire event. `CONDITION_FIELDS` / `CONDITION_OPS` / `ACTION_TYPES` /
+`ACTION_VALUE_ENUMS` are the engine's vocabulary and the schema layer validates writes against
+them, because an unrecognised value evaluates to "no match" / "do nothing" silently
+(ADR-0046, ADR-0047). A successful rule run fires `rule.triggered`.
+
+Actions write through the same surfaces everything else does — `apply_task_update` for fields,
+`dispatch_edge_added/removed` for labels — so a rule-made change earns the same activity entry
+and the same notifications a human-made change does (`source="rule"`, `actor="workflow"`).
+**Rules never chain**: every such write passes `trigger_rules=False`, and `sync_external=False`
+keeps rule-made changes out of third-party trackers where they could echo back in (ADR-0048).
+The old "max recursion depth 2" counter was dead code — nothing ever incremented it, because
+the actions bypassed the write surfaces entirely.
 
 **`scheduler.py`** — asyncio background loop, ticks every 3600 seconds. Seven jobs:
 1. Due-date reminders (`task.due_soon` / `task.overdue`)

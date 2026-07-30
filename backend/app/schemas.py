@@ -210,13 +210,17 @@ class WebhookEventOut(BaseModel):
 # --- Integration ---
 
 
-def _check_events(v: list[str] | None) -> list[str] | None:
-    """Reject subscribing to an event nobody fires — it is a checkbox that does nothing."""
-    from app.services.notifier import NOTIFICATION_EVENTS
+def _check_sources(v: list[str] | None) -> list[str] | None:
+    """Reject filtering on a cause the notifier never labels a payload with.
+
+    Events are validated in the router instead: the vocabulary now includes the events
+    the user's own active rules emit, which needs a database session (ADR-0048).
+    """
+    from app.services.notifier import NOTIFICATION_SOURCES
 
     if v is not None:
-        for event in v:
-            _reject_unknown("event", event, set(NOTIFICATION_EVENTS))
+        for source in v:
+            _reject_unknown("source", source, set(NOTIFICATION_SOURCES))
     return v
 
 
@@ -227,6 +231,7 @@ class IntegrationCreate(BaseModel):
     secret: str | None = None
     project_id: str | None = None
     events: list[str] = ["task.done", "task.failed", "project.complete"]
+    sources: list[str] | None = None
     active: bool = True
     email_to: str | None = None
     email_subject_prefix: str | None = "[Shard]"
@@ -235,10 +240,10 @@ class IntegrationCreate(BaseModel):
     auth_config: dict | None = None
     template_id: str | None = None
 
-    @field_validator("events")
+    @field_validator("sources")
     @classmethod
-    def _known_events(cls, v: list[str]) -> list[str]:
-        return _check_events(v)
+    def _known_sources(cls, v: list[str] | None) -> list[str] | None:
+        return _check_sources(v)
 
 
 class IntegrationUpdate(BaseModel):
@@ -250,6 +255,7 @@ class IntegrationUpdate(BaseModel):
     secret: str | None = None
     project_id: str | None = None
     events: list[str] | None = None
+    sources: list[str] | None = None
     active: bool | None = None
     email_to: str | None = None
     email_subject_prefix: str | None = None
@@ -258,10 +264,10 @@ class IntegrationUpdate(BaseModel):
     auth_config: dict | None = None
     template_id: str | None = None
 
-    @field_validator("events")
+    @field_validator("sources")
     @classmethod
-    def _known_events(cls, v: list[str] | None) -> list[str] | None:
-        return _check_events(v)
+    def _known_sources(cls, v: list[str] | None) -> list[str] | None:
+        return _check_sources(v)
 
 
 class IntegrationOut(BaseModel):
@@ -274,6 +280,7 @@ class IntegrationOut(BaseModel):
     secret: str | None
     project_id: str | None
     events: list[str]
+    sources: list[str] | None = None
     active: bool
     created_at: datetime
     email_to: str | None = None

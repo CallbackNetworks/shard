@@ -100,7 +100,7 @@ def test_callback_fires_status_changed_event(client, db, sample_project, monkeyp
 
     events = []
 
-    async def fake_notify(db_, task, event):
+    async def fake_notify(db_, task, event, **kwargs):
         events.append(event)
 
     monkeypatch.setattr(task_mutations, "fire_notifications", fake_notify)

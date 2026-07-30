@@ -208,6 +208,10 @@ export const getIntegrationHealth = (integrationId) =>
 export const getIntegrationEvents = () =>
   api.get('/integrations/events').then(r => r.data)
 
+// Which causes an integration can narrow to (ADR-0048); empty selection means all.
+export const getIntegrationSources = () =>
+  api.get('/integrations/sources').then(r => r.data)
+
 // Integration templates
 export const getIntegrationTemplates = () =>
   api.get('/integrations/templates').then(r => r.data)

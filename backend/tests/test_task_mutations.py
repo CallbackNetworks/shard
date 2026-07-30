@@ -25,7 +25,7 @@ def capture(monkeypatch):
     """Capture notification events and ws broadcasts; silence external sync."""
     events: dict = {"notifications": [], "broadcasts": [], "synced": []}
 
-    async def fake_notify(db, task, event):
+    async def fake_notify(db, task, event, **kwargs):
         events["notifications"].append(event)
 
     async def fake_broadcast(event, data=None):
@@ -140,16 +140,29 @@ async def test_field_change_syncs_to_external(db, task, capture):
 
 
 @pytest.mark.asyncio
-async def test_rules_run_with_depth(db, task, capture, monkeypatch):
+async def test_every_field_change_triggers_its_rule(db, task, capture, monkeypatch):
     seen = []
 
     async def fake_rules(db_, trigger, task_, context):
-        seen.append((trigger, context.get("_rule_depth")))
+        seen.append(trigger)
 
     monkeypatch.setattr(task_mutations, "run_rules", fake_rules)
-    await apply_task_update(db, task.id, {"status": "in_progress", "priority": "high"}, rule_depth=1)
-    assert ("task.status_changed", 1) in seen
-    assert ("task.priority_changed", 1) in seen
+    await apply_task_update(db, task.id, {"status": "in_progress", "priority": "high"})
+    assert "task.status_changed" in seen
+    assert "task.priority_changed" in seen
+
+
+@pytest.mark.asyncio
+async def test_trigger_rules_false_skips_rule_evaluation(db, task, capture, monkeypatch):
+    """A rule's own change must not be able to trigger another rule (ADR-0048)."""
+    seen = []
+
+    async def fake_rules(db_, trigger, task_, context):
+        seen.append(trigger)
+
+    monkeypatch.setattr(task_mutations, "run_rules", fake_rules)
+    await apply_task_update(db, task.id, {"status": "done"}, trigger_rules=False)
+    assert seen == []
 
 
 @pytest.mark.asyncio

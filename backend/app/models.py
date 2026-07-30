@@ -83,6 +83,9 @@ class Integration(Base):
     secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # null = global
     events: Mapped[list] = mapped_column(JSON, default=list)
+    # Which causes to accept (see NOTIFICATION_SOURCES). Null or empty means every
+    # source, so integrations written before ADR-0048 keep their behaviour.
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     # email-specific fields

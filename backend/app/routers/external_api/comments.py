@@ -80,7 +80,7 @@ async def api_create_comment(
     )
     db.commit()
     db.refresh(comment)
-    await fire_notifications(db, task, "comment.created")
+    await fire_notifications(db, task, "comment.created", source="api", actor=f"api:{api_key.name}")
     await ws_manager.broadcast("comment.created", {"project_id": project_id, "task_id": task_id})
     return comment
 

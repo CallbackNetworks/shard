@@ -16,6 +16,12 @@ with the reason spelled out.
 writing a ``labeled``/``in_cycle``/``depends_on``/``contains`` edge without
 dispatching it skips the outbound sync, the activity entry and the broadcast,
 so the second guard below holds edge writers to the same standard.
+
+``services/rules_engine`` used to hold an exemption from both, on the grounds that it
+runs inside a dispatch already. That was the bypass: a rule's own changes were invisible
+to everything downstream. It now goes through both surfaces with ``trigger_rules=False``,
+which stops the recursion the exemption was really about (ADR-0048), so both exemptions
+are gone.
 """
 
 import re
@@ -31,8 +37,6 @@ EDGE_DISPATCH = re.compile(r"dispatch_edge_(added|removed)\(")
 
 # Files that write edges but legitimately never dispatch, with the reason.
 EDGE_ALLOWED = {
-    # Rule actions run inside a dispatch already in flight; re-dispatching would recurse.
-    "services/rules_engine.py": "executes rule actions from within a dispatch",
     # Inbound direction of the external sync: dispatching would push the same
     # change straight back out to the provider it just came from (ADR-0014).
     "routers/issue_sync.py": "applies inbound provider state; must not echo it back",
@@ -45,8 +49,6 @@ EDGE_ALLOWED = {
 ALLOWED = {
     # The pipeline itself.
     "services/task_mutations.py": "is the pipeline",
-    # Runs inside the pipeline's rule phase; its writes are the rule actions.
-    "services/rules_engine.py": "executes rule actions from within the pipeline",
     # Writes only bookkeeping fields that no rule or notification keys off:
     # reminder_sent_at, callback_token, external_* linkage, progress fields.
     "services/scheduler.py": "reminder_sent_at bookkeeping (recurrence uses the pipeline)",

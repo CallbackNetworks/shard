@@ -1391,10 +1391,12 @@ Manage outbound webhook/email subscriptions programmatically.
 
 ## Events Reference
 
-The full list is served by `GET /integrations/events` and `GET /api/v1/subscriptions/events`;
-both return `NOTIFICATION_EVENTS` from `services/notifier.py`, which is the only copy.
-Subscribing to anything outside it is rejected with 422. Every event below has a real fire
-site, pinned by a test (ADR-0047).
+The full list is served by `GET /integrations/events` and `GET /api/v1/subscriptions/events`.
+Both return the built-in `NOTIFICATION_EVENTS` from `services/notifier.py` — the only copy —
+**plus every event name an active workflow rule emits via its `fire_event` action**, so a
+custom event becomes subscribable as soon as something actually fires it (ADR-0048).
+Subscribing to anything outside that list is rejected with 422. Every built-in event below
+has a real fire site, pinned by a test (ADR-0047).
 
 | Event | Fired when |
 |---|---|
@@ -1433,12 +1435,35 @@ integration with `project_id: null`, which listens to all projects.
     "status": "done",
     "priority": "high"
   },
+  "source": "user",
+  "actor": "alice",
   "timestamp": "2026-03-21T10:00:00Z"
 }
 ```
 
 `project.created` and `project.archived` have no task to hang off, so the `task` key is
 **absent** from their payload rather than filled with a placeholder — treat it as optional.
+
+### `source` — what caused the change
+
+Rule actions run through the same pipeline a person's change runs through, so a rule
+flipping a task to `done` emits the same `task.done` a person would (ADR-0048). `source`
+says which it was; `actor` names it (`"workflow"` for rules, the assignee or API key
+otherwise, `null` when unattributable).
+
+| `source` | Meaning |
+|---|---|
+| `user` | A person acting in the SPA (includes bulk actions and the graph API) |
+| `api` | An external API key, the MCP server, or an import |
+| `rule` | A workflow rule's own action |
+| `scheduler` | The background loop — due dates, recurrence, digests |
+| `webhook` | An inbound CI/CD callback or issue-sync echo |
+| `assistant` | The LLM assistant's tools |
+
+An integration can narrow to a subset with `sources`, served by
+`GET /integrations/sources`. **Null or empty means every source**, so integrations created
+before this existed are unaffected. `{"sources": ["user"]}` is how you say "tell me about
+task changes, but not the ones my own automation made".
 
 Additional headers per integration type:
 - Drone: `X-Drone-Event: custom`
