@@ -50,3 +50,4 @@
 | [0046](0046-validate-workflow-rule-vocabulary.md) | 工作流程規則的詞彙在寫入時驗證，標籤動作接受名稱 | Accepted | 2026-07-28 |
 | [0047](0047-notification-events-single-list.md) | 通知事件收斂成單一清單，並讓每個事件真的送得出去 | Accepted | 2026-07-28 |
 | [0048](0048-rule-actions-through-the-pipeline-and-event-subscription.md) | 規則的動作走同一條寫入管線，通知來源成為可訂閱的設定 | Accepted | 2026-07-30 |
+| [0049](0049-rules-trigger-on-nodes-not-tasks.md) | 規則的觸發從 task 收斂到 node | Accepted | 2026-07-30 |

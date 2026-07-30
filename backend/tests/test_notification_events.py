@@ -34,7 +34,13 @@ def read_key_header(db):
 
 # Functions that actually deliver an event, plus the thin dispatcher wrapper that takes
 # the event name from its caller. Add yours here if you introduce another wrapper.
-FIRE_FUNCTIONS = ("fire_notifications", "fire_project_notifications", "_fire_project_event")
+FIRE_FUNCTIONS = (
+    "fire_notifications",
+    "fire_project_notifications",
+    "fire_node_notifications",
+    "_fire_project_event",
+    "_fire",  # rules_engine wrapper: picks the task- or node-scoped fire (ADR-0049)
+)
 EVENT_LITERAL = re.compile(r'"([a-z]+\.[a-z_]+)"')
 
 

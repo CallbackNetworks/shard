@@ -2,38 +2,43 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, GitMerge } from 'lucide-react'
-import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, getWorkflowRuleTriggers } from '../api/client'
+import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, getWorkflowRuleVocabulary } from '../api/client'
 import { DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import FormField from '../components/shared/FormField'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import EmptyState from '../components/shared/EmptyState'
 
-// Triggers come from the engine (ADR-0048), so the label is derived rather than looked
-// up: a trigger added on the server shows up here readable, with nothing to edit.
-const triggerLabel = (trigger) =>
-  String(trigger).replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+// The whole rule vocabulary comes from the engine (ADR-0048, ADR-0049), so labels are
+// derived rather than looked up: a trigger, field or action added on the server shows up
+// here readable, with nothing to edit.
+const humanize = (value) =>
+  String(value).replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
-const CONDITION_FIELDS = ['status', 'priority', 'assignee', 'title_contains', 'has_label']
-const CONDITION_OPS = ['eq', 'neq', 'contains', 'in']
-const ACTION_TYPES = [
-  { value: 'set_status', label: 'Set Status' },
-  { value: 'set_priority', label: 'Set Priority' },
-  { value: 'set_assignee', label: 'Set Assignee' },
-  { value: 'add_label', label: 'Add Label (name or ID)' },
-  { value: 'remove_label', label: 'Remove Label (name or ID)' },
-  { value: 'add_comment', label: 'Add Comment' },
-  { value: 'fire_event', label: 'Fire Integration Event' },
-]
+const triggerLabel = humanize
 
-function ConditionRow({ cond, onChange, onRemove }) {
+// A value the rule was saved with stays selectable even if the engine has since dropped
+// it, so editing an old rule never silently rewrites the field you did not touch.
+const withCurrent = (options, current) =>
+  options.includes(current) ? options : [current, ...options]
+
+// Hints only; an action type missing here still renders under its derived label.
+const ACTION_HINTS = {
+  add_label: 'name or ID',
+  remove_label: 'name or ID',
+}
+
+const actionLabel = (type) =>
+  ACTION_HINTS[type] ? `${humanize(type)} (${ACTION_HINTS[type]})` : humanize(type)
+
+function ConditionRow({ cond, fields, ops, onChange, onRemove }) {
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
       <select value={cond.field} onChange={e => onChange({ ...cond, field: e.target.value })} className="kt-input" style={{ width: 'auto', minWidth: 120 }}>
-        {CONDITION_FIELDS.map(f => <option key={f} value={f}>{f}</option>)}
+        {withCurrent(fields, cond.field).map(f => <option key={f} value={f}>{f}</option>)}
       </select>
       <select value={cond.op} onChange={e => onChange({ ...cond, op: e.target.value })} className="kt-input" style={{ width: 'auto', minWidth: 80 }}>
-        {CONDITION_OPS.map(o => <option key={o} value={o}>{o}</option>)}
+        {withCurrent(ops, cond.op).map(o => <option key={o} value={o}>{o}</option>)}
       </select>
       <input value={cond.value} onChange={e => onChange({ ...cond, value: e.target.value })} placeholder="value" className="kt-input" style={{ flex: 1, minWidth: 100 }} />
       <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
@@ -43,11 +48,11 @@ function ConditionRow({ cond, onChange, onRemove }) {
   )
 }
 
-function ActionRow({ action, onChange, onRemove }) {
+function ActionRow({ action, types, onChange, onRemove }) {
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
       <select value={action.type} onChange={e => onChange({ ...action, type: e.target.value })} className="kt-input" style={{ width: 'auto', minWidth: 160 }}>
-        {ACTION_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+        {withCurrent(types, action.type).map(a => <option key={a} value={a}>{actionLabel(a)}</option>)}
       </select>
       <input value={action.value} onChange={e => onChange({ ...action, value: e.target.value })} placeholder="value" className="kt-input" style={{ flex: 1, minWidth: 100 }} />
       <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
@@ -58,12 +63,16 @@ function ActionRow({ action, onChange, onRemove }) {
 }
 
 function RuleModal({ initial, onSave, onClose }) {
-  const { data: triggers = [] } = useQuery({
-    queryKey: ['workflow-rule-triggers'],
-    queryFn: getWorkflowRuleTriggers,
+  const { data: vocabulary } = useQuery({
+    queryKey: ['workflow-rule-vocabulary'],
+    queryFn: getWorkflowRuleVocabulary,
     staleTime: Infinity,
   })
-  const emptyRule ={ name: '', trigger: 'task.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
+  const triggers = vocabulary?.triggers ?? []
+  const conditionFields = vocabulary?.condition_fields ?? []
+  const conditionOps = vocabulary?.condition_ops ?? []
+  const actionTypes = vocabulary?.action_types ?? []
+  const emptyRule ={ name: '', trigger: 'node.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
   const [form, setForm] = useState(initial ? {
     ...initial,
     project_id: initial.project_id || '',
@@ -93,15 +102,13 @@ function RuleModal({ initial, onSave, onClose }) {
       </FormField>
       <FormField label="Trigger">
         <select value={form.trigger} onChange={e => set('trigger', e.target.value)} className="kt-input">
-          {/* The saved trigger stays selectable while the list loads, and if a rule
-              predates a trigger the engine has since dropped it stays visible. */}
-          {(triggers.includes(form.trigger) ? triggers : [form.trigger, ...triggers])
+          {withCurrent(triggers, form.trigger)
             .map(tr => <option key={tr} value={tr}>{triggerLabel(tr)}</option>)}
         </select>
       </FormField>
       <FormField label="Conditions (all must match)">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} />)}
+          {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} fields={conditionFields} ops={conditionOps} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} />)}
           <button onClick={addCond} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
             <Plus size={10} /> Add Condition
           </button>
@@ -109,7 +116,7 @@ function RuleModal({ initial, onSave, onClose }) {
       </FormField>
       <FormField label="Actions">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {form.actions.map((a, i) => <ActionRow key={i} action={a} onChange={v => updateAction(i, v)} onRemove={() => removeAction(i)} />)}
+          {form.actions.map((a, i) => <ActionRow key={i} action={a} types={actionTypes} onChange={v => updateAction(i, v)} onRemove={() => removeAction(i)} />)}
           <button onClick={addAction} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
             <Plus size={10} /> Add Action
           </button>

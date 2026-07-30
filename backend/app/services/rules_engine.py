@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # rule that sits in the list looking healthy and never runs, so there is one list and a
 # test pins each entry to a real ``run_rules`` call (ADR-0048).
 SUPPORTED_TRIGGERS = [
-    "task.created",
+    "node.created",
     "task.status_changed",
     "task.label_added",
     "task.priority_changed",
@@ -30,7 +30,7 @@ SUPPORTED_TRIGGERS = [
 # spelling (``title`` for ``title_contains``, ``equals`` for ``eq``) sits in the list
 # looking healthy while never firing. These sets are the source of truth the schema
 # layer validates against, so such a rule is rejected at write time instead.
-CONDITION_FIELDS = {"status", "priority", "assignee", "title_contains", "has_label"}
+CONDITION_FIELDS = {"status", "priority", "assignee", "title_contains", "has_label", "type", "has_role"}
 CONDITION_OPS = {"eq", "neq", "contains", "in"}
 ACTION_TYPES = {
     "set_status",
@@ -41,6 +41,14 @@ ACTION_TYPES = {
     "add_comment",
     "fire_event",
 }
+
+# ``node.created`` fires for every node, so a rule may now land on something that is not
+# a task (ADR-0049). Every action but ``fire_event`` needs what only a task has: a data
+# assignee field, a project to resolve label names against, a ``Comment.task_id``, or a
+# status/priority vocabulary that is task-shaped (``ACTION_VALUE_ENUMS`` rejects a
+# project's ``archived`` at write time). They are skipped *visibly* on other nodes rather
+# than quietly doing nothing.
+TASK_ONLY_ACTIONS = ACTION_TYPES - {"fire_event"}
 
 # Actions whose value is a closed enum. The others take free text (an assignee name,
 # a label name, a comment body) and cannot be checked ahead of time.
@@ -64,17 +72,31 @@ def _session_of(task) -> Session | None:
         return None
 
 
-def _eval_condition(cond: dict, task: "graph.TaskView", context: dict, db: Session | None = None) -> bool:
+def _eval_condition(cond: dict, task, context: dict, db: Session | None = None) -> bool:
+    """Evaluate one condition against a task view or a plain ``Node`` (ADR-0049).
+
+    Both carry ``type``/``title``/``status``/``priority``; only a task view has
+    ``assignee`` (it lives in the node's ``data``), so on any other node that field
+    reads as empty and an ``eq`` condition on it simply does not match.
+    """
     field = cond.get("field", "")
     op = cond.get("op", "eq")
     value = cond.get("value", "")
 
-    if field == "status":
-        actual = task.status
+    if field == "type":
+        actual = task.type or ""
+    elif field == "has_role":
+        session = db if db is not None else _session_of(task)
+        if session is None:
+            return False
+        held = graph.has_role(session, task.type, value)
+        return held if op != "neq" else not held
+    elif field == "status":
+        actual = task.status or ""
     elif field == "priority":
-        actual = task.priority
+        actual = task.priority or ""
     elif field == "assignee":
-        actual = task.assignee or ""
+        actual = getattr(task, "assignee", None) or ""
     elif field == "title_contains":
         return (value.lower() in task.title.lower()) if op != "neq" else (value.lower() not in task.title.lower())
     elif field == "has_label":
@@ -114,7 +136,12 @@ def _resolve_label(db: Session, task: "graph.TaskView", value: str) -> "graph.La
     return None
 
 
-async def _apply_fields(db: Session, task: "graph.TaskView", changes: dict) -> "graph.TaskView":
+def _is_task(db: Session, node) -> bool:
+    """Whether the rule's subject plays the task role (ADR-0040)."""
+    return graph.has_role(db, node.type, graph.ROLE_TASK)
+
+
+async def _apply_fields(db: Session, task, changes: dict):
     """Write a rule's field change through the task pipeline (ADR-0048).
 
     A rule-made change is as real as a human-made one: it earns the same activity entry
@@ -122,6 +149,8 @@ async def _apply_fields(db: Session, task: "graph.TaskView", changes: dict) -> "
     another rule; ``sync_external=False`` keeps rule-made changes out of third-party
     issue trackers, where they could echo back in as inbound events (ADR-0014).
     The caller owns the commit and the aggregate broadcast.
+
+    Only reached for task-role nodes: every field action is in ``TASK_ONLY_ACTIONS``.
     """
     from app.services.task_mutations import apply_task_update
 
@@ -138,10 +167,46 @@ async def _apply_fields(db: Session, task: "graph.TaskView", changes: dict) -> "
     )
 
 
-async def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> "graph.TaskView":
-    """Execute one rule action, returning the task refreshed if the action changed it."""
+def _skip(db: Session, node, atype: str) -> None:
+    """Record that an action could not run here, instead of doing nothing quietly.
+
+    A task-only action landing on a non-task node is the exact shape of bug this module
+    keeps producing (ADR-0047/0048): the rule looks like it ran, and nothing says why
+    half of it did not. The activity feed gets the reason.
+    """
+    log_activity(
+        db,
+        action="rule.skipped",
+        project_id=None,
+        actor="workflow",
+        detail=f'Action "{atype}" skipped: {node.type} "{node.title}" does not play the task role',
+        meta={"node_id": node.id, "type": node.type, "action": atype},
+    )
+    logger.info("rule action %s skipped for non-task node %s (%s)", atype, node.id, node.type)
+
+
+async def _fire(db: Session, node, event: str) -> None:
+    """Deliver a rule-emitted event, scoped the way the subject allows (ADR-0049).
+
+    A task hangs off its project; anything else hangs off its nearest container, or off
+    nothing at all — in which case only unscoped integrations hear it.
+    """
+    from app.services.notifier import fire_node_notifications, fire_notifications
+
+    if _is_task(db, node):
+        await fire_notifications(db, node, event, source="rule", actor="workflow")
+    else:
+        await fire_node_notifications(db, node, event, source="rule", actor="workflow")
+
+
+async def _exec_action(db: Session, action: dict, task):
+    """Execute one rule action, returning the subject refreshed if the action changed it."""
     atype = action.get("type", "")
     value = action.get("value", "")
+
+    if atype in TASK_ONLY_ACTIONS and not _is_task(db, task):
+        _skip(db, task, atype)
+        return task
 
     if atype == "set_status":
         if value in ACTION_VALUE_ENUMS["set_status"]:
@@ -169,12 +234,10 @@ async def _exec_action(db: Session, action: dict, task: "graph.TaskView") -> "gr
         # Deferred import to avoid circular
         import asyncio
 
-        from app.services.notifier import fire_notifications
-
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                loop.create_task(fire_notifications(db, task, value, source="rule", actor="workflow"))
+                loop.create_task(_fire(db, task, value))
         except Exception as exc:
             logger.warning("fire_event action failed: %s", exc)
     return task
@@ -206,10 +269,13 @@ async def _apply_label(db: Session, task: "graph.TaskView", value: str, *, added
 async def run_rules(
     db: Session,
     trigger: str,
-    task: "graph.TaskView",
+    task,
     context: dict,
 ) -> None:
     """Evaluate all active rules matching the trigger and execute matching ones.
+
+    ``task`` is the rule's subject: a ``TaskView`` on the task triggers, a plain ``Node``
+    on ``node.created``, which fires for every node type (ADR-0049).
 
     Rules never chain: every write a rule makes is dispatched with ``trigger_rules=False``,
     so this function is never re-entered from its own actions (ADR-0048). The depth
@@ -224,8 +290,15 @@ async def run_rules(
         )
         .all()
     )
+    if not rules:
+        return
 
-    task_project_id = graph.project_id_of_task(db, task.id)
+    is_task = _is_task(db, task)
+    if is_task:
+        task_project_id = graph.project_id_of_task(db, task.id)
+    else:
+        container = graph.container_of_node(db, task.id)
+        task_project_id = container.id if container is not None else None
     for rule in rules:
         # Check project scope
         if rule.project_id and rule.project_id != task_project_id:
@@ -250,19 +323,15 @@ async def run_rules(
                 db,
                 action="rule.executed",
                 project_id=task_project_id,
-                task_id=task.id,
+                task_id=task.id if is_task else None,
                 actor="workflow",
-                detail=f'Rule "{rule.name}" executed on task "{task.title}"',
-                meta={"rule_id": rule.id, "trigger": trigger},
+                detail=f'Rule "{rule.name}" executed on {task.type} "{task.title}"',
+                meta={"rule_id": rule.id, "trigger": trigger, "node_id": task.id},
             )
-            logger.info("Rule '%s' executed for task '%s'", rule.name, task.title)
+            logger.info("Rule '%s' executed for node '%s'", rule.name, task.title)
 
-            # Deferred import: notifier does not import this module, but the
-            # fire_event action already reaches into it the same way.
-            from app.services.notifier import fire_notifications
-
-            await fire_notifications(db, task, "rule.triggered", source="rule", actor="workflow")
+            await _fire(db, task, "rule.triggered")
 
         except Exception as exc:
-            logger.warning("Rule %s failed for task %s: %s", rule.id, task.id, exc)
+            logger.warning("Rule %s failed for node %s: %s", rule.id, task.id, exc)
             db.rollback()

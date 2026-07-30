@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from app.models import ActivityLog, Comment, WorkflowRule
+from app.models import ActivityLog, Comment, Node, NodeType, WorkflowRule
 from app.services import graph, rules_engine, task_mutations
 from app.services.rules_engine import _eval_condition, _exec_action, run_rules
 from tests.factories import make_project, make_task
@@ -530,3 +530,114 @@ class TestRuleChangesAreVisible:
         await run_rules(db, "task.status_changed", task, {})
 
         assert called == []
+
+
+class TestRulesSeeEveryNode:
+    """``node.created`` fires for every node type, not only task-role ones (ADR-0049).
+
+    Before this, a user could define a ``decision`` type and have no way at all to say
+    "when a decision is created, tell my external system": non-task nodes never reached
+    the engine, and the conditions could not read a node's type or roles.
+    """
+
+    @pytest.fixture()
+    def decision(self, db):
+        """A node with no task role, inside a project."""
+        db.add(NodeType(key="decision", label="Decision", is_builtin=False, roles=[]))
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        node = Node(type="decision", title="Adopt the graph model", status="todo")
+        db.add(node)
+        db.flush()
+        graph.add_edge(db, project.id, node.id, graph.REL_CONTAINS)
+        db.flush()
+        return project, node
+
+    @staticmethod
+    def _rule(db, *, conditions, actions):
+        rule = WorkflowRule(
+            name="R", trigger="node.created", conditions=conditions, actions=actions, active=True, run_count=0
+        )
+        db.add(rule)
+        db.flush()
+        return rule
+
+    @pytest.mark.asyncio
+    async def test_a_rule_runs_on_a_non_task_node(self, db, decision):
+        _, node = decision
+        rule = self._rule(db, conditions=[], actions=[{"type": "fire_event", "value": "decision.made"}])
+
+        await run_rules(db, "node.created", node, {})
+
+        db.refresh(rule)
+        assert rule.run_count == 1
+
+    @pytest.mark.asyncio
+    async def test_type_condition_narrows_to_one_type(self, db, decision):
+        _, node = decision
+        matching = self._rule(
+            db,
+            conditions=[{"field": "type", "op": "eq", "value": "decision"}],
+            actions=[{"type": "fire_event", "value": "decision.made"}],
+        )
+        other = self._rule(
+            db,
+            conditions=[{"field": "type", "op": "eq", "value": "task"}],
+            actions=[{"type": "fire_event", "value": "nope"}],
+        )
+
+        await run_rules(db, "node.created", node, {})
+
+        db.refresh(matching)
+        db.refresh(other)
+        assert (matching.run_count, other.run_count) == (1, 0)
+
+    @pytest.mark.asyncio
+    async def test_has_role_condition_is_how_a_rule_stays_task_only(self, db, decision):
+        """The shape the Alembic migration rewrites every old ``task.created`` rule into."""
+        _, node = decision
+        rule = self._rule(
+            db,
+            conditions=[{"field": "has_role", "op": "eq", "value": "task"}],
+            actions=[{"type": "fire_event", "value": "nope"}],
+        )
+
+        await run_rules(db, "node.created", node, {})
+        db.refresh(rule)
+        assert rule.run_count == 0
+
+        task = make_task(db, project_id=decision[0].id, title="T", status="todo")
+        db.add(task)
+        db.flush()
+        await run_rules(db, "node.created", graph.get_task(db, task.id), {})
+        db.refresh(rule)
+        assert rule.run_count == 1
+
+    @pytest.mark.asyncio
+    async def test_a_task_only_action_is_skipped_visibly(self, db, decision):
+        """Not a silent no-op: the activity feed says which action and why (ADR-0049)."""
+        _, node = decision
+        self._rule(db, conditions=[], actions=[{"type": "add_comment", "value": "hi"}])
+
+        await run_rules(db, "node.created", node, {})
+
+        skipped = db.query(ActivityLog).filter(ActivityLog.action == "rule.skipped").all()
+        assert len(skipped) == 1
+        assert skipped[0].meta["action"] == "add_comment"
+        assert skipped[0].meta["node_id"] == node.id
+        assert db.query(Comment).count() == 0
+
+    @pytest.mark.asyncio
+    async def test_fire_event_is_scoped_to_the_nearest_container(self, db, decision):
+        project, node = decision
+        assert graph.container_of_node(db, node.id).id == project.id
+
+    @pytest.mark.asyncio
+    async def test_a_node_with_no_container_has_no_project_scope(self, db):
+        db.add(NodeType(key="decision", label="Decision", is_builtin=False, roles=[]))
+        node = Node(type="decision", title="Orphan", status="todo")
+        db.add(node)
+        db.flush()
+
+        assert graph.container_of_node(db, node.id) is None

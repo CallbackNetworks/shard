@@ -335,32 +335,52 @@ async def fire_project_notifications(
     await _deliver(db, project, event, task=None, source=source, actor=actor)
 
 
-async def _deliver(
+async def fire_node_notifications(
     db: Session,
-    project: "graph.ProjectView",
+    node,
     event: str,
     *,
-    task: "graph.TaskView | None",
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
 ) -> None:
-    total, done, progress = _compute_progress(project, db)
+    """Fire an event for a node that is neither a task nor a project (ADR-0049).
+
+    A rule can now trigger on any node, so its ``fire_event`` action needs somewhere to
+    deliver. The node's nearest container becomes the scope when it has one; otherwise
+    the event is unscoped and only global integrations hear it.
+    """
+    project = graph.container_of_node(db, node.id)
+    await _deliver(db, project, event, task=None, node=node, source=source, actor=actor)
+
+
+async def _deliver(
+    db: Session,
+    project: "graph.ProjectView | None",
+    event: str,
+    *,
+    task: "graph.TaskView | None",
+    node=None,
+    source: str = DEFAULT_SOURCE,
+    actor: str | None = None,
+) -> None:
     source = normalize_source(source)
 
     payload = {
         "event": event,
-        "project": {
+        "source": source,
+        "actor": actor,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+    if project is not None:
+        total, done, progress = _compute_progress(project, db)
+        payload["project"] = {
             "id": project.id,
             "name": project.name,
             "status": project.status,
             "progress": progress,
             "total_tasks": total,
             "done_tasks": done,
-        },
-        "source": source,
-        "actor": actor,
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
+        }
     if task is not None:
         payload["task"] = {
             "id": task.id,
@@ -368,18 +388,24 @@ async def _deliver(
             "status": task.status,
             "priority": task.priority,
         }
+    if node is not None:
+        payload["node"] = {
+            "id": node.id,
+            "type": node.type,
+            "title": node.title,
+            "status": node.status,
+        }
 
     # An unscoped integration (project_id NULL) listens to every project. It has to be
     # matched with IS NULL: ``project_id IN (:id, NULL)`` is never true for a NULL row,
     # so the previous form silently delivered nothing to global integrations (ADR-0047).
-    integrations = (
-        db.query(Integration)
-        .filter(
-            Integration.active == True,
-            or_(Integration.project_id == project.id, Integration.project_id.is_(None)),
-        )
-        .all()
+    # A node with no container has no scope at all, so only the global ones can match.
+    scope = (
+        Integration.project_id.is_(None)
+        if project is None
+        else or_(Integration.project_id == project.id, Integration.project_id.is_(None))
     )
+    integrations = db.query(Integration).filter(Integration.active == True, scope).all()
 
     matching = [i for i in integrations if event in i.events and _wants_source(i, source)]
     if not matching:
@@ -402,8 +428,9 @@ async def _deliver(
     for integration in webhook_integrations:
         await _dispatch_webhook(db, integration, event, payload, background=True)
 
-    # Create in-app notification
-    _create_notification(db, event, task, project)
+    # Create in-app notification (project-scoped; a node with no container has no feed)
+    if project is not None:
+        _create_notification(db, event, task, project)
 
 
 _EVENT_MESSAGES = {

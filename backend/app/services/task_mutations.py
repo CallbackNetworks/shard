@@ -252,7 +252,10 @@ async def finalize_task_create(
         db.flush()
     task = graph.get_task(db, task_id)
 
-    await run_rules(db, "task.created", task, {})
+    # "node.created", not "task.created": the trigger is node-shaped and a rule narrows
+    # to tasks with a has_role condition (ADR-0049). The *notification* below stays
+    # task.created — that vocabulary is separate and unchanged.
+    await run_rules(db, "node.created", task, {})
     if commit:
         db.commit()
     task = graph.get_task(db, task_id)

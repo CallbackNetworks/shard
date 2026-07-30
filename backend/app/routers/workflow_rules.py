@@ -5,7 +5,14 @@ from app.database import get_db
 from app.models import WorkflowRule
 from app.schemas import WorkflowRuleCreate, WorkflowRuleOut, WorkflowRuleUpdate
 from app.services import graph
-from app.services.rules_engine import SUPPORTED_TRIGGERS
+from app.services.rules_engine import (
+    ACTION_TYPES,
+    ACTION_VALUE_ENUMS,
+    CONDITION_FIELDS,
+    CONDITION_OPS,
+    SUPPORTED_TRIGGERS,
+    TASK_ONLY_ACTIONS,
+)
 
 router = APIRouter(prefix="/workflow-rules", tags=["workflow-rules"])
 
@@ -34,15 +41,24 @@ def create_rule(body: WorkflowRuleCreate, db: Session = Depends(get_db)):
     return rule
 
 
-@router.get("/triggers")
-def list_triggers():
-    """The moments a rule can hook onto.
+@router.get("/vocabulary")
+def rule_vocabulary():
+    """Everything the rule editor needs to render itself.
 
-    Declared before ``/{rule_id}`` so the path parameter does not swallow it. The rule
-    editor renders whatever this returns instead of keeping its own copy: a fourth
-    place to add a trigger is a fourth place to forget one (ADR-0048).
+    Declared before ``/{rule_id}`` so the path parameter does not swallow it. The editor
+    renders whatever this returns instead of keeping its own copy: a second place to add
+    a trigger, field or action is a second place to forget one (ADR-0048, ADR-0049).
+    Every value here is also what the schema validates writes against, so anything the
+    editor offers is by construction something the engine understands.
     """
-    return SUPPORTED_TRIGGERS
+    return {
+        "triggers": SUPPORTED_TRIGGERS,
+        "condition_fields": sorted(CONDITION_FIELDS),
+        "condition_ops": sorted(CONDITION_OPS),
+        "action_types": sorted(ACTION_TYPES),
+        "action_value_enums": {k: sorted(v) for k, v in ACTION_VALUE_ENUMS.items()},
+        "task_only_actions": sorted(TASK_ONLY_ACTIONS),
+    }
 
 
 @router.get("/{rule_id}", response_model=WorkflowRuleOut)

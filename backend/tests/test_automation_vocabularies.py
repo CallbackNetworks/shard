@@ -18,16 +18,21 @@ from app.services.notifier import (
     DEFAULT_SOURCE,
     NOTIFICATION_SOURCES,
 )
-from app.services.rules_engine import SUPPORTED_TRIGGERS
+from app.services.rules_engine import (
+    ACTION_TYPES,
+    CONDITION_FIELDS,
+    CONDITION_OPS,
+    SUPPORTED_TRIGGERS,
+)
 from app.services.task_mutations import _SOURCE_SUFFIX
 from tests.source_scan import app_sources, calls_to, keyword_arg, positional_args
 
-TRIGGER_LITERAL = re.compile(r'"(task\.[a-z_]+)"')
+TRIGGER_LITERAL = re.compile(r'"((?:task|node)\.[a-z_]+)"')
 STRING_LITERAL = re.compile(r'^"([^"]*)"$')
 
 # Where a trigger is queued rather than passed straight in: apply_task_update collects
 # (trigger, context) pairs while it works out what changed, then drains them.
-QUEUE_APPEND = re.compile(r"triggered_rules\.append\(\(\s*\"(task\.[a-z_]+)\"")
+QUEUE_APPEND = re.compile(r"triggered_rules\.append\(\(\s*\"((?:task|node)\.[a-z_]+)\"")
 
 # Functions whose ``source=`` argument is a notification source. Scoped deliberately:
 # ``source`` is a common parameter name (a label's origin, an assistant decision's
@@ -38,6 +43,7 @@ PIPELINE_FUNCTIONS = (
     "finalize_task_create",
     "fire_notifications",
     "fire_project_notifications",
+    "fire_node_notifications",
     "dispatch_node_created",
     "dispatch_node_updated",
     "dispatch_node_deleted",
@@ -96,23 +102,27 @@ class TestEveryTriggerIsWired:
         )
 
 
-class TestTheEditorIsServedTheTriggers:
-    """The rule editor must render this list, not keep a fourth copy of it.
+class TestTheEditorIsServedTheVocabulary:
+    """The rule editor must render these lists, not keep a fourth copy of them.
 
     A hardcoded copy in the frontend is a place to add a trigger the backend does not
     know, which is at least loud (the write 422s) — but also a place to *miss* one the
     backend gained, which is silent.
     """
 
-    def test_the_endpoint_serves_the_engines_list(self, client):
-        r = client.get("/api/workflow-rules/triggers")
+    def test_the_endpoint_serves_the_engines_vocabulary(self, client):
+        r = client.get("/api/workflow-rules/vocabulary")
         assert r.status_code == 200
-        assert r.json() == SUPPORTED_TRIGGERS
+        body = r.json()
+        assert body["triggers"] == SUPPORTED_TRIGGERS
+        assert body["condition_fields"] == sorted(CONDITION_FIELDS)
+        assert body["condition_ops"] == sorted(CONDITION_OPS)
+        assert body["action_types"] == sorted(ACTION_TYPES)
 
-    def test_triggers_is_not_shadowed_by_the_rule_id_route(self, client):
-        # /workflow-rules/{rule_id} is declared after /triggers; if that ever flips,
-        # this returns 404 "Rule not found" instead of the list.
-        assert client.get("/api/workflow-rules/triggers").json() != {"detail": "Rule not found"}
+    def test_vocabulary_is_not_shadowed_by_the_rule_id_route(self, client):
+        # /workflow-rules/{rule_id} is declared after /vocabulary; if that ever flips,
+        # this returns 404 "Rule not found" instead of the vocabulary.
+        assert client.get("/api/workflow-rules/vocabulary").json() != {"detail": "Rule not found"}
 
 
 class TestEverySourceIsProduced:

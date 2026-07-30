@@ -31,7 +31,7 @@ def test_create_rule(client):
         "/api/workflow-rules",
         json={
             "name": "Auto-prioritize",
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [{"field": "status", "op": "eq", "value": "todo"}],
             "actions": [{"type": "set_priority", "value": "high"}],
             "active": True,
@@ -40,7 +40,7 @@ def test_create_rule(client):
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Auto-prioritize"
-    assert data["trigger"] == "task.created"
+    assert data["trigger"] == "node.created"
     assert data["active"] is True
     assert data["project_id"] is None
     assert len(data["conditions"]) == 1
@@ -80,7 +80,7 @@ def test_get_rule(client):
         "/api/workflow-rules",
         json={
             "name": "Fetch me",
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [],
             "actions": [{"type": "set_status", "value": "in_progress"}],
         },
@@ -102,7 +102,7 @@ def test_update_rule(client):
         "/api/workflow-rules",
         json={
             "name": "Original name",
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [],
             "actions": [{"type": "set_priority", "value": "low"}],
         },
@@ -130,7 +130,7 @@ def test_update_rule_deactivate(client):
         "/api/workflow-rules",
         json={
             "name": "Active rule",
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [],
             "actions": [{"type": "set_status", "value": "done"}],
             "active": True,
@@ -151,7 +151,7 @@ def test_delete_rule(client):
         "/api/workflow-rules",
         json={
             "name": "To Delete",
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [],
             "actions": [{"type": "set_priority", "value": "medium"}],
         },
@@ -182,7 +182,7 @@ def test_list_rules_filter_project(client, sample_project):
         "/api/workflow-rules",
         json={
             "name": "Global rule",
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [],
             "actions": [{"type": "set_priority", "value": "low"}],
         },
@@ -193,7 +193,7 @@ def test_list_rules_filter_project(client, sample_project):
         json={
             "name": "Project rule",
             "project_id": sample_project.id,
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [],
             "actions": [{"type": "set_priority", "value": "high"}],
         },
@@ -219,7 +219,7 @@ def test_dry_run_rule(client, db, sample_project):
         "/api/workflow-rules",
         json={
             "name": "Match todo tasks",
-            "trigger": "task.created",
+            "trigger": "node.created",
             "conditions": [{"field": "status", "op": "eq", "value": "todo"}],
             "actions": [{"type": "set_priority", "value": "high"}],
         },
@@ -242,7 +242,7 @@ def test_dry_run_rule(client, db, sample_project):
 def _rule_body(**overrides):
     body = {
         "name": "R",
-        "trigger": "task.created",
+        "trigger": "node.created",
         "conditions": [{"field": "status", "op": "eq", "value": "todo"}],
         "actions": [{"type": "set_priority", "value": "high"}],
     }

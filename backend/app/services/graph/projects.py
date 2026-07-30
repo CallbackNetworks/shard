@@ -12,6 +12,7 @@ type; after B6 the ``projects`` table is dropped and ``graph_sync`` is retired.
 """
 
 import uuid
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -147,6 +148,29 @@ def container_view(db: Session, node_id: str) -> ProjectView | None:
     """
     node = db.get(Node, node_id)
     return _project_view(node) if node is not None else None
+
+
+def container_of_node(db: Session, node_id: str) -> ProjectView | None:
+    """Nearest container-role ``contains`` ancestor of any node (ADR-0049).
+
+    ``project_of_task`` pins to the built-in ``project`` type, which is right for a task
+    but too narrow for the notifier now that a rule can fire on any node: something
+    created inside a user-defined container still needs a delivery scope. Returns None
+    for a node with no container at all — the caller treats that as unscoped.
+    """
+    from .core import container_type_keys, parents_of
+
+    keys = container_type_keys(db)
+    queue: deque[str] = deque([node_id])
+    seen: set[str] = {node_id}
+    while queue:
+        for parent in parents_of(db, queue.popleft()):
+            if parent.type in keys:
+                return _project_view(parent)
+            if parent.id not in seen:
+                seen.add(parent.id)
+                queue.append(parent.id)
+    return None
 
 
 def find_project_by_share_token(db: Session, token: str) -> ProjectView | None:

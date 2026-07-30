@@ -85,6 +85,10 @@ async def dispatch_node_created(db: Session, node: Node, *, actor: str | None = 
         meta={"type": node.type, "node_id": node.id},
     )
     db.commit()
+    # Rules see every node, not only task-role ones (ADR-0049). The task branch above
+    # already ran them from inside finalize_task_create.
+    await run_rules(db, "node.created", node, {})
+    db.commit()
     await _fire_project_event(db, node, "project.created", source=source, actor=actor)
     await ws_manager.broadcast("node.created", {"node_id": node.id, "type": node.type})
 

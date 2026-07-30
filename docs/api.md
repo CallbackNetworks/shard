@@ -699,7 +699,7 @@ Query parameters:
     "id": "uuid",
     "name": "Auto-assign high priority",
     "project_id": "uuid | null",
-    "trigger": "task.created",
+    "trigger": "node.created",
     "conditions": [{ "field": "priority", "op": "eq", "value": "high" }],
     "actions": [{ "type": "set_assignee", "value": "alice" }],
     "active": true,
@@ -715,9 +715,9 @@ Query parameters:
 {
   "name": "string",
   "project_id": "uuid (optional, null = global)",
-  "trigger": "task.created | task.status_changed | task.label_added | task.priority_changed",
+  "trigger": "node.created | task.status_changed | task.label_added | task.priority_changed",
   "conditions": [
-    { "field": "priority | status | title_contains | has_label | assignee", "op": "eq | neq | contains | in", "value": "string or array" }
+    { "field": "priority | status | title_contains | has_label | assignee | type | has_role", "op": "eq | neq | contains | in", "value": "string or array" }
   ],
   "actions": [
     { "type": "set_status | set_priority | set_assignee | add_label | remove_label | add_comment | fire_event", "value": "string" }
@@ -726,15 +726,28 @@ Query parameters:
 }
 ```
 
-#### `GET /workflow-rules/triggers`
-The moments a rule can hook onto. The rule editor renders this rather than keeping its
-own copy, so a trigger the UI offers is always one the engine actually fires (ADR-0048).
+#### `GET /workflow-rules/vocabulary`
+Everything the rule editor needs to render itself. It renders whatever this returns
+rather than keeping its own copy, so anything the UI offers is by construction something
+the engine understands (ADR-0048, ADR-0049).
 
 ```json
-["task.created", "task.status_changed", "task.label_added", "task.priority_changed"]
+{
+  "triggers": ["node.created", "task.status_changed", "task.label_added", "task.priority_changed"],
+  "condition_fields": ["assignee", "has_label", "has_role", "priority", "status", "title_contains", "type"],
+  "condition_ops": ["contains", "eq", "in", "neq"],
+  "action_types": ["add_comment", "add_label", "fire_event", "remove_label", "set_assignee", "set_priority", "set_status"],
+  "action_value_enums": { "set_status": ["done", "failed", "in_progress", "todo"], "set_priority": ["high", "low", "medium", "urgent"] },
+  "task_only_actions": ["add_comment", "add_label", "remove_label", "set_assignee", "set_priority", "set_status"]
+}
 ```
 
-A `trigger` outside this list is rejected with 422.
+Any value outside these lists is rejected with 422 at write time.
+
+`node.created` fires for **every** node, not only tasks (ADR-0049). Narrow it with a
+`has_role eq task` condition, or `type eq <type_key>` for one specific type. Actions in
+`task_only_actions` are skipped (and logged as `rule.skipped`) when the node they land on
+has no task role.
 
 #### `GET /workflow-rules/{id}`
 #### `PATCH /workflow-rules/{id}`
