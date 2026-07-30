@@ -7,14 +7,12 @@ served to every consumer, and these tests keep it pinned to real fire sites (ADR
 
 import hashlib
 import re
-from pathlib import Path
 
 import pytest
 
 from app.models import ApiKey, WorkflowRule
 from app.services.notifier import NOTIFICATION_EVENTS
-
-BACKEND = Path(__file__).resolve().parent.parent
+from tests.source_scan import app_sources, calls_to, positional_args
 
 
 @pytest.fixture()
@@ -40,54 +38,12 @@ FIRE_FUNCTIONS = ("fire_notifications", "fire_project_notifications", "_fire_pro
 EVENT_LITERAL = re.compile(r'"([a-z]+\.[a-z_]+)"')
 
 
-def _call_args(source: str, start: int) -> str:
-    """Text between the parentheses of the call beginning at ``start``.
-
-    A regex cannot do this: ``fire_notifications(db, graph.task_view(task, db), "x")``
-    has a nested call, so matching up to the first ``)`` loses the event.
-    """
-    open_at = source.index("(", start)
-    depth = 0
-    for i in range(open_at, len(source)):
-        if source[i] == "(":
-            depth += 1
-        elif source[i] == ")":
-            depth -= 1
-            if depth == 0:
-                return source[open_at + 1 : i]
-    return ""
-
-
-def _positional_args(args: str) -> list[str]:
-    """Split a call's argument text into its positional arguments.
-
-    Depth-aware so a nested call's commas do not split it, and keyword arguments are
-    dropped — the event is positional and ``source=``/``actor=`` now follow it (ADR-0048),
-    so taking the last argument is no longer the same as taking the event.
-    """
-    parts, depth, current = [], 0, ""
-    for ch in args:
-        if ch in "([{":
-            depth += 1
-        elif ch in ")]}":
-            depth -= 1
-        if ch == "," and depth == 0:
-            parts.append(current)
-            current = ""
-        else:
-            current += ch
-    parts.append(current)
-    return [p.strip() for p in parts if p.strip() and not re.match(r"^[A-Za-z_]\w*\s*=[^=]", p.strip())]
-
-
 def _fired_events() -> set[str]:
     """Every event name reaching a fire site anywhere in the backend."""
     found: set[str] = set()
-    pattern = re.compile(rf"\b(?:{'|'.join(FIRE_FUNCTIONS)})\s*\(")
-    for path in (BACKEND / "app").rglob("*.py"):
-        source = path.read_text()
-        for match in pattern.finditer(source):
-            positional = _positional_args(_call_args(source, match.start()))
+    for _path, source in app_sources():
+        for args in calls_to(source, *FIRE_FUNCTIONS):
+            positional = positional_args(args)
             literals = EVENT_LITERAL.findall(" ".join(positional))
             if literals:
                 found.update(literals)
