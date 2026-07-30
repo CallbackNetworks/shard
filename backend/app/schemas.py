@@ -573,7 +573,7 @@ class WorkflowAction(BaseModel):
 def _check_trigger(v: str | None) -> str | None:
     from app.services.rules_engine import SUPPORTED_TRIGGERS
 
-    return v if v is None else _reject_unknown("trigger", v, SUPPORTED_TRIGGERS)
+    return v if v is None else _reject_unknown("trigger", v, set(SUPPORTED_TRIGGERS))
 
 
 class WorkflowRuleCreate(BaseModel):

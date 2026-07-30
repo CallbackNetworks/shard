@@ -82,18 +82,37 @@ class TestEveryTriggerIsWired:
     """A trigger the UI offers must have somewhere that fires it, and vice versa."""
 
     def test_no_dark_triggers(self):
-        dark = SUPPORTED_TRIGGERS - _triggers_fired()
+        dark = set(SUPPORTED_TRIGGERS) - _triggers_fired()
         assert dark == set(), (
             f"trigger offered but never fired: {sorted(dark)}. A rule saved with it would "
             "sit in the list looking healthy and never run."
         )
 
     def test_no_undeclared_triggers(self):
-        extra = _triggers_fired() - SUPPORTED_TRIGGERS
+        extra = _triggers_fired() - set(SUPPORTED_TRIGGERS)
         assert extra == set(), (
             f"fired but not offered: {sorted(extra)}. Nothing can subscribe to it, because "
             "the schema rejects it at write time."
         )
+
+
+class TestTheEditorIsServedTheTriggers:
+    """The rule editor must render this list, not keep a fourth copy of it.
+
+    A hardcoded copy in the frontend is a place to add a trigger the backend does not
+    know, which is at least loud (the write 422s) — but also a place to *miss* one the
+    backend gained, which is silent.
+    """
+
+    def test_the_endpoint_serves_the_engines_list(self, client):
+        r = client.get("/api/workflow-rules/triggers")
+        assert r.status_code == 200
+        assert r.json() == SUPPORTED_TRIGGERS
+
+    def test_triggers_is_not_shadowed_by_the_rule_id_route(self, client):
+        # /workflow-rules/{rule_id} is declared after /triggers; if that ever flips,
+        # this returns 404 "Rule not found" instead of the list.
+        assert client.get("/api/workflow-rules/triggers").json() != {"detail": "Rule not found"}
 
 
 class TestEverySourceIsProduced:

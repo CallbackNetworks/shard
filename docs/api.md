@@ -726,6 +726,16 @@ Query parameters:
 }
 ```
 
+#### `GET /workflow-rules/triggers`
+The moments a rule can hook onto. The rule editor renders this rather than keeping its
+own copy, so a trigger the UI offers is always one the engine actually fires (ADR-0048).
+
+```json
+["task.created", "task.status_changed", "task.label_added", "task.priority_changed"]
+```
+
+A `trigger` outside this list is rejected with 422.
+
 #### `GET /workflow-rules/{id}`
 #### `PATCH /workflow-rules/{id}`
 Same fields as POST, all optional.

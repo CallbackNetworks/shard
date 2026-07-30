@@ -182,6 +182,9 @@ export const updateWorkflowRule = (id, data) => api.patch(`/workflow-rules/${id}
 export const deleteWorkflowRule = (id) => api.delete(`/workflow-rules/${id}`)
 export const testWorkflowRule = (ruleId, taskId) =>
   api.post(`/workflow-rules/${ruleId}/test`, null, { params: { task_id: taskId } }).then(r => r.data)
+// The moments a rule can hook onto, served by the engine so the UI keeps no copy (ADR-0048)
+export const getWorkflowRuleTriggers = () =>
+  api.get('/workflow-rules/triggers').then(r => r.data)
 
 // Notifications
 export const getNotifications = (params = {}) => api.get('/notifications', { params }).then(r => r.data)

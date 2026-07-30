@@ -2,19 +2,17 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, GitMerge } from 'lucide-react'
-import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule } from '../api/client'
+import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, getWorkflowRuleTriggers } from '../api/client'
 import { DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import FormField from '../components/shared/FormField'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import EmptyState from '../components/shared/EmptyState'
 
-const TRIGGERS = [
-  { value: 'task.created', label: 'Task Created' },
-  { value: 'task.status_changed', label: 'Task Status Changed' },
-  { value: 'task.label_added', label: 'Task Label Added' },
-  { value: 'task.priority_changed', label: 'Task Priority Changed' },
-]
+// Triggers come from the engine (ADR-0048), so the label is derived rather than looked
+// up: a trigger added on the server shows up here readable, with nothing to edit.
+const triggerLabel = (trigger) =>
+  String(trigger).replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
 const CONDITION_FIELDS = ['status', 'priority', 'assignee', 'title_contains', 'has_label']
 const CONDITION_OPS = ['eq', 'neq', 'contains', 'in']
@@ -60,7 +58,12 @@ function ActionRow({ action, onChange, onRemove }) {
 }
 
 function RuleModal({ initial, onSave, onClose }) {
-  const emptyRule = { name: '', trigger: 'task.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
+  const { data: triggers = [] } = useQuery({
+    queryKey: ['workflow-rule-triggers'],
+    queryFn: getWorkflowRuleTriggers,
+    staleTime: Infinity,
+  })
+  const emptyRule ={ name: '', trigger: 'task.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
   const [form, setForm] = useState(initial ? {
     ...initial,
     project_id: initial.project_id || '',
@@ -90,7 +93,10 @@ function RuleModal({ initial, onSave, onClose }) {
       </FormField>
       <FormField label="Trigger">
         <select value={form.trigger} onChange={e => set('trigger', e.target.value)} className="kt-input">
-          {TRIGGERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          {/* The saved trigger stays selectable while the list loads, and if a rule
+              predates a trigger the engine has since dropped it stays visible. */}
+          {(triggers.includes(form.trigger) ? triggers : [form.trigger, ...triggers])
+            .map(tr => <option key={tr} value={tr}>{triggerLabel(tr)}</option>)}
         </select>
       </FormField>
       <FormField label="Conditions (all must match)">
@@ -164,8 +170,6 @@ export default function WorkflowRules() {
     else createMut.mutate(data)
   }
 
-  const TRIGGER_LABELS = Object.fromEntries(TRIGGERS.map(t => [t.value, t.label]))
-
   return (
     <div className="kt-page">
       {modal && <RuleModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
@@ -217,7 +221,7 @@ export default function WorkflowRules() {
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
                     <span className="kt-chip" style={{ color: DARK.success, background: 'rgba(250,204,21,0.1)' }}>
-                      when: {TRIGGER_LABELS[rule.trigger] || rule.trigger}
+                      when: {triggerLabel(rule.trigger)}
                     </span>
                     {(rule.conditions || []).map((c, i) => (
                       <span key={i} className="kt-chip">

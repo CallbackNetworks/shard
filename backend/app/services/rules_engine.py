@@ -14,12 +14,16 @@ from app.services.activity import log_activity
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_TRIGGERS = {
+# Every moment a rule can hook onto. Ordered, because this list is served to the rule
+# editor rather than copied into it — a trigger the UI offers but nothing fires is a
+# rule that sits in the list looking healthy and never runs, so there is one list and a
+# test pins each entry to a real ``run_rules`` call (ADR-0048).
+SUPPORTED_TRIGGERS = [
     "task.created",
     "task.status_changed",
     "task.label_added",
     "task.priority_changed",
-}
+]
 
 # The vocabulary the engine understands. An unrecognised field, op or action type
 # evaluates to "no match" / "do nothing" *silently*, so a rule saved with a near-miss

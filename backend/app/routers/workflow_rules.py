@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import WorkflowRule
 from app.schemas import WorkflowRuleCreate, WorkflowRuleOut, WorkflowRuleUpdate
 from app.services import graph
+from app.services.rules_engine import SUPPORTED_TRIGGERS
 
 router = APIRouter(prefix="/workflow-rules", tags=["workflow-rules"])
 
@@ -31,6 +32,17 @@ def create_rule(body: WorkflowRuleCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(rule)
     return rule
+
+
+@router.get("/triggers")
+def list_triggers():
+    """The moments a rule can hook onto.
+
+    Declared before ``/{rule_id}`` so the path parameter does not swallow it. The rule
+    editor renders whatever this returns instead of keeping its own copy: a fourth
+    place to add a trigger is a fourth place to forget one (ADR-0048).
+    """
+    return SUPPORTED_TRIGGERS
 
 
 @router.get("/{rule_id}", response_model=WorkflowRuleOut)
