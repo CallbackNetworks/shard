@@ -132,7 +132,7 @@ def _resolve_label(db: Session, task: "graph.TaskView", value: str) -> "graph.La
         for candidate in graph.labels_in_project(db, project_id):
             if candidate.name == value:
                 return candidate
-    logger.warning("workflow action label %r not found for task %s", value, task.id)
+    # The caller records the miss in the activity feed; a log line alone is invisible.
     return None
 
 
@@ -167,22 +167,34 @@ async def _apply_fields(db: Session, task, changes: dict):
     )
 
 
-def _skip(db: Session, node, atype: str) -> None:
-    """Record that an action could not run here, instead of doing nothing quietly.
+def _skip(db: Session, node, atype: str, reason: str, detail: str) -> None:
+    """Record that an action could not run, instead of doing nothing quietly.
 
-    A task-only action landing on a non-task node is the exact shape of bug this module
-    keeps producing (ADR-0047/0048): the rule looks like it ran, and nothing says why
-    half of it did not. The activity feed gets the reason.
+    An action that cannot execute is the exact shape of bug this module keeps producing
+    (ADR-0047/0048/0049): the rule looks like it ran, its run_count goes up, and nothing
+    says why half of it did nothing. There are three ways to get here — a task-only
+    action on a non-task node, a label the project does not have, and a status/priority
+    value outside the enum — and all three land in the activity feed with a reason.
+
+    Scoped to the project (and the task) so it shows up in the feed the user is actually
+    looking at, not only in the global one.
     """
+    is_task = _is_task(db, node)
+    if is_task:
+        project_id = graph.project_id_of_task(db, node.id)
+    else:
+        container = graph.container_of_node(db, node.id)
+        project_id = container.id if container is not None else None
     log_activity(
         db,
         action="rule.skipped",
-        project_id=None,
+        project_id=project_id,
+        task_id=node.id if is_task else None,
         actor="workflow",
-        detail=f'Action "{atype}" skipped: {node.type} "{node.title}" does not play the task role',
-        meta={"node_id": node.id, "type": node.type, "action": atype},
+        detail=detail,
+        meta={"node_id": node.id, "type": node.type, "action": atype, "reason": reason},
     )
-    logger.info("rule action %s skipped for non-task node %s (%s)", atype, node.id, node.type)
+    logger.info("rule action %s skipped for node %s (%s): %s", atype, node.id, node.type, reason)
 
 
 async def _fire(db: Session, node, event: str) -> None:
@@ -205,15 +217,31 @@ async def _exec_action(db: Session, action: dict, task):
     value = action.get("value", "")
 
     if atype in TASK_ONLY_ACTIONS and not _is_task(db, task):
-        _skip(db, task, atype)
+        _skip(
+            db,
+            task,
+            atype,
+            "not_a_task",
+            f'Action "{atype}" skipped: {task.type} "{task.title}" does not play the task role',
+        )
+        return task
+
+    if atype in ACTION_VALUE_ENUMS and value not in ACTION_VALUE_ENUMS[atype]:
+        # Rejected at write time since ADR-0046, so only a rule saved before that can
+        # hold such a value — but it would still fail in silence.
+        _skip(
+            db,
+            task,
+            atype,
+            "invalid_value",
+            f'Action "{atype}" skipped: "{value}" is not one of {sorted(ACTION_VALUE_ENUMS[atype])}',
+        )
         return task
 
     if atype == "set_status":
-        if value in ACTION_VALUE_ENUMS["set_status"]:
-            return await _apply_fields(db, task, {"status": value})
+        return await _apply_fields(db, task, {"status": value})
     elif atype == "set_priority":
-        if value in ACTION_VALUE_ENUMS["set_priority"]:
-            return await _apply_fields(db, task, {"priority": value})
+        return await _apply_fields(db, task, {"priority": value})
     elif atype == "set_assignee":
         return await _apply_fields(db, task, {"assignee": value or None})
     elif atype in ("add_label", "remove_label"):
@@ -249,6 +277,14 @@ async def _apply_label(db: Session, task: "graph.TaskView", value: str, *, added
 
     label = _resolve_label(db, task, value)
     if label is None:
+        atype = "add_label" if added else "remove_label"
+        _skip(
+            db,
+            task,
+            atype,
+            "label_not_found",
+            f'Action "{atype}" skipped: no label named "{value}" in this project',
+        )
         return
     # Same arguments either way: the caller owns the commit and the aggregate broadcast,
     # and trigger_rules=False stops task.label_added from re-entering the engine.

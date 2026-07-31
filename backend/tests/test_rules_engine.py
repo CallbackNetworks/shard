@@ -427,12 +427,33 @@ class TestLabelActionsAcceptNames:
         assert label.id not in graph.label_ids_for_task(db, task.id)
 
     @pytest.mark.asyncio
-    async def test_unknown_label_is_a_no_op(self, db, project_and_task):
-        _, task = project_and_task
+    async def test_unknown_label_is_a_visible_no_op(self, db, project_and_task):
+        """The label the project does not have used to fail with only a log line.
+
+        This is the user-visible case: a rule naming a label nobody ever created runs
+        happily forever, raising its run_count, and never says the label is missing.
+        """
+        project, task = project_and_task
         await _exec_action(db, {"type": "add_label", "value": "nope"}, task)
         db.flush()
 
         assert graph.label_ids_for_task(db, task.id) == []
+        skipped = db.query(ActivityLog).filter(ActivityLog.action == "rule.skipped").one()
+        assert skipped.meta["reason"] == "label_not_found"
+        assert "nope" in skipped.detail
+        # Scoped so it lands in the feed the user is looking at, not only the global one.
+        assert (skipped.project_id, skipped.task_id) == (project.id, task.id)
+
+    @pytest.mark.asyncio
+    async def test_a_value_outside_the_enum_is_a_visible_no_op(self, db, project_and_task):
+        """Rejected at write time since ADR-0046, so only pre-existing rules get here."""
+        _, task = project_and_task
+        await _exec_action(db, {"type": "set_status", "value": "archived"}, task)
+        db.flush()
+
+        assert graph.get_task(db, task.id).status == "todo"
+        skipped = db.query(ActivityLog).filter(ActivityLog.action == "rule.skipped").one()
+        assert skipped.meta["reason"] == "invalid_value"
 
 
 class TestVocabularyMatchesTheEngine:
