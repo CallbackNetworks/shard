@@ -52,3 +52,4 @@
 | [0048](0048-rule-actions-through-the-pipeline-and-event-subscription.md) | 規則的動作走同一條寫入管線，通知來源成為可訂閱的設定 | Accepted | 2026-07-30 |
 | [0049](0049-rules-trigger-on-nodes-not-tasks.md) | 規則的觸發從 task 收斂到 node | Accepted | 2026-07-30 |
 | [0050](0050-every-skipped-rule-action-is-visible.md) | 規則動作跳過時一律留下原因 | Accepted | 2026-07-30 |
+| [0051](0051-webhooks-never-invent-an-outcome.md) | Webhook 兩端都不再自己編造結果 | Accepted | 2026-07-31 |

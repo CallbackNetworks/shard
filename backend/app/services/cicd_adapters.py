@@ -23,30 +23,51 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Each map covers its provider's *documented* vocabulary, not just the common cases.
+# A status outside these maps is left unmapped rather than guessed at: an outcome this
+# system invents is worse than no outcome, because it is indistinguishable from one the
+# CI system actually reported (ADR-0051).
 STATUS_MAP_GITHUB = {
-    "completed": {"success": "done", "failure": "failed", "cancelled": "failed", "skipped": "done"},
+    "completed": {
+        "success": "done",
+        "neutral": "done",
+        "skipped": "done",
+        "failure": "failed",
+        "cancelled": "failed",
+        "timed_out": "failed",
+        "action_required": "failed",
+        "startup_failure": "failed",
+        "stale": "failed",
+    },
     "in_progress": "in_progress",
     "queued": "todo",
     "requested": "todo",
     "waiting": "todo",
+    "pending": "todo",
 }
 
 STATUS_MAP_GITLAB = {
     "success": "done",
     "failed": "failed",
     "canceled": "failed",
+    "cancelled": "failed",
     "skipped": "done",
     "running": "in_progress",
+    "preparing": "in_progress",
     "pending": "todo",
     "created": "todo",
     "manual": "todo",
+    "scheduled": "todo",
+    "waiting_for_resource": "todo",
 }
 
 STATUS_MAP_BITBUCKET = {
     "SUCCESSFUL": "done",
     "FAILED": "failed",
+    "ERROR": "failed",
     "STOPPED": "failed",
     "INPROGRESS": "in_progress",
+    "IN_PROGRESS": "in_progress",
     "PENDING": "todo",
 }
 
@@ -63,11 +84,18 @@ STATUS_MAP_DRONE = {
     "failure": "failed",
     "error": "failed",
     "killed": "failed",
+    "declined": "failed",
+    "skipped": "done",
     "running": "in_progress",
     "pending": "todo",
+    "blocked": "todo",
 }
 
 VALID_STATUSES = {"todo", "in_progress", "done", "failed"}
+
+# What ``status`` is when the payload carried no outcome this system recognises. The
+# caller must not touch the task in that case — see ``normalize_webhook_payload``.
+UNMAPPED = None
 
 
 def _base_result() -> dict[str, Any]:
@@ -138,7 +166,7 @@ def parse_github(headers: dict[str, str], body: dict) -> dict[str, Any]:
         run_status = run.get("status", "")
 
         if conclusion:
-            result["status"] = STATUS_MAP_GITHUB.get("completed", {}).get(conclusion, "failed")
+            result["status"] = STATUS_MAP_GITHUB.get("completed", {}).get(conclusion)
         elif run_status in STATUS_MAP_GITHUB:
             mapped = STATUS_MAP_GITHUB[run_status]
             result["status"] = mapped if isinstance(mapped, str) else "todo"
@@ -171,7 +199,7 @@ def parse_github(headers: dict[str, str], body: dict) -> dict[str, Any]:
         cr_status = cr.get("status", "")
 
         if conclusion:
-            result["status"] = STATUS_MAP_GITHUB.get("completed", {}).get(conclusion, "failed")
+            result["status"] = STATUS_MAP_GITHUB.get("completed", {}).get(conclusion)
         elif cr_status == "in_progress":
             result["status"] = "in_progress"
         else:
@@ -187,7 +215,7 @@ def parse_github(headers: dict[str, str], body: dict) -> dict[str, Any]:
         cs = body["check_suite"]
         conclusion = cs.get("conclusion")
         if conclusion:
-            result["status"] = STATUS_MAP_GITHUB.get("completed", {}).get(conclusion, "failed")
+            result["status"] = STATUS_MAP_GITHUB.get("completed", {}).get(conclusion)
         else:
             result["status"] = "in_progress"
         result["message"] = f"Check suite {conclusion or cs.get('status', 'unknown')}"
@@ -200,7 +228,7 @@ def parse_github(headers: dict[str, str], body: dict) -> dict[str, Any]:
         ds = body["deployment_status"]
         state = ds.get("state", "")
         state_map = {"success": "done", "failure": "failed", "error": "failed", "pending": "in_progress"}
-        result["status"] = state_map.get(state, "in_progress")
+        result["status"] = state_map.get(state)
         result["message"] = f"Deployment {state}: {ds.get('description', '')}"
         result["build_url"] = ds.get("target_url") or ds.get("log_url")
         return result
@@ -209,7 +237,7 @@ def parse_github(headers: dict[str, str], body: dict) -> dict[str, Any]:
     if "state" in body and "sha" in body and "context" in body:
         state = body["state"]
         state_map = {"success": "done", "failure": "failed", "error": "failed", "pending": "in_progress"}
-        result["status"] = state_map.get(state, "in_progress")
+        result["status"] = state_map.get(state)
         result["message"] = f"{body.get('context', 'Status')}: {body.get('description', state)}"
         result["commit_sha"] = body.get("sha")
         result["build_url"] = body.get("target_url")
@@ -235,7 +263,7 @@ def parse_gitlab(headers: dict[str, str], body: dict) -> dict[str, Any]:
     if object_kind == "pipeline":
         attrs = body.get("object_attributes", {})
         gl_status = attrs.get("status", "")
-        result["status"] = STATUS_MAP_GITLAB.get(gl_status, "in_progress")
+        result["status"] = STATUS_MAP_GITLAB.get(gl_status)
         result["message"] = f"Pipeline #{attrs.get('id', '?')} {gl_status}"
         result["build_url"] = attrs.get("url")
         result["build_number"] = str(attrs.get("id", ""))
@@ -255,7 +283,7 @@ def parse_gitlab(headers: dict[str, str], body: dict) -> dict[str, Any]:
     # Build/Job event
     if object_kind in ("build", "job"):
         gl_status = body.get("build_status", "")
-        result["status"] = STATUS_MAP_GITLAB.get(gl_status, "in_progress")
+        result["status"] = STATUS_MAP_GITLAB.get(gl_status)
         result["message"] = f"Job '{body.get('build_name', '?')}' {gl_status}"
         result["build_number"] = str(body.get("build_id", ""))
         result["commit_sha"] = body.get("sha") or body.get("commit", {}).get("sha")
@@ -278,7 +306,7 @@ def parse_gitlab(headers: dict[str, str], body: dict) -> dict[str, Any]:
         pipeline = attrs.get("head_pipeline", {})
         if pipeline:
             gl_status = pipeline.get("status", "")
-            result["status"] = STATUS_MAP_GITLAB.get(gl_status, "in_progress")
+            result["status"] = STATUS_MAP_GITLAB.get(gl_status)
             result["message"] = f"MR !{attrs.get('iid', '?')} pipeline {gl_status}"
             result["build_url"] = pipeline.get("web_url")
             result["commit_sha"] = pipeline.get("sha")
@@ -307,7 +335,7 @@ def parse_bitbucket(headers: dict[str, str], body: dict) -> dict[str, Any]:
     if "commit_status" in body:
         cs = body["commit_status"]
         bb_state = cs.get("state", "")
-        result["status"] = STATUS_MAP_BITBUCKET.get(bb_state, "in_progress")
+        result["status"] = STATUS_MAP_BITBUCKET.get(bb_state)
         result["message"] = f"{cs.get('name', 'Build')} {bb_state.lower()}"
         result["build_url"] = cs.get("url")
         result["commit_sha"] = cs.get("commit", {}).get("hash") if isinstance(cs.get("commit"), dict) else None
@@ -318,7 +346,7 @@ def parse_bitbucket(headers: dict[str, str], body: dict) -> dict[str, Any]:
         pipeline = body.get("pipeline", {}) if isinstance(body.get("pipeline"), dict) else {}
         state = pipeline.get("state", {})
         state_name = state.get("name", "") if isinstance(state, dict) else str(state)
-        result["status"] = STATUS_MAP_BITBUCKET.get(state_name.upper(), "in_progress")
+        result["status"] = STATUS_MAP_BITBUCKET.get(state_name.upper())
         result["message"] = f"Pipeline {state_name}"
         result["build_number"] = str(pipeline.get("build_number", ""))
 
@@ -361,9 +389,9 @@ def parse_jenkins(headers: dict[str, str], body: dict) -> dict[str, Any]:
         if phase == "STARTED":
             result["status"] = "in_progress"
         elif phase in ("COMPLETED", "FINALIZED"):
-            result["status"] = STATUS_MAP_JENKINS.get(jenkins_status, "failed")
+            result["status"] = STATUS_MAP_JENKINS.get(jenkins_status)
         else:
-            result["status"] = STATUS_MAP_JENKINS.get(jenkins_status, "in_progress")
+            result["status"] = STATUS_MAP_JENKINS.get(jenkins_status)
 
         result["message"] = f"Build #{build.get('number', '?')} {phase} ({jenkins_status or 'unknown'})"
         result["build_url"] = build.get("full_url") or build.get("url")
@@ -382,7 +410,7 @@ def parse_jenkins(headers: dict[str, str], body: dict) -> dict[str, Any]:
     # Flat format from Generic Webhook Trigger
     if "result" in body or "build_status" in body:
         jenkins_status = body.get("result") or body.get("build_status", "")
-        result["status"] = STATUS_MAP_JENKINS.get(jenkins_status.upper(), "failed")
+        result["status"] = STATUS_MAP_JENKINS.get(jenkins_status.upper())
         result["message"] = f"Build {jenkins_status}"
         result["build_url"] = body.get("build_url") or body.get("url")
         result["build_number"] = str(body.get("build_number") or body.get("number", ""))
@@ -408,7 +436,7 @@ def parse_drone(headers: dict[str, str], body: dict) -> dict[str, Any]:
 
     build = body.get("build", body)  # Drone may wrap in 'build' or send flat
     drone_status = build.get("status", "")
-    result["status"] = STATUS_MAP_DRONE.get(drone_status, "in_progress")
+    result["status"] = STATUS_MAP_DRONE.get(drone_status)
     result["message"] = f"Build #{build.get('number', '?')} {drone_status}"
     result["build_url"] = build.get("link")
     result["build_number"] = str(build.get("number", ""))
@@ -444,8 +472,13 @@ def parse_generic(headers: dict[str, str], body: dict) -> dict[str, Any]:
     return result
 
 
-def _extract_simple_status(body: dict) -> str:
-    """Try to extract a valid status from body, falling back to 'done'."""
+def _extract_simple_status(body: dict) -> str | None:
+    """Extract a status from a simple payload, or ``None`` if it carries none we know.
+
+    Returning ``None`` rather than a guess is the whole point (ADR-0051): this is the
+    path an empty body, a typo and an unrecognised vocabulary all end up on, and every
+    one of them used to mean "done".
+    """
     status = body.get("status", "")
     if status in VALID_STATUSES:
         return status
@@ -473,7 +506,34 @@ def _extract_simple_status(body: dict) -> str:
         "skipped": "done",
         "aborted": "failed",
     }
-    return common_map.get(status_lower, "done")
+    return common_map.get(status_lower)
+
+
+def _raw_status(body: dict) -> str | None:
+    """The status string the sender actually used, for the record we leave behind.
+
+    Providers bury it in different places; this is best-effort and only ever used to
+    tell the user what arrived, never to decide anything.
+    """
+    for path in (
+        ("status",),
+        ("state",),
+        ("workflow_run", "conclusion"),
+        ("workflow_run", "status"),
+        ("check_run", "conclusion"),
+        ("check_suite", "conclusion"),
+        ("deployment_status", "state"),
+        ("object_attributes", "status"),
+        ("build", "phase"),
+        ("build", "status"),
+        ("commit_status", "state"),
+    ):
+        value: Any = body
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        if isinstance(value, str) and value:
+            return value
+    return None
 
 
 PROVIDER_PARSERS = {
@@ -511,9 +571,13 @@ def normalize_webhook_payload(
         logger.exception("Failed to parse %s webhook payload", provider)
         result = parse_generic(headers, body)
 
-    # Ensure status is always valid
+    # Anything the maps did not recognise stays unmapped. This used to default to "done",
+    # which meant a timed-out build, a typo, an empty body and a payload from a system we
+    # cannot parse all reported the task as finished — an invented outcome the caller
+    # could not tell apart from a real one (ADR-0051).
     if result.get("status") not in VALID_STATUSES:
-        result["status"] = "done"
+        result["status"] = UNMAPPED
+        result["raw_status"] = _raw_status(body)
 
     # Clean up empty strings to None
     for key in ("commit_sha", "branch", "build_url", "build_number", "triggered_by"):

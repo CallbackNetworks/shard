@@ -1132,16 +1132,30 @@ Message format:
 #### `POST /webhook/callback/{callback_token}`
 No authentication required. `callback_token` is the task's unique webhook identifier.
 
+Accepts either the simple format below or a native payload from GitHub Actions, GitLab CI,
+Jenkins, Drone, or Bitbucket Pipelines. The provider is auto-detected from the request
+headers, or can be forced with `?provider=github|gitlab|jenkins|drone|bitbucket`.
+
 ```json
 // Request
 { "status": "todo | in_progress | done | failed", "message": "optional string" }
 
-// Response 200
-{ "ok": true, "task_id": "uuid", "status": "done" }
+// Response 200 — the enriched task (TaskOut)
+{ "id": "uuid", "status": "done", "...": "..." }
 
 // Response 404 — token not found
-{ "detail": "Task not found" }
+{ "detail": "Invalid callback token" }
+
+// Response 422 — ?provider= names an adapter that does not exist
+{ "detail": "Unknown provider 'githbu'; expected one of [...]" }
 ```
+
+**Unrecognised statuses are never guessed at** (ADR-0051). If the payload carries no
+outcome this system can map — an unknown string, a provider status outside its documented
+vocabulary, or no status at all — the task is **left unchanged** and the response is its
+current state. Two records are written: a build-history row with `status: "unmapped"`
+(visible via `GET /webhook/events/{task_id}`) and a `webhook.unmapped_status` activity
+entry carrying the raw status that arrived.
 
 #### `GET /webhook/events/{task_id}`
 Build history for a task — every inbound CI/CD event received, newest first.

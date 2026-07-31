@@ -10,13 +10,18 @@ from app.database import get_db
 from app.models import WebhookEvent
 from app.schemas import TaskOut, WebhookEventOut
 from app.services import graph
-from app.services.cicd_adapters import normalize_webhook_payload
+from app.services.activity import log_activity
+from app.services.cicd_adapters import PROVIDER_PARSERS, normalize_webhook_payload
 from app.services.enrichment import enrich_task
 from app.services.task_mutations import apply_task_update
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
+
+# What a build-history row says when the callback carried no status we recognise. The
+# column is not nullable, and "we could not read this" is itself worth recording.
+UNMAPPED_STATUS = "unmapped"
 
 # Maximum age for webhook requests (5 minutes) - replay protection
 MAX_TIMESTAMP_AGE_SECONDS = 300
@@ -88,6 +93,15 @@ async def webhook_callback(
     native payloads from GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket Pipelines.
     The provider is auto-detected from headers, or can be forced via ?provider= query param.
     """
+    # A misspelled hint used to fall through to generic parsing, so ?provider=githbu
+    # quietly parsed a GitHub payload with the wrong adapter and reported whatever that
+    # produced. The caller asked for a specific adapter; say so if it does not exist.
+    if provider is not None and provider not in PROVIDER_PARSERS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown provider {provider!r}; expected one of {sorted(PROVIDER_PARSERS)}",
+        )
+
     task = graph.find_task_by_callback_token(db, callback_token)
     if not task:
         raise HTTPException(status_code=404, detail="Invalid callback token")
@@ -115,12 +129,12 @@ async def webhook_callback(
     # Normalize the payload through CI/CD adapters
     normalized = normalize_webhook_payload(headers, body, provider_hint=provider)
 
-    # Store webhook event for build history (committed by the pipeline below).
+    # Store webhook event for build history (committed below).
     webhook_event = WebhookEvent(
         task_id=task.id,
         provider=normalized.get("provider", "generic"),
         event_type=normalized.get("event_type"),
-        status=normalized["status"],
+        status=normalized["status"] or UNMAPPED_STATUS,
         message=normalized.get("message"),
         commit_sha=normalized.get("commit_sha"),
         branch=normalized.get("branch"),
@@ -132,6 +146,27 @@ async def webhook_callback(
         raw_payload=normalized.get("raw_payload"),
     )
     db.add(webhook_event)
+
+    if normalized["status"] is None:
+        # The payload carried no outcome this system recognises. Record what arrived and
+        # leave the task where it is: guessing used to mean "done", so a timed-out build
+        # closed the task it should have flagged (ADR-0051). The build history row above
+        # and this entry are the whole point — an unmapped callback must be findable.
+        raw = normalized.get("raw_status")
+        log_activity(
+            db,
+            action="webhook.unmapped_status",
+            project_id=graph.project_id_of_task(db, task.id),
+            task_id=task.id,
+            actor="webhook",
+            detail=(
+                f"Callback from {normalized.get('provider', 'generic')} carried no status this "
+                f"system recognises ({raw!r}); task left unchanged"
+            ),
+            meta={"provider": normalized.get("provider"), "raw_status": raw},
+        )
+        db.commit()
+        return enrich_task(graph.get_task(db, task.id), db)
 
     # sync_external=False: the change originated externally, echoing it back
     # to the external issue would loop.

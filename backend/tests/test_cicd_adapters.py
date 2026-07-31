@@ -211,12 +211,17 @@ class TestParseGitlab:
         assert r["branch"] == "feature"
 
     def test_merge_request_no_pipeline(self):
+        """Opening an MR is not a build result, so it must not close the task.
+
+        This asserted "done" — the most visible instance of the old fallback: merely
+        opening a merge request marked the linked task complete.
+        """
         body = {
             "object_kind": "merge_request",
             "object_attributes": {"iid": 6, "action": "open"},
         }
         r = parse_gitlab({}, body)
-        assert r["status"] == "done"  # fallback
+        assert r["status"] is None
 
 
 # ── parse_bitbucket ──────────────────────────────────────────────────────
@@ -394,10 +399,11 @@ class TestParseGeneric:
         assert r["build_number"] == "42"
         assert r["triggered_by"] == "bot"
 
-    def test_unknown_status_defaults_to_done(self):
+    def test_unknown_status_is_left_unmapped(self):
+        """It used to default to "done" — a status we cannot read is not a success."""
         body = {"status": "something_unknown"}
         r = parse_generic({}, body)
-        assert r["status"] == "done"
+        assert r["status"] is None
 
 
 # ── normalize_webhook_payload ────────────────────────────────────────────

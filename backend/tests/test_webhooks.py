@@ -112,6 +112,68 @@ def test_callback_fires_status_changed_event(client, db, sample_project, monkeyp
     assert "project.complete" in events
 
 
+class TestUnrecognisedCallback:
+    """A callback this system cannot read must never invent an outcome (ADR-0051)."""
+
+    def _post(self, client, task, payload):
+        return client.post(f"/webhook/callback/{task.callback_token}", json=payload)
+
+    def test_unknown_status_leaves_the_task_alone(self, client, db, sample_project):
+        task = _make_task(db, sample_project.id, status="in_progress")
+        resp = self._post(client, task, {"status": "sucess"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "in_progress"
+        db.refresh(task)
+        assert task.status == "in_progress"
+
+    def test_unknown_status_is_recorded_in_the_activity_feed(self, client, db, sample_project):
+        from app.models import ActivityLog
+
+        task = _make_task(db, sample_project.id)
+        self._post(client, task, {"status": "timed_out"})
+
+        row = db.query(ActivityLog).filter(ActivityLog.action == "webhook.unmapped_status").one()
+        # Scoped to the project, or the project activity page would never show it.
+        assert row.project_id == sample_project.id
+        assert row.task_id == task.id
+        assert row.meta["raw_status"] == "timed_out"
+
+    def test_unknown_status_still_lands_in_build_history(self, client, db, sample_project):
+        from app.models import WebhookEvent
+
+        task = _make_task(db, sample_project.id)
+        self._post(client, task, {"status": "whatever"})
+
+        event = db.query(WebhookEvent).filter(WebhookEvent.task_id == task.id).one()
+        assert event.status == "unmapped"
+
+    def test_empty_body_leaves_the_task_alone(self, client, db, sample_project):
+        task = _make_task(db, sample_project.id, status="todo")
+        resp = self._post(client, task, {})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "todo"
+
+    def test_unknown_provider_hint_is_rejected(self, client, db, sample_project):
+        task = _make_task(db, sample_project.id)
+        resp = client.post(
+            f"/webhook/callback/{task.callback_token}?provider=githbu",
+            json={"status": "done"},
+        )
+        assert resp.status_code == 422
+        assert "githbu" in resp.json()["detail"]
+        db.refresh(task)
+        assert task.status == "todo"
+
+    def test_known_provider_hint_still_works(self, client, db, sample_project):
+        task = _make_task(db, sample_project.id)
+        resp = client.post(
+            f"/webhook/callback/{task.callback_token}?provider=github",
+            json={"action": "completed", "workflow_run": {"conclusion": "success"}},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "done"
+
+
 def test_callback_same_status_logs_no_activity(client, db, sample_project):
     """A no-op status callback no longer records a bogus status_changed row."""
     from app.models import ActivityLog

@@ -111,13 +111,17 @@ def _build_headers(integration: Integration, body_bytes: bytes | None = None) ->
     auth_type = getattr(integration, "auth_type", None) or "bearer"
     auth_config = getattr(integration, "auth_config", None) or {}
 
-    if integration.type == "webhook":
+    # Signing and authentication are independent. They used to share one if/elif chain,
+    # so a "webhook" integration matched the first branch and every auth_type below was
+    # unreachable: the Basic username/password (or API key) typed into the UI was
+    # accepted, stored, and then never sent (ADR-0051).
+    if integration.type == "webhook" and integration.secret and body_bytes is not None:
         # HMAC-SHA256 signature (GitHub-style): X-Signature: sha256=<hex>
-        if integration.secret and body_bytes is not None:
-            sig = hmac.new(integration.secret.encode(), body_bytes, hashlib.sha256).hexdigest()
-            headers["X-Signature"] = f"sha256={sig}"
-            headers["X-Hub-Signature-256"] = f"sha256={sig}"
-    elif auth_type == "basic":
+        sig = hmac.new(integration.secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+        headers["X-Signature"] = f"sha256={sig}"
+        headers["X-Hub-Signature-256"] = f"sha256={sig}"
+
+    if auth_type == "basic":
         # Basic auth from auth_config: {"username": "...", "password": "..."}
         import base64
 
@@ -132,8 +136,11 @@ def _build_headers(integration: Integration, body_bytes: bytes | None = None) ->
         headers[header_name] = header_value
     elif auth_type == "none":
         pass  # No auth
-    else:
-        # Default: bearer token (legacy behavior)
+    elif integration.type != "webhook":
+        # Default: bearer token (legacy behavior). Skipped for "webhook", where the same
+        # field means the HMAC signing key — the UI labels it "Signing Secret" there —
+        # and sending it as a bearer token would hand the receiver the key it is meant
+        # to verify signatures with.
         if integration.secret:
             headers["Authorization"] = f"Bearer {integration.secret}"
 

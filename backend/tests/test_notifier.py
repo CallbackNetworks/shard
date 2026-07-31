@@ -135,6 +135,54 @@ class TestBuildHeaders:
         headers = _build_headers(integ)
         assert headers["X-Custom"] == "value1"
 
+    def test_webhook_signature_and_basic_auth_coexist(self, db):
+        """Signing and authentication are independent (ADR-0051).
+
+        A "webhook" integration used to short-circuit the auth chain, so configuring
+        basic auth on it produced a request with no Authorization header at all.
+        """
+        integ = Integration(
+            name="Hook",
+            type="webhook",
+            url="https://example.com",
+            secret="mysecret",
+            events=["task.done"],
+            active=True,
+            auth_type="basic",
+            auth_config={"username": "u", "password": "p"},
+        )
+        db.add(integ)
+        db.flush()
+
+        body = b'{"event":"task.done"}'
+        headers = _build_headers(integ, body)
+
+        expected_sig = hmac.new(b"mysecret", body, hashlib.sha256).hexdigest()
+        assert headers["X-Signature"] == f"sha256={expected_sig}"
+        assert headers["Authorization"] == "Basic dTpw"
+
+    def test_webhook_secret_is_never_sent_as_bearer_token(self, db):
+        """For type="webhook" the secret is the HMAC signing key.
+
+        Sending it as a bearer token would hand the receiver the very key it is
+        supposed to use to verify us.
+        """
+        integ = Integration(
+            name="Hook",
+            type="webhook",
+            url="https://example.com",
+            secret="mysecret",
+            events=["task.done"],
+            active=True,
+            auth_type="bearer",
+        )
+        db.add(integ)
+        db.flush()
+
+        headers = _build_headers(integ, b"{}")
+        assert "X-Signature" in headers
+        assert "Authorization" not in headers
+
     def test_always_has_platform_event_header(self, db):
         p = make_project(db, name="P")
         db.add(p)
