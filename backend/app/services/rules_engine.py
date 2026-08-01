@@ -57,6 +57,69 @@ ACTION_VALUE_ENUMS = {
     "set_priority": {"low", "medium", "high"},
 }
 
+# Actions that write one task field, and which field (used to compare before writing).
+FIELD_ACTIONS = {"set_status": "status", "set_priority": "priority", "set_assignee": "assignee"}
+
+# What an action actually did. "It ran" and "it changed something" are two different
+# questions, and an execution record that only answers the first is as contentless as a
+# ``ran 47×`` counter: a rule whose every action was a no-op reads exactly like one that
+# changed the world (ADR-0053). Every action now reports one of these.
+OUTCOME_APPLIED = "applied"  # ran and changed something
+OUTCOME_NO_OP = "no_op"  # ran, correctly, and changed nothing — not a defect
+OUTCOME_SKIPPED = "skipped"  # could not run at all (ADR-0050)
+OUTCOME_FAILED = "failed"  # raised (ADR-0052)
+OUTCOMES = {OUTCOME_APPLIED, OUTCOME_NO_OP, OUTCOME_SKIPPED, OUTCOME_FAILED}
+
+
+def _outcome(atype: str, value, outcome: str, *, reason: str | None = None, **extra) -> dict:
+    """One action's record, as stored in ``rule.executed``'s ``meta["actions"]``."""
+    record = {"type": atype, "value": value, "outcome": outcome}
+    if reason:
+        record["reason"] = reason
+    record.update(extra)
+    return record
+
+
+def _describe(record: dict) -> str:
+    """One human-readable clause per action, for the ``rule.executed`` detail line.
+
+    The frontend renders ``meta["actions"]`` structurally; this is what someone reading
+    the plain sentence — an email digest, a log line, the activity feed's one-liner — has
+    to be able to act on, so it says the outcome even when the outcome is "nothing".
+    """
+    atype, value, outcome = record["type"], record.get("value"), record["outcome"]
+    if outcome == OUTCOME_SKIPPED:
+        return f"{atype} skipped ({record.get('reason', 'unknown')})"
+    if atype in FIELD_ACTIONS:
+        field = FIELD_ACTIONS[atype]
+        if outcome == OUTCOME_NO_OP:
+            return f"{field} already {value or 'unset'}"
+        return f"{field} {record.get('from') or 'unset'} -> {value or 'unset'}"
+    if atype == "add_label":
+        return f'label "{value}" already set' if outcome == OUTCOME_NO_OP else f'+label "{value}"'
+    if atype == "remove_label":
+        return f'label "{value}" was not set' if outcome == OUTCOME_NO_OP else f'-label "{value}"'
+    if atype == "add_comment":
+        return "commented"
+    if atype == "fire_event":
+        count = record.get("subscribers", 0)
+        if not count:
+            return f'fired "{value}" to no subscriber'
+        return f'fired "{value}" to {count} subscriber{"" if count == 1 else "s"}'
+    return f"{atype} {outcome}"
+
+
+def _summarize(rule: WorkflowRule, node, records: list[dict]) -> str:
+    """The ``rule.executed`` detail line: what the run set off, not merely that it ran."""
+    subject = f'{node.type} "{node.title}"'
+    if not records:
+        return f'Rule "{rule.name}" ran on {subject} with no actions'
+    clauses = "; ".join(_describe(record) for record in records)
+    applied = sum(1 for record in records if record["outcome"] == OUTCOME_APPLIED)
+    if applied == 0:
+        return f'Rule "{rule.name}" ran on {subject} with no effect: {clauses}'
+    return f'Rule "{rule.name}" ran on {subject}: {clauses}'
+
 
 def _session_of(task) -> Session | None:
     """Best-effort session for a task.
@@ -180,7 +243,7 @@ def _scope_of(db: Session, node) -> tuple[str | None, str | None]:
     return (container.id if container is not None else None), None
 
 
-def _skip(db: Session, node, atype: str, reason: str, detail: str) -> None:
+def _skip(db: Session, node, atype: str, value, reason: str, detail: str, rule: WorkflowRule | None = None) -> dict:
     """Record that an action could not run, instead of doing nothing quietly.
 
     An action that cannot execute is the exact shape of bug this module keeps producing
@@ -189,8 +252,16 @@ def _skip(db: Session, node, atype: str, reason: str, detail: str) -> None:
     action on a non-task node, a label the project does not have, and a status/priority
     value outside the enum — and all three land in the activity feed with a reason.
     An action that *raises* is the fourth; see ``_failed``.
+
+    ``rule`` is threaded in so the entry can say *which* rule skipped: without it the feed
+    could report "add_label skipped: no label named security" and leave the reader to
+    guess which of their rules said that.
     """
     project_id, task_id = _scope_of(db, node)
+    meta = {"node_id": node.id, "type": node.type, "action": atype, "reason": reason}
+    if rule is not None:
+        meta["rule_id"] = rule.id
+        meta["rule_name"] = rule.name
     log_activity(
         db,
         action="rule.skipped",
@@ -198,9 +269,10 @@ def _skip(db: Session, node, atype: str, reason: str, detail: str) -> None:
         task_id=task_id,
         actor="workflow",
         detail=detail,
-        meta={"node_id": node.id, "type": node.type, "action": atype, "reason": reason},
+        meta=meta,
     )
     logger.info("rule action %s skipped for node %s (%s): %s", atype, node.id, node.type, reason)
+    return _outcome(atype, value, OUTCOME_SKIPPED, reason=reason)
 
 
 def _failed(db: Session, rule: WorkflowRule, node, exc: Exception) -> None:
@@ -228,56 +300,71 @@ def _failed(db: Session, rule: WorkflowRule, node, exc: Exception) -> None:
     )
 
 
-async def _fire(db: Session, node, event: str) -> None:
+async def _fire(db: Session, node, event: str) -> int:
     """Deliver a rule-emitted event, scoped the way the subject allows (ADR-0049).
 
     A task hangs off its project; anything else hangs off its nearest container, or off
-    nothing at all — in which case only unscoped integrations hear it.
+    nothing at all — in which case only unscoped integrations hear it. Returns how many
+    integrations were subscribed, because "fired" and "reached somebody" are different
+    facts and the execution record has to distinguish them (ADR-0053).
     """
     from app.services.notifier import fire_node_notifications, fire_notifications
 
     if _is_task(db, node):
-        await fire_notifications(db, node, event, source="rule", actor="workflow")
-    else:
-        await fire_node_notifications(db, node, event, source="rule", actor="workflow")
+        return await fire_notifications(db, node, event, source="rule", actor="workflow")
+    return await fire_node_notifications(db, node, event, source="rule", actor="workflow")
 
 
-async def _exec_action(db: Session, action: dict, task):
-    """Execute one rule action, returning the subject refreshed if the action changed it."""
+async def _exec_action(db: Session, action: dict, task, rule: WorkflowRule | None = None) -> tuple[object, dict]:
+    """Execute one rule action.
+
+    Returns the subject (refreshed if the action changed it) and a record of what the
+    action actually did — see ``_outcome``. Every branch must produce a record: an action
+    that returns without one is the silent path this module keeps having to re-close.
+    """
     atype = action.get("type", "")
     value = action.get("value", "")
 
     if atype in TASK_ONLY_ACTIONS and not _is_task(db, task):
-        _skip(
+        return task, _skip(
             db,
             task,
             atype,
+            value,
             "not_a_task",
             f'Action "{atype}" skipped: {task.type} "{task.title}" does not play the task role',
+            rule,
         )
-        return task
 
     if atype in ACTION_VALUE_ENUMS and value not in ACTION_VALUE_ENUMS[atype]:
         # Rejected at write time since ADR-0046, so only a rule saved before that can
         # hold such a value — but it would still fail in silence.
-        _skip(
+        return task, _skip(
             db,
             task,
             atype,
+            value,
             "invalid_value",
             f'Action "{atype}" skipped: "{value}" is not one of {sorted(ACTION_VALUE_ENUMS[atype])}',
+            rule,
         )
-        return task
 
-    if atype == "set_status":
-        return await _apply_fields(db, task, {"status": value})
-    elif atype == "set_priority":
-        return await _apply_fields(db, task, {"priority": value})
-    elif atype == "set_assignee":
-        return await _apply_fields(db, task, {"assignee": value or None})
-    elif atype in ("add_label", "remove_label"):
-        await _apply_label(db, task, value, added=atype == "add_label")
-    elif atype == "add_comment":
+    if atype in FIELD_ACTIONS:
+        field = FIELD_ACTIONS[atype]
+        target = value or None if field == "assignee" else value
+        current = getattr(task, field, None)
+        # Setting a field to what it already holds is legitimate — an idempotent rule is
+        # a correct rule — but it is not a change, and the pipeline downstream fires
+        # nothing for it. Comparing here is what lets the record say so.
+        if (current or None) == (target or None):
+            return task, _outcome(atype, value, OUTCOME_NO_OP, reason="unchanged")
+        task = await _apply_fields(db, task, {field: target})
+        return task, _outcome(atype, value, OUTCOME_APPLIED, **{"from": current})
+
+    if atype in ("add_label", "remove_label"):
+        return task, await _apply_label(db, task, value, added=atype == "add_label", rule=rule)
+
+    if atype == "add_comment":
         from app.services.notifier import fire_notifications
 
         comment = Comment(
@@ -288,45 +375,72 @@ async def _exec_action(db: Session, action: dict, task):
         )
         db.add(comment)
         db.flush()
-        await fire_notifications(db, task, "comment.created", source="rule", actor="workflow")
-    elif atype == "fire_event":
+        subscribers = await fire_notifications(db, task, "comment.created", source="rule", actor="workflow")
+        return task, _outcome(atype, value, OUTCOME_APPLIED, subscribers=subscribers)
+
+    if atype == "fire_event":
         # Awaited like every other action. This used to be a bare ``loop.create_task``
         # left over from when ``_exec_action`` was synchronous: it delivered only because
         # the ``rule.triggered`` await further down happened to give it a turn, it dropped
         # the event entirely with no running loop, and its exceptions went unobserved.
-        await _fire(db, task, value)
-    return task
+        subscribers = await _fire(db, task, value)
+        # An event nobody subscribed to is the silent empty set of ADR-0047 seen from the
+        # sending end: the rule did its part, and it reached no one.
+        return task, _outcome(
+            atype,
+            value,
+            OUTCOME_APPLIED if subscribers else OUTCOME_NO_OP,
+            reason=None if subscribers else "no_subscribers",
+            subscribers=subscribers,
+        )
+
+    # Unreachable while ACTION_TYPES is validated at write time (ADR-0046); recorded
+    # rather than ignored so a future action type added to the vocabulary but not to this
+    # dispatch shows up instead of vanishing.
+    return task, _skip(
+        db,
+        task,
+        atype,
+        value,
+        "unknown_action",
+        f'Action "{atype}" skipped: the engine has no implementation for it',
+        rule,
+    )
 
 
-async def _apply_label(db: Session, task: "graph.TaskView", value: str, *, added: bool) -> None:
+async def _apply_label(
+    db: Session, task: "graph.TaskView", value: str, *, added: bool, rule: WorkflowRule | None = None
+) -> dict:
     """Attach or detach a label through the edge dispatcher, without triggering rules."""
     from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 
+    atype = "add_label" if added else "remove_label"
     label = _resolve_label(db, task, value)
     if label is None:
-        atype = "add_label" if added else "remove_label"
-        _skip(
+        return _skip(
             db,
             task,
             atype,
+            value,
             "label_not_found",
             f'Action "{atype}" skipped: no label named "{value}" in this project',
+            rule,
         )
-        return
     # Same arguments either way: the caller owns the commit and the aggregate broadcast,
     # and trigger_rules=False stops task.label_added from re-entering the engine.
     opts = dict(actor="workflow", commit=False, broadcast=False, trigger_rules=False)
     if added:
         if label.id in graph.label_ids_for_task(db, task.id):
-            return
+            return _outcome(atype, value, OUTCOME_NO_OP, reason="already_labelled", label_id=label.id)
         graph.set_label(db, task.id, label.id)
         db.flush()
         await dispatch_edge_added(db, task.id, label.id, graph.REL_LABELED, **opts)
     else:
         if not graph.unset_label(db, task.id, label.id):
-            return
+            return _outcome(atype, value, OUTCOME_NO_OP, reason="not_labelled", label_id=label.id)
         db.flush()
         await dispatch_edge_removed(db, task.id, label.id, graph.REL_LABELED, **opts)
+    return _outcome(atype, value, OUTCOME_APPLIED, label_id=label.id)
 
 
 async def run_rules(
@@ -376,11 +490,20 @@ async def run_rules(
                     continue
 
                 # Execute actions. Each returns the task, refreshed when it changed it,
-                # so a later action in the same rule sees the earlier one's result.
+                # so a later action in the same rule sees the earlier one's result, plus
+                # a record of what it actually did.
+                records: list[dict] = []
                 for action in rule.actions or []:
-                    task = await _exec_action(db, action, task)
+                    task, record = await _exec_action(db, action, task, rule)
+                    records.append(record)
 
+                effects = sum(1 for record in records if record["outcome"] == OUTCOME_APPLIED)
                 rule.run_count = (rule.run_count or 0) + 1
+                # Counted separately from run_count, which answers "did it fire" and has
+                # been read as "did it do something" ever since it was the only number on
+                # the card. A rule at 47 runs / 0 effects is doing nothing, loudly.
+                if effects:
+                    rule.effect_count = (rule.effect_count or 0) + 1
                 rule.last_run_at = datetime.now(UTC)
                 db.flush()
 
@@ -390,10 +513,17 @@ async def run_rules(
                     project_id=task_project_id,
                     task_id=task_scope_id,
                     actor="workflow",
-                    detail=f'Rule "{rule.name}" executed on {task.type} "{task.title}"',
-                    meta={"rule_id": rule.id, "trigger": trigger, "node_id": node_id},
+                    detail=_summarize(rule, task, records),
+                    meta={
+                        "rule_id": rule.id,
+                        "rule_name": rule.name,
+                        "trigger": trigger,
+                        "node_id": node_id,
+                        "actions": records,
+                        "effect_count": effects,
+                    },
                 )
-                logger.info("Rule '%s' executed for node '%s'", rule.name, task.title)
+                logger.info("Rule '%s' ran on node '%s' (%d/%d applied)", rule.name, task.title, effects, len(records))
 
             await _fire(db, task, "rule.triggered")
 

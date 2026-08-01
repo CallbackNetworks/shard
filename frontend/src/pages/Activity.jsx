@@ -5,6 +5,7 @@ import { Activity as ActivityIcon, Filter, ChevronLeft, ChevronRight } from 'luc
 import { getActivity, getProjects } from '../api/client'
 import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
 import { actionGroup, buildActivitySignals, bucketActivitySignals, summarizeActivitySignals } from '../utils/activitySignals'
+import { actionClause, outcomeColor, outcomeLabel } from '../utils/ruleOutcomes'
 import { formatTimestamp, absoluteTime } from '../utils/datetime'
 import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -35,6 +36,13 @@ const ACTION_COLORS = {
   'webhook.unmapped_status': DARK.warning,
 }
 
+/** A rule run that changed nothing is not the same event as one that did, so it does not
+ *  get the same colour even though the action string is identical (ADR-0053). */
+function entryColor(entry) {
+  if (entry.action === 'rule.executed' && entry.meta?.effect_count === 0) return DARK.textDim
+  return ACTION_COLORS[entry.action] || DARK.textDim
+}
+
 const ACTION_GROUPS = [
   { key: 'all', label: 'All' },
   { key: 'task', label: 'Tasks' },
@@ -57,6 +65,35 @@ const chip = (active) => ({
 })
 
 const VIEW_MODES = ['log', 'timeline', 'wall']
+
+/**
+ * What a rule run actually set off, one chip per action (ADR-0053).
+ *
+ * The entry's own sentence says it too, but only as prose; these are the two axes the
+ * user has to be able to separate at a glance — did each action run, and did it change
+ * anything. Rendered only for entries that carry `meta.actions`, so older rows and every
+ * other action type are unaffected.
+ */
+function RuleOutcomes({ records, t }) {
+  if (!Array.isArray(records) || records.length === 0) return null
+  return (
+    <div className="kt-activity-event-outcomes">
+      {records.map((record, i) => {
+        const color = outcomeColor(record.outcome)
+        return (
+          <span
+            key={i}
+            className="kt-chip"
+            style={{ color, borderColor: `${color}55` }}
+            title={outcomeLabel(record, t)}
+          >
+            {actionClause(record)} · {outcomeLabel(record, t)}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
 
 function SignalMarker({ signal }) {
   return (
@@ -275,7 +312,7 @@ export default function Activity() {
           {!isLoading && filtered.length > 0 && viewMode === 'log' && (
             <div className="kt-activity-list">
               {filtered.map((entry, i) => {
-                const color = ACTION_COLORS[entry.action] || DARK.textDim
+                const color = entryColor(entry)
                 const group = actionGroup(entry).toUpperCase()
                 return (
                   <article key={entry.id || i} className="kt-activity-event" style={{ animationDelay: `${i * 0.035}s` }}>
@@ -284,6 +321,7 @@ export default function Activity() {
                       <div className="kt-activity-event-detail">
                         {entry.detail || entry.action}
                       </div>
+                      <RuleOutcomes records={entry.meta?.actions} t={t} />
                       <div className="kt-activity-event-meta">
                         <span className="kt-chip" style={{ color, borderColor: `${color}55` }}>{entry.action}</span>
                         <span>{group}</span>

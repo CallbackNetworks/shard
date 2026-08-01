@@ -620,6 +620,9 @@ class WorkflowRuleOut(BaseModel):
     actions: list
     active: bool
     run_count: int
+    # How many runs changed anything, so the card can distinguish a busy rule from a
+    # rule that fires constantly and does nothing (ADR-0053).
+    effect_count: int = 0
     last_run_at: datetime | None
     created_at: datetime
 

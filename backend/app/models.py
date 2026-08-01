@@ -489,5 +489,8 @@ class WorkflowRule(Base):
     actions: Mapped[list] = mapped_column(JSON, default=list)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     run_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # How many of those runs changed anything. run_count alone reads as "this rule is
+    # working" even when every action was a no-op or a skip (ADR-0053).
+    effect_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)

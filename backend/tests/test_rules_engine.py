@@ -90,46 +90,64 @@ class TestExecAction:
         db.flush()
         return project, t
 
-    # _exec_action returns the task, refreshed when the action changed it: field writes
-    # go through apply_task_update, which rebuilds the TaskView, so the view handed in is
-    # stale afterwards (ADR-0048).
+    # _exec_action returns (task, outcome). The task is refreshed when the action changed
+    # it: field writes go through apply_task_update, which rebuilds the TaskView, so the
+    # view handed in is stale afterwards (ADR-0048). The outcome says what the action
+    # actually did (ADR-0053).
 
     @pytest.mark.asyncio
     async def test_set_status(self, db, project_and_task):
         _, task = project_and_task
-        task = await _exec_action(db, {"type": "set_status", "value": "done"}, task)
+        task, outcome = await _exec_action(db, {"type": "set_status", "value": "done"}, task)
         assert task.status == "done"
+        assert outcome["outcome"] == "applied"
+        assert outcome["from"] == "todo"
 
     @pytest.mark.asyncio
     async def test_set_status_invalid_ignored(self, db, project_and_task):
         _, task = project_and_task
-        task = await _exec_action(db, {"type": "set_status", "value": "invalid"}, task)
+        task, outcome = await _exec_action(db, {"type": "set_status", "value": "invalid"}, task)
         assert task.status == "todo"
+        assert (outcome["outcome"], outcome["reason"]) == ("skipped", "invalid_value")
 
     @pytest.mark.asyncio
     async def test_set_priority(self, db, project_and_task):
         _, task = project_and_task
-        task = await _exec_action(db, {"type": "set_priority", "value": "high"}, task)
+        task, outcome = await _exec_action(db, {"type": "set_priority", "value": "high"}, task)
         assert task.priority == "high"
+        assert outcome["outcome"] == "applied"
 
     @pytest.mark.asyncio
     async def test_set_priority_invalid_ignored(self, db, project_and_task):
         _, task = project_and_task
-        task = await _exec_action(db, {"type": "set_priority", "value": "critical"}, task)
+        task, outcome = await _exec_action(db, {"type": "set_priority", "value": "critical"}, task)
         assert task.priority == "low"
+        assert (outcome["outcome"], outcome["reason"]) == ("skipped", "invalid_value")
 
     @pytest.mark.asyncio
     async def test_set_assignee(self, db, project_and_task):
         _, task = project_and_task
-        task = await _exec_action(db, {"type": "set_assignee", "value": "bob"}, task)
+        task, outcome = await _exec_action(db, {"type": "set_assignee", "value": "bob"}, task)
         assert task.assignee == "bob"
+        assert outcome["outcome"] == "applied"
 
     @pytest.mark.asyncio
     async def test_set_assignee_empty_clears(self, db, project_and_task):
         _, task = project_and_task
-        task = await _exec_action(db, {"type": "set_assignee", "value": "alice"}, task)
-        task = await _exec_action(db, {"type": "set_assignee", "value": ""}, task)
+        task, _ = await _exec_action(db, {"type": "set_assignee", "value": "alice"}, task)
+        task, outcome = await _exec_action(db, {"type": "set_assignee", "value": ""}, task)
         assert task.assignee is None
+        assert outcome["outcome"] == "applied"
+
+    @pytest.mark.asyncio
+    async def test_setting_a_field_to_what_it_already_holds_is_a_no_op(self, db, project_and_task):
+        """Idempotent is correct, but it is not a change, and the record has to say so."""
+        _, task = project_and_task
+        task, outcome = await _exec_action(db, {"type": "set_priority", "value": "low"}, task)
+        assert task.priority == "low"
+        assert (outcome["outcome"], outcome["reason"]) == ("no_op", "unchanged")
+        # A no-op writes nothing downstream either: no status/priority activity entry.
+        assert db.query(ActivityLog).count() == 0
 
     @pytest.mark.asyncio
     async def test_add_label(self, db, project_and_task):
@@ -480,7 +498,22 @@ class TestVocabularyMatchesTheEngine:
         assert self._handled(source, "op") == rules_engine.CONDITION_OPS
 
     def test_action_types(self, source):
-        assert self._handled(source, "atype") == rules_engine.ACTION_TYPES
+        # The three field actions dispatch through the FIELD_ACTIONS table rather than an
+        # ``atype ==`` branch, so the scan cannot see them. A table is a stronger pin than
+        # a scan — it is inspectable at runtime — and TestExecAction proves each key
+        # writes its field end to end.
+        assert self._handled(source, "atype") | set(rules_engine.FIELD_ACTIONS) == rules_engine.ACTION_TYPES
+
+    def test_every_field_action_names_a_real_task_field(self, db):
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        task = make_task(db, project_id=project.id, title="T")
+        db.add(task)
+        db.flush()
+        view = graph.get_task(db, task.id)
+        for field in rules_engine.FIELD_ACTIONS.values():
+            assert hasattr(view, field), field
 
 
 class TestRuleChangesAreVisible:
@@ -727,3 +760,164 @@ class TestARuleThatRaises:
         assert good.run_count == 1
         assert bad.run_count == 0
         assert db.query(Comment).count() == 1
+
+
+class TestTheExecutionRecordSaysWhatItSetOff:
+    """``Rule "R" executed on task "T"`` records that something ran and nothing about
+    what it did — the same defect as a ``ran 47×`` counter, moved into the feed.
+
+    Every run now carries a per-action outcome, and the four outcomes are distinct:
+    applied (changed something), no_op (ran correctly, changed nothing), skipped
+    (could not run), failed (raised). ADR-0053.
+    """
+
+    @pytest.fixture()
+    def project_and_task(self, db):
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        task = make_task(db, project_id=project.id, title="T", status="todo", priority="low")
+        db.add(task)
+        db.flush()
+        return project, graph.get_task(db, task.id)
+
+    def _rule(self, db, name, actions, project_id=None):
+        rule = WorkflowRule(
+            name=name,
+            project_id=project_id,
+            trigger="node.created",
+            conditions=[],
+            actions=actions,
+            active=True,
+            run_count=0,
+        )
+        db.add(rule)
+        db.flush()
+        return rule
+
+    def _executed(self, db):
+        return db.query(ActivityLog).filter(ActivityLog.action == "rule.executed").one()
+
+    @pytest.mark.asyncio
+    async def test_an_applied_action_names_the_change(self, db, project_and_task):
+        _, task = project_and_task
+        self._rule(db, "Escalate", [{"type": "set_priority", "value": "high"}])
+
+        await run_rules(db, "node.created", task, {})
+
+        entry = self._executed(db)
+        assert entry.meta["effect_count"] == 1
+        assert entry.meta["actions"] == [{"type": "set_priority", "value": "high", "outcome": "applied", "from": "low"}]
+        assert "priority low -> high" in entry.detail
+
+    @pytest.mark.asyncio
+    async def test_a_run_where_nothing_changed_says_so(self, db, project_and_task):
+        """The state the previous ADRs missed: it ran, it succeeded, it did nothing."""
+        _, task = project_and_task
+        rule = self._rule(db, "Idempotent", [{"type": "set_priority", "value": "low"}])
+
+        await run_rules(db, "node.created", task, {})
+
+        entry = self._executed(db)
+        assert entry.meta["effect_count"] == 0
+        assert entry.meta["actions"][0]["outcome"] == "no_op"
+        assert "no effect" in entry.detail
+        assert "priority already low" in entry.detail
+        db.refresh(rule)
+        # It still ran — the run counter is honest, it is just not the whole story.
+        assert (rule.run_count, rule.effect_count) == (1, 0)
+
+    @pytest.mark.asyncio
+    async def test_an_event_nobody_subscribed_to_is_a_no_op_not_a_success(self, db, project_and_task):
+        """The silent empty set of ADR-0047, seen from the sending end."""
+        _, task = project_and_task
+        self._rule(db, "Announce", [{"type": "fire_event", "value": "deploy.requested"}])
+
+        await run_rules(db, "node.created", task, {})
+
+        record = self._executed(db).meta["actions"][0]
+        assert (record["outcome"], record["reason"], record["subscribers"]) == ("no_op", "no_subscribers", 0)
+        assert "to no subscriber" in self._executed(db).detail
+
+    @pytest.mark.asyncio
+    async def test_a_subscribed_event_counts_its_listeners(self, db, project_and_task, monkeypatch):
+        from app.models import Integration
+        from app.services import notifier
+
+        project, task = project_and_task
+        db.add(
+            Integration(
+                name="Hook",
+                type="webhook",
+                url="https://example.com",
+                project_id=project.id,
+                events=["deploy.requested"],
+                active=True,
+            )
+        )
+        db.flush()
+        self._rule(db, "Announce", [{"type": "fire_event", "value": "deploy.requested"}])
+
+        async def no_send(*a, **kw):
+            return True
+
+        monkeypatch.setattr(notifier, "_dispatch_webhook", no_send)
+        await run_rules(db, "node.created", task, {})
+
+        record = self._executed(db).meta["actions"][0]
+        assert (record["outcome"], record["subscribers"]) == ("applied", 1)
+        assert "to 1 subscriber" in self._executed(db).detail
+
+    @pytest.mark.asyncio
+    async def test_a_skipped_action_names_the_rule_that_skipped_it(self, db, project_and_task):
+        """Without rule_id the feed says an action was skipped and leaves the reader to
+        guess which of their rules said it."""
+        _, task = project_and_task
+        rule = self._rule(db, "Tagger", [{"type": "add_label", "value": "nope"}])
+
+        await run_rules(db, "node.created", task, {})
+
+        skipped = db.query(ActivityLog).filter(ActivityLog.action == "rule.skipped").one()
+        assert skipped.meta["rule_id"] == rule.id
+        assert skipped.meta["rule_name"] == "Tagger"
+        # And the run's own record carries the same skip, so one entry tells the story.
+        assert self._executed(db).meta["actions"][0]["outcome"] == "skipped"
+        assert self._executed(db).meta["effect_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_every_action_produces_exactly_one_record(self, db, project_and_task):
+        """An action that returns without a record is the silent path this keeps reopening."""
+        project, task = project_and_task
+        graph.create_label(db, project.id, name="urgent", color="#f00")
+        self._rule(
+            db,
+            "Everything",
+            [
+                {"type": "set_status", "value": "in_progress"},
+                {"type": "add_label", "value": "urgent"},
+                {"type": "add_label", "value": "urgent"},
+                {"type": "add_comment", "value": "note"},
+                {"type": "fire_event", "value": "custom.thing"},
+            ],
+        )
+
+        await run_rules(db, "node.created", task, {})
+
+        records = self._executed(db).meta["actions"]
+        assert len(records) == 5
+        assert [r["outcome"] for r in records] == ["applied", "applied", "no_op", "applied", "no_op"]
+        assert all(r["outcome"] in rules_engine.OUTCOMES for r in records)
+        assert self._executed(db).meta["effect_count"] == 3
+
+    @pytest.mark.asyncio
+    async def test_effect_count_only_moves_when_something_changed(self, db, project_and_task):
+        _, task = project_and_task
+        rule = self._rule(db, "Escalate", [{"type": "set_priority", "value": "high"}])
+
+        await run_rules(db, "node.created", task, {})
+        task = graph.get_task(db, task.id)
+        await run_rules(db, "node.created", task, {})
+
+        db.refresh(rule)
+        # Ran twice; only the first run changed anything.
+        assert (rule.run_count, rule.effect_count) == (2, 1)

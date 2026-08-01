@@ -54,3 +54,4 @@
 | [0050](0050-every-skipped-rule-action-is-visible.md) | 規則動作跳過時一律留下原因 | Accepted | 2026-07-30 |
 | [0051](0051-webhooks-never-invent-an-outcome.md) | Webhook 兩端都不再自己編造結果 | Accepted | 2026-07-31 |
 | [0052](0052-recorded-is-not-visible.md) | 記錄下來不等於看得見 | Accepted | 2026-08-01 |
+| [0053](0053-an-execution-record-says-what-it-set-off.md) | 執行紀錄要說出它觸發了什麼 | Accepted | 2026-08-01 |

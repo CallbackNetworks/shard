@@ -704,11 +704,41 @@ Query parameters:
     "actions": [{ "type": "set_assignee", "value": "alice" }],
     "active": true,
     "run_count": 42,
+    "effect_count": 12,
     "last_run_at": "ISO 8601 | null",
     "created_at": "ISO 8601"
   }
 ]
 ```
+
+`run_count` is how many times the rule fired; `effect_count` is how many of those runs
+changed anything (ADR-0053). A rule with `run_count` high and `effect_count` 0 is firing
+constantly and doing nothing — every action is a no-op or a skip.
+
+Each run writes a `rule.executed` activity entry whose `meta` carries the per-action
+outcome:
+
+```json
+{
+  "action": "rule.executed",
+  "detail": "Rule \"R\" ran on task \"T\" with no effect: priority already high; fired \"deploy.requested\" to no subscriber",
+  "meta": {
+    "rule_id": "uuid",
+    "rule_name": "R",
+    "trigger": "node.created",
+    "node_id": "uuid",
+    "effect_count": 0,
+    "actions": [
+      { "type": "set_priority", "value": "high", "outcome": "no_op", "reason": "unchanged" },
+      { "type": "fire_event", "value": "deploy.requested", "outcome": "no_op", "reason": "no_subscribers", "subscribers": 0 }
+    ]
+  }
+}
+```
+
+`outcome` is one of `applied` (ran and changed something), `no_op` (ran correctly and
+changed nothing), `skipped` (could not run — also written as its own `rule.skipped`
+entry), or `failed` (raised — written as `rule.failed`).
 
 #### `POST /workflow-rules`
 ```json

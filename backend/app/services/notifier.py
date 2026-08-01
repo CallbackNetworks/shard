@@ -312,17 +312,22 @@ async def fire_notifications(
     *,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
-) -> None:
+) -> int:
     """Fire a task-scoped event to every integration subscribed to it.
 
     ``source`` says what caused the change — a person, an API client, a rule, the
     scheduler. Subscribers can filter on it, so "notify me about task.done, but not the
     ones a rule did" is a subscription setting rather than a hardcoded policy (ADR-0048).
+
+    Returns how many integrations matched, so a caller can tell "delivered" from
+    "delivered to nobody" — an event with no subscriber is the silent empty set this
+    module keeps producing (ADR-0047), and only the caller knows whether that is worth
+    reporting.
     """
     project: graph.ProjectView | None = graph.project_of_task(db, task.id)
     if project is None:
-        return
-    await _deliver(db, project, event, task=task, source=source, actor=actor)
+        return 0
+    return await _deliver(db, project, event, task=task, source=source, actor=actor)
 
 
 async def fire_project_notifications(
@@ -332,14 +337,14 @@ async def fire_project_notifications(
     *,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
-) -> None:
+) -> int:
     """Fire an event that belongs to the project itself and has no task.
 
     ``project.created`` and ``project.archived`` have no task to hang off, so the
     payload omits the ``task`` key entirely rather than inventing a placeholder;
     consumers must treat it as optional (ADR-0047).
     """
-    await _deliver(db, project, event, task=None, source=source, actor=actor)
+    return await _deliver(db, project, event, task=None, source=source, actor=actor)
 
 
 async def fire_node_notifications(
@@ -349,7 +354,7 @@ async def fire_node_notifications(
     *,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
-) -> None:
+) -> int:
     """Fire an event for a node that is neither a task nor a project (ADR-0049).
 
     A rule can now trigger on any node, so its ``fire_event`` action needs somewhere to
@@ -357,7 +362,7 @@ async def fire_node_notifications(
     the event is unscoped and only global integrations hear it.
     """
     project = graph.container_of_node(db, node.id)
-    await _deliver(db, project, event, task=None, node=node, source=source, actor=actor)
+    return await _deliver(db, project, event, task=None, node=node, source=source, actor=actor)
 
 
 async def _deliver(
@@ -369,7 +374,7 @@ async def _deliver(
     node=None,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
-) -> None:
+) -> int:
     source = normalize_source(source)
 
     payload = {
@@ -416,7 +421,7 @@ async def _deliver(
 
     matching = [i for i in integrations if event in i.events and _wants_source(i, source)]
     if not matching:
-        return
+        return 0
 
     email_integrations = [i for i in matching if i.type == "email"]
     webhook_integrations = [i for i in matching if i.type != "email"]
@@ -438,6 +443,8 @@ async def _deliver(
     # Create in-app notification (project-scoped; a node with no container has no feed)
     if project is not None:
         _create_notification(db, event, task, project)
+
+    return len(matching)
 
 
 _EVENT_MESSAGES = {

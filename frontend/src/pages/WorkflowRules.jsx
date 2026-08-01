@@ -222,8 +222,18 @@ export default function WorkflowRules() {
                       background: rule.active ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.07)',
                       color: rule.active ? DARK.success : '#6b7280',
                     }}>{rule.active ? 'active' : 'paused'}</span>
+                    {/* "ran 47×" answers a question nobody asked. A rule that fires
+                        constantly and changes nothing looks identical to one that works,
+                        so the effect count sits next to it — and stands out when it is
+                        zero, because that is the case worth acting on (ADR-0053). */}
                     {rule.run_count > 0 && (
-                      <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>ran {rule.run_count}×</span>
+                      <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>
+                        {t('rules.ranCount', { n: rule.run_count })}
+                        {' · '}
+                        <span style={{ color: rule.effect_count ? undefined : DARK.warning }}>
+                          {t('rules.withEffect', { n: rule.effect_count || 0 })}
+                        </span>
+                      </span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
