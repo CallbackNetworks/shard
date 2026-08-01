@@ -3225,14 +3225,42 @@ h1 {
   font-size: 10px;
   text-transform: uppercase;
 }
-/* Per-action rule outcomes (ADR-0053). Sits between the sentence and the meta row: it
-   is the substance of the entry, not metadata about it. */
-.kt-activity-event-outcomes {
+/* Per-action rule outcomes (ADR-0053). In the activity feed it sits between the sentence
+   and the meta row — it is the substance of the entry, not metadata about it. The same
+   chips render a dry-run's prediction and a rule's static warnings (ADR-0054). */
+.kt-rule-outcomes {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
   font-size: 10px;
+}
+/* Dry-run subject picker: results float over the card so the row does not jump. */
+.kt-rule-subject-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  width: 260px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kt-rule-subject-option {
+  background: none;
+  border: none;
+  color: var(--kt-ink);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 5px 7px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kt-rule-subject-option:hover {
+  background: rgba(var(--kt-ink-rgb), 0.06);
 }
 .kt-activity-event-time {
   display: grid;

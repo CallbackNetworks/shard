@@ -295,3 +295,94 @@ def test_dry_run_sees_labels(client, db, sample_project):
     data = client.post(f"/api/workflow-rules/{rule_id}/test?task_id={task.id}").json()
     assert data["conditions_met"] == [True]
     assert data["would_fire"] is True
+
+
+# --- The dry-run predicts outcomes instead of echoing the rule back (ADR-0054) ---
+
+
+def test_dry_run_does_not_promise_what_the_engine_would_skip(client, db, sample_project):
+    """The bug this closes: ``actions`` was ``rule.actions`` returned verbatim, so a rule
+    whose label does not exist got a green light from the very button meant to catch it."""
+    task = _make_task(db, sample_project.id)
+    rule_id = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(conditions=[], actions=[{"type": "add_label", "value": "security"}]),
+    ).json()["id"]
+
+    data = client.post(f"/api/workflow-rules/{rule_id}/test?node_id={task.id}").json()
+
+    assert data["would_fire"] is True  # the conditions do match
+    assert data["actions"][0]["outcome"] == "skipped"  # and the action still cannot run
+    assert data["actions"][0]["reason"] == "label_not_found"
+    assert data["effect_count"] == 0
+
+
+def test_dry_run_separates_would_change_from_would_run(client, db, sample_project):
+    task = _make_task(db, sample_project.id, priority="high")
+    rule_id = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(conditions=[], actions=[{"type": "set_priority", "value": "high"}]),
+    ).json()["id"]
+
+    data = client.post(f"/api/workflow-rules/{rule_id}/test?node_id={task.id}").json()
+
+    assert data["would_fire"] is True
+    assert data["actions"][0]["outcome"] == "no_op"
+    assert data["effect_count"] == 0
+
+
+def test_dry_run_accepts_a_node_that_is_not_a_task(client, db, sample_project):
+    """Rules trigger on node.created for every type (ADR-0049); the dry-run only knew
+    about tasks, so the one case where every action is skipped could not be checked."""
+    rule_id = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(conditions=[], actions=[{"type": "set_priority", "value": "high"}]),
+    ).json()["id"]
+
+    data = client.post(f"/api/workflow-rules/{rule_id}/test?node_id={sample_project.id}").json()
+
+    assert data["node"]["type"] == "project"
+    assert data["actions"][0]["outcome"] == "skipped"
+    assert data["actions"][0]["reason"] == "not_a_task"
+
+
+def test_dry_run_still_accepts_the_old_task_id_parameter(client, db, sample_project):
+    task = _make_task(db, sample_project.id)
+    rule_id = client.post("/api/workflow-rules", json=_rule_body(conditions=[])).json()["id"]
+
+    assert client.post(f"/api/workflow-rules/{rule_id}/test?task_id={task.id}").status_code == 200
+
+
+def test_dry_run_needs_a_subject(client):
+    rule_id = client.post("/api/workflow-rules", json=_rule_body()).json()["id"]
+    assert client.post(f"/api/workflow-rules/{rule_id}/test").status_code == 422
+
+
+# --- Saving a rule says what can never work (ADR-0054) ---
+
+
+def test_saving_a_rule_warns_about_a_label_that_does_not_exist(client):
+    r = client.post("/api/workflow-rules", json=_rule_body(actions=[{"type": "add_label", "value": "security"}]))
+
+    assert r.status_code == 201  # a warning, not a rejection: the label may appear later
+    assert [(w["type"], w["reason"]) for w in r.json()["warnings"]] == [("add_label", "label_not_found")]
+
+
+def test_the_warning_clears_itself_once_the_label_exists(client, db, sample_project):
+    """Warnings are about the world, not the rule, so they are computed per read: a stored
+    one would keep accusing a rule the user has already fixed."""
+    rule_id = client.post(
+        "/api/workflow-rules", json=_rule_body(actions=[{"type": "add_label", "value": "security"}])
+    ).json()["id"]
+    assert client.get(f"/api/workflow-rules/{rule_id}").json()["warnings"]
+
+    graph.create_label(db, sample_project.id, name="security", color="#f00")
+    db.commit()
+
+    assert client.get(f"/api/workflow-rules/{rule_id}").json()["warnings"] == []
+
+
+def test_a_working_rule_carries_no_warning(client):
+    r = client.post("/api/workflow-rules", json=_rule_body())
+    assert r.json()["warnings"] == []
+    assert client.get("/api/workflow-rules").json()[0]["warnings"] == []

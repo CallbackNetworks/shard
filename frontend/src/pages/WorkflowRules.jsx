@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Play, X, GitMerge } from 'lucide-react'
-import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, getWorkflowRuleVocabulary } from '../api/client'
+import { Plus, Trash2, Play, X, GitMerge, AlertTriangle } from 'lucide-react'
+import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, getWorkflowRuleVocabulary, search } from '../api/client'
 import { DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import FormField from '../components/shared/FormField'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import EmptyState from '../components/shared/EmptyState'
+import RuleOutcomeChips from '../components/shared/RuleOutcomeChips'
 
 // The whole rule vocabulary comes from the engine (ADR-0048, ADR-0049), so labels are
 // derived rather than looked up: a trigger, field or action added on the server shows up
@@ -59,6 +60,63 @@ function ActionRow({ action, types, onChange, onRemove }) {
         <X size={12} />
       </button>
     </div>
+  )
+}
+
+/**
+ * Pick the node to dry-run against, by name.
+ *
+ * This used to be a bare text box asking for a node ID — a value the user has to go and
+ * copy from somewhere else, which made the button that checks a rule harder to use than
+ * the rule itself. Projects are offered alongside tasks because a rule can trigger on any
+ * node (ADR-0049), and a non-task subject is precisely the case worth checking.
+ */
+function SubjectPicker({ selected, onPick, t }) {
+  const [term, setTerm] = useState('')
+  const { data } = useQuery({
+    queryKey: ['rule-subject-search', term],
+    queryFn: () => search(term),
+    enabled: term.trim().length >= 2,
+    staleTime: 30_000,
+  })
+  const results = [
+    ...(data?.tasks || []).map(x => ({ id: x.id, title: x.title, type: 'task' })),
+    ...(data?.projects || []).map(x => ({ id: x.id, title: x.name, type: 'project' })),
+  ].slice(0, 6)
+
+  if (selected) {
+    return (
+      <span className="kt-chip" style={{ fontSize: 11 }}>
+        {selected.type}: {selected.title}
+        <button onClick={() => onPick(null)} className="kt-icon-btn" style={{ color: DARK.danger, marginLeft: 4 }}>
+          <X size={10} />
+        </button>
+      </span>
+    )
+  }
+  return (
+    <span style={{ position: 'relative' }}>
+      <input
+        value={term}
+        onChange={e => setTerm(e.target.value)}
+        placeholder={t('rules.subjectPlaceholder')}
+        className="kt-input"
+        style={{ width: 220, fontSize: 11 }}
+      />
+      {results.length > 0 && (
+        <div className="kt-card kt-rule-subject-results">
+          {results.map(r => (
+            <button
+              key={r.id}
+              onClick={() => { onPick(r); setTerm('') }}
+              className="kt-rule-subject-option"
+            >
+              <span style={{ color: DARK.textDim }}>{r.type}</span> {r.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
   )
 }
 
@@ -138,7 +196,7 @@ export default function WorkflowRules() {
   const { data: rules = [], isLoading } = useQuery({ queryKey: ['workflow-rules'], queryFn: getWorkflowRules })
   const [modal, setModal] = useState(null)
   const [testResults, setTestResults] = useState({})
-  const [testTaskId, setTestTaskId] = useState('')
+  const [subject, setSubject] = useState(null)
 
   const createMut = useInvalidatingMutation({
     mutationFn: createWorkflowRule,
@@ -162,7 +220,7 @@ export default function WorkflowRules() {
     invalidateKeys: [['workflow-rules']],
   })
   const testMut = useInvalidatingMutation({
-    mutationFn: ({ ruleId, taskId }) => testWorkflowRule(ruleId, taskId),
+    mutationFn: ({ ruleId, nodeId }) => testWorkflowRule(ruleId, nodeId),
     onSuccess: (data, { ruleId }) => setTestResults(r => ({ ...r, [ruleId]: data })),
   })
 
@@ -251,6 +309,16 @@ export default function WorkflowRules() {
                       </span>
                     ))}
                   </div>
+                  {/* What can never work, said the moment the rule is saved rather than
+                      after it has quietly done nothing for a week. Not an error: the
+                      label may be created tomorrow, and the warning clears itself when
+                      it is (ADR-0054). */}
+                  {rule.warnings?.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      <AlertTriangle size={11} style={{ color: DARK.warning, flexShrink: 0 }} />
+                      <RuleOutcomeChips records={rule.warnings} />
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 12, flexWrap: 'wrap' }}>
                   <button
@@ -269,32 +337,36 @@ export default function WorkflowRules() {
 
               {/* Test section */}
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.05)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>Dry-run:</span>
-                <input
-                  value={testTaskId}
-                  onChange={e => setTestTaskId(e.target.value)}
-                  placeholder="task ID"
-                  className="kt-input"
-                  style={{ width: 220, fontSize: 11 }}
-                />
+                <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.2)' }}>{t('rules.dryRun')}</span>
+                <SubjectPicker selected={subject} onPick={setSubject} t={t} />
                 <button
-                  onClick={() => testMut.mutate({ ruleId: rule.id, taskId: testTaskId })}
-                  disabled={!testTaskId.trim()}
+                  onClick={() => testMut.mutate({ ruleId: rule.id, nodeId: subject.id })}
+                  disabled={!subject}
                   className="kt-btn"
-                  style={{ fontSize: 11, opacity: testTaskId.trim() ? 1 : 0.4 }}
+                  style={{ fontSize: 11, opacity: subject ? 1 : 0.4 }}
                 >
-                  <Play size={10} /> Test
+                  <Play size={10} /> {t('rules.test')}
                 </button>
+                {/* Two answers, not one: whether the conditions match this subject, and
+                    what each action would then do. "Would fire 1 action" was neither —
+                    it counted the rule's own configuration back at the user, and said
+                    "would fire" for actions that skip every time (ADR-0054). */}
                 {testResults[rule.id] && (
-                  <span style={{
-                    fontSize: 11, padding: '2px 8px',
-                    background: testResults[rule.id].would_fire ? 'rgba(250,204,21,0.1)' : 'rgba(var(--kt-ink-rgb), 0.05)',
-                    color: testResults[rule.id].would_fire ? DARK.success : 'rgba(var(--kt-ink-rgb), 0.3)',
-                  }}>
-                    {testResults[rule.id].would_fire
-                      ? `Would fire ${testResults[rule.id].actions?.length} action(s)`
-                      : 'Would not fire'}
-                  </span>
+                  testResults[rule.id].would_fire ? (
+                    <>
+                      <span style={{ fontSize: 11, color: DARK.textMid }}>
+                        {t('rules.wouldChange', {
+                          n: testResults[rule.id].effect_count,
+                          total: testResults[rule.id].actions?.length ?? 0,
+                        })}
+                      </span>
+                      <RuleOutcomeChips records={testResults[rule.id].actions} />
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)' }}>
+                      {t('rules.wouldNotFire')}
+                    </span>
+                  )
                 )}
               </div>
             </div>

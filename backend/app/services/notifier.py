@@ -96,6 +96,56 @@ def _wants_source(integration: Integration, source: str) -> bool:
     return source in selected
 
 
+def matching_integrations(
+    db: Session,
+    project: "graph.ProjectView | None",
+    event: str,
+    *,
+    source: str = DEFAULT_SOURCE,
+) -> list[Integration]:
+    """Every active integration that would receive this event in this scope.
+
+    Split out of ``_deliver`` so the same membership test answers two questions:
+    "who is about to receive this" and "would anyone receive this at all". A caller that
+    only wants the second must not have to send the event to find out (ADR-0054).
+
+    An unscoped integration (project_id NULL) listens to every project. It has to be
+    matched with IS NULL: ``project_id IN (:id, NULL)`` is never true for a NULL row,
+    so the previous form silently delivered nothing to global integrations (ADR-0047).
+    A node with no container has no scope at all, so only the global ones can match.
+    """
+    source = normalize_source(source)
+    scope = (
+        Integration.project_id.is_(None)
+        if project is None
+        else or_(Integration.project_id == project.id, Integration.project_id.is_(None))
+    )
+    integrations = db.query(Integration).filter(Integration.active == True, scope).all()
+    return [i for i in integrations if event in i.events and _wants_source(i, source)]
+
+
+def count_subscribers(
+    db: Session,
+    project: "graph.ProjectView | None",
+    event: str,
+    *,
+    source: str = DEFAULT_SOURCE,
+) -> int:
+    """How many integrations would receive this event, without sending it."""
+    return len(matching_integrations(db, project, event, source=source))
+
+
+def event_has_subscriber(db: Session, event: str, *, source: str = DEFAULT_SOURCE) -> bool:
+    """Whether *any* active integration subscribes to this event, in any project.
+
+    Scope-blind on purpose: a global rule fires on tasks in every project, so "nobody in
+    this project listens" is not enough to call the rule dead — only "nobody anywhere" is.
+    """
+    source = normalize_source(source)
+    integrations = db.query(Integration).filter(Integration.active == True).all()
+    return any(event in i.events and _wants_source(i, source) for i in integrations)
+
+
 def _compute_progress(project: "graph.ProjectView", db: Session) -> tuple[int, int, float]:
     tasks = graph.tasks_in_project(db, project.id)
     total = len(tasks)
@@ -408,18 +458,7 @@ async def _deliver(
             "status": node.status,
         }
 
-    # An unscoped integration (project_id NULL) listens to every project. It has to be
-    # matched with IS NULL: ``project_id IN (:id, NULL)`` is never true for a NULL row,
-    # so the previous form silently delivered nothing to global integrations (ADR-0047).
-    # A node with no container has no scope at all, so only the global ones can match.
-    scope = (
-        Integration.project_id.is_(None)
-        if project is None
-        else or_(Integration.project_id == project.id, Integration.project_id.is_(None))
-    )
-    integrations = db.query(Integration).filter(Integration.active == True, scope).all()
-
-    matching = [i for i in integrations if event in i.events and _wants_source(i, source)]
+    matching = matching_integrations(db, project, event, source=source)
     if not matching:
         return 0
 

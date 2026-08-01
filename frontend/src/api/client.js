@@ -180,8 +180,10 @@ export const getWorkflowRules = (projectId) =>
 export const createWorkflowRule = (data) => api.post('/workflow-rules', data).then(r => r.data)
 export const updateWorkflowRule = (id, data) => api.patch(`/workflow-rules/${id}`, data).then(r => r.data)
 export const deleteWorkflowRule = (id) => api.delete(`/workflow-rules/${id}`)
-export const testWorkflowRule = (ruleId, taskId) =>
-  api.post(`/workflow-rules/${ruleId}/test`, null, { params: { task_id: taskId } }).then(r => r.data)
+// Dry-run against any node, not only a task (ADR-0049/0054): the answer for a non-task
+// subject — every task-only action skipped — is exactly what the user needs to see.
+export const testWorkflowRule = (ruleId, nodeId) =>
+  api.post(`/workflow-rules/${ruleId}/test`, null, { params: { node_id: nodeId } }).then(r => r.data)
 // Triggers, condition fields/ops and action types, served by the engine so the UI keeps
 // no copy of any of them (ADR-0048, ADR-0049)
 export const getWorkflowRuleVocabulary = () =>

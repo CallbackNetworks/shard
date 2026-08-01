@@ -706,7 +706,10 @@ Query parameters:
     "run_count": 42,
     "effect_count": 12,
     "last_run_at": "ISO 8601 | null",
-    "created_at": "ISO 8601"
+    "created_at": "ISO 8601",
+    "warnings": [
+      { "type": "add_label", "value": "security", "outcome": "skipped", "reason": "label_not_found" }
+    ]
   }
 ]
 ```
@@ -714,6 +717,13 @@ Query parameters:
 `run_count` is how many times the rule fired; `effect_count` is how many of those runs
 changed anything (ADR-0053). A rule with `run_count` high and `effect_count` 0 is firing
 constantly and doing nothing — every action is a no-op or a skip.
+
+`warnings` lists the actions that cannot work for **any** subject — a label no project
+has, an event no integration subscribes to (ADR-0054). Computed per request rather than
+stored, because the condition is about the world and not about the rule: create the label
+and the warning disappears on the next read. It is never a reason to reject a write; a
+global rule that is dead in one project is alive in another. Same record shape as an
+execution outcome, so the same UI renders both.
 
 Each run writes a `rule.executed` activity entry whose `meta` carries the per-action
 outcome:
@@ -785,16 +795,29 @@ Same fields as POST, all optional.
 
 #### `DELETE /workflow-rules/{id}`
 
-#### `POST /workflow-rules/{id}/test?task_id={tid}`
-Dry-run: check which actions would fire for a given task without executing them.
+#### `POST /workflow-rules/{id}/test?node_id={nid}`
+Dry-run one rule against one node, without executing anything. `task_id` is accepted as a
+deprecated alias for `node_id`; any node works, not only a task (ADR-0049).
 
 ```json
 {
   "would_fire": true,
   "conditions_met": [true, true],
-  "actions": [{ "type": "set_assignee", "value": "alice" }]
+  "node": { "id": "uuid", "type": "task", "title": "Fix login bug" },
+  "actions": [
+    { "type": "set_assignee", "value": "alice", "outcome": "applied", "from": null },
+    { "type": "add_label", "value": "security", "outcome": "skipped", "reason": "label_not_found" }
+  ],
+  "effect_count": 1
 }
 ```
+
+`actions` used to be the rule's own `actions` echoed back, which said "would fire" for
+actions the engine skips every time. Each one is now put through the engine's own
+prediction, so a dry-run reports the same four-value `outcome` an execution records and
+cannot promise something the engine would not do (ADR-0054). `would_fire` answers only
+whether the conditions match; `effect_count` answers how many actions would change
+anything. Empty `actions` when `would_fire` is false.
 
 ---
 

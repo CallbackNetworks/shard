@@ -118,6 +118,7 @@ from app.services.graph.labels import (
     get_label,
     label_ids_for_task,
     label_project_map,
+    label_ref_exists,
     labeled_ids_map,
     labels_for_task,
     labels_in_project,

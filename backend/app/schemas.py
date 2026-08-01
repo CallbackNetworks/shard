@@ -625,6 +625,10 @@ class WorkflowRuleOut(BaseModel):
     effect_count: int = 0
     last_run_at: datetime | None
     created_at: datetime
+    # Actions that cannot work for any subject — a label nothing resolves to, an event
+    # nobody subscribes to. Computed per request, not stored: the world changes without
+    # the rule being touched (ADR-0054).
+    warnings: list[dict] = []
 
 
 # --- Webhook Delivery ---

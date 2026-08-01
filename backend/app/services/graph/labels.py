@@ -178,6 +178,20 @@ def find_label_by_name(db: Session, project_id: str, name: str, *, label_type: s
     return None
 
 
+def label_ref_exists(db: Session, value: str, *, project_id: str | None = None) -> bool:
+    """Whether a label id or name resolves to something — anywhere, or in one project.
+
+    Labels are project-scoped but a global workflow rule names one without a project, so
+    "no such label here" is not the same claim as "no such label at all". Scope-blind by
+    default; pass ``project_id`` for a project-scoped rule (ADR-0054).
+    """
+    if get_label(db, value, project_id=project_id) is not None:
+        return True
+    if project_id is not None:
+        return find_label_by_name(db, project_id, value) is not None
+    return db.query(Node.id).filter(Node.type == NODE_LABEL, Node.title == value).first() is not None
+
+
 def decisions(db: Session, *, project_id: str | None = None, status: str | None = None) -> list[LabelView]:
     """Label nodes whose kind is ``decision``, newest first (filtered in Python).
 

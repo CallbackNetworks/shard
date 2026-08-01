@@ -921,3 +921,152 @@ class TestTheExecutionRecordSaysWhatItSetOff:
         db.refresh(rule)
         # Ran twice; only the first run changed anything.
         assert (rule.run_count, rule.effect_count) == (2, 1)
+
+
+class TestPredictionIsWhatExecutionDoes:
+    """The dry-run used to echo ``rule.actions`` back verbatim: the rule's own
+    configuration returned as if it were a result. It reported "would fire: add_label
+    security" for a rule that skipped every single time, because no such label existed.
+
+    One function decides now — ``predict_outcome`` — and execution performs whatever it
+    says. Two implementations of "would this work" is one more than can be kept in step,
+    and the one that drifts is the one telling the user their rule is fine. ADR-0054.
+    """
+
+    @pytest.fixture()
+    def project_and_task(self, db):
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        task = make_task(db, project_id=project.id, title="T", status="todo", priority="low")
+        db.add(task)
+        db.flush()
+        graph.create_label(db, project.id, name="urgent", color="#f00")
+        db.flush()
+        return project, graph.get_task(db, task.id)
+
+    @pytest.mark.parametrize(
+        "action",
+        [
+            {"type": "set_status", "value": "done"},  # applied
+            {"type": "set_priority", "value": "low"},  # no_op: already low
+            {"type": "set_status", "value": "archived"},  # skipped: outside the enum
+            {"type": "set_assignee", "value": "bob"},
+            {"type": "add_label", "value": "urgent"},
+            {"type": "add_label", "value": "nope"},  # skipped: no such label
+            {"type": "remove_label", "value": "urgent"},  # no_op: not attached
+            {"type": "add_comment", "value": "hello"},
+            {"type": "fire_event", "value": "custom.thing"},  # no_op: no subscriber
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_the_prediction_matches_what_running_it_records(self, db, project_and_task, action):
+        _, task = project_and_task
+        predicted = rules_engine.predict_outcome(db, action, task)
+
+        _, recorded = await _exec_action(db, action, task)
+
+        assert predicted["outcome"] == recorded["outcome"]
+        assert predicted.get("reason") == recorded.get("reason")
+
+    @pytest.mark.asyncio
+    async def test_predicting_changes_nothing(self, db, project_and_task):
+        """A prediction that writes is not a prediction. It must be safe to run one on
+        every keystroke in the rule editor."""
+        project, task = project_and_task
+        before = (
+            db.query(ActivityLog).count(),
+            db.query(Comment).count(),
+            len(graph.label_ids_for_task(db, task.id)),
+        )
+
+        for action in (
+            {"type": "set_status", "value": "done"},
+            {"type": "add_label", "value": "urgent"},
+            {"type": "add_label", "value": "nope"},
+            {"type": "add_comment", "value": "hello"},
+            {"type": "fire_event", "value": "custom.thing"},
+        ):
+            rules_engine.predict_outcome(db, action, task)
+        db.flush()
+
+        assert graph.get_task(db, task.id).status == "todo"
+        assert before == (
+            db.query(ActivityLog).count(),
+            db.query(Comment).count(),
+            len(graph.label_ids_for_task(db, task.id)),
+        )
+        assert project is not None
+
+    def test_a_skip_prediction_carries_the_same_reason_the_feed_would_show(self, db, project_and_task):
+        _, task = project_and_task
+        record = rules_engine.predict_outcome(db, {"type": "add_label", "value": "nope"}, task)
+
+        assert record["outcome"] == "skipped"
+        assert 'no label named "nope"' in rules_engine.skip_detail(record, task)
+
+    def test_every_action_type_is_predictable(self, db, project_and_task):
+        """A type the engine can run but not predict would make the dry-run silent about
+        it — the same empty answer this module keeps having to re-close."""
+        _, task = project_and_task
+        for atype in rules_engine.ACTION_TYPES:
+            value = sorted(rules_engine.ACTION_VALUE_ENUMS.get(atype, {"x"}))[0]
+            record = rules_engine.predict_outcome(db, {"type": atype, "value": value}, task)
+            assert record["outcome"] in rules_engine.OUTCOMES, atype
+
+
+class TestRuleWarningsHaveNoSubject:
+    """``predict_outcome`` answers "what would this do to this task". A rule is saved
+    long before it has a subject, and the questions worth asking then — does this label
+    exist, does anyone subscribe to this event — need no subject at all. ADR-0054."""
+
+    @pytest.fixture()
+    def project(self, db):
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        return project
+
+    def test_a_label_no_project_has_is_flagged(self, db, project):
+        found = rules_engine.rule_warnings(db, [{"type": "add_label", "value": "nope"}])
+        assert [(w["type"], w["reason"]) for w in found] == [("add_label", "label_not_found")]
+
+    def test_a_label_that_exists_somewhere_is_not_flagged(self, db, project):
+        """A global rule fires on every project, so a label existing anywhere is enough."""
+        graph.create_label(db, project.id, name="urgent", color="#f00")
+        db.flush()
+        assert rules_engine.rule_warnings(db, [{"type": "add_label", "value": "urgent"}]) == []
+
+    def test_a_project_scoped_rule_is_judged_in_its_own_project(self, db, project):
+        other = make_project(db, name="Other")
+        db.add(other)
+        db.flush()
+        graph.create_label(db, other.id, name="urgent", color="#f00")
+        db.flush()
+
+        assert rules_engine.rule_warnings(db, [{"type": "add_label", "value": "urgent"}]) == []
+        found = rules_engine.rule_warnings(db, [{"type": "add_label", "value": "urgent"}], project_id=project.id)
+        assert found[0]["reason"] == "label_not_found"
+
+    def test_an_event_nobody_subscribes_to_is_flagged(self, db, project):
+        found = rules_engine.rule_warnings(db, [{"type": "fire_event", "value": "deploy.requested"}])
+        assert [(w["outcome"], w["reason"]) for w in found] == [("no_op", "no_subscribers")]
+
+    def test_a_subscribed_event_is_not_flagged(self, db, project):
+        from app.models import Integration
+
+        db.add(
+            Integration(
+                name="Hook",
+                type="webhook",
+                url="https://example.com",
+                project_id=project.id,
+                events=["deploy.requested"],
+                active=True,
+            )
+        )
+        db.flush()
+        assert rules_engine.rule_warnings(db, [{"type": "fire_event", "value": "deploy.requested"}]) == []
+
+    def test_a_working_rule_warns_about_nothing(self, db, project):
+        assert rules_engine.rule_warnings(db, [{"type": "set_status", "value": "done"}]) == []

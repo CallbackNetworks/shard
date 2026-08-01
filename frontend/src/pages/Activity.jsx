@@ -5,7 +5,7 @@ import { Activity as ActivityIcon, Filter, ChevronLeft, ChevronRight } from 'luc
 import { getActivity, getProjects } from '../api/client'
 import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
 import { actionGroup, buildActivitySignals, bucketActivitySignals, summarizeActivitySignals } from '../utils/activitySignals'
-import { actionClause, outcomeColor, outcomeLabel } from '../utils/ruleOutcomes'
+import RuleOutcomeChips from '../components/shared/RuleOutcomeChips'
 import { formatTimestamp, absoluteTime } from '../utils/datetime'
 import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -65,35 +65,6 @@ const chip = (active) => ({
 })
 
 const VIEW_MODES = ['log', 'timeline', 'wall']
-
-/**
- * What a rule run actually set off, one chip per action (ADR-0053).
- *
- * The entry's own sentence says it too, but only as prose; these are the two axes the
- * user has to be able to separate at a glance — did each action run, and did it change
- * anything. Rendered only for entries that carry `meta.actions`, so older rows and every
- * other action type are unaffected.
- */
-function RuleOutcomes({ records, t }) {
-  if (!Array.isArray(records) || records.length === 0) return null
-  return (
-    <div className="kt-activity-event-outcomes">
-      {records.map((record, i) => {
-        const color = outcomeColor(record.outcome)
-        return (
-          <span
-            key={i}
-            className="kt-chip"
-            style={{ color, borderColor: `${color}55` }}
-            title={outcomeLabel(record, t)}
-          >
-            {actionClause(record)} · {outcomeLabel(record, t)}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
 
 function SignalMarker({ signal }) {
   return (
@@ -321,7 +292,7 @@ export default function Activity() {
                       <div className="kt-activity-event-detail">
                         {entry.detail || entry.action}
                       </div>
-                      <RuleOutcomes records={entry.meta?.actions} t={t} />
+                      <RuleOutcomeChips records={entry.meta?.actions} />
                       <div className="kt-activity-event-meta">
                         <span className="kt-chip" style={{ color, borderColor: `${color}55` }}>{entry.action}</span>
                         <span>{group}</span>
