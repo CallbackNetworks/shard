@@ -26,6 +26,12 @@ jobs:
       - name: Security audit
         run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend sh -c "pip install pip-audit && pip-audit --strict"
 
+      - name: Build MCP image
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks build mcp
+
+      - name: MCP server tests
+        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps mcp pytest test_server.py -q
+
       - name: Cleanup
         if: always()
         run: |

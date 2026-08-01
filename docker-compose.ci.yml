@@ -16,6 +16,15 @@ services:
     networks:
       - ci-network
 
+  # The MCP server ships as part of the product (prod `mcp` profile), so its
+  # suite gates the build like every other one. All its HTTP calls are mocked,
+  # so it needs no backend.
+  mcp:
+    build: ./mcp_server
+    working_dir: /app/mcp_server
+    networks:
+      - ci-network
+
   # ---------- PostgreSQL test target (co-equal with SQLite, see ADR-0020) ----------
   postgres:
     profiles: [pgtest]
