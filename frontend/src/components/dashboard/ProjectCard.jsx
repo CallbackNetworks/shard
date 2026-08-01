@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { BRAND, STATUS_MAP, DARK } from '../../constants/theme'
 import s from '../../pages/Dashboard.module.css'
 

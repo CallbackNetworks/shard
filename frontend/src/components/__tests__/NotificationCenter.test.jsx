@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   dismissNotification: vi.fn(),
 }))
 
-vi.mock('react-router-dom', () => ({
+vi.mock('react-router', () => ({
   useNavigate: () => mocks.navigate,
 }))
 

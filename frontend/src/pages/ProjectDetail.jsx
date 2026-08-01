@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Zap, Bot, Rss, Check, Share2, MessageSquare, CalendarClock } from 'lucide-react'
 import {

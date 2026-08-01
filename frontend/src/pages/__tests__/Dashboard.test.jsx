@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k) => k }),
@@ -11,8 +11,8 @@ vi.mock('../../hooks/useBreakpoint', () => ({
 }))
 
 const navigate = vi.fn()
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom')
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router')
   return { ...actual, useNavigate: () => navigate }
 })
 

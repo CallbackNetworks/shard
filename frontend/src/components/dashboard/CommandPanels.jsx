@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { Plus, Clock, Activity, AlertTriangle, CheckCircle2, Radio } from 'lucide-react'
 import { densityCount } from '../../utils/uiPrefs'
 import ActivityFeed from './ActivityFeed'

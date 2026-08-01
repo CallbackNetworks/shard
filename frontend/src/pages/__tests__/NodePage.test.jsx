@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -10,7 +10,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 const mockNavigate = vi.fn()
-vi.mock('react-router-dom', async (importOriginal) => {
+vi.mock('react-router', async (importOriginal) => {
   const mod = await importOriginal()
   return { ...mod, useParams: () => ({ id: 'n1' }), useNavigate: () => mockNavigate }
 })

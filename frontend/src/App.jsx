@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { BrowserRouter, useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, useLocation, useNavigate, Routes, Route, Navigate } from 'react-router'
 import CommandPalette from './components/CommandPalette'
 import AssistantPanel from './components/AssistantPanel'
 import NotificationCenter from './components/NotificationCenter'

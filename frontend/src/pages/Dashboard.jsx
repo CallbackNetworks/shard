@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, FolderOpen, Archive, User, Activity, BarChart2, TrendingUp, Shield, ListChecks, GitCompare, Settings, Eye, EyeOff } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats, getGoals, getDecisions, getPreference, setPreference } from '../api/client'

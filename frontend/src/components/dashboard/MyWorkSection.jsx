@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { densityCount } from '../../utils/uiPrefs'
 import TaskRow from './TaskRow'
 import s from '../../pages/Dashboard.module.css'
