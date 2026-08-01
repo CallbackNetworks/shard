@@ -185,6 +185,15 @@ add comment, fire event. `CONDITION_FIELDS` / `CONDITION_OPS` / `ACTION_TYPES` /
 them, because an unrecognised value evaluates to "no match" / "do nothing" silently
 (ADR-0046, ADR-0047). A successful rule run fires `rule.triggered`.
 
+**`rule_vocabulary.py`** — the other half of that vocabulary: what may go in a rule's
+*value*, per action type and per condition field, as `enum` (closed, the write surface
+rejects the rest) / `suggest` (open, but there is something real to offer) / `free`
+(ADR-0056). Derived at read time from the same constants the engine evaluates against,
+plus the live graph — the labels that exist, the registered node and edge types, the
+subscribable events and how many integrations subscribe to each. Served by
+`GET /workflow-rules/vocabulary`; the editor renders the control the kind calls for
+instead of one text box for all eighteen slots.
+
 Actions write through the same surfaces everything else does — `apply_task_update` for fields,
 `dispatch_edge_added/removed` for labels — so a rule-made change earns the same activity entry
 and the same notifications a human-made change does (`source="rule"`, `actor="workflow"`).

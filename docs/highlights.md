@@ -151,7 +151,10 @@ Define rules that trigger on any change to the graph and execute actions automat
 - **Conditions:** Filter by what the subject *is* (status, priority, labels, assignee,
   type, role) and by what just *happened* to it (which field moved, which relationship,
   which end of it, what was at the far end)
-- **Actions:** Auto-assign, change status, change priority, add labels, send notifications
+- **Actions:** Auto-assign, change status, change priority, add labels, send an
+  integration event — and every value box knows what belongs in it: a picker where the
+  set is closed, the labels and events that actually exist where it is open, and a live
+  count of how many integrations would receive an event before the rule is saved
 - **No chaining:** a rule's own writes are dispatched with rules disabled, so a rule can
   never trigger another one
 - **Dry run:** Test a rule against any node before activating — it reports what each

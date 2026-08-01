@@ -135,6 +135,20 @@ def count_subscribers(
     return len(matching_integrations(db, project, event, source=source))
 
 
+def subscriber_counts(db: Session, events: list[str], *, source: str = DEFAULT_SOURCE) -> dict[str, int]:
+    """How many integrations subscribe to each event, in one pass over the table.
+
+    The plural form of ``event_has_subscriber``, and scope-blind for the same reason: a
+    global rule fires in every project. Serves the rule editor, where "fire an event" is
+    the one action whose effect lands on another page entirely — without the count it
+    reads as a button that does something, when it may reach nobody (ADR-0056).
+    """
+    source = normalize_source(source)
+    active = db.query(Integration).filter(Integration.active == True).all()  # noqa: E712
+    wanted = [i for i in active if _wants_source(i, source)]
+    return {event: sum(1 for i in wanted if event in i.events) for event in events}
+
+
 def event_has_subscriber(db: Session, event: str, *, source: str = DEFAULT_SOURCE) -> bool:
     """Whether *any* active integration subscribes to this event, in any project.
 

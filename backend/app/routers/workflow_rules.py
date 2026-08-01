@@ -5,9 +5,9 @@ from app.database import get_db
 from app.models import WorkflowRule
 from app.schemas import WorkflowRuleCreate, WorkflowRuleOut, WorkflowRuleUpdate
 from app.services import graph
+from app.services.rule_vocabulary import action_value_specs, condition_value_specs
 from app.services.rules_engine import (
     ACTION_TYPES,
-    ACTION_VALUE_ENUMS,
     CONDITION_FIELDS,
     CONDITION_OPS,
     SUPPORTED_TRIGGERS,
@@ -79,7 +79,7 @@ def create_rule(body: WorkflowRuleCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/vocabulary")
-def rule_vocabulary():
+def rule_vocabulary(project_id: str | None = None, db: Session = Depends(get_db)):
     """Everything the rule editor needs to render itself.
 
     Declared before ``/{rule_id}`` so the path parameter does not swallow it. The editor
@@ -87,6 +87,9 @@ def rule_vocabulary():
     a trigger, field or action is a second place to forget one (ADR-0048, ADR-0049).
     Every value here is also what the schema validates writes against, so anything the
     editor offers is by construction something the engine understands.
+
+    ``project_id`` narrows the label suggestions to one project's labels; without it they
+    are scope-blind, matching how a global rule's label reference is resolved.
     """
     return {
         "triggers": SUPPORTED_TRIGGERS,
@@ -97,7 +100,11 @@ def rule_vocabulary():
         "condition_fields": sorted(CONDITION_FIELDS),
         "condition_ops": sorted(CONDITION_OPS),
         "action_types": sorted(ACTION_TYPES),
-        "action_value_enums": {k: sorted(v) for k, v in ACTION_VALUE_ENUMS.items()},
+        # What may go in the value box, per action and per condition field (ADR-0056).
+        # Replaces ``action_value_enums``, which covered two of the seven actions and
+        # none of the eleven condition fields, and which nothing ever read.
+        "action_values": action_value_specs(db, project_id=project_id),
+        "condition_values": condition_value_specs(db, project_id=project_id),
         "task_only_actions": sorted(TASK_ONLY_ACTIONS),
     }
 

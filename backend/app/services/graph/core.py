@@ -40,6 +40,12 @@ ROLE_TASK = "task"  # plays the task/subtask role
 ROLE_SHAREABLE = "shareable"  # can mint a public share facade
 ROLE_SUBSCRIBABLE = "subscribable"  # can expose an iCal feed
 
+# The whole role vocabulary, in the order it is offered to a user. Closed: a role is a
+# capability the code implements, not user-defined data like a node type, so a name
+# outside this tuple is a typo — and a ``has_role`` condition carrying one matches
+# nothing and says nothing about why (ADR-0056).
+ROLES = (ROLE_CONTAINER, ROLE_TASK, ROLE_SHAREABLE, ROLE_SUBSCRIBABLE)
+
 
 def has_role(db: Session, type_key: str, role: str) -> bool:
     """Whether the node type ``type_key`` carries ``role`` (ADR-0040).

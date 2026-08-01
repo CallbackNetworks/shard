@@ -3271,6 +3271,16 @@ h1 {
   font-size: 11px;
   line-height: 1.4;
 }
+/* What a value box or an action reaches beyond this form: who receives the event, which
+   nodes an action is skipped on. Sits under the row it belongs to (ADR-0056). */
+.kt-rule-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  padding-left: 2px;
+}
 .kt-activity-event-time {
   display: grid;
   justify-items: end;

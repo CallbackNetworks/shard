@@ -81,10 +81,22 @@ TASK_ONLY_ACTIONS = ACTION_TYPES - {"fire_event"}
 
 # Actions whose value is a closed enum. The others take free text (an assignee name,
 # a label name, a comment body) and cannot be checked ahead of time.
+#
+# Ordered, and ordered *meaningfully* (lifecycle, then ascending severity), because this
+# is also what the editor's value dropdown renders. A set would have to be sorted to be
+# served, and alphabetical order puts "done" first and reads high/low/medium — the same
+# vocabulary, presented as nonsense. One ordered source, no second list to keep in step.
 ACTION_VALUE_ENUMS = {
-    "set_status": {"todo", "in_progress", "done", "failed"},
-    "set_priority": {"low", "medium", "high"},
+    "set_status": ("todo", "in_progress", "done", "failed"),
+    "set_priority": ("low", "medium", "high"),
 }
+
+# Which end of an edge the rule is looking at. Named here rather than spelled inline at
+# the dispatch site so the value the editor offers and the value the dispatcher supplies
+# are the same two strings (ADR-0056).
+EDGE_SIDE_SOURCE = "source"
+EDGE_SIDE_TARGET = "target"
+EDGE_SIDES = (EDGE_SIDE_SOURCE, EDGE_SIDE_TARGET)
 
 # Actions that write one task field, and which field (used to compare before writing).
 FIELD_ACTIONS = {"set_status": "status", "set_priority": "priority", "set_assignee": "assignee"}
@@ -461,7 +473,7 @@ def rule_warnings(db: Session, actions, *, project_id: str | None = None, trigge
 _SKIP_DETAILS = {
     "not_a_task": lambda r, n: f'Action "{r["type"]}" skipped: {n.type} "{n.title}" does not play the task role',
     "invalid_value": lambda r, n: (
-        f'Action "{r["type"]}" skipped: "{r.get("value")}" is not one of {sorted(ACTION_VALUE_ENUMS[r["type"]])}'
+        f'Action "{r["type"]}" skipped: "{r.get("value")}" is not one of {list(ACTION_VALUE_ENUMS[r["type"]])}'
     ),
     "label_not_found": lambda r, n: f'Action "{r["type"]}" skipped: no label named "{r.get("value")}" in this project',
     "node_deleted": lambda r, n: (

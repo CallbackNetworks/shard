@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, GitMerge, AlertTriangle } from 'lucide-react'
@@ -23,25 +23,72 @@ const triggerLabel = humanize
 const withCurrent = (options, current) =>
   options.includes(current) ? options : [current, ...options]
 
-// Hints only; an action type missing here still renders under its derived label.
-const ACTION_HINTS = {
-  add_label: 'name or ID',
-  remove_label: 'name or ID',
+// Only where the derived name misleads. "Fire Event" reads like something that happens
+// here; the event goes to whatever integrations subscribe, on another page entirely.
+// Everything else keeps its derived label, so an action added on the server still shows
+// up readable with nothing to translate first.
+const actionLabel = (type, t) => t(`rules.action.${type}`, { defaultValue: humanize(type) })
+
+// Switching what the value belongs to must not leave the old value behind: "high" is a
+// priority, not a label name, and carrying it across is how a rule gets saved holding a
+// value that matches nothing. A closed set lands on its first option — the only choice
+// that is valid by construction — and everything else empties, because guessing at a
+// label name or an event name would be inventing content the user did not write.
+const defaultValueFor = (spec) => (spec?.kind === 'enum' ? (spec.options[0] ?? '') : '')
+
+/**
+ * The value box, told what it belongs to (ADR-0056).
+ *
+ * It used to be one plain text input for all eighteen slots, so the only way to know
+ * that `set_priority` takes `low|medium|high` and `fire_event` takes an event name was
+ * to have read the engine. `spec.kind` decides the control: a closed set the engine
+ * rejects anything outside gets a picker; an open one with something real to offer gets
+ * a datalist (type anything, see what exists); the rest gets the plain box it deserves.
+ */
+function ValueInput({ spec, value, slot, onChange, t }) {
+  const listId = useId()
+  const options = spec?.options ?? []
+  if (spec?.kind === 'enum') {
+    return (
+      <select value={value} onChange={e => onChange(e.target.value)} className="kt-input" style={{ flex: 1, minWidth: 120 }}>
+        {withCurrent(options, value).map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+  }
+  return (
+    <>
+      <input
+        list={options.length ? listId : undefined}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={t(`rules.valueHint.${slot}`, { defaultValue: t('rules.valuePlaceholder') })}
+        className="kt-input"
+        style={{ flex: 1, minWidth: 100 }}
+      />
+      {options.length > 0 && (
+        <datalist id={listId}>
+          {options.map(o => <option key={o} value={o} />)}
+        </datalist>
+      )}
+    </>
+  )
 }
 
-const actionLabel = (type) =>
-  ACTION_HINTS[type] ? `${humanize(type)} (${ACTION_HINTS[type]})` : humanize(type)
-
-function ConditionRow({ cond, fields, ops, onChange, onRemove }) {
+function ConditionRow({ cond, fields, ops, specs, onChange, onRemove, t }) {
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-      <select value={cond.field} onChange={e => onChange({ ...cond, field: e.target.value })} className="kt-input" style={{ width: 'auto', minWidth: 120 }}>
+      <select
+        value={cond.field}
+        onChange={e => onChange({ ...cond, field: e.target.value, value: defaultValueFor(specs[e.target.value]) })}
+        className="kt-input"
+        style={{ width: 'auto', minWidth: 120 }}
+      >
         {withCurrent(fields, cond.field).map(f => <option key={f} value={f}>{f}</option>)}
       </select>
       <select value={cond.op} onChange={e => onChange({ ...cond, op: e.target.value })} className="kt-input" style={{ width: 'auto', minWidth: 80 }}>
         {withCurrent(ops, cond.op).map(o => <option key={o} value={o}>{o}</option>)}
       </select>
-      <input value={cond.value} onChange={e => onChange({ ...cond, value: e.target.value })} placeholder="value" className="kt-input" style={{ flex: 1, minWidth: 100 }} />
+      <ValueInput spec={specs[cond.field]} value={cond.value} slot={cond.field} onChange={v => onChange({ ...cond, value: v })} t={t} />
       <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
         <X size={12} />
       </button>
@@ -49,16 +96,36 @@ function ConditionRow({ cond, fields, ops, onChange, onRemove }) {
   )
 }
 
-function ActionRow({ action, types, onChange, onRemove }) {
+function ActionRow({ action, types, specs, onChange, onRemove, t }) {
+  const spec = specs[action.type]
+  // Who would receive this, said while the rule is being written rather than after it
+  // has fired into the void. `fire_event` is the only action whose effect lands
+  // somewhere else, and an event nobody subscribes to is delivered to nobody — the
+  // same silent empty set the warning on the saved rule reports (ADR-0054).
+  const subscribers = spec?.subscribers?.[action.value]
   return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-      <select value={action.type} onChange={e => onChange({ ...action, type: e.target.value })} className="kt-input" style={{ width: 'auto', minWidth: 160 }}>
-        {withCurrent(types, action.type).map(a => <option key={a} value={a}>{actionLabel(a)}</option>)}
-      </select>
-      <input value={action.value} onChange={e => onChange({ ...action, value: e.target.value })} placeholder="value" className="kt-input" style={{ flex: 1, minWidth: 100 }} />
-      <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
-        <X size={12} />
-      </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select
+          value={action.type}
+          onChange={e => onChange({ ...action, type: e.target.value, value: defaultValueFor(specs[e.target.value]) })}
+          className="kt-input"
+          style={{ width: 'auto', minWidth: 180 }}
+        >
+          {withCurrent(types, action.type).map(a => <option key={a} value={a}>{actionLabel(a, t)}</option>)}
+        </select>
+        <ValueInput spec={spec} value={action.value} slot={action.type} onChange={v => onChange({ ...action, value: v })} t={t} />
+        <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
+          <X size={12} />
+        </button>
+      </div>
+      {action.type === 'fire_event' && action.value && (
+        <span className="kt-rule-hint" style={{ color: subscribers ? DARK.textDim : DARK.warning }}>
+          {subscribers
+            ? t('rules.eventSubscribers', { n: subscribers })
+            : <><AlertTriangle size={11} /> {t('rules.eventNoSubscribers')}</>}
+        </span>
+      )}
     </div>
   )
 }
@@ -121,15 +188,22 @@ function SubjectPicker({ selected, onPick, t }) {
 }
 
 function RuleModal({ initial, onSave, onClose, t }) {
+  // Not cached forever any more: the value vocabulary now carries labels, events and
+  // subscriber counts, all of which change on other pages while this one is open.
   const { data: vocabulary } = useQuery({
     queryKey: ['workflow-rule-vocabulary'],
     queryFn: getWorkflowRuleVocabulary,
-    staleTime: Infinity,
+    staleTime: 30_000,
   })
   const triggers = vocabulary?.triggers ?? []
   const conditionFields = vocabulary?.condition_fields ?? []
   const conditionOps = vocabulary?.condition_ops ?? []
   const actionTypes = vocabulary?.action_types ?? []
+  // What may go in each value box (ADR-0056). Served per action type and per condition
+  // field, so the control matches the slot instead of being one text box for all of them.
+  const actionValues = vocabulary?.action_values ?? {}
+  const conditionValues = vocabulary?.condition_values ?? {}
+  const taskOnlyActions = vocabulary?.task_only_actions ?? []
   // Which condition fields describe *the change* rather than the subject, and which of
   // them each trigger actually reports (ADR-0055). A field the trigger never supplies is
   // rejected by the write surface, so the editor must not offer it in the first place.
@@ -151,14 +225,24 @@ function RuleModal({ initial, onSave, onClose, t }) {
   const strayFields = [...new Set(
     form.conditions.map(c => c.field).filter(f => contextFields.has(f) && !allowedContext.includes(f))
   )]
+  // Every trigger now fires for every node type (ADR-0049/0055), so a rule with no
+  // condition narrowing it to tasks will land on projects, labels and cycles too — where
+  // all but `fire_event` are skipped. Said once, next to the actions it concerns, and
+  // only when the rule has not already narrowed itself.
+  const narrowedToTasks = form.conditions.some(
+    c => c.op === 'eq' && ((c.field === 'has_role' && c.value === 'task') || (c.field === 'type' && c.value === 'task'))
+  )
+  const taskOnlyInUse = narrowedToTasks
+    ? []
+    : [...new Set(form.actions.map(a => a.type).filter(t => taskOnlyActions.includes(t)))]
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const updateCond = (i, c) => set('conditions', form.conditions.map((x, j) => j === i ? c : x))
   const removeCond = (i) => set('conditions', form.conditions.filter((_, j) => j !== i))
-  const addCond = () => set('conditions', [...form.conditions, { field: 'status', op: 'eq', value: 'todo' }])
+  const addCond = () => set('conditions', [...form.conditions, { field: 'status', op: 'eq', value: defaultValueFor(conditionValues.status) }])
   const updateAction = (i, a) => set('actions', form.actions.map((x, j) => j === i ? a : x))
   const removeAction = (i) => set('actions', form.actions.filter((_, j) => j !== i))
-  const addAction = () => set('actions', [...form.actions, { type: 'set_status', value: 'in_progress' }])
+  const addAction = () => set('actions', [...form.actions, { type: 'set_status', value: defaultValueFor(actionValues.set_status) }])
 
   return (
     <FormModal
@@ -180,7 +264,7 @@ function RuleModal({ initial, onSave, onClose, t }) {
       </FormField>
       <FormField label="Conditions (all must match)">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} fields={fieldsForTrigger} ops={conditionOps} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} />)}
+          {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} fields={fieldsForTrigger} ops={conditionOps} specs={conditionValues} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} t={t} />)}
           <button onClick={addCond} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
             <Plus size={10} /> Add Condition
           </button>
@@ -194,10 +278,15 @@ function RuleModal({ initial, onSave, onClose, t }) {
       </FormField>
       <FormField label="Actions">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {form.actions.map((a, i) => <ActionRow key={i} action={a} types={actionTypes} onChange={v => updateAction(i, v)} onRemove={() => removeAction(i)} />)}
+          {form.actions.map((a, i) => <ActionRow key={i} action={a} types={actionTypes} specs={actionValues} onChange={v => updateAction(i, v)} onRemove={() => removeAction(i)} t={t} />)}
           <button onClick={addAction} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
             <Plus size={10} /> Add Action
           </button>
+          {taskOnlyInUse.length > 0 && (
+            <span className="kt-rule-hint" style={{ color: DARK.textDim }}>
+              {t('rules.taskOnlyActions', { actions: taskOnlyInUse.join(', ') })}
+            </span>
+          )}
         </div>
       </FormField>
       <FormField label="Project ID (optional, leave blank for global)">
@@ -325,7 +414,7 @@ export default function WorkflowRules() {
                     ))}
                     {(rule.actions || []).map((a, i) => (
                       <span key={i} className="kt-chip" style={{ color: DARK.success, background: 'rgba(250,204,21,0.1)' }}>
-                        → {a.type}: {a.value}
+                        → {actionLabel(a.type, t)}: {a.value}
                       </span>
                     ))}
                   </div>

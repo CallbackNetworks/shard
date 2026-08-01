@@ -475,3 +475,84 @@ def test_an_unmet_condition_still_settles_it(client, db, sample_project):
     data = client.post(f"/api/workflow-rules/{rule_id}/test?node_id={task.id}").json()
     assert data["would_fire"] is False
     assert data["actions"] == []
+
+
+# --- Every value box knows what belongs in it (ADR-0056) ---
+
+
+class TestValueVocabulary:
+    """The editor rendered one free text box for every action and every condition,
+    because the vocabulary that would have told it otherwise was served and never read —
+    and for eleven of the eighteen slots it was never served at all. These tests pin the
+    served side: a slot with no spec falls back to a free box, which is the defect.
+    """
+
+    def test_every_action_type_says_what_its_value_may_be(self, client):
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        assert sorted(body["action_values"]) == body["action_types"]
+        assert all(spec["kind"] in ("enum", "suggest", "free") for spec in body["action_values"].values())
+
+    def test_every_condition_field_says_what_its_value_may_be(self, client):
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        assert sorted(body["condition_values"]) == body["condition_fields"]
+        assert all(spec["kind"] in ("enum", "suggest", "free") for spec in body["condition_values"].values())
+
+    def test_a_closed_set_is_offered_in_the_order_it_means_something(self, client):
+        """Alphabetical order would read high/low/medium and put "done" first: the same
+        vocabulary, presented as nonsense. The engine's tuple is the order."""
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        assert body["action_values"]["set_status"] == {
+            "kind": "enum",
+            "options": ["todo", "in_progress", "done", "failed"],
+        }
+        assert body["action_values"]["set_priority"]["options"] == ["low", "medium", "high"]
+
+    def test_an_enum_option_is_something_the_write_surface_accepts(self, client):
+        """The point of offering a list: everything on it saves. A picker that offers a
+        value the schema then rejects is worse than a text box."""
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        for value in body["action_values"]["set_status"]["options"]:
+            r = client.post("/api/workflow-rules", json=_rule_body(actions=[{"type": "set_status", "value": value}]))
+            assert r.status_code == 201, value
+
+    def test_labels_that_exist_are_offered_instead_of_typed(self, client, db, sample_project):
+        graph.create_label(db, project_id=sample_project.id, name="urgent", color="#f00")
+        db.commit()
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        assert "urgent" in body["action_values"]["add_label"]["options"]
+        assert "urgent" in body["condition_values"]["has_label"]["options"]
+        # Open, not closed: a rule may name a label that will be created tomorrow, which
+        # is why the miss is a warning rather than a 422 (ADR-0054).
+        assert body["action_values"]["add_label"]["kind"] == "suggest"
+
+    def test_fire_event_says_how_many_integrations_would_receive_each_event(self, client, db):
+        """The one action whose effect lands on another page. Without the count it reads
+        as a button that does something, when it may reach nobody."""
+        from app.models import Integration
+
+        db.add(Integration(name="ops", type="webhook", url="https://x.test", events=["task.done"], active=True))
+        db.commit()
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        spec = body["action_values"]["fire_event"]
+        assert spec["subscribers"]["task.done"] == 1
+        assert spec["subscribers"]["task.created"] == 0
+        assert set(spec["subscribers"]) == set(spec["options"])
+
+    def test_a_rules_own_event_becomes_offerable_to_the_next_rule(self, client):
+        """``fire_event`` takes a free string, so the vocabulary is the built-ins plus
+        whatever the user's own active rules emit (ADR-0048)."""
+        client.post(
+            "/api/workflow-rules",
+            json=_rule_body(actions=[{"type": "fire_event", "value": "deploy.requested"}]),
+        )
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        assert "deploy.requested" in body["action_values"]["fire_event"]["options"]
+
+    def test_label_suggestions_can_be_narrowed_to_one_project(self, client, db, sample_project):
+        graph.create_label(db, project_id=sample_project.id, name="here", color="#f00")
+        other = graph.create_project(db, name="Other")
+        graph.create_label(db, project_id=other.id, name="elsewhere", color="#f00")
+        db.commit()
+        body = client.get(f"/api/workflow-rules/vocabulary?project_id={sample_project.id}").json()
+        options = body["action_values"]["add_label"]["options"]
+        assert "here" in options and "elsewhere" not in options

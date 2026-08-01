@@ -257,10 +257,11 @@ async def _run_edge_rules(db: Session, source_id: str, target_id: str, rel_type:
     the generalisation, and conditions (``has_role``, ``edge_side``) narrow it back down;
     a rule whose conditions do not match leaves nothing behind at all.
     """
-    from app.services.rules_engine import subject_for
+    from app.services.rules_engine import EDGE_SIDE_SOURCE, EDGE_SIDE_TARGET, subject_for
 
     trigger = "edge.added" if added else "edge.removed"
-    for subject_id, other_id, side in ((source_id, target_id, "source"), (target_id, source_id, "target")):
+    ends = ((source_id, target_id, EDGE_SIDE_SOURCE), (target_id, source_id, EDGE_SIDE_TARGET))
+    for subject_id, other_id, side in ends:
         subject = subject_for(db, subject_id)
         if subject is None:
             continue

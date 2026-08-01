@@ -767,6 +767,8 @@ entry), or `failed` (raised — written as `rule.failed`).
 ```
 
 #### `GET /workflow-rules/vocabulary`
+Query: `project_id` (optional — narrows the label suggestions to one project).
+
 Everything the rule editor needs to render itself. It renders whatever this returns
 rather than keeping its own copy, so anything the UI offers is by construction something
 the engine understands (ADR-0048, ADR-0049).
@@ -784,12 +786,39 @@ the engine understands (ADR-0048, ADR-0049).
   "condition_fields": ["assignee", "changed_field", "edge_side", "edge_type", "has_label", "has_role", "other_type", "priority", "status", "title_contains", "type"],
   "condition_ops": ["contains", "eq", "in", "neq"],
   "action_types": ["add_comment", "add_label", "fire_event", "remove_label", "set_assignee", "set_priority", "set_status"],
-  "action_value_enums": { "set_status": ["done", "failed", "in_progress", "todo"], "set_priority": ["high", "low", "medium", "urgent"] },
+  "action_values": {
+    "add_comment": { "kind": "free", "options": [] },
+    "add_label": { "kind": "suggest", "options": ["urgent", "security"] },
+    "fire_event": { "kind": "suggest", "options": ["task.done", "deploy.requested"], "subscribers": { "task.done": 2, "deploy.requested": 0 } },
+    "set_status": { "kind": "enum", "options": ["todo", "in_progress", "done", "failed"] }
+  },
+  "condition_values": {
+    "edge_side": { "kind": "enum", "options": ["source", "target"] },
+    "has_label": { "kind": "suggest", "options": ["urgent", "security"] },
+    "has_role": { "kind": "enum", "options": ["container", "task", "shareable", "subscribable"] },
+    "title_contains": { "kind": "free", "options": [] }
+  },
   "task_only_actions": ["add_comment", "add_label", "remove_label", "set_assignee", "set_priority", "set_status"]
 }
 ```
 
-Any value outside these lists is rejected with 422 at write time.
+Any trigger, condition field, op or action type outside these lists is rejected with 422
+at write time.
+
+`action_values` / `condition_values` say what may go in a rule's **value** (ADR-0056) —
+one entry per action type and per condition field, so a value box is never a bare text
+input with no clue what to type. Three kinds:
+
+| `kind` | Meaning | Control |
+|--------|---------|---------|
+| `enum` | closed; the write surface rejects anything else | a picker. `options` order is meaningful (`todo → failed`, `low → high`), not alphabetical |
+| `suggest` | open, but there is something real to offer (labels that exist, subscribable events, registered relation keys) | a text box with the options attached — a value outside them is legal and may become valid later, which is why the miss is a *warning*, not a 422 |
+| `free` | a comment body, a person's name — nothing to offer | a plain text box |
+
+`fire_event` additionally carries `subscribers`: how many active integrations would
+receive each event. It is the one action whose effect lands elsewhere entirely, and an
+event nobody subscribes to is delivered to nobody — the count says so while the rule is
+still being written, rather than after it has fired into the void.
 
 **Every trigger fires for every node type** (ADR-0049, ADR-0055). Narrow one with a
 `has_role eq task` condition, or `type eq <type_key>` for one specific type. Actions in

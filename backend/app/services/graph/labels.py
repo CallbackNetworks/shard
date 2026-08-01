@@ -192,6 +192,25 @@ def label_ref_exists(db: Session, value: str, *, project_id: str | None = None) 
     return db.query(Node.id).filter(Node.type == NODE_LABEL, Node.title == value).first() is not None
 
 
+def label_names(db: Session, *, project_id: str | None = None) -> list[str]:
+    """Every label name a rule could refer to, deduplicated and sorted.
+
+    The read side of ``label_ref_exists`` and scope-blind for the same reason: a global
+    rule names a label without naming a project, so the editor has to offer what exists
+    anywhere. Suggestions, not a closed set — a rule may legitimately name a label that
+    will be created later, which is why the miss is a warning and not a 422 (ADR-0056).
+
+    Decision records are label nodes too (``data.type == "decision"``), and naming one in
+    a rule is legal but never intended, so they are left out of the suggestions. Legality
+    is unchanged — this list is what to offer, not what is allowed.
+    """
+    if project_id is not None:
+        views = labels_in_project(db, project_id)
+    else:
+        views = [_label_view(node, None) for node in db.query(Node).filter(Node.type == NODE_LABEL).all()]
+    return sorted({view.name for view in views if view.name and view.type != "decision"})
+
+
 def decisions(db: Session, *, project_id: str | None = None, status: str | None = None) -> list[LabelView]:
     """Label nodes whose kind is ``decision``, newest first (filtered in Python).
 
