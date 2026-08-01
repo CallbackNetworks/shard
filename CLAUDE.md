@@ -132,7 +132,7 @@ Config in `backend/pyproject.toml`: line-length 120, rules `E,F,I,W,UP,B`. Ignor
 docker compose exec frontend npm run lint
 ```
 
-Config in `frontend/eslint.config.js` (flat config). CI allows up to 300 warnings (`--max-warnings 300`).
+Config in `frontend/eslint.config.js` (flat config). CI allows up to 10 warnings (`--max-warnings 10`).
 
 ## CI/CD pipeline (`.github/workflows/ci.yml`)
 
@@ -176,7 +176,7 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh databas
 
 **`fire_notifications(db, task, event)`** in `services/notifier.py`: sends to all matching active integrations. Webhook-type integrations get HMAC-SHA256 `X-Signature`/`X-Hub-Signature-256` headers; email integrations use SMTP. Creates a `WebhookDelivery` log row per attempt with retry backoff `[1, 5, 30, 120, 360]` minutes.
 
-**`run_rules(db, trigger, task, context)`** in `services/rules_engine.py`: evaluates active `WorkflowRule` rows. Called from `tasks.py` after create (`task.created`) and after status/priority changes. Pass `_rule_depth=1` in context from rule-triggered updates to prevent infinite loops (max depth 2).
+**`run_rules(db, trigger, node, context)`** in `services/rules_engine.py`: evaluates active `WorkflowRule` rows. Triggers are graph-shaped, not task-shaped (ADR-0049, ADR-0055): `node.created`, `node.updated`, `node.deleted`, `edge.added`, `edge.removed`. Called from `services/task_mutations.py` (task writes) and `services/graph_dispatch.py` (every other node/edge write); `context` carries what changed (`changed`, `edge_type`, `edge_side`, `other_type`) so conditions can match the change, not just the subject. Rules never chain: every write a rule makes goes back through the same pipeline with `trigger_rules=False` (ADR-0048).
 
 **Scheduler** (`services/scheduler.py`): asyncio loop, ticks every 3600 s. `_run_tick` runs seven checks, each isolated in its own try/except so one failure cannot starve the rest: due-date reminders (`task.due_soon`/`task.overdue`), recurring task generation, failed webhook retries, daily summary email (once per day at `SUMMARY_HOUR` UTC to all email-type integrations), weekly digest (`DIGEST_DAY`), SLA aging, and the daily backup.
 
@@ -211,10 +211,13 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh databas
 **Inbound CI/CD callback:**
 ```
 POST /webhook/callback/{task.callback_token}
-  -> task.status updated -> log_activity()
-  -> fire_notifications() -> WebhookDelivery logged
-  -> if all tasks done -> fire "project.complete" too
-  -> run_rules() called for status_changed trigger
+  -> WebhookEvent row logged (build history), always
+  -> unrecognised status -> log "webhook.unmapped_status", task left unchanged (ADR-0051)
+  -> otherwise apply_task_update(status, source="webhook", sync_external=False)
+       -> log_activity()
+       -> fire_notifications() -> WebhookDelivery logged
+       -> if all tasks done -> fire "project.complete" too
+       -> run_rules("node.updated", context={"changed": [...]})
 ```
 
 **External API** (`/api/v1`): requires `X-API-Key` header. Auth middleware is bypassed for `/api/v1/` — API key is the sole auth mechanism. Scopes: `read`, `write`, `admin`.
