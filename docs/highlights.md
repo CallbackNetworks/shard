@@ -144,13 +144,18 @@ Every task gets a unique callback URL. Point your CI/CD pipeline at it and task 
 
 ## 9. Workflow Automation Engine
 
-Define rules that trigger on task events and execute actions automatically:
+Define rules that trigger on any change to the graph and execute actions automatically:
 
-- **Triggers:** `task.created`, `task.status_changed`, `task.priority_changed`
-- **Conditions:** Filter by status, priority, labels, or assignee
+- **Triggers:** `node.created`, `node.updated`, `node.deleted`, `edge.added`,
+  `edge.removed` — every node type, not only tasks (ADR-0049, ADR-0055)
+- **Conditions:** Filter by what the subject *is* (status, priority, labels, assignee,
+  type, role) and by what just *happened* to it (which field moved, which relationship,
+  which end of it, what was at the far end)
 - **Actions:** Auto-assign, change status, change priority, add labels, send notifications
-- **Depth limiting:** Rules can trigger other rules (max depth 2) to prevent infinite loops
-- **Dry run:** Test rules against existing tasks before activating
+- **No chaining:** a rule's own writes are dispatched with rules disabled, so a rule can
+  never trigger another one
+- **Dry run:** Test a rule against any node before activating — it reports what each
+  action would actually do, and says so when the answer depends on the change itself
 
 ---
 

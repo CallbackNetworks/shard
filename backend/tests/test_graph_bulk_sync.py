@@ -38,7 +38,7 @@ def test_bulk_update_runs_workflow_rules(client, db):
     db.add(
         WorkflowRule(
             name="Escalate done tasks",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[{"field": "status", "op": "eq", "value": "done"}],
             actions=[{"type": "set_priority", "value": "high"}],
             active=True,

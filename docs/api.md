@@ -755,9 +755,9 @@ entry), or `failed` (raised — written as `rule.failed`).
 {
   "name": "string",
   "project_id": "uuid (optional, null = global)",
-  "trigger": "node.created | task.status_changed | task.label_added | task.priority_changed",
+  "trigger": "node.created | node.updated | node.deleted | edge.added | edge.removed",
   "conditions": [
-    { "field": "priority | status | title_contains | has_label | assignee | type | has_role", "op": "eq | neq | contains | in", "value": "string or array" }
+    { "field": "priority | status | title_contains | has_label | assignee | type | has_role | changed_field | edge_type | edge_side | other_type", "op": "eq | neq | contains | in", "value": "string or array" }
   ],
   "actions": [
     { "type": "set_status | set_priority | set_assignee | add_label | remove_label | add_comment | fire_event", "value": "string" }
@@ -773,8 +773,15 @@ the engine understands (ADR-0048, ADR-0049).
 
 ```json
 {
-  "triggers": ["node.created", "task.status_changed", "task.label_added", "task.priority_changed"],
-  "condition_fields": ["assignee", "has_label", "has_role", "priority", "status", "title_contains", "type"],
+  "triggers": ["node.created", "node.updated", "node.deleted", "edge.added", "edge.removed"],
+  "trigger_context_fields": {
+    "node.created": [],
+    "node.updated": ["changed_field"],
+    "node.deleted": [],
+    "edge.added": ["edge_side", "edge_type", "other_type"],
+    "edge.removed": ["edge_side", "edge_type", "other_type"]
+  },
+  "condition_fields": ["assignee", "changed_field", "edge_side", "edge_type", "has_label", "has_role", "other_type", "priority", "status", "title_contains", "type"],
   "condition_ops": ["contains", "eq", "in", "neq"],
   "action_types": ["add_comment", "add_label", "fire_event", "remove_label", "set_assignee", "set_priority", "set_status"],
   "action_value_enums": { "set_status": ["done", "failed", "in_progress", "todo"], "set_priority": ["high", "low", "medium", "urgent"] },
@@ -784,10 +791,31 @@ the engine understands (ADR-0048, ADR-0049).
 
 Any value outside these lists is rejected with 422 at write time.
 
-`node.created` fires for **every** node, not only tasks (ADR-0049). Narrow it with a
+**Every trigger fires for every node type** (ADR-0049, ADR-0055). Narrow one with a
 `has_role eq task` condition, or `type eq <type_key>` for one specific type. Actions in
 `task_only_actions` are skipped (and logged as `rule.skipped`) when the node they land on
 has no task role.
+
+The last four condition fields describe **the change**, not the subject, and only some
+triggers supply them — that is what `trigger_context_fields` lists. A rule using one its
+trigger does not carry is rejected with 422 (not warned about: `node.created` will never
+carry a `changed_field`, so the rule contradicts itself).
+
+| Trigger | Fires when | Subject |
+|---------|-----------|---------|
+| `node.created` | any node is created | the new node |
+| `node.updated` | one or more fields actually move — a write echoing the current value back is not a change | the updated node; `changed_field` holds the whole set, so one edit touching two fields runs a matching rule once |
+| `node.deleted` | before the teardown, while the subject still exists | the node being deleted; every action but `fire_event` is skipped with reason `node_deleted`, because a write to a node on its way out is one nobody will ever read |
+| `edge.added` / `edge.removed` | any relationship is written or dropped | **each endpoint in turn** — `edge_side` is `source` or `target`, `other_type` is the type at the far end. A rule with no conditions therefore runs twice for one edge |
+
+Edges that disappear because their node was deleted do not fire `edge.removed`;
+`node.deleted` is the event that covers them.
+
+The task-shaped triggers this replaces map onto conditions: `task.status_changed` is
+`node.updated` + `changed_field eq status`, and `task.label_added` is `edge.added` +
+`edge_type eq labeled`. Existing rules were rewritten into that form by migration
+`c2e4a6b8d0f1`, which also added `has_role eq task` so a rule written for tasks does not
+start running against projects and labels.
 
 #### `GET /workflow-rules/{id}`
 #### `PATCH /workflow-rules/{id}`
@@ -817,7 +845,16 @@ actions the engine skips every time. Each one is now put through the engine's ow
 prediction, so a dry-run reports the same four-value `outcome` an execution records and
 cannot promise something the engine would not do (ADR-0054). `would_fire` answers only
 whether the conditions match; `effect_count` answers how many actions would change
-anything. Empty `actions` when `would_fire` is false.
+anything. Empty `actions` when `would_fire` is `false`.
+
+`would_fire` and each entry of `conditions_met` are **tri-state**: `true`, `false`, or
+`null`. A subject is not an event, so a condition about the change that fires the rule
+(`changed_field`, `edge_type`, `edge_side`, `other_type`) has no answer here and reports
+`null` rather than `false` — calling it unmet would make every `node.updated` rule report
+"would not fire", the same false report as the pre-ADR-0054 dry-run in the opposite
+direction. `false` beats `null` beats `true`: one definitely-unmet condition settles it,
+otherwise an undecidable one leaves the answer open and the action predictions are still
+returned (ADR-0055).
 
 ---
 

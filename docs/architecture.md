@@ -136,11 +136,14 @@ so the rest of the codebase reads as if the old tables still existed.
 behaviour: task-role nodes go through the task pipeline, container-role nodes seed share
 tokens on create and cascade on delete (`graph.delete_container`), everything else gets a
 plain node write. `dispatch_edge_added` / `dispatch_edge_removed` do the same for
-relationships: `labeled` fires the label activity, the `task.label_added` workflow trigger
-and outbound label sync; `in_cycle` fires milestone sync; `depends_on` broadcasts both
-endpoints; `contains` onto a task-role node logs a membership change. Both take
-`commit=False` / `broadcast=False` for batch callers that own the transaction and emit one
-aggregate event.
+relationships: `labeled` fires the label activity and outbound label sync; `in_cycle` fires
+milestone sync; `depends_on` broadcasts both endpoints; `contains` onto a task-role node
+logs a membership change. Every edge write also runs the `edge.added` / `edge.removed`
+workflow triggers once for *each* endpoint (ADR-0055) — `contains` goes container → task,
+so a rule about a task being filed somewhere would never see it if only the source
+counted. Both take `commit=False` / `broadcast=False` for batch callers that own the
+transaction and emit one aggregate event, and `trigger_rules=False` for writes a rule
+itself made.
 
 **`task_mutations.py`** — the single post-mutation sequence for tasks (ADR-0038).
 `finalize_task_create` and `apply_task_update` run, in order: activity log → workflow rules →
@@ -448,10 +451,13 @@ ApiKey:
 WorkflowRule:
   id, name
   project_id  FK → Node (nullable = global)
-  trigger     "task.created" | "task.status_changed" | "task.label_added" | "task.priority_changed"
-  conditions  JSON[]                     # [{field, op, value}, ...]
+  trigger     "node.created" | "node.updated" | "node.deleted" | "edge.added" | "edge.removed"
+  conditions  JSON[]                     # [{field, op, value}, ...]; the change-shaped
+                                         # fields (changed_field, edge_type, edge_side,
+                                         # other_type) are what narrow a generic trigger
+                                         # back to a specific event (ADR-0055)
   actions     JSON[]                     # [{type, value}, ...]
-  active, run_count, last_run_at, created_at
+  active, run_count, effect_count, last_run_at, created_at
 
 RecurrenceRule:
   id

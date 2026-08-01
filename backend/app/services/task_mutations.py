@@ -114,6 +114,11 @@ async def apply_task_update(
     old_description = task.description
     old_due_date = task.due_date
 
+    # What actually moved, before the write. One ``node.updated`` carrying the whole set
+    # replaces the old per-field triggers, so a change to both status and priority runs a
+    # matching rule once rather than twice (ADR-0055).
+    changed_fields = sorted(k for k, v in changes.items() if getattr(task, k, None) != v)
+
     if changes:
         task = graph.update_task(db, task_id, **changes)
 
@@ -130,10 +135,14 @@ async def apply_task_update(
             detail=f'Task "{task.title}" changed from {old_status} to {changes["status"]}{suffix}',
             meta={"old_status": old_status, "new_status": changes["status"], **(activity_meta or {})},
         )
-        triggered_rules.append(("task.status_changed", {"old_status": old_status}))
 
-    if "priority" in changes and changes["priority"] != old_priority:
-        triggered_rules.append(("task.priority_changed", {"old_priority": old_priority}))
+    if changed_fields:
+        triggered_rules.append(
+            (
+                "node.updated",
+                {"changed": changed_fields, "old_status": old_status, "old_priority": old_priority},
+            )
+        )
 
     if "assignee" in changes and changes["assignee"] != old_assignee:
         log_activity(

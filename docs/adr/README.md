@@ -56,3 +56,4 @@
 | [0052](0052-recorded-is-not-visible.md) | 記錄下來不等於看得見 | Accepted | 2026-08-01 |
 | [0053](0053-an-execution-record-says-what-it-set-off.md) | 執行紀錄要說出它觸發了什麼 | Accepted | 2026-08-01 |
 | [0054](0054-one-prediction-shared-by-three-surfaces.md) | 預演與執行共用同一個判斷 | Accepted | 2026-08-01 |
+| [0055](0055-rules-trigger-on-graph-change-not-only-creation.md) | 規則觸發於整張圖的變更，而不只是建立 | Accepted | 2026-08-01 |

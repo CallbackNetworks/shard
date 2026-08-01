@@ -27,12 +27,16 @@ from app.services.rules_engine import (
 from app.services.task_mutations import _SOURCE_SUFFIX
 from tests.source_scan import app_sources, calls_to, keyword_arg, positional_args
 
-TRIGGER_LITERAL = re.compile(r'"((?:task|node)\.[a-z_]+)"')
+TRIGGER_LITERAL = re.compile(r'"((?:task|node|edge)\.[a-z_]+)"')
 STRING_LITERAL = re.compile(r'^"([^"]*)"$')
 
 # Where a trigger is queued rather than passed straight in: apply_task_update collects
 # (trigger, context) pairs while it works out what changed, then drains them.
-QUEUE_APPEND = re.compile(r"triggered_rules\.append\(\(\s*\"((?:task|node)\.[a-z_]+)\"")
+QUEUE_APPEND = re.compile(r"triggered_rules\.append\(\s*\(?\s*\(?\s*\"((?:task|node|edge)\.[a-z_]+)\"")
+
+# Where the trigger is chosen a line before it is passed: the edge dispatcher picks
+# between edge.added and edge.removed once and hands the variable to run_rules.
+ASSIGNMENT = re.compile(r"^[ \t]*(\w+)[ \t]*=[ \t]*(.+)$", re.M)
 
 # Functions whose ``source=`` argument is a notification source. Scoped deliberately:
 # ``source`` is a common parameter name (a label's origin, an assistant decision's
@@ -57,6 +61,11 @@ def _triggers_fired() -> set[str]:
     found: set[str] = set()
     for _path, source in app_sources():
         queued = set(QUEUE_APPEND.findall(source))
+        assigned: dict[str, set[str]] = {}
+        for name, expression in ASSIGNMENT.findall(source):
+            literals = set(TRIGGER_LITERAL.findall(expression))
+            if literals:
+                assigned.setdefault(name, set()).update(literals)
         for args in calls_to(source, "run_rules"):
             positional = positional_args(args)
             if len(positional) < 2:
@@ -65,8 +74,9 @@ def _triggers_fired() -> set[str]:
             if literals:
                 found.update(literals)
             elif positional[1].isidentifier():
-                # Drained from the queue built earlier in the same module.
+                # Named a line earlier: drained from the queue, or chosen by a branch.
                 found.update(queued)
+                found.update(assigned.get(positional[1], set()))
     return found
 
 

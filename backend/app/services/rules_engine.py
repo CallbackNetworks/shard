@@ -20,9 +20,10 @@ logger = logging.getLogger(__name__)
 # test pins each entry to a real ``run_rules`` call (ADR-0048).
 SUPPORTED_TRIGGERS = [
     "node.created",
-    "task.status_changed",
-    "task.label_added",
-    "task.priority_changed",
+    "node.updated",
+    "node.deleted",
+    "edge.added",
+    "edge.removed",
 ]
 
 # The vocabulary the engine understands. An unrecognised field, op or action type
@@ -30,8 +31,36 @@ SUPPORTED_TRIGGERS = [
 # spelling (``title`` for ``title_contains``, ``equals`` for ``eq``) sits in the list
 # looking healthy while never firing. These sets are the source of truth the schema
 # layer validates against, so such a rule is rejected at write time instead.
-CONDITION_FIELDS = {"status", "priority", "assignee", "title_contains", "has_label", "type", "has_role"}
+CONDITION_FIELDS = {
+    # What the subject *is*.
+    "status",
+    "priority",
+    "assignee",
+    "title_contains",
+    "has_label",
+    "type",
+    "has_role",
+    # What just *happened* to it (ADR-0055). These read the trigger's context rather
+    # than the node, and only some triggers carry each of them.
+    "changed_field",
+    "edge_type",
+    "edge_side",
+    "other_type",
+}
 CONDITION_OPS = {"eq", "neq", "contains", "in"}
+
+# Which context fields each trigger carries. A condition on a field its trigger never
+# supplies is a rule that can never fire — not because the world is missing something,
+# but because the rule contradicts itself — so it is rejected at write time rather than
+# warned about (ADR-0055; the warning/422 line is drawn in ADR-0054).
+TRIGGER_CONTEXT_FIELDS = {
+    "node.created": set(),
+    "node.updated": {"changed_field"},
+    "node.deleted": set(),
+    "edge.added": {"edge_type", "edge_side", "other_type"},
+    "edge.removed": {"edge_type", "edge_side", "other_type"},
+}
+CONTEXT_FIELDS = set().union(*TRIGGER_CONTEXT_FIELDS.values())
 ACTION_TYPES = {
     "set_status",
     "set_priority",
@@ -135,25 +164,57 @@ def _session_of(task) -> Session | None:
         return None
 
 
-def _eval_condition(cond: dict, task, context: dict, db: Session | None = None) -> bool:
+def _membership(held: bool, op: str) -> bool:
+    """A set-valued field's answer. ``neq`` inverts it; everything else asserts it.
+
+    Shared by ``has_label``, ``has_role`` and ``changed_field``: all three ask whether
+    something is in a set, and ``has_label`` used to ignore the operator entirely — so
+    ``has_label neq urgent`` matched exactly the tasks that *do* carry urgent (ADR-0055).
+    """
+    return not held if op == "neq" else held
+
+
+def _in_set(values, op: str, value) -> bool:
+    """Whether ``value`` (or, for ``in``, any of a list) is among ``values``."""
+    wanted = value if isinstance(value, list) else [value]
+    return _membership(any(v in values for v in wanted), op)
+
+
+def _eval_condition(cond: dict, task, context: dict, db: Session | None = None) -> bool | None:
     """Evaluate one condition against a task view or a plain ``Node`` (ADR-0049).
 
     Both carry ``type``/``title``/``status``/``priority``; only a task view has
     ``assignee`` (it lives in the node's ``data``), so on any other node that field
     reads as empty and an ``eq`` condition on it simply does not match.
+
+    Returns ``None`` — not ``False`` — for a condition about the change that triggered
+    the rule when no change is at hand (ADR-0055). Only the dry-run can be in that
+    position; at run time the trigger always supplies its own context fields, and a rule
+    carrying a field its trigger does not supply is rejected at write time. The
+    distinction matters because "this does not match" and "this cannot be judged here"
+    are different answers, and reporting the second as the first is how the dry-run
+    lied before ADR-0054.
     """
     field = cond.get("field", "")
     op = cond.get("op", "eq")
     value = cond.get("value", "")
 
-    if field == "type":
+    if field in CONTEXT_FIELDS:
+        key = "changed" if field == "changed_field" else field
+        if key not in context:
+            return None
+        actual = context[key]
+        if isinstance(actual, list | set | tuple):
+            return _in_set(actual, op, value)
+        actual = actual or ""
+
+    elif field == "type":
         actual = task.type or ""
     elif field == "has_role":
         session = db if db is not None else _session_of(task)
         if session is None:
             return False
-        held = graph.has_role(session, task.type, value)
-        return held if op != "neq" else not held
+        return _membership(graph.has_role(session, task.type, value), op)
     elif field == "status":
         actual = task.status or ""
     elif field == "priority":
@@ -165,7 +226,7 @@ def _eval_condition(cond: dict, task, context: dict, db: Session | None = None) 
     elif field == "has_label":
         session = db if db is not None else _session_of(task)
         label_names = [lb.name for lb in graph.labels_for_task(session, task.id)] if session is not None else []
-        return value in label_names
+        return _in_set(label_names, op, value)
     else:
         return False
 
@@ -204,6 +265,37 @@ def _is_task(db: Session, node) -> bool:
     return graph.has_role(db, node.type, graph.ROLE_TASK)
 
 
+def subject_for(db: Session, node_id: str):
+    """The rule's view of a node: a ``TaskView`` where the type plays the task role.
+
+    A plain ``Node`` has no ``assignee`` (it lives in the node's ``data`` bag), so
+    evaluating a task against one silently reports every assignee condition as unmet.
+    Every entry point that hands a subject to ``run_rules`` resolves it through here.
+    """
+    node = graph.get_node(db, node_id)
+    if node is None:
+        return None
+    if _is_task(db, node):
+        return graph.get_task(db, node_id) or node
+    return node
+
+
+def conditions_unsupported_by(trigger: str, conditions) -> list[str]:
+    """Condition fields this trigger never supplies — a rule that cannot ever fire.
+
+    Distinct from ``rule_warnings``, which is about the world and may come true later.
+    A ``node.created`` rule asking about ``changed_field`` is not waiting for anything;
+    it is self-contradictory, so the write surface rejects it outright (ADR-0055).
+    """
+    allowed = TRIGGER_CONTEXT_FIELDS.get(trigger, set())
+    seen = []
+    for cond in conditions or []:
+        field = cond.get("field", "") if isinstance(cond, dict) else getattr(cond, "field", "")
+        if field in CONTEXT_FIELDS and field not in allowed and field not in seen:
+            seen.append(field)
+    return seen
+
+
 async def _apply_fields(db: Session, task, changes: dict):
     """Write a rule's field change through the task pipeline (ADR-0048).
 
@@ -230,15 +322,19 @@ async def _apply_fields(db: Session, task, changes: dict):
     )
 
 
-def _scope_of(db: Session, node) -> tuple[str | None, str | None]:
+def _scope_of(db: Session, node, trigger: str | None = None) -> tuple[str | None, str | None]:
     """Where an entry about this node belongs: (project_id, task_id).
 
     The activity feed filters by ``project_id``, so an entry written with ``None`` is
     only reachable from the global list — written but invisible where it matters. A task
     hangs off its project; anything else off its nearest container (ADR-0049/0050).
+
+    On ``node.deleted`` the entry deliberately hangs off the project alone:
+    ``delete_task_tree`` clears the activity rows pointing at the task, so an entry
+    written with ``task_id`` moments before would be deleted along with it (ADR-0055).
     """
     if _is_task(db, node):
-        return graph.project_id_of_task(db, node.id), node.id
+        return graph.project_id_of_task(db, node.id), (None if trigger == "node.deleted" else node.id)
     container = graph.container_of_node(db, node.id)
     return (container.id if container is not None else None), None
 
@@ -255,7 +351,7 @@ def _field_target(field: str, value):
     return (value or None) if field == "assignee" else value
 
 
-def predict_outcome(db: Session, action: dict, node) -> dict:
+def predict_outcome(db: Session, action: dict, node, *, trigger: str | None = None) -> dict:
     """What this action would do to this node — computed without doing it (ADR-0054).
 
     The single source of truth for three surfaces that must never disagree: the engine
@@ -270,6 +366,12 @@ def predict_outcome(db: Session, action: dict, node) -> dict:
     """
     atype = action.get("type", "")
     value = action.get("value", "")
+
+    # The subject is still there — rules run before the teardown — but it is on its way
+    # out, so writing to it is writing to something nobody will ever read (ADR-0055).
+    # Firing an event is the one thing that still means something on a deletion.
+    if trigger == "node.deleted" and atype != "fire_event":
+        return _outcome(atype, value, OUTCOME_SKIPPED, reason="node_deleted")
 
     if atype in TASK_ONLY_ACTIONS and not _is_task(db, node):
         return _outcome(atype, value, OUTCOME_SKIPPED, reason="not_a_task")
@@ -322,7 +424,7 @@ def predict_outcome(db: Session, action: dict, node) -> dict:
     return _outcome(atype, value, OUTCOME_SKIPPED, reason="unknown_action")
 
 
-def rule_warnings(db: Session, actions, *, project_id: str | None = None) -> list[dict]:
+def rule_warnings(db: Session, actions, *, project_id: str | None = None, trigger: str | None = None) -> list[dict]:
     """Which of a rule's actions cannot work for *any* subject (ADR-0054).
 
     ``predict_outcome`` answers "what would this do to this task". This answers the
@@ -341,7 +443,11 @@ def rule_warnings(db: Session, actions, *, project_id: str | None = None) -> lis
     for action in actions or []:
         atype = action.get("type", "") if isinstance(action, dict) else getattr(action, "type", "")
         value = action.get("value", "") if isinstance(action, dict) else getattr(action, "value", "")
-        if atype in ("add_label", "remove_label"):
+        if trigger == "node.deleted" and atype != "fire_event":
+            # Subjectless by construction: nothing that gets deleted is worth writing to
+            # (ADR-0055), so this one is knowable the moment the rule is saved.
+            found.append(_outcome(atype, value, OUTCOME_SKIPPED, reason="node_deleted"))
+        elif atype in ("add_label", "remove_label"):
             if not graph.label_ref_exists(db, value, project_id=project_id):
                 found.append(_outcome(atype, value, OUTCOME_SKIPPED, reason="label_not_found"))
         elif atype == "fire_event":
@@ -358,6 +464,9 @@ _SKIP_DETAILS = {
         f'Action "{r["type"]}" skipped: "{r.get("value")}" is not one of {sorted(ACTION_VALUE_ENUMS[r["type"]])}'
     ),
     "label_not_found": lambda r, n: f'Action "{r["type"]}" skipped: no label named "{r.get("value")}" in this project',
+    "node_deleted": lambda r, n: (
+        f'Action "{r["type"]}" skipped: {n.type} "{n.title}" is being deleted, so writing to it would be lost'
+    ),
     "unknown_action": lambda r, n: f'Action "{r["type"]}" skipped: the engine has no implementation for it',
 }
 
@@ -370,7 +479,7 @@ def skip_detail(record: dict, node) -> str:
     return describe(record, node)
 
 
-def _skip(db: Session, node, record: dict, rule: WorkflowRule | None = None) -> dict:
+def _skip(db: Session, node, record: dict, rule: WorkflowRule | None = None, trigger: str | None = None) -> dict:
     """Record that an action could not run, instead of doing nothing quietly.
 
     An action that cannot execute is the exact shape of bug this module keeps producing
@@ -385,7 +494,7 @@ def _skip(db: Session, node, record: dict, rule: WorkflowRule | None = None) -> 
     guess which of their rules said that.
     """
     atype, reason = record["type"], record.get("reason", "unknown")
-    project_id, task_id = _scope_of(db, node)
+    project_id, task_id = _scope_of(db, node, trigger)
     meta = {"node_id": node.id, "type": node.type, "action": atype, "reason": reason}
     if rule is not None:
         meta["rule_id"] = rule.id
@@ -443,7 +552,9 @@ async def _fire(db: Session, node, event: str) -> int:
     return await fire_node_notifications(db, node, event, source="rule", actor="workflow")
 
 
-async def _exec_action(db: Session, action: dict, task, rule: WorkflowRule | None = None) -> tuple[object, dict]:
+async def _exec_action(
+    db: Session, action: dict, task, rule: WorkflowRule | None = None, trigger: str | None = None
+) -> tuple[object, dict]:
     """Execute one rule action.
 
     Execution is prediction plus the write: ``predict_outcome`` decides what this action
@@ -454,11 +565,11 @@ async def _exec_action(db: Session, action: dict, task, rule: WorkflowRule | Non
     Returns the subject (refreshed if the action changed it) and the record of what the
     action did — see ``_outcome``.
     """
-    record = predict_outcome(db, action, task)
+    record = predict_outcome(db, action, task, trigger=trigger)
     atype, value, outcome = record["type"], record.get("value"), record["outcome"]
 
     if outcome == OUTCOME_SKIPPED:
-        return task, _skip(db, task, record, rule)
+        return task, _skip(db, task, record, rule, trigger)
     if outcome == OUTCOME_NO_OP:
         # Nothing left to do, by definition: the field already holds the value, the label
         # is already (or already not) attached, the event has nobody to reach.
@@ -499,7 +610,7 @@ async def _exec_action(db: Session, action: dict, task, rule: WorkflowRule | Non
     # Unreachable: ``predict_outcome`` skips any type it has no branch for, and a guard
     # test pins both dispatches to ACTION_TYPES. Kept so an action added to prediction but
     # not here degrades to a visible skip instead of a silent success.
-    return task, _skip(db, task, _outcome(atype, value, OUTCOME_SKIPPED, reason="unknown_action"), rule)
+    return task, _skip(db, task, _outcome(atype, value, OUTCOME_SKIPPED, reason="unknown_action"), rule, trigger)
 
 
 async def _write_label(db: Session, task: "graph.TaskView", label_id: str, *, added: bool) -> None:
@@ -511,7 +622,7 @@ async def _write_label(db: Session, task: "graph.TaskView", label_id: str, *, ad
     from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 
     # Same arguments either way: the caller owns the commit and the aggregate broadcast,
-    # and trigger_rules=False stops task.label_added from re-entering the engine.
+    # and trigger_rules=False stops the edge.added it writes from re-entering the engine.
     opts = dict(actor="workflow", commit=False, broadcast=False, trigger_rules=False)
     if added:
         graph.set_label(db, task.id, label_id)
@@ -531,8 +642,13 @@ async def run_rules(
 ) -> None:
     """Evaluate all active rules matching the trigger and execute matching ones.
 
-    ``task`` is the rule's subject: a ``TaskView`` on the task triggers, a plain ``Node``
-    on ``node.created``, which fires for every node type (ADR-0049).
+    ``task`` is the rule's subject: a ``TaskView`` for a task-role node, a plain ``Node``
+    otherwise. Every trigger now fires for every node type — creation, field changes,
+    deletion, and either end of an edge (ADR-0055).
+
+    ``context`` carries what just happened: ``changed`` for ``node.updated``, and
+    ``edge_type``/``edge_side``/``other_type`` for the edge triggers. Conditions on those
+    fields are what narrow a generic trigger back down to a specific event.
 
     Rules never chain: every write a rule makes is dispatched with ``trigger_rules=False``,
     so this function is never re-entered from its own actions (ADR-0048). The depth
@@ -551,7 +667,7 @@ async def run_rules(
         return
 
     is_task = _is_task(db, task)
-    task_project_id, task_scope_id = _scope_of(db, task)
+    task_project_id, task_scope_id = _scope_of(db, task, trigger)
     node_id = task.id
     for rule in rules:
         # Check project scope
@@ -564,9 +680,11 @@ async def run_rules(
             # on the paths that leave the commit to the caller, the very write that
             # triggered this run. One rule's defect is now one rule's problem.
             with db.begin_nested():
-                # Evaluate conditions (AND logic)
-                all_match = all(_eval_condition(c, task, context, db) for c in (rule.conditions or []))
-                if not all_match:
+                # Conditions are ANDed. ``is True`` rather than a plain truth test: an
+                # undecidable condition (ADR-0055) must not fire the rule, and the only
+                # way to get one here would be a rule whose trigger does not supply the
+                # field — which the write surface rejects.
+                if not all(_eval_condition(c, task, context, db) is True for c in (rule.conditions or [])):
                     continue
 
                 # Execute actions. Each returns the task, refreshed when it changed it,
@@ -574,7 +692,7 @@ async def run_rules(
                 # a record of what it actually did.
                 records: list[dict] = []
                 for action in rule.actions or []:
-                    task, record = await _exec_action(db, action, task, rule)
+                    task, record = await _exec_action(db, action, task, rule, trigger)
                     records.append(record)
 
                 effects = sum(1 for record in records if record["outcome"] == OUTCOME_APPLIED)

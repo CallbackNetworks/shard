@@ -214,7 +214,7 @@ class TestRunRules:
         project, task = setup
         rule = WorkflowRule(
             name="Auto high priority comment",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[{"field": "status", "op": "eq", "value": "done"}],
             actions=[{"type": "add_comment", "value": "Task completed!"}],
             active=True,
@@ -223,7 +223,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
         db.flush()
 
         c = db.query(Comment).filter(Comment.task_id == task.id).first()
@@ -237,7 +237,7 @@ class TestRunRules:
         project, task = setup
         rule = WorkflowRule(
             name="Only for todo",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[{"field": "status", "op": "eq", "value": "todo"}],
             actions=[{"type": "add_comment", "value": "Should not appear"}],
             active=True,
@@ -246,7 +246,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
 
         c = db.query(Comment).filter(Comment.task_id == task.id).first()
         assert c is None
@@ -257,7 +257,7 @@ class TestRunRules:
         project, task = setup
         rule = WorkflowRule(
             name="Disabled rule",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[],
             actions=[{"type": "set_priority", "value": "low"}],
             active=False,
@@ -266,7 +266,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
         assert task.priority == "high"
 
     @pytest.mark.asyncio
@@ -274,7 +274,7 @@ class TestRunRules:
         project, task = setup
         rule = WorkflowRule(
             name="On create only",
-            trigger="task.created",
+            trigger="node.created",
             conditions=[],
             actions=[{"type": "set_priority", "value": "low"}],
             active=True,
@@ -283,7 +283,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
         assert task.priority == "high"
 
     @pytest.mark.asyncio
@@ -296,7 +296,7 @@ class TestRunRules:
         rule = WorkflowRule(
             name="Scoped to other",
             project_id=other.id,
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[],
             actions=[{"type": "set_priority", "value": "low"}],
             active=True,
@@ -305,7 +305,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
         assert task.priority == "high"
 
     @pytest.mark.asyncio
@@ -320,7 +320,7 @@ class TestRunRules:
         db.add(
             WorkflowRule(
                 name="A: start work",
-                trigger="task.created",
+                trigger="node.created",
                 conditions=[],
                 actions=[{"type": "set_status", "value": "in_progress"}],
                 active=True,
@@ -329,7 +329,7 @@ class TestRunRules:
         )
         chained = WorkflowRule(
             name="B: reacts to status changes",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[],
             actions=[{"type": "set_priority", "value": "low"}],
             active=True,
@@ -338,7 +338,7 @@ class TestRunRules:
         db.add(chained)
         db.flush()
 
-        await run_rules(db, "task.created", task, {})
+        await run_rules(db, "node.created", task, {})
 
         assert graph.get_task(db, task.id).status == "in_progress"  # A ran
         db.refresh(chained)
@@ -350,7 +350,7 @@ class TestRunRules:
         project, task = setup
         rule = WorkflowRule(
             name="Both conditions",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[
                 {"field": "status", "op": "eq", "value": "done"},
                 {"field": "priority", "op": "eq", "value": "high"},
@@ -362,7 +362,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
         db.flush()
 
         c = db.query(Comment).filter(Comment.task_id == task.id).first()
@@ -374,7 +374,7 @@ class TestRunRules:
         project, task = setup
         rule = WorkflowRule(
             name="Partial match",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[
                 {"field": "status", "op": "eq", "value": "done"},
                 {"field": "priority", "op": "eq", "value": "low"},  # task is high
@@ -386,7 +386,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
 
         c = db.query(Comment).filter(Comment.task_id == task.id).first()
         assert c is None
@@ -396,7 +396,7 @@ class TestRunRules:
         project, task = setup
         rule = WorkflowRule(
             name="No conditions",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[],
             actions=[{"type": "set_assignee", "value": "bot"}],
             active=True,
@@ -405,7 +405,7 @@ class TestRunRules:
         db.add(rule)
         db.flush()
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
         assert graph.get_task(db, task.id).assignee == "bot"
 
 
@@ -492,7 +492,13 @@ class TestVocabularyMatchesTheEngine:
         return handled
 
     def test_condition_fields(self, source):
-        assert self._handled(source, "field") == rules_engine.CONDITION_FIELDS
+        # The context fields (ADR-0055) share one ``field in CONTEXT_FIELDS`` branch
+        # instead of an ``== "x"`` clause each, so the scan cannot see them individually.
+        # Same argument as FIELD_ACTIONS below: the set is a runtime-inspectable table,
+        # and it is built from TRIGGER_CONTEXT_FIELDS, so a field no trigger supplies
+        # cannot get into it.
+        assert self._handled(source, "field") | rules_engine.CONTEXT_FIELDS == rules_engine.CONDITION_FIELDS
+        assert rules_engine.CONTEXT_FIELDS == set().union(*rules_engine.TRIGGER_CONTEXT_FIELDS.values())
 
     def test_condition_ops(self, source):
         assert self._handled(source, "op") == rules_engine.CONDITION_OPS
@@ -537,9 +543,7 @@ class TestRuleChangesAreVisible:
 
     @staticmethod
     def _rule(db, actions):
-        rule = WorkflowRule(
-            name="R", trigger="task.status_changed", conditions=[], actions=actions, active=True, run_count=0
-        )
+        rule = WorkflowRule(name="R", trigger="node.updated", conditions=[], actions=actions, active=True, run_count=0)
         db.add(rule)
         db.flush()
         return rule
@@ -554,7 +558,7 @@ class TestRuleChangesAreVisible:
             fired.append((event, kwargs.get("source")))
 
         monkeypatch.setattr(task_mutations, "fire_notifications", fake_fire)
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
 
         assert ("task.status_changed", "rule") in fired
         assert ("task.done", "rule") in fired
@@ -564,7 +568,7 @@ class TestRuleChangesAreVisible:
         project, task = setup
         self._rule(db, [{"type": "set_status", "value": "done"}])
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
 
         actions = [a.action for a in db.query(ActivityLog).filter(ActivityLog.task_id == task.id).all()]
         assert "task.status_changed" in actions
@@ -581,7 +585,7 @@ class TestRuleChangesAreVisible:
             lambda *a, **k: called.append(True),
         )
 
-        await run_rules(db, "task.status_changed", task, {})
+        await run_rules(db, "node.updated", task, {})
 
         assert called == []
 

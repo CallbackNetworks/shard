@@ -107,6 +107,9 @@ async def dispatch_node_updated(
     if _has_task_role(db, node.type):
         await apply_task_update(db, node.id, changes, actor=actor, source=source)
         return db.get(Node, node.id)
+    # Which fields actually moved, not which were submitted: a rule asking "when status
+    # changed" must not fire for a PATCH that sent the same status back (ADR-0055).
+    changed = sorted(k for k, v in changes.items() if getattr(node, k, None) != v)
     graph.update_node(db, node.id, **changes)
     log_activity(
         db,
@@ -117,6 +120,9 @@ async def dispatch_node_updated(
         meta={"type": node.type, "node_id": node.id, "fields": sorted(changes)},
     )
     db.commit()
+    if changed:
+        await run_rules(db, "node.updated", db.get(Node, node.id), {"changed": changed})
+        db.commit()
     if changes.get("status") == "archived":
         await _fire_project_event(db, node, "project.archived", source=source, actor=actor)
     await ws_manager.broadcast("node.updated", {"node_id": node.id, "type": node.type})
@@ -151,6 +157,10 @@ async def dispatch_node_deleted(db: Session, node: Node, *, actor: str | None = 
         task = graph.get_task(db, node_id)
         if task is not None:
             await fire_notifications(db, task, "task.deleted", source=source, actor=actor)
+            # Before the teardown, while the subject still exists. Every action but
+            # fire_event is skipped visibly: writing to a node on its way out is a write
+            # nobody will ever read (ADR-0055).
+            await run_rules(db, "node.deleted", task, {})
         graph.delete_task_tree(db, node_id)
         db.commit()
         await ws_manager.broadcast("task.deleted", {"project_id": project_id, "task_id": node_id})
@@ -164,8 +174,11 @@ async def dispatch_node_deleted(db: Session, node: Node, *, actor: str | None = 
         detail=f'{node_type} "{title}" deleted',
         meta={"type": node_type, "node_id": node_id},
     )
+    await run_rules(db, "node.deleted", node, {})
     # Container-role nodes (project/goal/custom) cascade their exclusively-owned tasks
     # and scoped labels/cycles (ADR-0043); other types just drop the node and its edges.
+    # The edges that vanish with the node do not fire edge.removed: this event is the
+    # one that covers them (ADR-0055).
     if node_type in graph.container_type_keys(db):
         graph.delete_container(db, node_id)
     else:
@@ -232,6 +245,39 @@ def _log_label_change(db: Session, task_id: str, label_id: str, *, added: bool, 
     )
 
 
+async def _run_edge_rules(db: Session, source_id: str, target_id: str, rel_type: str, *, added: bool) -> None:
+    """Run the edge rules once for each end of the edge (ADR-0055).
+
+    An edge is a fact about two nodes and either of them may want to react, so the
+    subject is each endpoint in turn and ``edge_side`` says which one it is. Firing only
+    for the source would make "when a task is linked into a container" inexpressible —
+    ``contains`` runs container -> task, so the task is never the source.
+
+    A rule with no conditions therefore runs twice for one edge. That is the price of
+    the generalisation, and conditions (``has_role``, ``edge_side``) narrow it back down;
+    a rule whose conditions do not match leaves nothing behind at all.
+    """
+    from app.services.rules_engine import subject_for
+
+    trigger = "edge.added" if added else "edge.removed"
+    for subject_id, other_id, side in ((source_id, target_id, "source"), (target_id, source_id, "target")):
+        subject = subject_for(db, subject_id)
+        if subject is None:
+            continue
+        other = db.get(Node, other_id)
+        await run_rules(
+            db,
+            trigger,
+            subject,
+            {
+                "edge_type": rel_type,
+                "edge_side": side,
+                "other_type": other.type if other is not None else None,
+                "other_id": other_id,
+            },
+        )
+
+
 async def _dispatch_edge(
     db: Session,
     source_id: str,
@@ -271,15 +317,12 @@ async def _dispatch_edge(
     if commit:
         db.commit()
 
+    if trigger_rules:
+        await _run_edge_rules(db, source_id, target_id, rel_type, added=added)
+        if commit:
+            db.commit()
+
     if rel_type == graph.REL_LABELED:
-        if added:
-            # "task.label_added" is an advertised workflow trigger; before edge
-            # dispatch existed no write path ever fired it (ADR-0045).
-            task = graph.get_task(db, source_id) if trigger_rules else None
-            if task is not None:
-                await run_rules(db, "task.label_added", task, {"label_id": target_id})
-                if commit:
-                    db.commit()
         await _sync_task_labels(db, source_id)
         await _broadcast_task_touched(db, broadcast, source_id)
         return

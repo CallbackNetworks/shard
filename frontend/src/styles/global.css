@@ -3262,6 +3262,15 @@ h1 {
 .kt-rule-subject-option:hover {
   background: rgba(var(--kt-ink-rgb), 0.06);
 }
+/* A condition the chosen trigger can never answer: the rule would be rejected on save,
+   so it is said here, next to the conditions, rather than as a server error (ADR-0055). */
+.kt-rule-stray {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 1.4;
+}
 .kt-activity-event-time {
   display: grid;
   justify-items: end;

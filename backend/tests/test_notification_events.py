@@ -121,7 +121,7 @@ class TestCustomEventsAreSubscribable:
     def _rule(db, *, event: str, active: bool = True) -> WorkflowRule:
         rule = WorkflowRule(
             name=f"emit {event}",
-            trigger="task.status_changed",
+            trigger="node.updated",
             conditions=[],
             actions=[{"type": "fire_event", "value": event}],
             active=active,

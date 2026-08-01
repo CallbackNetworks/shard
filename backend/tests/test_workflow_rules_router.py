@@ -59,7 +59,7 @@ def test_create_rule_with_project_scope(client, sample_project):
         json={
             "name": "Project-scoped rule",
             "project_id": sample_project.id,
-            "trigger": "task.status_changed",
+            "trigger": "node.updated",
             "conditions": [],
             # Was "urgent" before ADR-0047 — no such priority exists, so the rule was
             # accepted and then did nothing; the value enum now rejects it at write time.
@@ -386,3 +386,92 @@ def test_a_working_rule_carries_no_warning(client):
     r = client.post("/api/workflow-rules", json=_rule_body())
     assert r.json()["warnings"] == []
     assert client.get("/api/workflow-rules").json()[0]["warnings"] == []
+
+
+# --- A condition its trigger can never answer is a rejection, not a warning (ADR-0055) ---
+
+
+def test_a_condition_the_trigger_never_supplies_is_rejected(client):
+    """Not a warning: a warning may come true tomorrow, but ``node.created`` will never
+    carry a ``changed_field``. Accepting it would add one more healthy-looking rule that
+    never fires — the failure this whole line of ADRs exists to remove."""
+    r = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(trigger="node.created", conditions=[{"field": "changed_field", "op": "eq", "value": "status"}]),
+    )
+    assert r.status_code == 422
+    assert "changed_field" in r.text
+
+
+def test_the_rejection_names_what_the_trigger_does_carry(client):
+    r = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(trigger="node.updated", conditions=[{"field": "edge_type", "op": "eq", "value": "labeled"}]),
+    )
+    assert r.status_code == 422
+    assert "changed_field" in r.text  # what node.updated offers instead
+
+
+def test_a_context_condition_is_accepted_by_its_own_trigger(client):
+    r = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(trigger="node.updated", conditions=[{"field": "changed_field", "op": "eq", "value": "status"}]),
+    )
+    assert r.status_code == 201
+
+
+def test_patch_is_checked_against_the_merged_rule(client):
+    """Changing only the trigger can strand conditions that were legal under the old one."""
+    rule_id = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(trigger="edge.added", conditions=[{"field": "edge_type", "op": "eq", "value": "labeled"}]),
+    ).json()["id"]
+
+    assert client.patch(f"/api/workflow-rules/{rule_id}", json={"trigger": "node.created"}).status_code == 422
+
+
+def test_the_vocabulary_says_which_fields_each_trigger_carries(client):
+    """So the editor offers only the fields that mean something, instead of letting the
+    user build a rule the write surface then rejects."""
+    body = client.get("/api/workflow-rules/vocabulary").json()
+    assert body["trigger_context_fields"]["node.created"] == []
+    assert body["trigger_context_fields"]["node.updated"] == ["changed_field"]
+    assert body["trigger_context_fields"]["edge.added"] == ["edge_side", "edge_type", "other_type"]
+
+
+# --- A subject is not an event, so some conditions have no answer (ADR-0055) ---
+
+
+def test_dry_run_reports_an_undecidable_condition_as_null(client, db, sample_project):
+    """Reporting it ``False`` would make every ``node.updated`` rule say "would not fire" —
+    the same false answer as the old dry-run, in the opposite direction."""
+    task = _make_task(db, sample_project.id)
+    rule_id = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(trigger="node.updated", conditions=[{"field": "changed_field", "op": "eq", "value": "status"}]),
+    ).json()["id"]
+
+    data = client.post(f"/api/workflow-rules/{rule_id}/test?node_id={task.id}").json()
+    assert data["conditions_met"] == [None]
+    assert data["would_fire"] is None
+    # Still predicted: the answer "if it fires, here is what it would do" is the useful part.
+    assert [a["outcome"] for a in data["actions"]] == ["applied"]
+
+
+def test_an_unmet_condition_still_settles_it(client, db, sample_project):
+    """False beats null: one condition that definitely does not match ends the question."""
+    task = _make_task(db, sample_project.id, status="done")
+    rule_id = client.post(
+        "/api/workflow-rules",
+        json=_rule_body(
+            trigger="node.updated",
+            conditions=[
+                {"field": "status", "op": "eq", "value": "todo"},
+                {"field": "changed_field", "op": "eq", "value": "status"},
+            ],
+        ),
+    ).json()["id"]
+
+    data = client.post(f"/api/workflow-rules/{rule_id}/test?node_id={task.id}").json()
+    assert data["would_fire"] is False
+    assert data["actions"] == []

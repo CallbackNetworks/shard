@@ -120,7 +120,7 @@ function SubjectPicker({ selected, onPick, t }) {
   )
 }
 
-function RuleModal({ initial, onSave, onClose }) {
+function RuleModal({ initial, onSave, onClose, t }) {
   const { data: vocabulary } = useQuery({
     queryKey: ['workflow-rule-vocabulary'],
     queryFn: getWorkflowRuleVocabulary,
@@ -130,6 +130,11 @@ function RuleModal({ initial, onSave, onClose }) {
   const conditionFields = vocabulary?.condition_fields ?? []
   const conditionOps = vocabulary?.condition_ops ?? []
   const actionTypes = vocabulary?.action_types ?? []
+  // Which condition fields describe *the change* rather than the subject, and which of
+  // them each trigger actually reports (ADR-0055). A field the trigger never supplies is
+  // rejected by the write surface, so the editor must not offer it in the first place.
+  const triggerContextFields = vocabulary?.trigger_context_fields ?? {}
+  const contextFields = new Set(Object.values(triggerContextFields).flat())
   const emptyRule ={ name: '', trigger: 'node.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
   const [form, setForm] = useState(initial ? {
     ...initial,
@@ -137,6 +142,15 @@ function RuleModal({ initial, onSave, onClose }) {
     conditions: initial.conditions || [],
     actions: initial.actions || [],
   } : emptyRule)
+
+  const allowedContext = triggerContextFields[form.trigger] ?? []
+  const fieldsForTrigger = conditionFields.filter(f => !contextFields.has(f) || allowedContext.includes(f))
+  // Conditions the *current* trigger cannot answer. Surfaced instead of dropped: a rule
+  // being edited was saved under some trigger, and silently deleting the condition that
+  // gave it its meaning is how a rule ends up looking healthy and doing nothing.
+  const strayFields = [...new Set(
+    form.conditions.map(c => c.field).filter(f => contextFields.has(f) && !allowedContext.includes(f))
+  )]
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const updateCond = (i, c) => set('conditions', form.conditions.map((x, j) => j === i ? c : x))
@@ -152,7 +166,7 @@ function RuleModal({ initial, onSave, onClose }) {
       onClose={onClose}
       onSubmit={() => onSave(form)}
       submitLabel="Save"
-      submitDisabled={!form.name || form.actions.length === 0}
+      submitDisabled={!form.name || form.actions.length === 0 || strayFields.length > 0}
       wide
     >
       <FormField label="Name">
@@ -166,10 +180,16 @@ function RuleModal({ initial, onSave, onClose }) {
       </FormField>
       <FormField label="Conditions (all must match)">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} fields={conditionFields} ops={conditionOps} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} />)}
+          {form.conditions.map((c, i) => <ConditionRow key={i} cond={c} fields={fieldsForTrigger} ops={conditionOps} onChange={v => updateCond(i, v)} onRemove={() => removeCond(i)} />)}
           <button onClick={addCond} className="kt-btn" style={{ alignSelf: 'flex-start' }}>
             <Plus size={10} /> Add Condition
           </button>
+          {strayFields.length > 0 && (
+            <span className="kt-rule-stray" style={{ color: DARK.warning }}>
+              <AlertTriangle size={11} />
+              {t('rules.strayConditions', { trigger: triggerLabel(form.trigger), fields: strayFields.join(', ') })}
+            </span>
+          )}
         </div>
       </FormField>
       <FormField label="Actions">
@@ -237,7 +257,7 @@ export default function WorkflowRules() {
 
   return (
     <div className="kt-page">
-      {modal && <RuleModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} />}
+      {modal && <RuleModal initial={modal.data} onSave={handleSave} onClose={() => setModal(null)} t={t} />}
 
       <div className="kt-page-header">
         <div className="kt-page-heading">
@@ -350,22 +370,31 @@ export default function WorkflowRules() {
                 {/* Two answers, not one: whether the conditions match this subject, and
                     what each action would then do. "Would fire 1 action" was neither —
                     it counted the rule's own configuration back at the user, and said
-                    "would fire" for actions that skip every time (ADR-0054). */}
+                    "would fire" for actions that skip every time (ADR-0054).
+
+                    Three states, not two: a subject is not an event, so a rule asking
+                    about the change that fires it (changed_field, edge_type…) has no
+                    answer here. Rendering that as "would not fire" would be the same
+                    false report in the opposite direction (ADR-0055). The action
+                    predictions are still worth showing — "if it fires, here is what it
+                    would do" is the half of the question a subject can answer. */}
                 {testResults[rule.id] && (
-                  testResults[rule.id].would_fire ? (
-                    <>
-                      <span style={{ fontSize: 11, color: DARK.textMid }}>
-                        {t('rules.wouldChange', {
-                          n: testResults[rule.id].effect_count,
-                          total: testResults[rule.id].actions?.length ?? 0,
-                        })}
-                      </span>
-                      <RuleOutcomeChips records={testResults[rule.id].actions} />
-                    </>
-                  ) : (
+                  testResults[rule.id].would_fire === false ? (
                     <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)' }}>
                       {t('rules.wouldNotFire')}
                     </span>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 11, color: DARK.textMid }}>
+                        {testResults[rule.id].would_fire === null
+                          ? t('rules.dependsOnChange')
+                          : t('rules.wouldChange', {
+                            n: testResults[rule.id].effect_count,
+                            total: testResults[rule.id].actions?.length ?? 0,
+                          })}
+                      </span>
+                      <RuleOutcomeChips records={testResults[rule.id].actions} />
+                    </>
                   )
                 )}
               </div>

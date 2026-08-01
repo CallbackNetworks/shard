@@ -12,8 +12,11 @@ from app.services.rules_engine import (
     CONDITION_OPS,
     SUPPORTED_TRIGGERS,
     TASK_ONLY_ACTIONS,
+    TRIGGER_CONTEXT_FIELDS,
+    conditions_unsupported_by,
     predict_outcome,
     rule_warnings,
+    subject_for,
 )
 
 router = APIRouter(prefix="/workflow-rules", tags=["workflow-rules"])
@@ -26,8 +29,28 @@ def _with_warnings(db: Session, rule: WorkflowRule) -> WorkflowRule:
     nobody subscribes), and the world changes without the rule being touched. A stored
     warning would keep accusing a rule that someone has since fixed by adding the label.
     """
-    rule.warnings = rule_warnings(db, rule.actions, project_id=rule.project_id)
+    rule.warnings = rule_warnings(db, rule.actions, project_id=rule.project_id, trigger=rule.trigger)
     return rule
+
+
+def _check_trigger_conditions(trigger: str, conditions) -> None:
+    """Reject a rule whose conditions ask about something its trigger never supplies.
+
+    Deliberately a 422 rather than a warning: ``rule_warnings`` describes the world and
+    may come true tomorrow, but ``node.created`` will never carry a ``changed_field``.
+    The rule contradicts itself, and accepting it would put yet another healthy-looking
+    rule that never fires into the list (ADR-0055).
+    """
+    stray = conditions_unsupported_by(trigger, conditions)
+    if stray:
+        allowed = sorted(TRIGGER_CONTEXT_FIELDS.get(trigger, set()))
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"condition field {stray} cannot be used with trigger '{trigger}': "
+                f"it carries {allowed or 'no change fields'}"
+            ),
+        )
 
 
 @router.get("", response_model=list[WorkflowRuleOut])
@@ -40,6 +63,7 @@ def list_rules(project_id: str | None = None, db: Session = Depends(get_db)):
 
 @router.post("", response_model=WorkflowRuleOut, status_code=status.HTTP_201_CREATED)
 def create_rule(body: WorkflowRuleCreate, db: Session = Depends(get_db)):
+    _check_trigger_conditions(body.trigger, body.conditions)
     rule = WorkflowRule(
         name=body.name,
         project_id=body.project_id,
@@ -66,6 +90,10 @@ def rule_vocabulary():
     """
     return {
         "triggers": SUPPORTED_TRIGGERS,
+        # Which condition fields each trigger can carry, so the editor offers only the
+        # ones that mean something there instead of letting the user build a rule the
+        # write surface then rejects (ADR-0055).
+        "trigger_context_fields": {k: sorted(v) for k, v in TRIGGER_CONTEXT_FIELDS.items()},
         "condition_fields": sorted(CONDITION_FIELDS),
         "condition_ops": sorted(CONDITION_OPS),
         "action_types": sorted(ACTION_TYPES),
@@ -92,6 +120,12 @@ def update_rule(rule_id: str, body: WorkflowRuleUpdate, db: Session = Depends(ge
         data["conditions"] = [c if isinstance(c, dict) else c.model_dump() for c in data["conditions"]]
     if "actions" in data and data["actions"] is not None:
         data["actions"] = [a if isinstance(a, dict) else a.model_dump() for a in data["actions"]]
+    # Checked against the merged result: a PATCH that changes only the trigger can strand
+    # conditions that were legal under the old one.
+    _check_trigger_conditions(
+        data.get("trigger") or rule.trigger,
+        data["conditions"] if data.get("conditions") is not None else rule.conditions,
+    )
     for k, v in data.items():
         setattr(rule, k, v)
     db.commit()
@@ -127,6 +161,11 @@ async def test_rule(
     Any node, not only a task: rules trigger on ``node.created`` for every type
     (ADR-0049), and the answer for a non-task subject — every task-only action skipped —
     is exactly what the user needs to see.
+
+    A subject is not an event, so conditions about *the change that fires the rule*
+    (``changed_field``, ``edge_type``…) have no answer here. They report ``null``, not
+    ``false``: calling them unmet would make every ``node.updated`` rule report "would
+    not fire", which is the same false green light in the opposite direction (ADR-0055).
     """
     rule = db.query(WorkflowRule).filter(WorkflowRule.id == rule_id).first()
     if not rule:
@@ -139,7 +178,7 @@ async def test_rule(
         raise HTTPException(status_code=404, detail="Node not found")
     # A task-role node is evaluated as a TaskView: assignee lives in the node's data bag,
     # so a plain Node would report every assignee condition as unmet.
-    subject = (graph.get_task(db, subject_id) or node) if graph.has_role(db, node.type, graph.ROLE_TASK) else node
+    subject = subject_for(db, subject_id)
 
     from app.services.rules_engine import _eval_condition
 
@@ -147,8 +186,14 @@ async def test_rule(
     # engine cannot recover a session from it and would report every label condition
     # as unmet (ADR-0045).
     met = [_eval_condition(c, subject, {}, db) for c in (rule.conditions or [])]
-    would_fire = all(met)
-    outcomes = [predict_outcome(db, a, subject) for a in (rule.actions or [])] if would_fire else []
+    # False beats null beats true: one unmet condition settles it, otherwise an
+    # undecidable one leaves the answer open.
+    would_fire = False if False in met else (None if None in met else True)
+    outcomes = (
+        [predict_outcome(db, a, subject, trigger=rule.trigger) for a in (rule.actions or [])]
+        if would_fire is not False
+        else []
+    )
     return {
         "would_fire": would_fire,
         "conditions_met": met,

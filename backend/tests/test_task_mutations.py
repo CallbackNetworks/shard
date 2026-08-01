@@ -141,15 +141,34 @@ async def test_field_change_syncs_to_external(db, task, capture):
 
 @pytest.mark.asyncio
 async def test_every_field_change_triggers_its_rule(db, task, capture, monkeypatch):
+    """One update fires one ``node.updated`` naming every field that moved (ADR-0055).
+
+    The two per-field triggers it replaces ran a rule matching both of them twice for a
+    single edit; the change set is now a condition (``changed_field``), so the rule runs
+    once and can still ask which field it was.
+    """
+    seen = []
+
+    async def fake_rules(db_, trigger, task_, context):
+        seen.append((trigger, context))
+
+    monkeypatch.setattr(task_mutations, "run_rules", fake_rules)
+    await apply_task_update(db, task.id, {"status": "in_progress", "priority": "high"})
+    assert [t for t, _ in seen] == ["node.updated"]
+    assert seen[0][1]["changed"] == ["priority", "status"]
+
+
+@pytest.mark.asyncio
+async def test_a_write_that_changes_nothing_triggers_nothing(db, task, capture, monkeypatch):
+    """Re-sending the values a task already has is not a change (ADR-0055)."""
     seen = []
 
     async def fake_rules(db_, trigger, task_, context):
         seen.append(trigger)
 
     monkeypatch.setattr(task_mutations, "run_rules", fake_rules)
-    await apply_task_update(db, task.id, {"status": "in_progress", "priority": "high"})
-    assert "task.status_changed" in seen
-    assert "task.priority_changed" in seen
+    await apply_task_update(db, task.id, {"status": task.status, "priority": task.priority})
+    assert seen == []
 
 
 @pytest.mark.asyncio

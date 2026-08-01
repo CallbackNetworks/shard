@@ -70,7 +70,7 @@ class TestLabelAddedTrigger:
         rule = WorkflowRule(
             id="rule-label",
             name="High on bug label",
-            trigger="task.label_added",
+            trigger="edge.added",
             project_id=sample_project.id,
             conditions=[{"field": "has_label", "value": "bug"}],
             actions=[{"type": "set_priority", "value": "high"}],
