@@ -53,3 +53,4 @@
 | [0049](0049-rules-trigger-on-nodes-not-tasks.md) | 規則的觸發從 task 收斂到 node | Accepted | 2026-07-30 |
 | [0050](0050-every-skipped-rule-action-is-visible.md) | 規則動作跳過時一律留下原因 | Accepted | 2026-07-30 |
 | [0051](0051-webhooks-never-invent-an-outcome.md) | Webhook 兩端都不再自己編造結果 | Accepted | 2026-07-31 |
+| [0052](0052-recorded-is-not-visible.md) | 記錄下來不等於看得見 | Accepted | 2026-08-01 |

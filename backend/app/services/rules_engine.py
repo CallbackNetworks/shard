@@ -167,6 +167,19 @@ async def _apply_fields(db: Session, task, changes: dict):
     )
 
 
+def _scope_of(db: Session, node) -> tuple[str | None, str | None]:
+    """Where an entry about this node belongs: (project_id, task_id).
+
+    The activity feed filters by ``project_id``, so an entry written with ``None`` is
+    only reachable from the global list — written but invisible where it matters. A task
+    hangs off its project; anything else off its nearest container (ADR-0049/0050).
+    """
+    if _is_task(db, node):
+        return graph.project_id_of_task(db, node.id), node.id
+    container = graph.container_of_node(db, node.id)
+    return (container.id if container is not None else None), None
+
+
 def _skip(db: Session, node, atype: str, reason: str, detail: str) -> None:
     """Record that an action could not run, instead of doing nothing quietly.
 
@@ -175,26 +188,44 @@ def _skip(db: Session, node, atype: str, reason: str, detail: str) -> None:
     says why half of it did nothing. There are three ways to get here — a task-only
     action on a non-task node, a label the project does not have, and a status/priority
     value outside the enum — and all three land in the activity feed with a reason.
-
-    Scoped to the project (and the task) so it shows up in the feed the user is actually
-    looking at, not only in the global one.
+    An action that *raises* is the fourth; see ``_failed``.
     """
-    is_task = _is_task(db, node)
-    if is_task:
-        project_id = graph.project_id_of_task(db, node.id)
-    else:
-        container = graph.container_of_node(db, node.id)
-        project_id = container.id if container is not None else None
+    project_id, task_id = _scope_of(db, node)
     log_activity(
         db,
         action="rule.skipped",
         project_id=project_id,
-        task_id=node.id if is_task else None,
+        task_id=task_id,
         actor="workflow",
         detail=detail,
         meta={"node_id": node.id, "type": node.type, "action": atype, "reason": reason},
     )
     logger.info("rule action %s skipped for node %s (%s): %s", atype, node.id, node.type, reason)
+
+
+def _failed(db: Session, rule: WorkflowRule, node, exc: Exception) -> None:
+    """Record that a rule raised, instead of leaving it to a log line nobody reads.
+
+    The fourth way a rule can do nothing. The other three are deliberate and land in the
+    feed via ``_skip``; this one is a genuine defect and used to be the *least* visible of
+    the four — the rule's run_count did not even move, so the list showed a rule that
+    looked idle rather than broken.
+    """
+    project_id, task_id = _scope_of(db, node)
+    log_activity(
+        db,
+        action="rule.failed",
+        project_id=project_id,
+        task_id=task_id,
+        actor="workflow",
+        detail=f'Rule "{rule.name}" failed on {node.type} "{node.title}": {exc}',
+        meta={
+            "rule_id": rule.id,
+            "node_id": node.id,
+            "type": node.type,
+            "error": f"{type(exc).__name__}: {exc}",
+        },
+    )
 
 
 async def _fire(db: Session, node, event: str) -> None:
@@ -259,15 +290,11 @@ async def _exec_action(db: Session, action: dict, task):
         db.flush()
         await fire_notifications(db, task, "comment.created", source="rule", actor="workflow")
     elif atype == "fire_event":
-        # Deferred import to avoid circular
-        import asyncio
-
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(_fire(db, task, value))
-        except Exception as exc:
-            logger.warning("fire_event action failed: %s", exc)
+        # Awaited like every other action. This used to be a bare ``loop.create_task``
+        # left over from when ``_exec_action`` was synchronous: it delivered only because
+        # the ``rule.triggered`` await further down happened to give it a turn, it dropped
+        # the event entirely with no running loop, and its exceptions went unobserved.
+        await _fire(db, task, value)
     return task
 
 
@@ -330,44 +357,54 @@ async def run_rules(
         return
 
     is_task = _is_task(db, task)
-    if is_task:
-        task_project_id = graph.project_id_of_task(db, task.id)
-    else:
-        container = graph.container_of_node(db, task.id)
-        task_project_id = container.id if container is not None else None
+    task_project_id, task_scope_id = _scope_of(db, task)
+    node_id = task.id
     for rule in rules:
         # Check project scope
         if rule.project_id and rule.project_id != task_project_id:
             continue
 
         try:
-            # Evaluate conditions (AND logic)
-            all_match = all(_eval_condition(c, task, context, db) for c in (rule.conditions or []))
-            if not all_match:
-                continue
+            # A savepoint per rule. A failure here used to ``db.rollback()`` the whole
+            # session, which discarded whatever earlier rules had already done — and,
+            # on the paths that leave the commit to the caller, the very write that
+            # triggered this run. One rule's defect is now one rule's problem.
+            with db.begin_nested():
+                # Evaluate conditions (AND logic)
+                all_match = all(_eval_condition(c, task, context, db) for c in (rule.conditions or []))
+                if not all_match:
+                    continue
 
-            # Execute actions. Each returns the task, refreshed when it changed it, so
-            # a later action in the same rule sees the earlier one's result.
-            for action in rule.actions or []:
-                task = await _exec_action(db, action, task)
+                # Execute actions. Each returns the task, refreshed when it changed it,
+                # so a later action in the same rule sees the earlier one's result.
+                for action in rule.actions or []:
+                    task = await _exec_action(db, action, task)
 
-            rule.run_count = (rule.run_count or 0) + 1
-            rule.last_run_at = datetime.now(UTC)
-            db.flush()
+                rule.run_count = (rule.run_count or 0) + 1
+                rule.last_run_at = datetime.now(UTC)
+                db.flush()
 
-            log_activity(
-                db,
-                action="rule.executed",
-                project_id=task_project_id,
-                task_id=task.id if is_task else None,
-                actor="workflow",
-                detail=f'Rule "{rule.name}" executed on {task.type} "{task.title}"',
-                meta={"rule_id": rule.id, "trigger": trigger, "node_id": task.id},
-            )
-            logger.info("Rule '%s' executed for node '%s'", rule.name, task.title)
+                log_activity(
+                    db,
+                    action="rule.executed",
+                    project_id=task_project_id,
+                    task_id=task_scope_id,
+                    actor="workflow",
+                    detail=f'Rule "{rule.name}" executed on {task.type} "{task.title}"',
+                    meta={"rule_id": rule.id, "trigger": trigger, "node_id": node_id},
+                )
+                logger.info("Rule '%s' executed for node '%s'", rule.name, task.title)
 
             await _fire(db, task, "rule.triggered")
 
         except Exception as exc:
-            logger.warning("Rule %s failed for node %s: %s", rule.id, task.id, exc)
-            db.rollback()
+            logger.warning("Rule %s failed for node %s: %s", rule.id, node_id, exc)
+            # The savepoint is already rolled back; the subject may be stale with it.
+            if is_task:
+                task = graph.get_task(db, node_id) or task
+            try:
+                _failed(db, rule, task, exc)
+            except Exception:
+                # Best-effort: recording the failure must not turn one broken rule into
+                # a failed request for the write that triggered it.
+                logger.exception("could not record rule failure for rule %s", rule.id)

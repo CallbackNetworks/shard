@@ -25,7 +25,14 @@ const ACTION_COLORS = {
   'project.complete':    STATUS_COLOR.done,
   'share.viewed':        DARK.textDim,
   'comment.created':     DARK.info,
-  'rule.triggered':      BRAND,
+  // Automation writes rule.executed / rule.skipped; rule.triggered is a *notification*
+  // event and never reaches this feed. The two "it did not work" actions are warnings on
+  // purpose — ADR-0050/0051 exist to make them visible, and textDim is the dimmest thing
+  // on the page.
+  'rule.executed':          BRAND,
+  'rule.skipped':           DARK.warning,
+  'rule.failed':            DARK.danger,
+  'webhook.unmapped_status': DARK.warning,
 }
 
 const ACTION_GROUPS = [
@@ -35,6 +42,7 @@ const ACTION_GROUPS = [
   { key: 'comment', label: 'Comments' },
   { key: 'share', label: 'Share' },
   { key: 'rule', label: 'Rules' },
+  { key: 'webhook', label: 'Webhooks' },
 ]
 
 const chip = (active) => ({

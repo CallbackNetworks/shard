@@ -223,6 +223,18 @@ function IntegrationModal({ initial, onSave, onClose }) {
                 <input value={form.url} onChange={e => set('url', e.target.value)} placeholder={t('integrations.webhookUrlPlaceholder')} className={`kt-input ${s.inputStyle}`} />
               </label>
 
+              {/* Signing is independent of authentication (ADR-0051): a webhook
+                  integration signs every payload with `secret` whatever auth_type is,
+                  so the field cannot live inside the bearer branch — choosing basic auth
+                  used to hide a key that was still in use. */}
+              {form.type === 'webhook' && (
+                <label className={s.labelStyle}>{t('integrations.signingSecret')}
+                  <input value={form.secret} onChange={e => set('secret', e.target.value)}
+                    placeholder={t('integrations.signingSecretPlaceholder')} className={`kt-input ${s.inputStyle}`} />
+                  <div className={s.hmacInfo}>{t('integrations.hmacSecretNote')}</div>
+                </label>
+              )}
+
               {/* Auth Type */}
               <label className={s.labelStyle}>{t('integrations.authType')}
                 <select value={form.auth_type || 'bearer'} onChange={e => set('auth_type', e.target.value)} className={`kt-input ${s.selectStyle}`}>
@@ -234,11 +246,10 @@ function IntegrationModal({ initial, onSave, onClose }) {
               </label>
 
               {/* Auth config based on type */}
-              {form.auth_type === 'bearer' && (
-                <label className={s.labelStyle}>
-                  {form.type === 'webhook' ? t('integrations.signingSecret') : t('integrations.bearerToken')}
+              {form.auth_type === 'bearer' && form.type !== 'webhook' && (
+                <label className={s.labelStyle}>{t('integrations.bearerToken')}
                   <input value={form.secret} onChange={e => set('secret', e.target.value)}
-                    placeholder={form.type === 'webhook' ? t('integrations.signingSecretPlaceholder') : 'token...'} className={`kt-input ${s.inputStyle}`} />
+                    placeholder="token..." className={`kt-input ${s.inputStyle}`} />
                 </label>
               )}
               {form.auth_type === 'basic' && (

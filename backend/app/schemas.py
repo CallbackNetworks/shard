@@ -204,6 +204,10 @@ class WebhookEventOut(BaseModel):
     build_duration_ms: int | None
     triggered_by: str | None
     test_summary: dict | None
+    # Served so build history can show what actually arrived. It is the only way to read a
+    # status="unmapped" row: the callback carried something this system could not map, and
+    # "which payload was that?" is the whole question at that point (ADR-0051).
+    raw_payload: dict | None = None
     created_at: datetime
 
 

@@ -1158,7 +1158,9 @@ current state. Two records are written: a build-history row with `status: "unmap
 entry carrying the raw status that arrived.
 
 #### `GET /webhook/events/{task_id}`
-Build history for a task — every inbound CI/CD event received, newest first.
+Build history for a task — every inbound CI/CD event received, newest first. Each row
+carries `raw_payload`, the body as it arrived; for a `status: "unmapped"` row that is the
+only record of what the CI system actually sent (ADR-0052).
 
 #### `POST /webhook/issues/{project_id}`
 Inbound issue/PR sync from GitHub, Gitea, or GitLab (ADR-0014/0017). The provider is

@@ -10,7 +10,12 @@ const STATUS_COLORS = {
   failed: STATUS_COLOR.failed,
   in_progress: STATUS_COLOR.in_progress,
   todo: STATUS_COLOR.todo,
+  // Not an outcome: the callback carried a status this system could not map, so the task
+  // was left alone (ADR-0051). Amber rather than grey — it wants looking at.
+  unmapped: DARK.warning,
 }
+
+const statusColor = (status) => STATUS_COLORS[status] || DARK.textDim
 
 const PROVIDER_ICONS = {
   github: '',
@@ -86,14 +91,14 @@ export default function BuildHistoryPanel({ taskId }) {
               style={{
                 background: 'rgba(var(--kt-ink-rgb), 0.03)', border: '1px solid rgba(var(--kt-ink-rgb), 0.06)',
                 borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
-                borderLeft: `3px solid ${STATUS_COLORS[ev.status] || '#6b7280'}`,
+                borderLeft: `3px solid ${statusColor(ev.status)}`,
               }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 14 }}>{PROVIDER_ICONS[ev.provider] || '🔗'}</span>
                 <span style={{ fontSize: 12, color: DARK.text, fontWeight: 600, flex: 1 }}>
                   {ev.message || `${ev.provider} ${ev.status}`}
                 </span>
-                <span style={{ fontSize: 10, color: STATUS_COLORS[ev.status], fontWeight: 600, textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 10, color: statusColor(ev.status), fontWeight: 600, textTransform: 'uppercase' }}>
                   {ev.status}
                 </span>
                 <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>
@@ -162,6 +167,23 @@ export default function BuildHistoryPanel({ taskId }) {
                       <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Time</span>
                       <span style={{ color: DARK.textMid }}>{new Date(ev.created_at).toLocaleString()}</span>
                     </div>
+                    {ev.status === 'unmapped' && (
+                      <div style={{ color: DARK.warning, lineHeight: 1.5 }}>
+                        {t('integrations.unmappedExplain')}
+                      </div>
+                    )}
+                    {ev.raw_payload && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Payload</span>
+                        <pre style={{
+                          margin: 0, flex: 1, maxHeight: 200, overflow: 'auto', fontSize: 10,
+                          color: DARK.textMid, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                        }}>
+                          {JSON.stringify(ev.raw_payload, null, 2)}
+                        </pre>
+                      </div>
+                    )}
                     {ev.test_summary && (
                       <div style={{ display: 'flex', gap: 8 }}>
                         <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', minWidth: 80 }}>Tests</span>

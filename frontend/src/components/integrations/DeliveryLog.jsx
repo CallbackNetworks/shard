@@ -2,19 +2,12 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, RefreshCw, RotateCcw } from 'lucide-react'
-import { getDeliveries, retryDelivery, bulkRetryDeliveries } from '../../api/client'
+import { getDeliveries, getIntegrationEvents, retryDelivery, bulkRetryDeliveries } from '../../api/client'
 import { globalAddToast } from '../../context/ToastContext'
 import { BRAND, DELIVERY_STATUS_COLORS } from '../../constants/theme'
 import { useInvalidatingMutation } from '../../hooks/useCrudMutations'
 import DeliveryDetailModal from './DeliveryDetailModal'
 import s from './DeliveryLog.module.css'
-
-const FILTER_EVENTS = [
-  'task.created', 'task.status_changed', 'task.done', 'task.failed', 'task.in_progress',
-  'task.assigned', 'task.deleted', 'task.due_soon', 'task.overdue',
-  'project.created', 'project.complete', 'project.archived',
-  'comment.created', 'rule.triggered',
-]
 
 /** Collapsible recent-deliveries log with filters, retry, and detail modal. */
 export default function DeliveryLog({ integrationId }) {
@@ -23,6 +16,16 @@ export default function DeliveryLog({ integrationId }) {
   const [selected, setSelected] = useState(null)
   const [filterEvent, setFilterEvent] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+
+  // The same list the subscription checkboxes use (ADR-0047). It was a hardcoded copy,
+  // which drifts by construction: the served list also carries the custom events a
+  // rule's fire_event emits (ADR-0048), so a subscribable event was unfilterable here.
+  const { data: filterEvents = [] } = useQuery({
+    queryKey: ['integration-events'],
+    queryFn: getIntegrationEvents,
+    enabled: expanded,
+    staleTime: Infinity,
+  })
 
   const { data: deliveries = [], refetch } = useQuery({
     queryKey: ['deliveries', integrationId, filterEvent, filterStatus],
@@ -74,7 +77,7 @@ export default function DeliveryLog({ integrationId }) {
             <select value={filterEvent} onChange={e => setFilterEvent(e.target.value)}
               className={s.filterSelect}>
               <option value="">{t('integrations.allEvents')}</option>
-              {FILTER_EVENTS.map(ev => <option key={ev} value={ev}>{ev}</option>)}
+              {filterEvents.map(ev => <option key={ev} value={ev}>{ev}</option>)}
             </select>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
               className={s.filterSelect}>

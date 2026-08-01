@@ -662,3 +662,68 @@ class TestRulesSeeEveryNode:
         db.flush()
 
         assert graph.container_of_node(db, node.id) is None
+
+
+# ── a rule that raises ───────────────────────────────────────────────────
+
+
+class TestARuleThatRaises:
+    """The fourth way a rule can do nothing, and until now the quietest one.
+
+    ``_skip`` covers the three deliberate ones. An action that *raises* used to leave a
+    ``logger.warning`` and nothing else, while ``db.rollback()`` threw away whatever
+    earlier rules had already written.
+    """
+
+    @staticmethod
+    def _rule(db, name, actions):
+        rule = WorkflowRule(name=name, trigger="node.created", conditions=[], actions=actions, active=True, run_count=0)
+        db.add(rule)
+        db.flush()
+        return rule
+
+    @pytest.fixture()
+    def task(self, db):
+        project = make_project(db, name="P")
+        db.add(project)
+        db.flush()
+        task = make_task(db, project_id=project.id, title="T", status="todo")
+        db.add(task)
+        db.flush()
+        return graph.get_task(db, task.id)
+
+    @pytest.mark.asyncio
+    async def test_a_raising_rule_is_recorded_in_the_activity_feed(self, db, task, monkeypatch):
+        rule = self._rule(db, "Boom", [{"type": "set_priority", "value": "high"}])
+
+        async def boom(*a, **kw):
+            raise RuntimeError("kaboom")
+
+        monkeypatch.setattr(rules_engine, "_apply_fields", boom)
+        await run_rules(db, "node.created", task, {})
+
+        rows = db.query(ActivityLog).filter(ActivityLog.action == "rule.failed").all()
+        assert len(rows) == 1
+        assert rows[0].meta["rule_id"] == rule.id
+        assert "kaboom" in rows[0].meta["error"]
+        # Scoped, or the project activity page would never show it.
+        assert rows[0].task_id == task.id
+        assert rows[0].project_id == graph.project_id_of_task(db, task.id)
+
+    @pytest.mark.asyncio
+    async def test_one_broken_rule_does_not_undo_another(self, db, task, monkeypatch):
+        """A savepoint per rule: the failure rolls back its own writes, nothing else."""
+        good = self._rule(db, "Good", [{"type": "add_comment", "value": "ran"}])
+        bad = self._rule(db, "Bad", [{"type": "set_priority", "value": "high"}])
+
+        async def boom(*a, **kw):
+            raise RuntimeError("kaboom")
+
+        monkeypatch.setattr(rules_engine, "_apply_fields", boom)
+        await run_rules(db, "node.created", task, {})
+
+        db.refresh(good)
+        db.refresh(bad)
+        assert good.run_count == 1
+        assert bad.run_count == 0
+        assert db.query(Comment).count() == 1
