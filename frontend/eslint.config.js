@@ -34,6 +34,8 @@ export default [
     languageOptions: {
       globals: {
         ...globals.browser,
+        // Guard tests read the source tree itself, so they run with node's globals too.
+        ...globals.node,
         describe: "readonly",
         it: "readonly",
         expect: "readonly",

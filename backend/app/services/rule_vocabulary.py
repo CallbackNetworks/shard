@@ -20,6 +20,13 @@ to one of three kinds:
 ``free``
     A comment body, a person's name. Nothing to offer; a plain box is the honest control.
 
+Each spec also says *who coined* the values it carries, in ``vocabulary``. The engine
+names things for itself — ``in_progress``, ``changed_field``, ``member_of`` — and the
+editor is free to show those as words; a label, an event or an assignee is the user's own
+string and must be shown back exactly as typed. Only the server knows which is which, and
+saying so here is what keeps a condition field added tomorrow from arriving on the wrong
+side of that line (ADR-0058).
+
 Derived at read time from the same constants the engine evaluates against, so a value
 this serves is by construction one the engine understands.
 """
@@ -43,8 +50,15 @@ KIND_SUGGEST = "suggest"
 KIND_FREE = "free"
 
 
-def _spec(kind: str, options=None, **extra) -> dict:
-    spec: dict = {"kind": kind, "options": list(options or [])}
+def _spec(kind: str, options=None, *, vocabulary: bool | None = None, **extra) -> dict:
+    """One value slot. ``vocabulary`` says the options are names the product coined, so a
+    reader may render them as words; it defaults to true for a closed set, because the
+    engine is the only thing that can define one."""
+    spec: dict = {
+        "kind": kind,
+        "options": list(options or []),
+        "vocabulary": kind == KIND_ENUM if vocabulary is None else vocabulary,
+    }
     spec.update(extra)
     return spec
 
@@ -111,17 +125,25 @@ def condition_value_specs(db: Session, *, project_id: str | None = None) -> dict
     specs = {
         # Wider than the action enums on purpose: a condition may name a status no task
         # action can write, because a rule can trigger on a project ("archived") too.
-        "status": _spec(KIND_SUGGEST, sorted(set(ACTION_VALUE_ENUMS["set_status"]) | set(_distinct(db, Node.status)))),
+        "status": _spec(
+            KIND_SUGGEST,
+            sorted(set(ACTION_VALUE_ENUMS["set_status"]) | set(_distinct(db, Node.status))),
+            vocabulary=True,
+        ),
         "priority": _spec(
-            KIND_SUGGEST, sorted(set(ACTION_VALUE_ENUMS["set_priority"]) | set(_distinct(db, Node.priority)))
+            KIND_SUGGEST,
+            sorted(set(ACTION_VALUE_ENUMS["set_priority"]) | set(_distinct(db, Node.priority))),
+            vocabulary=True,
         ),
         "assignee": _spec(KIND_FREE),
         "title_contains": _spec(KIND_FREE),
         "has_label": _spec(KIND_SUGGEST, graph.label_names(db, project_id=project_id)),
         "type": _spec(KIND_ENUM, node_types),
         "has_role": _spec(KIND_ENUM, graph.ROLES),
-        "changed_field": _spec(KIND_SUGGEST, _changed_field_names()),
-        "edge_type": _spec(KIND_SUGGEST, _edge_type_keys(db)),
+        # Open sets, but every name in them was coined by the engine, not by the user:
+        # a schema field and a relationship key, not a label somebody typed.
+        "changed_field": _spec(KIND_SUGGEST, _changed_field_names(), vocabulary=True),
+        "edge_type": _spec(KIND_SUGGEST, _edge_type_keys(db), vocabulary=True),
         "edge_side": _spec(KIND_ENUM, EDGE_SIDES),
         "other_type": _spec(KIND_ENUM, node_types),
     }

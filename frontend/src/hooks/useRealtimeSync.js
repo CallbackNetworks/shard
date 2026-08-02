@@ -17,7 +17,9 @@ export default function useRealtimeSync() {
           const { event, data } = JSON.parse(evt.data)
           // node.* covers container/label/cycle/goal writes through /api/nodes (ADR-0043);
           // task.*/project.* are the task and (legacy) project events.
-          if (event.startsWith('task.') || event.startsWith('project.') || event.startsWith('node.')) {
+          // comment.* is broadcast by the external API (an agent commenting), which is
+          // exactly the case with no local mutation to invalidate the cache.
+          if (event.startsWith('task.') || event.startsWith('project.') || event.startsWith('node.') || event.startsWith('comment.')) {
             qc.invalidateQueries({ queryKey: ['projects'] })
             if (data.project_id) {
               qc.invalidateQueries({ queryKey: ['project', data.project_id] })

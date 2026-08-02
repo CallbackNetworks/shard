@@ -6,6 +6,7 @@ import { getActivity, getProjects } from '../api/client'
 import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
 import { actionGroup, buildActivitySignals, bucketActivitySignals, summarizeActivitySignals } from '../utils/activitySignals'
 import RuleOutcomeChips from '../components/shared/RuleOutcomeChips'
+import { useRuleVocabulary } from '../hooks/useRuleVocabulary'
 import { formatTimestamp, absoluteTime } from '../utils/datetime'
 import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -185,6 +186,11 @@ export default function Activity() {
     keepPreviousData: true,
   })
 
+  // An executed rule's actions are read back here in the same words the Rules page uses
+  // to write them (ADR-0058); the same record shown two ways is a record nobody can match
+  // to its rule.
+  const ruleVocabulary = useRuleVocabulary()
+
   const filtered = actionFilter === 'all'
     ? activities
     : activities.filter(a => a.action.startsWith(actionFilter + '.'))
@@ -292,7 +298,7 @@ export default function Activity() {
                       <div className="kt-activity-event-detail">
                         {entry.detail || entry.action}
                       </div>
-                      <RuleOutcomeChips records={entry.meta?.actions} />
+                      <RuleOutcomeChips records={entry.meta?.actions} specs={ruleVocabulary?.action_values} />
                       <div className="kt-activity-event-meta">
                         <span className="kt-chip" style={{ color, borderColor: `${color}55` }}>{entry.action}</span>
                         <span>{group}</span>

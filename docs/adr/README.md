@@ -59,3 +59,4 @@
 | [0055](0055-rules-trigger-on-graph-change-not-only-creation.md) | 規則觸發於整張圖的變更，而不只是建立 | Accepted | 2026-08-01 |
 | [0056](0056-every-value-box-knows-what-belongs-in-it.md) | 每一個數值欄位都知道自己該裝什麼 | Accepted | 2026-08-01 |
 | [0057](0057-pin-what-a-fresh-build-installs.md) | 上線前的重建：升掉 React Router 的警報，並釘死一份重建就會變的相依 | Accepted | 2026-08-01 |
+| [0058](0058-engine-names-and-user-names.md) | 引擎取的名字唸成人話，使用者取的名字原字照搬 | Accepted | 2026-08-01 |

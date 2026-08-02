@@ -25,7 +25,9 @@ describe('RuleOutcomeChips', () => {
       { type: 'add_label', value: 'security', outcome: 'skipped', reason: 'label_not_found' },
     ]} />)
     const chip = screen.getByTitle(/rules\.outcome\.skipped/)
-    expect(chip.textContent).toContain('add_label "security"')
+    // The label name stays exactly as the user typed it; only the action's own name is
+    // read as words (ADR-0058).
+    expect(chip.textContent).toContain('Add Label "security"')
     expect(chip).toHaveStyle({ color: DARK.warning })
   })
 

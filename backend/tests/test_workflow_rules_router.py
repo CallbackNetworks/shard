@@ -504,6 +504,7 @@ class TestValueVocabulary:
         assert body["action_values"]["set_status"] == {
             "kind": "enum",
             "options": ["todo", "in_progress", "done", "failed"],
+            "vocabulary": True,
         }
         assert body["action_values"]["set_priority"]["options"] == ["low", "medium", "high"]
 
@@ -547,6 +548,31 @@ class TestValueVocabulary:
         )
         body = client.get("/api/workflow-rules/vocabulary").json()
         assert "deploy.requested" in body["action_values"]["fire_event"]["options"]
+
+    def test_every_slot_says_who_coined_its_values(self, client):
+        """The editor may read `in_progress` out as "In Progress"; it may not do that to a
+        label somebody typed. Only the server knows which is which, so every slot says so
+        — a slot that stayed silent would be read as the user's own words and print an
+        identifier at them (ADR-0058)."""
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        for slots in (body["action_values"], body["condition_values"]):
+            assert all(isinstance(spec["vocabulary"], bool) for spec in slots.values())
+
+    def test_the_engine_named_a_status_and_the_user_named_a_label(self, client):
+        body = client.get("/api/workflow-rules/vocabulary").json()
+        # Coined by the engine: it is the only thing that can define a closed set, and
+        # `changed_field` / `edge_type` are open only because a writer elsewhere may add
+        # to them — not because the user types into them.
+        assert body["action_values"]["set_status"]["vocabulary"] is True
+        assert body["condition_values"]["changed_field"]["vocabulary"] is True
+        assert body["condition_values"]["edge_type"]["vocabulary"] is True
+        assert body["condition_values"]["status"]["vocabulary"] is True
+        # The user's own words: shown back re-spelled, they are strings the user can no
+        # longer search for.
+        assert body["action_values"]["add_label"]["vocabulary"] is False
+        assert body["action_values"]["fire_event"]["vocabulary"] is False
+        assert body["action_values"]["add_comment"]["vocabulary"] is False
+        assert body["condition_values"]["assignee"]["vocabulary"] is False
 
     def test_label_suggestions_can_be_narrowed_to_one_project(self, client, db, sample_project):
         graph.create_label(db, project_id=sample_project.id, name="here", color="#f00")

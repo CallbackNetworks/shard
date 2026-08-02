@@ -67,23 +67,25 @@ const VOCABULARY = {
   condition_fields: ['changed_field', 'edge_side', 'edge_type', 'has_label', 'other_type', 'status'],
   condition_ops: ['contains', 'eq', 'in', 'neq'],
   action_types: ['fire_event', 'set_priority', 'set_status'],
-  // What may go in the value box, per slot (ADR-0056).
+  // What may go in the value box, per slot (ADR-0056), and whether the engine or the user
+  // is the one who named those values (ADR-0058).
   action_values: {
     fire_event: {
       kind: 'suggest',
       options: ['task.done', 'deploy.requested'],
+      vocabulary: false,
       subscribers: { 'task.done': 2, 'deploy.requested': 0 },
     },
-    set_priority: { kind: 'enum', options: ['low', 'medium', 'high'] },
-    set_status: { kind: 'enum', options: ['todo', 'in_progress', 'done', 'failed'] },
+    set_priority: { kind: 'enum', options: ['low', 'medium', 'high'], vocabulary: true },
+    set_status: { kind: 'enum', options: ['todo', 'in_progress', 'done', 'failed'], vocabulary: true },
   },
   condition_values: {
-    changed_field: { kind: 'suggest', options: ['status', 'priority'] },
-    edge_side: { kind: 'enum', options: ['source', 'target'] },
-    edge_type: { kind: 'suggest', options: ['contains', 'labeled'] },
-    has_label: { kind: 'suggest', options: ['urgent'] },
-    other_type: { kind: 'enum', options: ['task', 'project'] },
-    status: { kind: 'suggest', options: ['todo', 'done'] },
+    changed_field: { kind: 'suggest', options: ['status', 'priority'], vocabulary: true },
+    edge_side: { kind: 'enum', options: ['source', 'target'], vocabulary: true },
+    edge_type: { kind: 'suggest', options: ['contains', 'labeled'], vocabulary: true },
+    has_label: { kind: 'suggest', options: ['urgent'], vocabulary: false },
+    other_type: { kind: 'enum', options: ['task', 'project'], vocabulary: true },
+    status: { kind: 'suggest', options: ['todo', 'done'], vocabulary: true },
   },
   task_only_actions: ['set_priority', 'set_status'],
 }
@@ -175,7 +177,7 @@ describe('the dry-run has three answers, not two', () => {
     expect(screen.getByText('rules.dependsOnChange')).toBeTruthy()
     expect(screen.queryByText('rules.wouldNotFire')).toBeNull()
     // The half a subject *can* answer is still shown: if it fires, here is what it does.
-    expect(screen.getByText(/set_priority "high" · rules.outcome.applied/)).toBeTruthy()
+    expect(screen.getByText(/Set Priority "High" · rules.outcome.applied/)).toBeTruthy()
   })
 
   it('still reports a genuinely unmet condition as dead', () => {
@@ -272,12 +274,31 @@ describe('fire_event says where the event goes', () => {
   })
 })
 
+describe('a saved rule is read back, not transcribed', () => {
+  it('shows the engine\'s own names as words and keeps the keys one hover away', () => {
+    setup()
+    // The stored condition is still `changed_field eq status` — that is what the API
+    // takes and what a support question quotes — but nobody reads it that way (ADR-0058).
+    const chip = screen.getByTitle('changed_field eq status')
+    expect(chip.textContent).toContain('Changed Field')
+    expect(chip.textContent).toContain('"Status"')
+    expect(chip.textContent).not.toContain('changed_field')
+  })
+
+  it('prints no identifier at the user', () => {
+    const { container } = setup()
+    // Every name on this card came from the engine, and the whole card was written with
+    // pickers: an underscore here is an implementation detail that escaped.
+    expect(container.querySelector('.kt-card').textContent).not.toMatch(/_/)
+  })
+})
+
 describe('an action that only works on tasks says so', () => {
   it('names them while the trigger can still land on anything', () => {
     setup()
     fireEvent.click(screen.getByText('Edit'))
     // node.updated fires for projects and labels too (ADR-0049/0055); set_priority is
     // skipped on all of them, which used to be discoverable only from the activity feed.
-    expect(screen.getByText(/rules.taskOnlyActions.*set_priority/)).toBeTruthy()
+    expect(screen.getByText(/rules.taskOnlyActions.*Set Priority/)).toBeTruthy()
   })
 })

@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react'
 import { Plus, X, BarChart3, Copy, GitCompareArrows } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DARK, BRAND, STATUS_MAP } from '../constants/theme'
-import { duplicateCycle, compareCycles } from '../api/client'
-import axios from 'axios'
+import { duplicateCycle, compareCycles, getCycleBurndown } from '../api/client'
 
 function BurndownChart({ cycleId }) {
   const { t } = useTranslation()
   const [data, setData] = useState(null)
+  // Through the client, not a bare axios call: the internal API lives under `/api`
+  // (ADR-0036), and a root-level request is answered by the SPA's own index.html — a
+  // 200 full of HTML, which this chart then tried to plot.
   useEffect(() => {
     if (!cycleId) return
-    axios.get(`/analytics/cycle-burndown?cycle_id=${cycleId}`)
-      .then(r => setData(r.data))
+    getCycleBurndown(cycleId)
+      .then(rows => setData(Array.isArray(rows) ? rows : []))
       .catch(() => setData([]))
   }, [cycleId])
 

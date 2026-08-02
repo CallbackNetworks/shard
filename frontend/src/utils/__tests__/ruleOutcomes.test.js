@@ -29,8 +29,22 @@ describe('ruleOutcomes', () => {
   })
 
   it('renders the action with its value', () => {
-    expect(actionClause({ type: 'set_priority', value: 'high' })).toBe('set_priority "high"')
-    expect(actionClause({ type: 'add_comment', value: '' })).toBe('add_comment')
+    // The engine's name read as words; the raw key is what gets saved, not what gets
+    // shown (ADR-0058). With no catalogue entry the derived name is the answer.
+    expect(actionClause({ type: 'set_priority', value: 'high' }, t)).toBe('Set Priority "high"')
+    expect(actionClause({ type: 'add_comment', value: '' }, t)).toBe('Add Comment')
+  })
+
+  it('shows an engine value as words and the user\'s own value verbatim', () => {
+    // `in_progress` is a word the product coined, so it may be re-spelled for reading.
+    expect(actionClause({ type: 'set_status', value: 'in_progress' }, t, {
+      set_status: { kind: 'enum', options: [], vocabulary: true },
+    })).toBe('Set Status "In Progress"')
+    // A label name is the user's own string: shown back in other words it is a string
+    // they can no longer search for.
+    expect(actionClause({ type: 'add_label', value: 'needs_review' }, t, {
+      add_label: { kind: 'suggest', options: [], vocabulary: false },
+    })).toBe('Add Label "needs_review"')
   })
 
   it('appends the reason when the engine gave one', () => {

@@ -1,4 +1,5 @@
 import { BRAND, DARK } from '../constants/theme'
+import { actionPhrase } from './ruleTerms'
 
 /**
  * Mirrors `rules_engine.OUTCOME_*` (ADR-0053).
@@ -20,10 +21,9 @@ export function outcomeColor(outcome) {
   return OUTCOME_COLORS[outcome] || DARK.textDim
 }
 
-/** `set_priority "high"` — the action itself, without its outcome. */
-export function actionClause(record) {
-  const value = record?.value
-  return value ? `${record.type} "${value}"` : String(record?.type || '')
+/** `Set Priority "High"` — the action itself, without its outcome (ADR-0058). */
+export function actionClause(record, t, specs) {
+  return actionPhrase(record?.type, record?.value, t, specs)
 }
 
 /** Human-readable outcome, with the engine's reason when it has one. */

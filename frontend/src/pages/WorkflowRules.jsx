@@ -2,32 +2,22 @@ import { useId, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, GitMerge, AlertTriangle } from 'lucide-react'
-import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, getWorkflowRuleVocabulary, search } from '../api/client'
+import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, search } from '../api/client'
 import { DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import FormField from '../components/shared/FormField'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
+import { useRuleVocabulary } from '../hooks/useRuleVocabulary'
 import EmptyState from '../components/shared/EmptyState'
 import RuleOutcomeChips from '../components/shared/RuleOutcomeChips'
-
-// The whole rule vocabulary comes from the engine (ADR-0048, ADR-0049), so labels are
-// derived rather than looked up: a trigger, field or action added on the server shows up
-// here readable, with nothing to edit.
-const humanize = (value) =>
-  String(value).replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-
-const triggerLabel = humanize
+// The engine's own names are what gets saved; what gets shown is those names read as
+// words (ADR-0058). Nothing here decides which is which — the served spec does.
+import { actionLabel, conditionPhrase, fieldLabel, opLabel, triggerLabel, valueLabel } from '../utils/ruleTerms'
 
 // A value the rule was saved with stays selectable even if the engine has since dropped
 // it, so editing an old rule never silently rewrites the field you did not touch.
 const withCurrent = (options, current) =>
   options.includes(current) ? options : [current, ...options]
-
-// Only where the derived name misleads. "Fire Event" reads like something that happens
-// here; the event goes to whatever integrations subscribe, on another page entirely.
-// Everything else keeps its derived label, so an action added on the server still shows
-// up readable with nothing to translate first.
-const actionLabel = (type, t) => t(`rules.action.${type}`, { defaultValue: humanize(type) })
 
 // Switching what the value belongs to must not leave the old value behind: "high" is a
 // priority, not a label name, and carrying it across is how a rule gets saved holding a
@@ -51,7 +41,7 @@ function ValueInput({ spec, value, slot, onChange, t }) {
   if (spec?.kind === 'enum') {
     return (
       <select value={value} onChange={e => onChange(e.target.value)} className="kt-input" style={{ flex: 1, minWidth: 120 }}>
-        {withCurrent(options, value).map(o => <option key={o} value={o}>{o}</option>)}
+        {withCurrent(options, value).map(o => <option key={o} value={o}>{valueLabel(o, spec)}</option>)}
       </select>
     )
   }
@@ -67,7 +57,11 @@ function ValueInput({ spec, value, slot, onChange, t }) {
       />
       {options.length > 0 && (
         <datalist id={listId}>
-          {options.map(o => <option key={o} value={o} />)}
+          {/* The box holds the raw value because the raw value is what gets saved; the
+              readable form rides along as the option's label rather than replacing it,
+              since a suggestion list that shows something other than what it inserts is
+              a list you cannot trust. */}
+          {options.map(o => <option key={o} value={o} label={spec?.vocabulary ? valueLabel(o, spec) : undefined} />)}
         </datalist>
       )}
     </>
@@ -83,10 +77,10 @@ function ConditionRow({ cond, fields, ops, specs, onChange, onRemove, t }) {
         className="kt-input"
         style={{ width: 'auto', minWidth: 120 }}
       >
-        {withCurrent(fields, cond.field).map(f => <option key={f} value={f}>{f}</option>)}
+        {withCurrent(fields, cond.field).map(f => <option key={f} value={f}>{fieldLabel(f, t)}</option>)}
       </select>
       <select value={cond.op} onChange={e => onChange({ ...cond, op: e.target.value })} className="kt-input" style={{ width: 'auto', minWidth: 80 }}>
-        {withCurrent(ops, cond.op).map(o => <option key={o} value={o}>{o}</option>)}
+        {withCurrent(ops, cond.op).map(o => <option key={o} value={o}>{opLabel(o, t)}</option>)}
       </select>
       <ValueInput spec={specs[cond.field]} value={cond.value} slot={cond.field} onChange={v => onChange({ ...cond, value: v })} t={t} />
       <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
@@ -188,13 +182,18 @@ function SubjectPicker({ selected, onPick, t }) {
 }
 
 function RuleModal({ initial, onSave, onClose, t }) {
-  // Not cached forever any more: the value vocabulary now carries labels, events and
-  // subscriber counts, all of which change on other pages while this one is open.
-  const { data: vocabulary } = useQuery({
-    queryKey: ['workflow-rule-vocabulary'],
-    queryFn: getWorkflowRuleVocabulary,
-    staleTime: 30_000,
-  })
+  const emptyRule = { name: '', trigger: 'node.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
+  const [form, setForm] = useState(initial ? {
+    ...initial,
+    project_id: initial.project_id || '',
+    conditions: initial.conditions || [],
+    actions: initial.actions || [],
+  } : emptyRule)
+
+  // Scoped to the rule being written: a project-scoped rule resolves its label names
+  // against that project, so offering the whole installation's labels here would offer
+  // values that warn the moment they are saved.
+  const vocabulary = useRuleVocabulary(form.project_id)
   const triggers = vocabulary?.triggers ?? []
   const conditionFields = vocabulary?.condition_fields ?? []
   const conditionOps = vocabulary?.condition_ops ?? []
@@ -209,13 +208,6 @@ function RuleModal({ initial, onSave, onClose, t }) {
   // rejected by the write surface, so the editor must not offer it in the first place.
   const triggerContextFields = vocabulary?.trigger_context_fields ?? {}
   const contextFields = new Set(Object.values(triggerContextFields).flat())
-  const emptyRule ={ name: '', trigger: 'node.created', conditions: [], actions: [{ type: 'set_priority', value: 'high' }], active: true, project_id: '' }
-  const [form, setForm] = useState(initial ? {
-    ...initial,
-    project_id: initial.project_id || '',
-    conditions: initial.conditions || [],
-    actions: initial.actions || [],
-  } : emptyRule)
 
   const allowedContext = triggerContextFields[form.trigger] ?? []
   const fieldsForTrigger = conditionFields.filter(f => !contextFields.has(f) || allowedContext.includes(f))
@@ -259,7 +251,7 @@ function RuleModal({ initial, onSave, onClose, t }) {
       <FormField label="Trigger">
         <select value={form.trigger} onChange={e => set('trigger', e.target.value)} className="kt-input">
           {withCurrent(triggers, form.trigger)
-            .map(tr => <option key={tr} value={tr}>{triggerLabel(tr)}</option>)}
+            .map(tr => <option key={tr} value={tr}>{triggerLabel(tr, t)}</option>)}
         </select>
       </FormField>
       <FormField label="Conditions (all must match)">
@@ -271,7 +263,10 @@ function RuleModal({ initial, onSave, onClose, t }) {
           {strayFields.length > 0 && (
             <span className="kt-rule-stray" style={{ color: DARK.warning }}>
               <AlertTriangle size={11} />
-              {t('rules.strayConditions', { trigger: triggerLabel(form.trigger), fields: strayFields.join(', ') })}
+              {t('rules.strayConditions', {
+                trigger: triggerLabel(form.trigger, t),
+                fields: strayFields.map(f => fieldLabel(f, t)).join(', '),
+              })}
             </span>
           )}
         </div>
@@ -284,7 +279,7 @@ function RuleModal({ initial, onSave, onClose, t }) {
           </button>
           {taskOnlyInUse.length > 0 && (
             <span className="kt-rule-hint" style={{ color: DARK.textDim }}>
-              {t('rules.taskOnlyActions', { actions: taskOnlyInUse.join(', ') })}
+              {t('rules.taskOnlyActions', { actions: taskOnlyInUse.map(a => actionLabel(a, t)).join(', ') })}
             </span>
           )}
         </div>
@@ -303,6 +298,11 @@ function RuleModal({ initial, onSave, onClose, t }) {
 export default function WorkflowRules() {
   const { t } = useTranslation()
   const { data: rules = [], isLoading } = useQuery({ queryKey: ['workflow-rules'], queryFn: getWorkflowRules })
+  // The cards read a saved rule back in words, which needs the same vocabulary the editor
+  // writes it with — unscoped here, because the list mixes rules from every project.
+  const vocabulary = useRuleVocabulary()
+  const actionValues = vocabulary?.action_values ?? {}
+  const conditionValues = vocabulary?.condition_values ?? {}
   const [modal, setModal] = useState(null)
   const [testResults, setTestResults] = useState({})
   const [subject, setSubject] = useState(null)
@@ -405,16 +405,19 @@ export default function WorkflowRules() {
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
                     <span className="kt-chip" style={{ color: DARK.success, background: 'rgba(250,204,21,0.1)' }}>
-                      when: {triggerLabel(rule.trigger)}
+                      when: {triggerLabel(rule.trigger, t)}
                     </span>
+                    {/* The rule read back, not its JSON transcribed. `title` keeps the
+                        stored keys one hover away, because they are still what the API
+                        takes and what a support question will quote (ADR-0058). */}
                     {(rule.conditions || []).map((c, i) => (
-                      <span key={i} className="kt-chip">
-                        if {c.field} {c.op} "{c.value}"
+                      <span key={i} className="kt-chip" title={`${c.field} ${c.op} ${c.value}`}>
+                        if {conditionPhrase(c, t, conditionValues)}
                       </span>
                     ))}
                     {(rule.actions || []).map((a, i) => (
-                      <span key={i} className="kt-chip" style={{ color: DARK.success, background: 'rgba(250,204,21,0.1)' }}>
-                        → {actionLabel(a.type, t)}: {a.value}
+                      <span key={i} className="kt-chip" title={`${a.type} ${a.value}`} style={{ color: DARK.success, background: 'rgba(250,204,21,0.1)' }}>
+                        → {actionLabel(a.type, t)}: {valueLabel(a.value, actionValues[a.type])}
                       </span>
                     ))}
                   </div>
@@ -425,7 +428,7 @@ export default function WorkflowRules() {
                   {rule.warnings?.length > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                       <AlertTriangle size={11} style={{ color: DARK.warning, flexShrink: 0 }} />
-                      <RuleOutcomeChips records={rule.warnings} />
+                      <RuleOutcomeChips records={rule.warnings} specs={actionValues} />
                     </div>
                   )}
                 </div>
@@ -482,7 +485,7 @@ export default function WorkflowRules() {
                             total: testResults[rule.id].actions?.length ?? 0,
                           })}
                       </span>
-                      <RuleOutcomeChips records={testResults[rule.id].actions} />
+                      <RuleOutcomeChips records={testResults[rule.id].actions} specs={actionValues} />
                     </>
                   )
                 )}
