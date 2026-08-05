@@ -5,6 +5,7 @@ these helpers rather than querying ``Node`` / ``Edge`` directly so that cycle
 prevention and the "nearest ancestor" rules stay consistent.
 """
 
+import secrets
 import uuid
 from collections import defaultdict, deque
 from datetime import datetime
@@ -167,16 +168,33 @@ _TASK_DATA_SCALARS = (
 
 
 def _apply_task_data_defaults(data: dict) -> dict:
-    """Seed a task node's ``data`` with the full scalar surface + a callback token.
+    """Seed a task node's ``data`` with the full scalar surface + webhook credentials.
 
     Shared by ``create_task`` (built-in tasks) and ``create_node`` (user-defined
     task-like types, ADR-0035) so both produce nodes that satisfy ``TaskOut``.
+
+    Both credentials are seeded, not just the token: the callback endpoint is
+    unauthenticated by design, so the signature is the only thing standing between a
+    leaked URL and a write. A secret that has to be switched on is a secret nobody
+    switches on, and the callback refuses unsigned requests now (ADR-0060), so a task
+    without one could not receive callbacks at all.
     """
     for key in _TASK_DATA_SCALARS:
         data.setdefault(key, None)
     if not data.get("callback_token"):
         data["callback_token"] = str(uuid.uuid4())
+    if not data.get("webhook_secret"):
+        data["webhook_secret"] = new_webhook_secret()
     return data
+
+
+def new_webhook_secret() -> str:
+    """A signing key for inbound CI callbacks.
+
+    Hex rather than URL-safe base64: it is pasted into CI provider settings by hand and
+    ends up in shell one-liners, so it should survive being quoted, logged and copied.
+    """
+    return secrets.token_hex(32)
 
 
 # --- Provenance (audit trail) ------------------------------------------------

@@ -19,9 +19,12 @@ rule that lived in one hand-written place and did not generalise when the surfac
 So it lives here now, in one place, applied on the way out.
 """
 
-# Nobody has a reason to read these back. A PIN hash is a salted single-round SHA-256 of a
-# short numeric PIN, which is to say it is the PIN; a webhook secret is a signing key. Both
-# are credentials at rest, and a client only ever needs to know whether one is set.
+# Credentials at rest, which no node or task payload has a reason to carry. A PIN hash is
+# a salted single-round SHA-256 of a short numeric PIN, which is to say it is the PIN; a
+# webhook secret is a signing key. Reading a payload should say whether one is set, no
+# more. The secret does have to reach whoever configures CI — it is mandatory since
+# ADR-0060 — but through one deliberate, logged request (``GET /api/nodes/{id}/webhook``)
+# rather than riding along in every list response a session happens to fetch.
 NEVER_SERVED = ("share_pin_hash", "webhook_secret")
 
 # Capabilities rather than credentials: holding one lets you act. The share token *is* the

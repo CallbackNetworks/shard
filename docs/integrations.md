@@ -2,13 +2,22 @@
 
 ## Inbound: CI/CD Webhook
 
-Every task has a unique webhook URL. When a CI/CD pipeline finishes, it POSTs to this URL to update the task's status automatically.
+Every task has a unique webhook URL **and a signing secret**, both issued when the task is created. When a CI/CD pipeline finishes, it POSTs to this URL to update the task's status automatically.
 
-### Get the Webhook URL
+The callback endpoint is unauthenticated by design — a build runner cannot carry your session — so **the signature is what proves the caller is your pipeline. Unsigned callbacks are rejected with HTTP 401** (ADR-0060). The URL alone configures nothing.
+
+### Get the Webhook Credentials
 
 1. Go to a project in the management UI (`/app/projects/{id}`)
-2. Hover over any task — click the link icon to copy the webhook URL
-3. Format: `https://your-domain/webhook/callback/{callback_token}`
+2. Hover over any task — click the link icon to open its **webhook panel**
+3. Copy the callback URL and the signing secret from there
+
+| | |
+|---|---|
+| URL | `https://your-domain/webhook/callback/{callback_token}` |
+| Secret | 64 hex characters, revealed on request and never carried in a task payload |
+
+Reading the secret is recorded in the task's activity trail. If either credential leaks, rotate it: the refresh icon in the webhook panel issues a new secret, and the task detail view's regenerate action issues a new token. Old values stop working immediately.
 
 ### Native CI/CD Payload Support
 
@@ -30,14 +39,20 @@ You can also force provider detection via query param: `?provider=github`
 ### Simple Format (all CI/CD tools)
 
 ```bash
+BODY='{"status": "done", "message": "Build #42 passed in 3m 12s"}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $2}')
+
 curl -X POST https://your-domain/webhook/callback/{callback_token} \
   -H "Content-Type: application/json" \
-  -d '{"status": "done", "message": "Build #42 passed in 3m 12s"}'
+  -H "X-Signature: sha256=$SIG" \
+  -d "$BODY"
 ```
 
 **`status`** (required): `todo` | `in_progress` | `done` | `failed`
 
 **`message`** (optional): Human-readable description logged to activity
+
+The signature covers the exact bytes of the request body, so build it from the same string you send.
 
 ### Enriched Data (Build History)
 
@@ -65,9 +80,9 @@ Returns a list of all inbound webhook events for a task, newest first.
 
 If a webhook URL is compromised, regenerate the token from the task detail view (hover → refresh icon). The old URL stops working immediately.
 
-### Webhook Secret & Signature Verification
+### Signature Verification
 
-For security, you can set a **webhook secret** on each task. When configured, inbound requests must include a valid signature:
+Every inbound callback must carry a valid signature over the request body. Three formats are accepted, so the providers below need no adapter of their own:
 
 | Provider | Signature Header | Method |
 |---|---|---|
@@ -75,7 +90,9 @@ For security, you can set a **webhook secret** on each task. When configured, in
 | **GitLab** | `X-Gitlab-Token: <token>` | Exact match |
 | **Generic** | `X-Signature: sha256=<hex>` | HMAC-SHA256 |
 
-If a secret is set but no valid signature is provided, the request is rejected with HTTP 401.
+Anything else — no signature header, a signature over different bytes, a key that is not this task's — is rejected with HTTP 401 and nothing is written, not even a build-history row.
+
+Paste the secret into your provider's own webhook-secret field (GitHub: repository → Settings → Webhooks → Secret; GitLab: Settings → Webhooks → Secret token) and it will sign for you.
 
 **Replay protection**: If `X-Webhook-Timestamp` header is present, requests older than 5 minutes are rejected.
 

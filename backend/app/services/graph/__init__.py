@@ -51,6 +51,7 @@ from app.services.graph.core import (
     has_role,
     nearest_ancestor_of_type,
     neighbors,
+    new_webhook_secret,
     node_is_shareable,
     node_is_subscribable,
     parents_of,

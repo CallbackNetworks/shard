@@ -3,6 +3,10 @@ import os
 # Disable auth middleware for tests
 os.environ["AUTH_PASSWORD"] = ""
 
+import hashlib
+import hmac
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -56,6 +60,31 @@ def client(db):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def post_callback(client):
+    """POST a CI callback the way a real provider does — signed (ADR-0060).
+
+    The signature covers the exact bytes on the wire, so the body is serialised here
+    rather than handed to httpx's ``json=``: signing one encoding and sending another is
+    the mistake this helper exists to stop every caller from making independently.
+    """
+
+    def _post(task, payload, *, secret=None, query="", headers=None, sign=True):
+        body = json.dumps(payload).encode()
+        sent = dict(headers or {})
+        if sign:
+            key = task.webhook_secret if secret is None else secret
+            digest = hmac.new(key.encode(), body, hashlib.sha256).hexdigest()
+            sent.setdefault("X-Hub-Signature-256", f"sha256={digest}")
+        return client.post(
+            f"/webhook/callback/{task.callback_token}{query}",
+            content=body,
+            headers={"Content-Type": "application/json", **sent},
+        )
+
+    return _post
 
 
 @pytest.fixture()

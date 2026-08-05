@@ -28,14 +28,19 @@ MAX_TIMESTAMP_AGE_SECONDS = 300
 
 
 def _verify_signature(task: "graph.TaskView", request_body: bytes, headers: dict[str, str]) -> bool:
-    """
-    Verify inbound webhook signature if task.webhook_secret is configured.
-    Supports: GitHub HMAC-SHA256, GitLab token, generic HMAC.
-    Returns True if valid or if no secret is configured (open mode).
+    """Prove the caller holds this task's signing key.
+
+    Supports GitHub HMAC-SHA256, GitLab's plain token, and a generic HMAC header.
+
+    This used to return ``True`` when a task had no secret, which made the callback URL
+    the entire credential: anyone who read it out of a browser history, a proxy log, a
+    screenshot or a pasted CI config could post build results. Every task is issued a
+    secret at creation now, so a missing one means a node predating that change or one
+    cleared by hand — neither is a reason to accept an unsigned write (ADR-0060).
     """
     secret = task.webhook_secret
     if not secret:
-        return True  # No secret configured = accept all
+        return False
 
     h = {k.lower(): v for k, v in headers.items()}
 

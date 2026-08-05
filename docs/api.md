@@ -169,6 +169,23 @@ Generates a new `callback_token`. The old webhook URL stops working immediately.
 { "callback_token": "new_uuid" }
 ```
 
+#### `GET /nodes/{id}/webhook`
+The credentials a CI provider needs to call back into this task (ADR-0060). A request of
+its own rather than fields on the task, because the signing secret never rides along in a
+task payload (ADR-0059) — and reading it is recorded in the activity trail.
+
+```json
+{ "callback_token": "uuid", "secret": "64 hex chars", "path": "/webhook/callback/uuid" }
+```
+
+A path rather than a URL: behind a reverse proxy the server's idea of its own origin is
+whatever the last hop told it, while the client asking already knows the real one.
+`400` if the node's type does not receive callbacks.
+
+#### `POST /nodes/{id}/webhook/rotate-secret`
+Issues a new signing secret and returns the same shape. Callbacks signed with the old
+secret are rejected from that moment on.
+
 #### `POST /projects/{pid}/tasks/{tid}/create-external-issue`
 Create a GitHub/GitLab/Gitea issue from this task and link it (ADR-0026). Provider is
 auto-detected from the project's `repo_url` when omitted.

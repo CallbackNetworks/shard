@@ -19,7 +19,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
 from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
-from app.services import graph
+from app.services import graph, node_data
+from app.services.activity import log_activity
 from app.services.enrichment import enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -77,7 +78,11 @@ def graph_map(
                 "priority": n.priority,
                 "due_date": n.due_date,
                 "is_pinned": n.is_pinned,
-                **({"data": n.data} if with_data else {}),
+                # This endpoint assembles its payload by hand, so it never passed through
+                # ``NodeOut`` and never inherited the credential redaction every other
+                # node read gets (ADR-0059) — it was still handing out PIN hashes and
+                # signing secrets. Tokens stay: this is the owner's own session.
+                **({"data": node_data.public_data(n.data)} if with_data else {}),
             }
             for n in nodes
         ],
@@ -324,3 +329,82 @@ def set_node_share_expiry(node_id: str, body: SetExpiryBody, db: Session = Depen
     graph.update_node(db, node_id, share_expires_at=body.expires_at.isoformat() if body.expires_at else None)
     db.commit()
     return {"ok": True}
+
+
+# --- Inbound webhook credentials (ADR-0060) ----------------------------------
+# The signing secret is never served in a node or task payload (ADR-0059) and the
+# callback now refuses unsigned requests, so there has to be one deliberate place to
+# read it — otherwise the credential exists and nobody can configure CI with it.
+# It sits here rather than under /projects/{id}/tasks because a task-like custom type
+# is a first-class task (ADR-0035) and need not live under a literal project.
+
+
+class WebhookConfigOut(BaseModel):
+    """Everything needed to configure a CI provider, and nothing that reads back later."""
+
+    callback_token: str
+    secret: str
+    path: str
+
+
+def _load_task_node(node_id: str, db: Session) -> Node:
+    node = db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    if node.type not in graph.task_type_keys(db):
+        raise HTTPException(status_code=400, detail="node type does not receive webhook callbacks")
+    return node
+
+
+def _webhook_config(node: Node) -> WebhookConfigOut:
+    data = node.data or {}
+    token = data.get("callback_token")
+    if not token:
+        raise HTTPException(status_code=409, detail="node has no callback token")
+    # A path, not a URL: behind a reverse proxy the server's own idea of its origin is
+    # whatever the last hop told it, while the client asking already knows the real one.
+    return WebhookConfigOut(
+        callback_token=token, secret=data.get("webhook_secret") or "", path=f"/webhook/callback/{token}"
+    )
+
+
+@router.get("/{node_id}/webhook", response_model=WebhookConfigOut)
+def get_node_webhook_config(node_id: str, db: Session = Depends(get_db)):
+    """Reveal the callback credentials for one task, as a deliberate act.
+
+    A separate request rather than a field on the task, so that reading the secret is
+    something a person did at a moment that can be pointed at, instead of something that
+    rode along in every list response.
+    """
+    node = _load_task_node(node_id, db)
+    config = _webhook_config(node)
+    log_activity(
+        db,
+        "task.webhook_secret_revealed",
+        project_id=graph.project_id_of_task(db, node_id),
+        task_id=node_id,
+        actor="user",
+        detail=f'Webhook credentials revealed for "{node.title}"',
+        meta={"title": node.title},
+    )
+    db.commit()
+    return config
+
+
+@router.post("/{node_id}/webhook/rotate-secret", response_model=WebhookConfigOut)
+def rotate_node_webhook_secret(node_id: str, db: Session = Depends(get_db)):
+    """Issue a new signing key. Callbacks signed with the old one stop being accepted."""
+    node = _load_task_node(node_id, db)
+    graph.update_node(db, node_id, webhook_secret=graph.new_webhook_secret())
+    log_activity(
+        db,
+        "task.webhook_secret_rotated",
+        project_id=graph.project_id_of_task(db, node_id),
+        task_id=node_id,
+        actor="user",
+        detail=f'Webhook secret rotated for "{node.title}"',
+        meta={"title": node.title},
+    )
+    db.commit()
+    db.refresh(node)
+    return _webhook_config(node)

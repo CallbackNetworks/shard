@@ -1,0 +1,72 @@
+/* Inbound CI callback credentials for one task (ADR-0060). */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(var(--kt-ink-rgb), 0.35);
+}
+
+.value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.code {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  word-break: break-all;
+  background: rgba(var(--kt-ink-rgb), 0.04);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.07);
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: rgba(var(--kt-ink-rgb), 0.7);
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(var(--kt-ink-rgb), 0.35);
+  padding: 3px 4px;
+  display: flex;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.iconBtn:hover {
+  color: rgba(var(--kt-ink-rgb), 0.7);
+  background: rgba(var(--kt-ink-rgb), 0.05);
+}
+
+.hint {
+  color: rgba(var(--kt-ink-rgb), 0.3);
+  line-height: 1.6;
+}
+
+.hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: rgba(var(--kt-ink-rgb), 0.5);
+}
+
+.loading {
+  color: rgba(var(--kt-ink-rgb), 0.3);
+}

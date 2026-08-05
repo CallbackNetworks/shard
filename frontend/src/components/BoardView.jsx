@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link2, Trash2, Bot } from 'lucide-react'
+import { Trash2, Bot } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DndContext,
@@ -75,12 +75,10 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
         </span>
         {hovered && !isDragOverlay ? (
           <div style={{ display: 'flex', gap: 2 }}>
-            <button
-              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/webhook/callback/${task.callback_token}`)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.25)', padding: '2px 4px' }}
-            >
-              <Link2 size={11} />
-            </button>
+            {/* A one-click "copy webhook URL" used to sit here. The URL alone no longer
+                configures anything — the callback rejects unsigned requests (ADR-0060) —
+                so setup lives in the task's webhook panel, which hands over the URL and
+                the signing key together. */}
             <select
               value={task.status}
               onChange={e => onUpdate(task.id, { status: e.target.value })}

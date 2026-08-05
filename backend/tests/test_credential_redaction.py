@@ -79,6 +79,25 @@ class TestNeverServed:
         db.commit()
         assert "share_pin_set" not in (client.get(f"/api/nodes/{node.id}").json()["data"] or {})
 
+    def test_the_internal_graph_map_redacts_too(self, client, db, task_with_secrets):
+        """The one node read that assembles its own payload instead of using ``NodeOut``.
+
+        It therefore inherited none of the redaction, and was still serving PIN hashes
+        and signing secrets to the structure map. The frontend had already been changed
+        to read ``share_pin_set``, which this endpoint did not produce.
+        """
+        node = graph.create_node(db, "project", title="Mapped")
+        graph.update_node(db, node.id, share_pin_hash="salt:deadbeef")
+        db.commit()
+
+        nodes = client.get("/api/graph/map?include=data").json()["nodes"]
+        blobs = [n.get("data") or {} for n in nodes]
+
+        assert [b for b in blobs if "share_pin_hash" in b or "webhook_secret" in b] == []
+        assert any(b.get("share_pin_set") for b in blobs)
+        # The owner's own session still gets the tokens the UI is built from.
+        assert any(b.get("callback_token") for b in blobs)
+
 
 class TestTokensFollowAuthority:
     """A share token and a callback token let the holder act, so they track scope."""

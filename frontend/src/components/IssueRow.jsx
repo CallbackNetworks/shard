@@ -12,6 +12,7 @@ import MembershipPanel from './MembershipPanel'
 import RecurrencePanel from './RecurrencePanel'
 import AttachmentsPanel from './AttachmentsPanel'
 import BuildHistoryPanel from './BuildHistoryPanel'
+import WebhookPanel from './WebhookPanel'
 import MarkdownPreview from './MarkdownPreview'
 import TimeTracker from './TimeTracker'
 
@@ -32,6 +33,7 @@ export default memo(function IssueRow({
   const [showRecurrence, setShowRecurrence] = useState(false)
   const [showAttachments, setShowAttachments] = useState(false)
   const [showBuildHistory, setShowBuildHistory] = useState(false)
+  const [showWebhook, setShowWebhook] = useState(false)
 
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -50,11 +52,6 @@ export default memo(function IssueRow({
   const labels = task.labels || []
   const subtaskCount = task.subtask_count || 0
   const subtasks = allTasks.filter(t => t.parent_id === task.id)
-
-  const copyWebhook = (e) => {
-    e.stopPropagation()
-    navigator.clipboard.writeText(`${window.location.origin}/webhook/callback/${task.callback_token}`)
-  }
 
   const handleCreateSubtask = () => {
     if (!subtaskTitle.trim()) return
@@ -301,7 +298,8 @@ export default memo(function IssueRow({
               style={{ background: showBuildHistory ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showBuildHistory ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Activity size={12} />
             </button>
-            <button onClick={copyWebhook} title="Copy webhook URL" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+            <button onClick={(e) => { e.stopPropagation(); setShowWebhook(v => !v) }} title="Webhook setup"
+              style={{ background: showWebhook ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showWebhook ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Link2 size={12} />
             </button>
             {task.external_url ? (
@@ -400,6 +398,19 @@ export default memo(function IssueRow({
       {/* Attachments panel */}
       {showAttachments && (
         <AttachmentsPanel projectId={projectId} taskId={task.id} depth={depth} />
+      )}
+
+      {/* Webhook setup panel: URL and signing key together, because one without the
+          other configures nothing (ADR-0060). */}
+      {showWebhook && (
+        <div style={{
+          paddingLeft: 16 + depth * 20 + 36, paddingRight: 16,
+          paddingTop: 8, paddingBottom: 10,
+          borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
+          background: 'rgba(var(--kt-ink-rgb), 0.02)',
+        }}>
+          <WebhookPanel taskId={task.id} />
+        </div>
       )}
 
       {/* Build history panel */}

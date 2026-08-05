@@ -74,6 +74,11 @@ export const updateTask = (projectId, taskId, data) => api.patch(`/nodes/${taskI
 export const deleteTask = (projectId, taskId) => api.delete(`/nodes/${taskId}`)
 export const createExternalIssue = (projectId, taskId, provider) => api.post(`/projects/${projectId}/tasks/${taskId}/create-external-issue`, provider ? { provider } : {}).then(r => r.data)
 export const regenerateToken = (projectId, taskId) => api.post(`/projects/${projectId}/tasks/${taskId}/regenerate-token`).then(r => r.data)
+// The signing secret is never carried in a task payload (ADR-0059) and the callback
+// refuses unsigned requests (ADR-0060), so reading it is its own deliberate request —
+// logged as an activity — rather than a field somebody happens to already be holding.
+export const getWebhookConfig = (taskId) => api.get(`/nodes/${taskId}/webhook`).then(r => r.data)
+export const rotateWebhookSecret = (taskId) => api.post(`/nodes/${taskId}/webhook/rotate-secret`).then(r => r.data)
 export const reorderTasks = (projectId, taskIds) => api.post(`/projects/${projectId}/tasks/reorder`, { task_ids: taskIds })
 // Cross-project membership (ADR-0032): a task can belong to multiple projects via contains edges.
 export const addTaskMembership = (projectId, taskId, targetProjectId) =>
