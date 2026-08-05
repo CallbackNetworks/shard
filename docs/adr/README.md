@@ -60,3 +60,4 @@
 | [0056](0056-every-value-box-knows-what-belongs-in-it.md) | 每一個數值欄位都知道自己該裝什麼 | Accepted | 2026-08-01 |
 | [0057](0057-pin-what-a-fresh-build-installs.md) | 上線前的重建：升掉 React Router 的警報，並釘死一份重建就會變的相依 | Accepted | 2026-08-01 |
 | [0058](0058-engine-names-and-user-names.md) | 引擎取的名字唸成人話，使用者取的名字原字照搬 | Accepted | 2026-08-01 |
+| [0059](0059-credentials-do-not-leave-the-server.md) | 憑證不離開伺服器，以及沒有人在聽的即時事件 | Accepted | 2026-08-05 |

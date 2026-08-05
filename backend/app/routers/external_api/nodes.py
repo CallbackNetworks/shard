@@ -26,7 +26,7 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
-from app.services import graph
+from app.services import graph, node_data
 from app.services.enrichment import enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -84,6 +84,9 @@ def api_graph_map(
         else []
     )
     with_data = include == "data"
+    # Only the unconditional half here; the token half is applied to the whole v1 response
+    # by the redaction middleware, which knows the caller's scopes (ADR-0059).
+    reveal = True
     return {
         "nodes": [
             {
@@ -94,7 +97,7 @@ def api_graph_map(
                 "priority": n.priority,
                 "due_date": n.due_date,
                 "is_pinned": n.is_pinned,
-                **({"data": n.data} if with_data else {}),
+                **({"data": node_data.public_data(n.data, reveal_tokens=reveal)} if with_data else {}),
             }
             for n in nodes
         ],

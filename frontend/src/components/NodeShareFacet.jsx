@@ -29,7 +29,8 @@ export default function NodeShareFacet({ node, subscribable }) {
   const [expiryInput, setExpiryInput] = useState(toLocalInput(node?.data?.share_expires_at))
 
   const token = node?.data?.share_token || null
-  const pinSet = !!node?.data?.share_pin_hash
+  // The hash itself no longer leaves the server (ADR-0059) — only whether one is set.
+  const pinSet = !!node?.data?.share_pin_set
   const expiresAt = node?.data?.share_expires_at || null
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const shareUrl = token ? `${origin}/share/n/${token}` : ''

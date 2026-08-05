@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.services import node_data
+
 
 def _reject_unknown(name: str, value: str, allowed: set[str]) -> str:
     if value not in allowed:
@@ -131,7 +133,10 @@ class TaskOut(BaseModel):
     assigned_agent_key_id: str | None = None
     assigned_agent_name: str | None = None
     callback_token: str | None = None  # ADR-0035: task-like custom nodes may lack one
-    webhook_secret: str | None = None
+    # The signing key itself never leaves (ADR-0059); whether one exists is worth showing,
+    # because an unsigned callback is accepted from anyone holding the token.
+    webhook_secret: str | None = Field(default=None, exclude=True)
+    webhook_secret_set: bool = False
     start_date: datetime | None
     due_date: datetime | None
     time_estimate: int | None = None
@@ -153,6 +158,12 @@ class TaskOut(BaseModel):
     blocking: list[str] = []  # task IDs that depend on this task
     pull_requests: list[TaskPullRequestOut] = []
     recurrence: "RecurrenceRuleOut | None" = None
+
+    @model_validator(mode="after")
+    def _project_webhook_secret(self):
+        """Derived on every construction, so no caller can forget it (ADR-0059)."""
+        self.webhook_secret_set = bool(self.webhook_secret)
+        return self
 
 
 class TaskWithSubtasksOut(TaskOut):
@@ -1084,6 +1095,17 @@ class NodeOut(BaseModel):
     data: dict | None = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("data")
+    @classmethod
+    def _drop_credentials(cls, value: dict | None) -> dict | None:
+        """Credentials never leave, on any route (ADR-0059).
+
+        Here rather than in the routers because every node read funnels through this
+        schema, so there is no site left to forget. The *token* half of the redaction
+        depends on who is asking, not on the node, so it stays in the routers that know.
+        """
+        return node_data.public_data(value)
 
 
 class NodeRef(BaseModel):

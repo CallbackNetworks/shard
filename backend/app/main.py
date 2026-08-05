@@ -1,10 +1,12 @@
 import asyncio
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect as sa_inspect
@@ -52,6 +54,7 @@ from app.routers import auth as auth_mod
 from app.routers import ws as ws_router
 from app.routers.auth import router as auth_router
 from app.routers.labels import task_label_router
+from app.services import node_data
 from app.services.scheduler import due_date_reminder_loop, get_scheduler_health
 from app.services.search_backend import get_search_backend
 from app.services.usage_tracker import UsageTrackingMiddleware
@@ -172,6 +175,44 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class CredentialRedactionMiddleware(BaseHTTPMiddleware):
+    """No ``/api/v1`` response carries a capability token unless the key is ``admin``.
+
+    A share token and a CI callback token are authority, not description: either one lets
+    the holder act. ``/webhook/callback/{token}`` is deliberately unauthenticated and skips
+    its signature check when a task has no ``webhook_secret``, so a ``read``-scope key that
+    could list tokens held a working write path — the least privilege in the system
+    escalating to task mutation (ADR-0059).
+
+    Enforced here, on the finished response, rather than in each endpoint: v1 has a dozen
+    response shapes and will grow more, and a rule applied per-endpoint is one a new
+    endpoint can simply be written without. The invariant is a property of the response,
+    so it is checked on the response.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if not request.url.path.startswith("/api/v1"):
+            return response
+        scopes = getattr(request.state, "api_key_scopes", None)
+        # No scopes recorded means the request never reached the key dependency (a 401, a
+        # 404, an unauthenticated probe) — nothing that carries a node payload.
+        if scopes is None or "admin" in scopes:
+            return response
+        if response.headers.get("content-type", "").split(";")[0] != "application/json":
+            return response
+        body = b"".join([chunk async for chunk in response.body_iterator])
+        try:
+            payload = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            return Response(content=body, status_code=response.status_code, headers=dict(response.headers))
+        return JSONResponse(
+            content=jsonable_encoder(node_data.strip_tokens(payload)),
+            status_code=response.status_code,
+            headers={k: v for k, v in response.headers.items() if k.lower() not in ("content-length",)},
+        )
+
+
 app = FastAPI(
     title="Shard",
     version="1.0.0",
@@ -193,6 +234,8 @@ def _cors_origins() -> list[str]:
 
 app.add_middleware(UsageTrackingMiddleware)
 app.add_middleware(AuthMiddleware)
+# Added last, so it wraps outermost and sees the finished body of every v1 response.
+app.add_middleware(CredentialRedactionMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),

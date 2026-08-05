@@ -165,7 +165,7 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
         color: n.data?.color || '#facc15',
         projectCount: linked.length,
         projectIds: linked.map(p => p.id),
-        shareActive: Boolean(n.data?.share_token || n.data?.share_pin_hash),
+        shareActive: Boolean(n.data?.share_token || n.data?.share_pin_set),
       }
     })
 

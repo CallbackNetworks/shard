@@ -7,7 +7,7 @@ Provides API key verification and scope/project access checks.
 import hashlib
 from datetime import UTC, datetime
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +15,7 @@ from app.models import ApiKey
 
 
 def _get_api_key(
+    request: Request,
     x_api_key: str = Header(
         ..., alias="X-API-Key", description="API key (starts with tdp_). Create one in the API Keys page."
     ),
@@ -26,6 +27,10 @@ def _get_api_key(
         raise HTTPException(status_code=401, detail="Invalid or inactive API key")
     api_key.last_used_at = datetime.now(UTC)
     db.commit()
+    # Read back by the credential-redaction middleware after the route has produced its
+    # response (ADR-0059). Every v1 endpoint already depends on this function, so the
+    # middleware learns the caller's authority without a second lookup.
+    request.state.api_key_scopes = list(api_key.scopes or [])
     return api_key
 
 
