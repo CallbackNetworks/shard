@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { BACKEND_PATHS, claimedByBackend } from './backendPaths.js'
 
 const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000'
 
@@ -55,8 +56,7 @@ export default defineConfig({
         server.middlewares.use((req, _res, next) => {
           const url = req.url || '/'
           const isAsset = url.startsWith('/@') || url.startsWith('/src') || url.startsWith('/node_modules') || /\.\w+$/.test(url.split('?')[0])
-          const isProxied = ['/api','/webhook','/share/identity','/share/project','/ical','/ws','/health','/docs','/openapi.json','/redoc'].some(p => url.startsWith(p))
-          if (!isAsset && !isProxied) req.url = '/'
+          if (!isAsset && !claimedByBackend(url)) req.url = '/'
           next()
         })
       }
@@ -83,20 +83,14 @@ export default defineConfig({
       'localhost',
       ...(process.env.VITE_ALLOWED_HOSTS?.split(',').map(h => h.trim()).filter(Boolean) || []),
     ],
-    // Internal API is under /api (ADR-0036); the rest are external contracts that
-    // keep root paths. Share data is proxied granularly (/share/identity, /share/project)
-    // so the SPA share *pages* (/share/:token, /share/p/:token) still fall through.
-    proxy: {
-      '/api': backendUrl,
-      '/webhook': backendUrl,
-      '/share/identity': backendUrl,
-      '/share/project': backendUrl,
-      '/ical': backendUrl,
-      '/health': backendUrl,
-      '/docs': backendUrl,
-      '/openapi.json': backendUrl,
-      '/redoc': backendUrl,
-      '/ws': { target: backendUrl, ws: true },
-    }
+    // Derived from BACKEND_PATHS so the proxy and the SPA fallback above cannot drift
+    // apart. Vite treats a key beginning with `^` as a regular expression; a bare string
+    // key is a plain prefix, which is what let `/api` swallow `/api-keys`.
+    proxy: Object.fromEntries(
+      BACKEND_PATHS.map(p => [
+        `^${p.replace(/[.]/g, '\\.')}(?:[/?]|$)`,
+        p === '/ws' ? { target: backendUrl, ws: true } : backendUrl,
+      ]),
+    )
   }
 })

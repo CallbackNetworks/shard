@@ -1,87 +1,40 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import api from '../api/client'
+import { subscribe, getPending, drop, count } from '../api/offlineQueue'
 
-const DB_NAME = 'shard-offline'
-const STORE_NAME = 'pending-actions'
-const DB_VERSION = 1
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-async function enqueueAction(action) {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    tx.objectStore(STORE_NAME).add({
-      ...action,
-      timestamp: Date.now(),
-    })
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-  })
-}
-
-async function getPendingActions() {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly')
-    const req = tx.objectStore(STORE_NAME).getAll()
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-async function clearAction(id) {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    tx.objectStore(STORE_NAME).delete(id)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-  })
-}
-
+/**
+ * Connection state, plus replay of anything written while there was none (ADR-0062).
+ *
+ * The queue itself lives in `api/offlineQueue.js` and is filled by the axios interceptor —
+ * this hook only reports and drains it. It used to own the queue *and* expose the only way
+ * to add to it, which nothing ever called, so the count was permanently zero and this whole
+ * file was decoration.
+ */
 export default function useOfflineSync() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [pendingCount, setPendingCount] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const syncingRef = useRef(false)
 
+  const refreshCount = useCallback(async () => {
+    try {
+      setPendingCount(await count())
+    } catch { /* IndexedDB unavailable; the indicator simply stays quiet */ }
+  }, [])
+
   useEffect(() => {
     const goOnline = () => setIsOnline(true)
     const goOffline = () => setIsOnline(false)
     window.addEventListener('online', goOnline)
     window.addEventListener('offline', goOffline)
+    // The producer is an interceptor, not a component, so the count has to be pushed.
+    const unsubscribe = subscribe(refreshCount)
+    refreshCount()
     return () => {
       window.removeEventListener('online', goOnline)
       window.removeEventListener('offline', goOffline)
+      unsubscribe()
     }
-  }, [])
-
-  const refreshCount = useCallback(async () => {
-    try {
-      const actions = await getPendingActions()
-      setPendingCount(actions.length)
-    } catch { /* ignore */ }
-  }, [])
-
-  useEffect(() => {
-    refreshCount()
-  }, [refreshCount])
-
-  const queueAction = useCallback(async (type, url, data) => {
-    await enqueueAction({ type, url, data })
-    await refreshCount()
   }, [refreshCount])
 
   const syncPending = useCallback(async () => {
@@ -89,23 +42,32 @@ export default function useOfflineSync() {
     syncingRef.current = true
     setSyncing(true)
     try {
-      const actions = await getPendingActions()
-      for (const action of actions) {
+      for (const action of await getPending()) {
         try {
-          const token = localStorage.getItem('auth_token')
-          const headers = { 'Content-Type': 'application/json' }
-          if (token) headers['Authorization'] = `Bearer ${token}`
-
-          const opts = { method: action.type, headers }
-          if (action.data && action.type !== 'GET' && action.type !== 'DELETE') {
-            opts.body = JSON.stringify(action.data)
+          // Through the same instance, so the auth header and `/api` base are whatever the
+          // rest of the app uses. `_replay` keeps a failure here from being queued again.
+          await api.request({
+            method: action.method,
+            url: action.url,
+            data: action.data,
+            baseURL: '',
+            _replay: true,
+          })
+          await drop(action.id)
+        } catch (err) {
+          const status = err.response?.status
+          if (status === undefined) {
+            // Still no network. Stop; the rest keeps its order for the next attempt.
+            break
           }
-          const res = await fetch(action.url, opts)
-          if (res.ok || res.status === 404) {
-            await clearAction(action.id)
+          if (status >= 400 && status < 500) {
+            // The server understood and refused — a deleted target, a stale conflict, a
+            // rejected payload. Retrying cannot change that, and keeping it would block
+            // every later action behind it forever.
+            await drop(action.id)
+          } else {
+            break
           }
-        } catch {
-          break
         }
       }
     } finally {
@@ -116,10 +78,8 @@ export default function useOfflineSync() {
   }, [refreshCount])
 
   useEffect(() => {
-    if (isOnline && pendingCount > 0) {
-      syncPending()
-    }
+    if (isOnline && pendingCount > 0) syncPending()
   }, [isOnline, pendingCount, syncPending])
 
-  return { isOnline, pendingCount, syncing, queueAction, syncPending }
+  return { isOnline, pendingCount, syncing, syncPending }
 }

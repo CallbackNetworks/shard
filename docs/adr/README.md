@@ -62,3 +62,5 @@
 | [0058](0058-engine-names-and-user-names.md) | 引擎取的名字唸成人話，使用者取的名字原字照搬 | Accepted | 2026-08-01 |
 | [0059](0059-credentials-do-not-leave-the-server.md) | 憑證不離開伺服器，以及沒有人在聽的即時事件 | Accepted | 2026-08-05 |
 | [0060](0060-a-callback-is-signed-or-it-is-not-accepted.md) | 回呼有簽章，否則不算數 | Accepted | 2026-08-05 |
+| [0061](0061-a-page-route-is-not-a-backend-path.md) | 頁面路由不是後端路徑 | Accepted | 2026-08-06 |
+| [0062](0062-offline-writes-are-queued-where-every-write-passes.md) | 離線的寫入排在每一筆寫入都會經過的地方 | Accepted | 2026-08-06 |

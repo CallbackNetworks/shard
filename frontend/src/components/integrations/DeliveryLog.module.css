@@ -6,6 +6,14 @@
   padding-top: 10px;
 }
 
+/* Toggle and refresh are siblings, not nested: a button inside a button is invalid HTML
+   and leaves the inner control out of the accessibility tree. */
+.deliveryHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .deliveryToggleBtn {
   display: flex;
   align-items: center;

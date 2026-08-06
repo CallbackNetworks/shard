@@ -204,7 +204,9 @@ Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh databas
 
 **Keyboard shortcuts** (`hooks/useKeyboardShortcuts.js` + `components/KeyboardShortcutsHelp.jsx`): global single-key (`c`, `n`, `/`, `?`) and chord (`g→h`, `g→a`, `g→i`, `g→g`) shortcuts. `?` toggles the help modal.
 
-**Offline support** (`hooks/useOfflineSync.js` + `components/OfflineIndicator.jsx`): IndexedDB queue for pending mutations when offline. Auto-syncs when reconnected. Bottom-center indicator shows offline status and pending count.
+**Offline support** (`api/offlineQueue.js` + `hooks/useOfflineSync.js` + `components/OfflineIndicator.jsx`): IndexedDB queue for pending mutations when offline. The producer is the axios response interceptor in `api/client.js` — every write passes through it, so no per-mutation wiring is needed (ADR-0062). `FormData` uploads are not queued. `useOfflineSync` drains the queue through the same axios instance on reconnect, in insertion order, dropping actions the server refuses with a 4xx. Bottom-center indicator shows offline status and pending count.
+
+**Backend paths vs page routes** (`frontend/backendPaths.js`): the one list of URL prefixes that belong to the backend, matched by whole path segment. Both the Vite dev proxy and `frontend/nginx.conf` follow it; `src/__tests__/backendPathClaims.test.js` asserts no SPA route in `App.jsx` is claimed by either (ADR-0036, ADR-0061).
 
 ## Data flows
 

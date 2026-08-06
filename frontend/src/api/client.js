@@ -1,9 +1,14 @@
 import axios from 'axios'
 import { globalAddToast } from '../context/ToastContext'
+import { enqueue } from './offlineQueue'
 
 // Internal API is namespaced under /api (ADR-0036) so backend paths never collide
 // with SPA page routes. Public share calls below use plain axios and stay at root.
 const api = axios.create({ baseURL: '/api' })
+
+// Exported for the offline replay, which has to reuse this instance's auth header rather
+// than assemble a second, drifting copy of it.
+export default api
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('auth_token')
@@ -28,7 +33,51 @@ export function parse422(err) {
     .join('; ')
 }
 
-api.interceptors.response.use(null, err => {
+const WRITE_METHODS = ['post', 'put', 'patch', 'delete']
+
+/**
+ * A write that failed because there was no network, rather than because the server said no.
+ *
+ * Queued here — at the one point every write already passes through — so no list of
+ * "mutations that support offline" has to be kept in step with the features. A `FormData`
+ * body is the exception: replaying a file picked in a previous session is not something
+ * this can honestly promise, so those are left to fail and say so.
+ */
+async function queueIfOffline(err) {
+  const cfg = err.config
+  if (err.response || !cfg || cfg._replay) return false
+  if (!WRITE_METHODS.includes((cfg.method || '').toLowerCase())) return false
+  if (typeof FormData !== 'undefined' && cfg.data instanceof FormData) return false
+  if (navigator.onLine) return false
+
+  try {
+    await enqueue({
+      method: cfg.method.toUpperCase(),
+      url: `${cfg.baseURL || ''}${cfg.url}`,
+      data: typeof cfg.data === 'string' ? JSON.parse(cfg.data) : cfg.data,
+    })
+    return true
+  } catch {
+    // IndexedDB unavailable (private window, quota). Better to report the failure than to
+    // claim the change was kept.
+    return false
+  }
+}
+
+api.interceptors.response.use(null, async err => {
+  if (await queueIfOffline(err)) {
+    globalAddToast(
+      'Offline — this change is queued and will be sent when the connection is back',
+      'info',
+    )
+    err.queuedOffline = true
+    return Promise.reject(err)
+  }
+  if (!err.response && !err.config?._replay && !err.config?._silent) {
+    // A network failure has no `err.response`, so the branch below never fired and these
+    // simply disappeared.
+    globalAddToast(err.message || 'Network error', 'error')
+  }
   if (err.response?.status === 401 && window.location.pathname !== '/' && window.location.pathname !== '/login') {
     const isBackgroundRefetch = err.config?._isBackgroundRefetch
     if (!isBackgroundRefetch) {

@@ -55,20 +55,22 @@ export default function DeliveryLog({ integrationId }) {
 
   return (
     <div className={s.deliveryLogWrapper}>
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className={s.deliveryToggleBtn}
-      >
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        {t('integrations.recentDeliveries')}
+      {/* Refresh used to sit inside the toggle button, kept from toggling the panel by a
+          stopPropagation. Nesting one button in another is invalid HTML and hides the
+          inner control from assistive technology; as siblings neither needs the guard. */}
+      <div className={s.deliveryHeader}>
         <button
-          onClick={(e) => { e.stopPropagation(); refetch() }}
-          className={s.refreshBtn}
-          title="Refresh"
+          onClick={() => setExpanded(v => !v)}
+          className={s.deliveryToggleBtn}
+          aria-expanded={expanded}
         >
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          {t('integrations.recentDeliveries')}
+        </button>
+        <button onClick={() => refetch()} className={s.refreshBtn} title="Refresh">
           <RefreshCw size={10} />
         </button>
-      </button>
+      </div>
 
       {expanded && (
         <div className={s.deliveryContent}>
