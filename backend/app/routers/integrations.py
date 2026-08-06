@@ -6,6 +6,7 @@ from app.models import Integration
 from app.schemas import IntegrationCreate, IntegrationOut, IntegrationUpdate
 from app.services.email_sender import is_configured as smtp_configured
 from app.services.event_catalog import subscribable_events, validate_events
+from app.services.integration_data import merge_secret_dict
 from app.services.integration_templates import get_all_templates, get_template
 from app.services.notifier import NOTIFICATION_SOURCES, fire_test_notification
 
@@ -85,7 +86,14 @@ def update_integration(integration_id: str, body: IntegrationUpdate, db: Session
         raise HTTPException(status_code=404, detail="Integration not found")
     if body.events is not None:
         _validate_events_or_422(db, body.events)
-    for field, value in body.model_dump(exclude_none=True).items():
+    patch = body.model_dump(exclude_none=True)
+    # The credential dicts are merged, not replaced (ADR-0063). A client edits what it was
+    # shown, and what it was shown has its credentials withheld as nulls — so replacing
+    # wholesale would let "rename the basic-auth user" quietly delete the password.
+    for field in ("auth_config", "custom_headers"):
+        if field in patch:
+            patch[field] = merge_secret_dict(getattr(integration, field), patch[field])
+    for field, value in patch.items():
         setattr(integration, field, value)
     db.commit()
     db.refresh(integration)

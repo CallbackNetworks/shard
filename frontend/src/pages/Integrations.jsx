@@ -129,7 +129,13 @@ function CustomHeadersEditor({ headers, onChange }) {
           <div key={i} className={s.headerRow}>
             <input value={k} onChange={e => updateKey(k, e.target.value)} placeholder={t('integrations.headerKey')}
               className={`kt-input ${s.inputStyle} ${s.headerKeyInput}`} />
-            <input value={v} onChange={e => updateValue(k, e.target.value)} placeholder={t('integrations.headerValue')}
+            {/* A withheld value reads back as null (ADR-0063) and has to reach the server as
+                null again, because that is what "unchanged" means there. The null lives in
+                form state; this only keeps the input controlled while displaying nothing.
+                Do not normalise it away on the way in or out — that is how editing the
+                header name would silently clear its value. */}
+            <input value={v ?? ''} onChange={e => updateValue(k, e.target.value)}
+              placeholder={v === null ? t('integrations.headerValueSet') : t('integrations.headerValue')}
               className={`kt-input ${s.inputStyle} ${s.headerValueInput}`} />
             <button onClick={() => removeHeader(k)}
               className={s.removeHeaderBtn}>
@@ -227,10 +233,13 @@ function IntegrationModal({ initial, onSave, onClose }) {
                   integration signs every payload with `secret` whatever auth_type is,
                   so the field cannot live inside the bearer branch — choosing basic auth
                   used to hide a key that was still in use. */}
+              {/* The secret itself is never served back (ADR-0063), so an existing one shows
+                  as an empty box. Say so, or it reads as "no secret set". */}
               {form.type === 'webhook' && (
                 <label className={s.labelStyle}>{t('integrations.signingSecret')}
                   <input value={form.secret} onChange={e => set('secret', e.target.value)}
-                    placeholder={t('integrations.signingSecretPlaceholder')} className={`kt-input ${s.inputStyle}`} />
+                    placeholder={form.secret_set ? t('integrations.secretKeepPlaceholder') : t('integrations.signingSecretPlaceholder')}
+                    className={`kt-input ${s.inputStyle}`} />
                   <div className={s.hmacInfo}>{t('integrations.hmacSecretNote')}</div>
                 </label>
               )}
@@ -249,7 +258,8 @@ function IntegrationModal({ initial, onSave, onClose }) {
               {form.auth_type === 'bearer' && form.type !== 'webhook' && (
                 <label className={s.labelStyle}>{t('integrations.bearerToken')}
                   <input value={form.secret} onChange={e => set('secret', e.target.value)}
-                    placeholder="token..." className={`kt-input ${s.inputStyle}`} />
+                    placeholder={form.secret_set ? t('integrations.secretKeepPlaceholder') : 'token...'}
+                    className={`kt-input ${s.inputStyle}`} />
                 </label>
               )}
               {form.auth_type === 'basic' && (
@@ -257,8 +267,12 @@ function IntegrationModal({ initial, onSave, onClose }) {
                   <label className={s.labelStyle}>{t('integrations.basicUsername')}
                     <input value={form.auth_config?.username || ''} onChange={e => set('auth_config', { ...form.auth_config, username: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
+                  {/* The null that means "set, withheld" has to survive form state untouched
+                      and go back as null (ADR-0063); the input only displays around it. */}
                   <label className={s.labelStyle}>{t('integrations.basicPassword')}
-                    <input type="password" value={form.auth_config?.password || ''} onChange={e => set('auth_config', { ...form.auth_config, password: e.target.value })} className={`kt-input ${s.inputStyle}`} />
+                    <input type="password" value={form.auth_config?.password ?? ''}
+                      placeholder={form.auth_config?.password === null ? t('integrations.secretKeepPlaceholder') : ''}
+                      onChange={e => set('auth_config', { ...form.auth_config, password: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
                 </>
               )}
@@ -268,7 +282,9 @@ function IntegrationModal({ initial, onSave, onClose }) {
                     <input value={form.auth_config?.header_name || 'X-API-Key'} onChange={e => set('auth_config', { ...form.auth_config, header_name: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
                   <label className={s.labelStyle}>{t('integrations.apiKeyValue')}
-                    <input value={form.auth_config?.header_value || ''} onChange={e => set('auth_config', { ...form.auth_config, header_value: e.target.value })} className={`kt-input ${s.inputStyle}`} />
+                    <input value={form.auth_config?.header_value ?? ''}
+                      placeholder={form.auth_config?.header_value === null ? t('integrations.secretKeepPlaceholder') : ''}
+                      onChange={e => set('auth_config', { ...form.auth_config, header_value: e.target.value })} className={`kt-input ${s.inputStyle}`} />
                   </label>
                 </>
               )}
@@ -397,12 +413,16 @@ export default function Integrations() {
     const data = {
       ...form,
       project_id: form.project_id || null,
+      // Empty means "leave the stored secret alone", which is the only thing an empty box
+      // can honestly mean once the value is never shown (ADR-0063).
       secret: form.secret || null,
       email_to: form.email_to || null,
       email_subject_prefix: form.email_subject_prefix || '[Shard]',
       custom_headers: form.custom_headers && Object.keys(form.custom_headers).length > 0 ? form.custom_headers : null,
       auth_config: form.auth_config && Object.keys(form.auth_config).length > 0 ? form.auth_config : null,
     }
+    // Read-only projection of whether a secret exists (ADR-0063), not a field to write back.
+    delete data.secret_set
     if (form.type === 'email' && !data.url) data.url = ''
     if (modal.mode === 'edit') updateMut.mutate({ id: modal.data.id, data })
     else createMut.mutate(data)
@@ -505,8 +525,10 @@ export default function Integrations() {
                     className={s.testBtn}>
                     {testMut.isPending ? t('testing') : t('test')}
                   </button>
+                  {/* `intg.secret` is never present (ADR-0063); `secret_set` rides along in
+                      the spread so the field can say whether one exists. */}
                   <button onClick={() => setModal({ mode: 'edit', data: {
-                    ...intg, secret: intg.secret || '', project_id: intg.project_id || '',
+                    ...intg, secret: '', project_id: intg.project_id || '',
                     email_to: intg.email_to || '', email_subject_prefix: intg.email_subject_prefix || '[Shard]',
                     auth_type: intg.auth_type || 'bearer', auth_config: intg.auth_config || {},
                     custom_headers: intg.custom_headers || {},

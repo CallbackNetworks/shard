@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.services import node_data
+from app.services.integration_data import public_auth_config, public_custom_headers
 
 
 def _reject_unknown(name: str, value: str, allowed: set[str]) -> str:
@@ -292,7 +293,11 @@ class IntegrationOut(BaseModel):
     name: str
     type: str
     url: str
-    secret: str | None
+    # An integration's credentials never leave the server (ADR-0063). The signing key needs
+    # a boolean of its own because ``None`` already means "no secret" here; the two dicts
+    # do not, because a present key with a null value says "set, withheld" unambiguously.
+    secret: str | None = Field(default=None, exclude=True)
+    secret_set: bool = False
     project_id: str | None
     events: list[str]
     sources: list[str] | None = None
@@ -305,6 +310,14 @@ class IntegrationOut(BaseModel):
     auth_config: dict | None = None
     template_id: str | None = None
     smtp_warning: str | None = None
+
+    @model_validator(mode="after")
+    def _withhold_credentials(self):
+        """Derived on every construction, so no caller can forget it (ADR-0063)."""
+        self.secret_set = bool(self.secret)
+        self.auth_config = public_auth_config(self.auth_config)
+        self.custom_headers = public_custom_headers(self.custom_headers)
+        return self
 
 
 # --- Comment ---

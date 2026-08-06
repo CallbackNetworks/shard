@@ -64,3 +64,4 @@
 | [0060](0060-a-callback-is-signed-or-it-is-not-accepted.md) | 回呼有簽章，否則不算數 | Accepted | 2026-08-05 |
 | [0061](0061-a-page-route-is-not-a-backend-path.md) | 頁面路由不是後端路徑 | Accepted | 2026-08-06 |
 | [0062](0062-offline-writes-are-queued-where-every-write-passes.md) | 離線的寫入排在每一筆寫入都會經過的地方 | Accepted | 2026-08-06 |
+| [0063](0063-an-integrations-configuration-is-credentials.md) | 整合設定裡裝的就是憑證 | Accepted | 2026-08-06 |
