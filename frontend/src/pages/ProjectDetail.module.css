@@ -136,6 +136,12 @@
   color: rgba(var(--kt-ink-rgb), 0.3);
 }
 
+/* Part of the rolled-up count lives one level down (ADR-0065). */
+.progressNote {
+  font-size: 10px;
+  color: var(--kt-hit);
+}
+
 .progressBarTrack {
   width: 90px;
   height: 3px;
@@ -268,6 +274,11 @@
   color: #fff;
   font-size: 12px;
   cursor: pointer;
+}
+
+/* Sub-container panel sits between the header block and the issue list. */
+.childContainers:not(:empty) {
+  padding: 14px 24px 0;
 }
 
 /* ── Tabs ── */

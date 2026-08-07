@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Link2, Search } from 'lucide-react'
-import { getNode, getNodeTypes, getContainedTasks, updateTask, deleteTask } from '../api/client'
+import { getNode, getNodeTypes, getContainedTasks, getContainerSubtree, updateTask, deleteTask } from '../api/client'
 import NodeShareFacet from '../components/NodeShareFacet'
+import ChildContainersPanel from '../components/ChildContainersPanel'
 import { DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
 import BoardView from '../components/BoardView'
@@ -29,6 +30,15 @@ export default function ContainerView() {
     enabled: !!node,
   })
   const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  // Subtree rollup (ADR-0065): the board below shows this container's direct tasks,
+  // the header counts everything it transitively contains. Server-computed — the
+  // difference between the two numbers is exactly what used to go missing.
+  const { data: subtree } = useQuery({
+    queryKey: ['container-subtree', id],
+    queryFn: () => getContainerSubtree(id),
+    enabled: !!node,
+  })
+  const nestedTaskCount = subtree ? subtree.total_tasks - subtree.direct_task_count : 0
 
   const [view, setView] = useState('table')
   const [search, setSearch] = useState('')
@@ -87,7 +97,10 @@ export default function ContainerView() {
             <h1 className="kt-page-title" style={{ margin: 0 }}>
               {node.title || <em style={{ color: DARK.textDim }}>{t('nodePage.untitled')}</em>}
             </h1>
-            <span style={{ fontSize: 12, color: DARK.textDim }}>{t('containerView.count', { n: tasks.length })}</span>
+            <span style={{ fontSize: 12, color: DARK.textDim }}>
+              {t('containerView.count', { n: subtree?.total_tasks ?? tasks.length })}
+              {nestedTaskCount > 0 && ` ${t('containers.nestedNote', { n: nestedTaskCount })}`}
+            </span>
           </div>
           <p className="kt-page-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Link to={`/n/${id}`} style={{ color: DARK.textMid, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -101,6 +114,9 @@ export default function ContainerView() {
       {hasNodeRole(typeMeta, 'shareable') && (
         <NodeShareFacet node={node} subscribable={hasNodeRole(typeMeta, 'subscribable')} />
       )}
+
+      <ChildContainersPanel nodeId={id} />
+
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '0 1 260px' }}>
@@ -126,7 +142,12 @@ export default function ContainerView() {
       </div>
 
       {tasks.length === 0 ? (
-        <EmptyState message={t('containerView.empty')} hint={t('containerView.emptyHint')} />
+        // "Nothing here" is only true if nothing is nested either — otherwise the
+        // work is real and one level down, which is what the panel above lists.
+        <EmptyState
+          message={t('containerView.empty')}
+          hint={nestedTaskCount > 0 ? t('containers.emptyButNested', { n: nestedTaskCount }) : t('containerView.emptyHint')}
+        />
       ) : view === 'board' ? (
         <BoardView
           tasks={filtered}

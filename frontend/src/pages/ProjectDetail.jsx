@@ -16,6 +16,7 @@ import LabelManager, { LabelChip } from '../components/project/LabelManager'
 import TaskFiltersPanel from '../components/project/TaskFiltersPanel'
 import BulkToolbar from '../components/project/BulkToolbar'
 import ShareSettingsPanel from '../components/project/ShareSettingsPanel'
+import ChildContainersPanel from '../components/ChildContainersPanel'
 import GanttChart from '../components/GanttChart'
 import BoardView from '../components/BoardView'
 import CalendarView from '../components/CalendarView'
@@ -345,6 +346,13 @@ export default function ProjectDetail() {
           <div className={s.headerActions}>
             <div className={s.progressInfo}>
               <div className={s.progressText}>{project.done_tasks}/{project.total_tasks} done</div>
+              {/* Counts roll up the whole subtree (ADR-0065), so say when part of the
+                  work is not on the list below — the sub-container panel names where. */}
+              {project.total_tasks > project.direct_task_count && (
+                <div className={s.progressNote}>
+                  {project.total_tasks - project.direct_task_count} in sub-containers
+                </div>
+              )}
               <div className={s.progressBarTrack}>
                 <div className={s.progressBarFill} style={{ width: `${project.progress}%` }} />
               </div>
@@ -495,6 +503,12 @@ export default function ProjectDetail() {
             </span>
           </button>
         </div>
+      </div>
+
+      {/* Containers nested under this project (ADR-0065): their tasks are counted in
+          the header total but are not on this page's list. */}
+      <div className={s.childContainers}>
+        <ChildContainersPanel nodeId={id} />
       </div>
 
       {/* New issue form */}

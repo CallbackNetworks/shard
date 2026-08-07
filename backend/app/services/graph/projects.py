@@ -26,6 +26,7 @@ from app.services.graph.core import (
     _iso,
     _parse_dt,
     children_of,
+    container_type_keys,
     create_node,
     task_type_keys,
 )
@@ -207,6 +208,18 @@ def contained_task_ids(db: Session, project_id: str) -> list[str]:
     """Ids of tasks contained by a project via outgoing ``contains`` edges."""
     tasks = task_type_keys(db)
     return [n.id for n in children_of(db, project_id) if n.type in tasks]
+
+
+def child_container_ids(db: Session, container_id: str) -> list[str]:
+    """Ids of the container-role nodes this node directly ``contains`` (ADR-0065).
+
+    The other half of ``contained_task_ids``: a container's children split into
+    tasks (its board) and containers (the level below it). Both are ``contains``
+    edges — only the child's role tells them apart — so a nested container was
+    previously invisible to every reader, which asked only for the task half.
+    """
+    containers = container_type_keys(db)
+    return [n.id for n in children_of(db, container_id) if n.type in containers]
 
 
 def unfiled_task_ids(db: Session) -> list[str]:

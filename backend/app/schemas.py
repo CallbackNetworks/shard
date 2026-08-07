@@ -67,9 +67,15 @@ class ProjectOut(BaseModel):
     wip_limits: dict | None = None
     created_at: datetime
     updated_at: datetime
+    # Subtree rollup (ADR-0065): total/done/progress cover everything this project
+    # transitively contains; ``direct_task_count`` is what ``tasks`` below actually
+    # holds, so a reader can tell "12 of my 40 tasks live one level down" apart from
+    # a plain 40-task project.
     progress: float = 0.0
     total_tasks: int = 0
     done_tasks: int = 0
+    direct_task_count: int = 0
+    child_container_count: int = 0
     tasks: list["TaskOut"] = []
     labels: list[LabelOut] = []
     cycles: list["CycleOut"] = []
@@ -1119,6 +1125,34 @@ class NodeOut(BaseModel):
         depends on who is asking, not on the node, so it stays in the routers that know.
         """
         return node_data.public_data(value)
+
+
+class ContainerSummary(BaseModel):
+    """A container plus the task rollup of everything below it (ADR-0065).
+
+    The shape the container view reads for each level: ``total_tasks``/``done_tasks``/
+    ``progress`` cover the node's whole ``contains`` subtree, while
+    ``direct_task_count`` / ``child_container_count`` say how that work is split
+    between this level and the ones under it. ``direct_task_count`` counts under the
+    same top-level rule as the total, so ``total - direct`` is exactly the work
+    living in the containers below.
+    """
+
+    id: str
+    type: str
+    title: str
+    status: str | None = None
+    total_tasks: int = 0
+    done_tasks: int = 0
+    progress: float = 0.0
+    direct_task_count: int = 0
+    child_container_count: int = 0
+
+
+class ContainerSubtree(ContainerSummary):
+    """A container's own rollup plus one level of child containers, each rolled up."""
+
+    children: list[ContainerSummary] = []
 
 
 class NodeRef(BaseModel):

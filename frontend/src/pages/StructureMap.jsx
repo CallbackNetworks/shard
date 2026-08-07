@@ -8,6 +8,7 @@ import { STATUS_COLOR } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { dependencyNeighborhood } from '../utils/structureMap'
 import { deriveGraphStructure, focusGraph } from '../utils/graphStructure'
+import { containerRoute } from '../utils/containerRoute'
 import { buildMindMapLayout, buildNetworkLayout, buildTreeLayout, taskWeight } from '../utils/structureMapLayout'
 import { buildTerritoryModel } from '../utils/territoryModel'
 import useMapViewport from '../hooks/useMapViewport'
@@ -328,11 +329,9 @@ export default function StructureMap() {
 
   const containerHref = (containerId) => {
     const container = projectById.get(containerId)
-    if (!container) return null
-    // A goal is a container card too (ADR-0041) but keeps its own Goals view; custom
-    // container types open the generic ContainerView; built-in projects open ProjectDetail.
-    if (container.typeKey === 'goal') return '/goals'
-    return container.isCustomType ? `/c/${container.id}` : `/projects/${container.id}`
+    // Where a container opens is one shared rule (ADR-0065) — the sub-container
+    // panels link to the same pages and must not disagree with the map.
+    return container ? containerRoute(container.id, container.typeKey) : null
   }
 
   const jumpTo = (node) => {

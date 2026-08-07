@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Node
 from app.routers.deps import get_goal_or_404
 from app.schemas import GoalOut, GoalProjectOut
 from app.services import graph
@@ -16,16 +15,12 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 
 
 def _project_progress(db: Session, project_id: str) -> float:
-    """Compute progress for a single project (top-level tasks only)."""
-    task_ids = graph.contained_task_ids(db, project_id)
-    if not task_ids:
-        return 0.0
-    base = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), graph.top_level_task_filter(db))
-    total = base.count()
-    if total == 0:
-        return 0.0
-    done = base.filter(Node.status == "done").count()
-    return round(done / total * 100, 1)
+    """Progress for one project in a goal's breakdown — the shared subtree rule (ADR-0065).
+
+    The goal total above it already counts its whole subtree; a per-project row that
+    counted only direct children would contradict the total on the same page.
+    """
+    return graph.container_subtree_stats(db, project_id).progress
 
 
 def _enrich_goal(goal: graph.GoalView, db: Session) -> GoalOut:

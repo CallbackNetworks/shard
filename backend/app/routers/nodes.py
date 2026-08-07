@@ -18,7 +18,17 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
-from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
+from app.schemas import (
+    ContainerSubtree,
+    ContainerSummary,
+    EdgeCreate,
+    EdgeOut,
+    GraphEventOut,
+    NodeCreate,
+    NodeOut,
+    NodeUpdate,
+    TaskOut,
+)
 from app.services import graph, node_data
 from app.services.activity import log_activity
 from app.services.enrichment import enrich_task
@@ -208,6 +218,40 @@ def list_contained_tasks(node_id: str, db: Session = Depends(get_db)):
     views = graph.tasks_in_project(db, node_id)
     views.sort(key=lambda v: (v.position, v.created_at))
     return [enrich_task(v, db) for v in views]
+
+
+def _container_summary(db: Session, node: Node) -> ContainerSummary:
+    stats = graph.container_subtree_stats(db, node.id)
+    return ContainerSummary(
+        id=node.id,
+        type=node.type,
+        title=node.title,
+        status=node.status,
+        total_tasks=stats.total_tasks,
+        done_tasks=stats.done_tasks,
+        progress=stats.progress,
+        direct_task_count=stats.direct_task_count,
+        child_container_count=stats.child_container_count,
+    )
+
+
+@router.get("/{node_id}/subtree", response_model=ContainerSubtree)
+def get_node_subtree(node_id: str, db: Session = Depends(get_db)):
+    """This container's rollup plus its direct child containers, each rolled up (ADR-0065).
+
+    The companion to ``contained-tasks``: that endpoint answers "what sits on this
+    node's board", this one answers "what sits below it". Together they account for
+    every ``contains`` child, which is why the level a user inserts stops vanishing.
+    The rollup rule lives here, server-side, so no client re-derives it.
+    """
+    node = db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    children = [db.get(Node, cid) for cid in graph.child_container_ids(db, node_id)]
+    return ContainerSubtree(
+        **_container_summary(db, node).model_dump(),
+        children=[_container_summary(db, child) for child in children if child is not None],
+    )
 
 
 # --- Edges -------------------------------------------------------------------

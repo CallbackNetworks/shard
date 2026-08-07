@@ -444,6 +444,9 @@ export const getNodes = (type, query) => {
 export const getNode = (id) => api.get(`/nodes/${id}`).then(r => r.data)
 export const getNodeEvents = (id) => api.get(`/nodes/${id}/events`).then(r => r.data)
 export const getContainedTasks = (id) => api.get(`/nodes/${id}/contained-tasks`).then(r => r.data)
+// The other half of a container's children: the containers below it, each with the
+// task rollup of its own subtree (ADR-0065). Server owns the rollup rule.
+export const getContainerSubtree = (id) => api.get(`/nodes/${id}/subtree`).then(r => r.data)
 export const getGraphMap = ({ types, includeData } = {}) => {
   const params = {}
   if (types?.length) params.types = types.join(',')

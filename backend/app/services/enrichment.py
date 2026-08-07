@@ -131,16 +131,18 @@ def enrich_project(project, db) -> ProjectOut:
     task_ids = graph.contained_task_ids(db, project.id)
     tasks = graph.task_views_for_ids(db, task_ids) if task_ids else []
 
-    # Top-level tasks = not a subtask of any task (no incoming task->task contains edge).
-    subtask_set = graph.subtask_ids_among(db, [t.id for t in tasks])
-    top_tasks = [t for t in tasks if t.id not in subtask_set]
-    total = len(top_tasks)
-    done = sum(1 for t in top_tasks if t.status == "done")
-    progress = round(done / total * 100, 1) if total > 0 else 0.0
+    # Counts roll up the whole ``contains`` subtree, not just the direct children
+    # listed above (ADR-0065): a task nested in a container under this project is
+    # still this project's work. Identical to the old direct-children figure while
+    # nothing is nested. Top-level tasks only — a parent task and its subtasks must
+    # not be counted twice.
+    stats = graph.container_subtree_stats(db, project.id)
     out = ProjectOut.model_validate(project)
-    out.total_tasks = total
-    out.done_tasks = done
-    out.progress = progress
+    out.total_tasks = stats.total_tasks
+    out.done_tasks = stats.done_tasks
+    out.progress = stats.progress
+    out.direct_task_count = stats.direct_task_count
+    out.child_container_count = stats.child_container_count
 
     # Batch-load dependency, label, subtask and containment edges once for all tasks.
     task_ids = [t.id for t in tasks]

@@ -12,6 +12,7 @@ the view was built with.
 
 import uuid
 from collections import defaultdict
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -36,7 +37,12 @@ from app.services.graph.core import (
     remove_edge,
     task_type_keys,
 )
-from app.services.graph.projects import ProjectView, _project_view, contained_task_ids
+from app.services.graph.projects import (
+    ProjectView,
+    _project_view,
+    child_container_ids,
+    contained_task_ids,
+)
 
 
 def member_project_ids(db: Session, task_id: str) -> list[str]:
@@ -446,6 +452,48 @@ def subtask_ids_among(db: Session, task_ids) -> set[str]:
         .where(Edge.rel_type == REL_CONTAINS, Node.type.in_(task_type_keys(db)), Edge.target_id.in_(ids))
     ).scalars()
     return set(rows)
+
+
+@dataclass
+class ContainerStats:
+    """Task rollup for a container's whole ``contains`` subtree (ADR-0065)."""
+
+    total_tasks: int
+    done_tasks: int
+    progress: float
+    direct_task_count: int
+    child_container_count: int
+
+
+def container_subtree_stats(db: Session, container_id: str) -> ContainerStats:
+    """Task-weighted rollup over everything a container transitively contains (ADR-0065).
+
+    ``done top-level tasks / all top-level tasks`` across the subtree: a task held
+    directly and a task nested three containers down count the same. Subtasks are
+    excluded (a parent task and its children must not be double-counted), which is
+    the rule the per-project figure already used — so for a container with no child
+    containers this returns exactly the old direct-children numbers.
+    """
+    # Counted under the same rule as the total, or the difference between them
+    # ("how much work is one level down") would be nonsense — a project holding a
+    # task and its subtask directly would report more direct tasks than it has in
+    # its whole subtree.
+    direct_ids = contained_task_ids(db, container_id)
+    direct_tasks = len(set(direct_ids) - subtask_ids_among(db, direct_ids))
+    children = len(child_container_ids(db, container_id))
+    subtree = descendants_of(db, container_id)
+    if not subtree:
+        return ContainerStats(0, 0, 0.0, direct_tasks, children)
+    base = db.query(Node).filter(
+        Node.type.in_(task_type_keys(db)),
+        Node.id.in_(subtree),
+        top_level_task_filter(db),
+    )
+    total = base.count()
+    if total == 0:
+        return ContainerStats(0, 0, 0.0, direct_tasks, children)
+    done = base.filter(Node.status == "done").count()
+    return ContainerStats(total, done, round(done / total * 100, 1), direct_tasks, children)
 
 
 def top_level_task_filter(db: Session):

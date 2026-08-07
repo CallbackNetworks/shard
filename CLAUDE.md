@@ -176,6 +176,8 @@ The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and b
 
 **`enrich_task(task, db=None)`** in `services/enrichment.py`: the single aggregation point for `TaskOut`. Computes `labels`, `subtask_count`, `comment_count`, `blocked_by[]`, `blocking[]`, and `recurrence`. Always pass `db` when recurrence data is needed. Called by `enrich_project(project, db)` which also computes progress, cycle stats, and identities.
 
+**Container aggregation is subtree-shaped** (`graph.container_subtree_stats`, ADR-0065): a `contains` child may be a task *or* another container, so `progress` / `total_tasks` / `done_tasks` roll up the whole subtree (top-level tasks only, so a parent task and its subtasks count once). `direct_task_count` uses the same rule, so `total - direct` is the work living one level down. `goal_subtree_progress` is an alias for it. The two halves of a container's children have one endpoint each: `GET /api/nodes/{id}/contained-tasks` (its board) and `GET /api/nodes/{id}/subtree` (its child containers, each with its own rollup) — the frontend never re-derives a rollup from the tasks on screen.
+
 **`log_activity(db, action, *, project_id, task_id, actor, detail, meta)`** in `services/activity.py`: call after every meaningful mutation; does `db.flush()` not `db.commit()`.
 
 **`fire_notifications(db, task, event)`** in `services/notifier.py`: sends to all matching active integrations. Webhook-type integrations get HMAC-SHA256 `X-Signature`/`X-Hub-Signature-256` headers; email integrations use SMTP. Creates a `WebhookDelivery` log row per attempt with retry backoff `[1, 5, 30, 120, 360]` minutes.

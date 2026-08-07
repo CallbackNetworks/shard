@@ -66,3 +66,4 @@
 | [0062](0062-offline-writes-are-queued-where-every-write-passes.md) | 離線的寫入排在每一筆寫入都會經過的地方 | Accepted | 2026-08-06 |
 | [0063](0063-an-integrations-configuration-is-credentials.md) | 整合設定裡裝的就是憑證 | Accepted | 2026-08-06 |
 | [0064](0064-the-schema-upgrade-needs-a-home.md) | 升級 schema 這件事需要一個歸屬 | Accepted | 2026-08-06 |
+| [0065](0065-a-containers-numbers-count-its-whole-subtree.md) | 容器的數字要算到它底下的每一層 | Accepted | 2026-08-07 |

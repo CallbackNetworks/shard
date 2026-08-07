@@ -23,12 +23,10 @@ from app.services.graph.core import (
     add_edge,
     create_node,
     delete_node,
-    descendants_of,
     ensure_node,
-    task_type_keys,
 )
 from app.services.graph.projects import ProjectView, projects_by_ids
-from app.services.graph.tasks import top_level_task_filter
+from app.services.graph.tasks import container_subtree_stats
 
 
 def link_goal_project(db: Session, goal_id: str, project_id: str) -> None:
@@ -52,22 +50,11 @@ def project_ids_for_goal(db: Session, goal_id: str) -> list[str]:
 def goal_subtree_progress(db: Session, goal_id: str) -> float:
     """Task-weighted progress over the whole goal subtree (ADR-0041).
 
-    ``done top-level tasks / all top-level tasks`` across every container the goal
-    contains — tasks held directly by the goal and tasks nested in projects under it
-    count the same. Subtasks are excluded (mirrors the old per-project ``top_level``
-    rule) so a parent task and its children are not double-counted. Replaces the old
-    "average of each linked project's progress" (project-weighted) figure.
+    A goal is just a container, so the rule it introduced now lives in
+    ``container_subtree_stats`` and every container reads the same figure
+    (ADR-0065); this stays as the goal-shaped name its callers already use.
     """
-    subtree = descendants_of(db, goal_id)
-    if not subtree:
-        return 0.0
-    tasks = task_type_keys(db)
-    base = db.query(Node).filter(Node.type.in_(tasks), Node.id.in_(subtree), top_level_task_filter(db))
-    total = base.count()
-    if total == 0:
-        return 0.0
-    done = base.filter(Node.status == "done").count()
-    return round(done / total * 100, 1)
+    return container_subtree_stats(db, goal_id).progress
 
 
 def projects_for_goal(db: Session, goal_id: str) -> list[ProjectView]:

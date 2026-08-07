@@ -32,6 +32,10 @@ REL_DEPENDS_ON = "depends_on"  # blocked task -> prerequisite task
 REL_LABELED = "labeled"  # task -> label
 REL_IN_CYCLE = "in_cycle"  # task -> cycle
 
+# Widest ``IN (...)`` batch a level-at-a-time traversal will build. Well under every
+# supported driver's bind-parameter ceiling (SQLite's historical 999 included).
+_IN_CHUNK = 500
+
 
 # --- Capability roles (registry-driven; ADR-0033 A5, ADR-0040) ---------------
 
@@ -433,15 +437,27 @@ def nearest_ancestor_of_type(db: Session, node_id: str, node_type: str) -> Node 
 
 
 def descendants_of(db: Session, node_id: str) -> set[str]:
-    """Ids of all transitive children via ``contains``."""
+    """Ids of all transitive children via ``contains``.
+
+    Walks one *level* per query rather than one node per query: a container with
+    200 tasks used to cost 200 round trips, which made subtree rollups (ADR-0065)
+    too expensive to put on a list endpoint. ``IN`` batches stay chunked so a wide
+    level cannot hit a driver's bind-parameter limit.
+    """
     seen: set[str] = set()
-    queue: deque[str] = deque([node_id])
-    while queue:
-        current = queue.popleft()
-        for child in children_of(db, current):
-            if child.id not in seen:
-                seen.add(child.id)
-                queue.append(child.id)
+    frontier: list[str] = [node_id]
+    while frontier:
+        children: list[str] = []
+        for start in range(0, len(frontier), _IN_CHUNK):
+            rows = db.execute(
+                select(Edge.target_id).where(
+                    Edge.rel_type == REL_CONTAINS,
+                    Edge.source_id.in_(frontier[start : start + _IN_CHUNK]),
+                )
+            ).scalars()
+            children.extend(rows)
+        frontier = [child_id for child_id in dict.fromkeys(children) if child_id not in seen]
+        seen.update(frontier)
     return seen
 
 

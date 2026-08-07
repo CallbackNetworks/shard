@@ -134,6 +134,7 @@ from app.services.graph.projects import (
     ProjectView,
     _project_view,
     all_projects,
+    child_container_ids,
     contained_task_ids,
     container_of_node,
     container_view,
@@ -147,12 +148,14 @@ from app.services.graph.projects import (
 )
 from app.services.graph.tasks import (
     _TASK_HOT_COLUMNS,
+    ContainerStats,
     TaskView,
     _apply_task_fields,
     _containment_ids_map,
     _delete_task_node,
     child_task_ids_map,
     container_ids_map,
+    container_subtree_stats,
     create_task,
     delete_container,
     delete_task_tree,
