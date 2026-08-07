@@ -3,7 +3,6 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
@@ -14,6 +13,7 @@ from sqlalchemy import inspect as sa_inspect
 logger = logging.getLogger(__name__)
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app import db_schema
 from app.database import engine
 from app.models import Base
 from app.routers import (
@@ -60,29 +60,17 @@ from app.services.search_backend import get_search_backend
 from app.services.usage_tracker import UsageTrackingMiddleware
 
 
-def _stamp_alembic_head() -> None:
-    """Mark the Alembic chain as applied on a freshly created database.
-
-    The root revision is a no-op baseline that assumes the schema already
-    exists, so on a fresh database create_all() builds the full latest schema
-    and the chain must be stamped rather than upgraded.
-    """
-    from alembic import command as alembic_command
-    from alembic.config import Config as AlembicConfig
-
-    backend_root = Path(__file__).resolve().parents[1]
-    cfg = AlembicConfig(str(backend_root / "alembic.ini"))
-    cfg.set_main_option("script_location", str(backend_root / "migrations"))
-    alembic_command.stamp(cfg, "head")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    fresh_db = not sa_inspect(engine).has_table("tasks")
+    # Creating a schema is the only half of this the application does. Upgrading an
+    # existing one is a deploy step, because the lifespan runs once per uvicorn worker
+    # and concurrent upgrades would apply the same revisions twice — app/db_schema.py
+    # holds both halves of the decision (ADR-0064).
+    fresh_db = db_schema.schema_state(engine) == db_schema.FRESH
     Base.metadata.create_all(bind=engine)
-    if fresh_db and not sa_inspect(engine).has_table("alembic_version"):
+    if fresh_db and not sa_inspect(engine).has_table(db_schema.VERSION_TABLE):
         try:
-            _stamp_alembic_head()
+            db_schema.stamp_head()
         except Exception as exc:
             logger.warning("Could not stamp alembic head on fresh database: %s", exc)
     # Seed built-in node/edge type vocabulary (idempotent; ADR-0033).

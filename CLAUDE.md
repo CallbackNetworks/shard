@@ -152,7 +152,11 @@ docker compose exec backend sh -c "cd /app && alembic revision --autogenerate -m
 docker compose exec backend sh -c "cd /app && alembic upgrade head"
 ```
 
-Alembic uses `render_as_batch=True` for SQLite compatibility. On a fresh database the lifespan runs `Base.metadata.create_all()` and stamps the Alembic chain to `head` (see `_stamp_alembic_head` in `main.py` and ADR-0018); on an existing database, run `alembic upgrade head` for schema changes. All new schema changes go through Alembic.
+Alembic uses `render_as_batch=True` for SQLite compatibility. All new schema changes go through Alembic.
+
+**Who applies migrations** (`app/db_schema.py`, ADR-0064): one module holds the decision, and it recognises three states, not two. `FRESH` (no `nodes` table) is left to the app — the lifespan runs `create_all()` and *stamps* head, because the root revision is a no-op baseline and replaying the chain would `ALTER` tables nothing created. `MANAGED` (has `alembic_version`) is *upgraded*. `UNTRACKED` (tables but no `alembic_version`) refuses and exits non-zero rather than guess.
+
+The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and before `up -d`, not in the lifespan: the lifespan runs once per uvicorn worker and concurrent upgrades would apply the same revisions twice. That step is why production's schema tracks the code at all — before ADR-0064 nothing ran `upgrade` anywhere, and prod carried its original schema across every deploy.
 
 ## Backend architecture (`backend/app/`)
 

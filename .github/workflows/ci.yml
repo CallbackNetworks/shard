@@ -334,6 +334,16 @@ jobs:
       - name: Pull images
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" pull
 
+      # The schema has to reach head before anything serves against it, and exactly once:
+      # the lifespan runs per uvicorn worker, so it can create a new schema but must not
+      # upgrade an existing one (ADR-0064). Stopping the old backend first means no process
+      # is reading the database while it is half-migrated. A failure here fails the deploy
+      # and leaves the previous version running.
+      - name: Apply database migrations
+        run: |
+          docker compose -f "$DEPLOY_DIR/docker-compose.yml" stop backend
+          docker compose -f "$DEPLOY_DIR/docker-compose.yml" run --rm --no-deps backend python -m app.db_schema
+
       - name: Deploy services
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" up -d --remove-orphans
 
