@@ -73,14 +73,14 @@ fresh_db = not sa_inspect(engine).has_table("tasks")
 
 ```yaml
 - name: Apply database migrations
-  run: |
-    docker compose -f "$DEPLOY_DIR/docker-compose.yml" stop backend
-    docker compose -f "$DEPLOY_DIR/docker-compose.yml" run --rm --no-deps backend python -m app.db_schema
+  run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" run --rm --no-deps backend python -m app.db_schema
 ```
 
-先 `stop backend`，是為了讓資料庫在被改寫的那段時間裡沒有任何行程正在讀它。deploy 本來就會重啟容器，這一步不額外增加停機時間，但把「舊版程式短暫看到新 schema」這個窗口關掉了。
-
 失敗時整個 deploy 失敗，舊版繼續服務——這比讓一個半升級的資料庫開始接流量好。
+
+**這一步不先停掉舊的 backend**，而第一版是有停的。當時的理由是讓資料庫在被改寫時沒有行程正在讀它，聽起來很合理，實際跑出來是：`stop backend` 成功 → migration 判定為 `UNTRACKED` 而拒絕 → job 結束 → `up -d` 從來沒有執行 → **production 的 backend 就停在那裡，直到有人發現**。
+
+教訓寫成一句話：**一個會失敗的步驟，不可以是那個撐著 production 的步驟**。留著舊容器繼續跑，代價是幾秒鐘的「舊程式看到新 schema」；停掉它，代價是一次無人察覺的停機。後者貴得多。
 
 ## Consequences
 
@@ -98,6 +98,10 @@ fresh_db = not sa_inspect(engine).has_table("tasks")
 - migration 只在 deploy 時跑一次，這假設 production 只有一個 backend 容器。要水平擴充就得改成有鎖的方案。
 - 這次補跑是**一次性的追趕**，跨越了不知道多少支 revision。如果 `create_all()` 曾經先建好某張後續 migration 也要建的表，`upgrade head` 會以 "table already exists" 失敗。第一次執行前必須備份，並且要有人看著。
 - `UNTRACKED` 會擋下 deploy 而不是自己想辦法。這是刻意的，但代價是那種情況需要人介入。
+
+**第一次執行的實際結果**
+
+Production 的資料庫是 `UNTRACKED`：有表，但**連 `alembic_version` 都沒有**。它不是落後幾支 revision，而是從來沒有被 stamp 過，也就沒有任何紀錄說它的 schema 對應到哪一支。所以這條 chain 不能直接 upgrade——擋下來是對的，但也意味著要有人先判定它實際符合哪一支 revision 再 stamp，才輪得到自動升級接手。
 
 **尚未處理（本 ADR 不涵蓋）**
 

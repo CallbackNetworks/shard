@@ -336,13 +336,16 @@ jobs:
 
       # The schema has to reach head before anything serves against it, and exactly once:
       # the lifespan runs per uvicorn worker, so it can create a new schema but must not
-      # upgrade an existing one (ADR-0064). Stopping the old backend first means no process
-      # is reading the database while it is half-migrated. A failure here fails the deploy
-      # and leaves the previous version running.
+      # upgrade an existing one (ADR-0064).
+      #
+      # Nothing is stopped first. The first version of this step ran `stop backend` here so
+      # that no process was reading the database while it was being rewritten — and then the
+      # migration refused, the job ended, `up -d` never ran, and production stayed down with
+      # its backend stopped. A step that can fail must not be the one holding production
+      # open. Leaving the old container running costs a few seconds of old code against a
+      # new schema; getting it wrong costs an outage that lasts until a human notices.
       - name: Apply database migrations
-        run: |
-          docker compose -f "$DEPLOY_DIR/docker-compose.yml" stop backend
-          docker compose -f "$DEPLOY_DIR/docker-compose.yml" run --rm --no-deps backend python -m app.db_schema
+        run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" run --rm --no-deps backend python -m app.db_schema
 
       - name: Deploy services
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" up -d --remove-orphans
