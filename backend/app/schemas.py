@@ -61,6 +61,8 @@ class ProjectOut(BaseModel):
     description: str | None
     status: str
     share_token: str | None = None
+    # Whether a PIN protects the share page, never the hash itself (ADR-0059).
+    share_pin_set: bool = False
     share_expires_at: datetime | None = None
     allow_guest_notes: bool = False
     repo_url: str | None = None

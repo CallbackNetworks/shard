@@ -86,7 +86,6 @@ export default function ShareView({ scope = 'node' }) {
       <SharePinGate
         identity={data?.identity}
         token={token}
-        scope={scope}
         onVerified={(verifiedData) => setPinData(verifiedData)}
       />
     )

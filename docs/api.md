@@ -1025,7 +1025,9 @@ If the share link has expired, returns `410 Gone`.
 ```
 
 #### `GET /share/project/{share_token}`
-A project's own share endpoint, feeding the `/share/p/{token}` page.
+A project's own share endpoint, feeding the `/share/p/{token}` page. Honours a PIN set
+through `/api/nodes/{id}/share/set-pin` like every other shareable type (ADR-0072);
+unlock at `POST /share/node/{token}/verify`.
 
 #### `POST /share/node/{token}/verify`
 Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL) and returns

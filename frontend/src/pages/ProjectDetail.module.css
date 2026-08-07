@@ -194,6 +194,16 @@
   letter-spacing: 0;
 }
 
+/* Active state for a share-link header button: PIN protected and/or time-boxed.
+   A class, not an inline colour — global.css (ADR-0031) treats any button whose
+   *inline* style mentions #facc15 as a filled-yellow button and forces its text to
+   the background colour with !important, which rendered this button's label
+   invisible whenever the state it announces was actually on. */
+.archiveBtnActive {
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.4);
+}
+
 .newIssueBtn {
   display: flex;
   align-items: center;

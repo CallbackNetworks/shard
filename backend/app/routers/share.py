@@ -387,6 +387,17 @@ def get_share_project(token: str, request: Request, db: Session = Depends(get_db
     if project.share_expires_at and datetime.now(UTC) > _as_utc(project.share_expires_at):
         raise HTTPException(status_code=410, detail="Share link has expired")
 
+    # A PIN set on a project is enforced here like it is on every other shareable
+    # node (ADR-0072). It was settable through /api/nodes/{id}/share/set-pin all
+    # along and this page served straight past it.
+    if project.share_pin_hash:
+        session_token = request.cookies.get("share_session")
+        if not session_token or not _verify_token(session_token, project.id):
+            return {
+                "meta": {"requires_pin": True, "generated_at": datetime.now(UTC).isoformat()},
+                "identity": {"name": project.name, "color": "#facc15", "avatar": None},
+            }
+
     client_ip = request.client.host if request.client else "unknown"
     ip_hash = _hash_ip(client_ip)
     _maybe_log_share_view(
@@ -566,7 +577,7 @@ def _resolve_note_target(scope: str, token: str, request: Request, db: Session) 
             entity_id=project.id,
             expires_at=project.share_expires_at,
             allow_guest_notes=project.allow_guest_notes,
-            pin_hash=None,  # the project share page has never had a PIN gate
+            pin_hash=project.share_pin_hash,
             request=request,
         )
         return [project]

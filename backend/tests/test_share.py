@@ -230,6 +230,58 @@ def test_identity_note_requires_project_in_scope(client, db, sample_identity, sa
     assert resp.status_code == 201
 
 
+def test_project_share_pin_is_enforced(client, db, sample_project):
+    """A PIN set on a project actually protects its share page (ADR-0072).
+
+    ``/api/nodes/{id}/share/set-pin`` always accepted a project — it is a shareable
+    node — but ``ProjectView`` never read the hash back, so the page served straight
+    through. A lock that can be set and does nothing is worse than no lock: the owner
+    believes the share is protected.
+    """
+    token = sample_project.share_token
+    assert client.get(f"/share/project/{token}").json()["meta"]["requires_pin"] is False
+
+    assert client.post(f"/api/nodes/{sample_project.id}/share/set-pin", json={"pin": "8765"}).status_code == 200
+
+    # Locked on both doors, and the payload carries nothing but the name.
+    for path in (f"/share/project/{token}", f"/share/node/{token}"):
+        body = client.get(path).json()
+        assert body["meta"]["requires_pin"] is True, path
+        assert "projects" not in body, path
+
+    # The owner's own read says a PIN is set, without ever serving the hash.
+    project_out = client.get(f"/api/projects/{sample_project.id}").json()
+    assert project_out["share_pin_set"] is True
+    assert "share_pin_hash" not in project_out
+
+    # Wrong PIN stays locked; the right one unlocks and returns the project page.
+    assert client.post(f"/share/node/{token}/verify", json={"pin": "0000"}).status_code == 403
+    unlocked = client.post(f"/share/node/{token}/verify", json={"pin": "8765"})
+    assert unlocked.status_code == 200
+    assert [p["id"] for p in unlocked.json()["projects"]] == [sample_project.id]
+
+    # ...and the cookie it minted opens the page.
+    assert client.get(f"/share/project/{token}").json()["meta"]["requires_pin"] is False
+
+    assert client.delete(f"/api/nodes/{sample_project.id}/share/pin").status_code == 200
+    assert client.get(f"/api/projects/{sample_project.id}").json()["share_pin_set"] is False
+
+
+def test_pinned_project_note_requires_session(client, db, sample_project):
+    """The note gate follows the page gate — one is not a way around the other."""
+    graph.update_project(db, sample_project.id, allow_guest_notes=True)
+    db.commit()
+    client.post(f"/api/nodes/{sample_project.id}/share/set-pin", json={"pin": "8765"})
+    payload = {"guest_name": "Visitor", "body": "hello"}
+
+    resp = client.post(f"/share/project/{sample_project.share_token}/notes", json=payload)
+    assert resp.status_code == 403
+
+    client.post(f"/share/node/{sample_project.share_token}/verify", json={"pin": "8765"})
+    resp = client.post(f"/share/project/{sample_project.share_token}/notes", json=payload)
+    assert resp.status_code == 201
+
+
 def test_verify_through_generic_door_returns_the_identity_page(client, db, pinned_identity, sample_project):
     """Unlocking a page hands back that page (ADR-0070).
 

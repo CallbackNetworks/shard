@@ -148,6 +148,9 @@ def enrich_project(project, db) -> ProjectOut:
     # not be counted twice.
     stats = graph.container_subtree_stats(db, project.id)
     out = ProjectOut.model_validate(project)
+    # Whether a PIN is set, never the hash (ADR-0059) — the owner's UI needs the
+    # state to offer "remove", and model_validate would otherwise carry neither.
+    out.share_pin_set = getattr(project, "share_pin_hash", None) is not None
     out.total_tasks = stats.total_tasks
     out.done_tasks = stats.done_tasks
     out.progress = stats.progress

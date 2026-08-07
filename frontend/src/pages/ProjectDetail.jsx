@@ -9,7 +9,7 @@ import {
   reorderTasks,
   bulkUpdateTasks, exportTasks, importTasks,
   getSavedFilters, createSavedFilter,
-  setProjectShareExpiry, getProjectShareViewCount,
+  setProjectShareExpiry, getProjectShareViewCount, setNodeSharePin, clearNodeSharePin,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
 import LabelManager, { LabelChip } from '../components/project/LabelManager'
@@ -141,6 +141,11 @@ export default function ProjectDetail() {
     mutationFn: (expiresAt) => setProjectShareExpiry(id, expiresAt),
     onSuccess: invalidate,
   })
+
+  // A project is a shareable node, so its PIN uses the same endpoints every other
+  // shareable type does (ADR-0070); the share page enforces it since ADR-0072.
+  const setPinMut = useMutation({ mutationFn: (pin) => setNodeSharePin(id, pin), onSuccess: invalidate })
+  const clearPinMut = useMutation({ mutationFn: () => clearNodeSharePin(id), onSuccess: invalidate })
 
   const openShareSettings = async () => {
     const next = !shareSettingsOpen
@@ -403,9 +408,11 @@ export default function ProjectDetail() {
             </button>
             <button
               onClick={openShareSettings}
-              className={s.archiveBtn}
-              style={project.share_expires_at ? { color: '#facc15', borderColor: 'rgba(250,204,21,0.4)' } : undefined}
-              title={project.share_expires_at ? `Share link expires ${new Date(project.share_expires_at).toLocaleString()}` : 'Set share-link expiry and view access count'}
+              className={`${s.archiveBtn}${project.share_expires_at || project.share_pin_set ? ` ${s.archiveBtnActive}` : ''}`}
+              title={[
+                project.share_pin_set ? 'PIN protected' : null,
+                project.share_expires_at ? `expires ${new Date(project.share_expires_at).toLocaleString()}` : null,
+              ].filter(Boolean).join(' · ') || 'Set a share-link PIN or expiry, and see the view count'}
             >
               <CalendarClock size={12} />
               Link
@@ -444,6 +451,9 @@ export default function ProjectDetail() {
             shareViews={shareViews}
             onSetExpiry={(iso) => setExpiryMut.mutate(iso)}
             isPending={setExpiryMut.isPending}
+            onSetPin={(pin) => setPinMut.mutate(pin)}
+            onClearPin={() => clearPinMut.mutate()}
+            pinPending={setPinMut.isPending || clearPinMut.isPending}
           />
         )}
 

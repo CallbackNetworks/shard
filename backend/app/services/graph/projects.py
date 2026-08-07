@@ -40,6 +40,11 @@ class ProjectView:
     status: str
     share_token: str | None
     share_expires_at: datetime | None
+    # A project is a shareable node, so /api/nodes/{id}/share/set-pin has always
+    # accepted one. Without this field nothing downstream could see it and the
+    # share page served straight through — a lock that was set but not wired
+    # (ADR-0072). Mirrors IdentityView.
+    share_pin_hash: str | None
     allow_guest_notes: bool
     agent_instructions: str | None
     repo_url: str | None
@@ -57,6 +62,7 @@ def _project_view(node: Node) -> ProjectView:
         status=node.status or "active",
         share_token=data.get("share_token"),
         share_expires_at=_parse_dt(data.get("share_expires_at")),
+        share_pin_hash=data.get("share_pin_hash"),
         allow_guest_notes=bool(data.get("allow_guest_notes", False)),
         agent_instructions=data.get("agent_instructions"),
         repo_url=data.get("repo_url"),

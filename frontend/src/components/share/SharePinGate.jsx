@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import useBreakpoint from './useBreakpoint'
 
-// Every PIN-protected share verifies at the one generic door (ADR-0039, ADR-0070);
-// projects have no PIN gate.
-const VERIFY_PREFIX = { node: '/share/node' }
+// One verify door for every shareable node, whichever page the visitor is on
+// (ADR-0070, ADR-0071). It resolves the token and dispatches on the node's type, so a
+// project unlocks here exactly like an identity does — the scope-to-prefix map this
+// replaced silently fell back to the identity path for anything it did not list.
+const VERIFY_URL = (token) => `/share/node/${token}/verify`
 
-export default function SharePinGate({ identity, token, scope = 'node', onVerified }) {
+export default function SharePinGate({ identity, token, onVerified }) {
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const [pin, setPin] = useState('')
@@ -19,8 +21,7 @@ export default function SharePinGate({ identity, token, scope = 'node', onVerifi
     setLoading(true)
     setError('')
     try {
-      const prefix = VERIFY_PREFIX[scope] || VERIFY_PREFIX.node
-      const res = await fetch(`${prefix}/${token}/verify`, {
+      const res = await fetch(VERIFY_URL(token), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin }),
