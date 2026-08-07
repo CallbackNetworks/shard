@@ -401,8 +401,11 @@ export const getAnalyticsStatusTrend = (projectId, days) => api.get('/analytics/
 export const getEstimationCalibration = (params = {}) => api.get('/analytics/estimation-calibration', { params }).then(r => r.data)
 export const getEstimateSuggestion = (rawEstimate, projectId) => api.get('/analytics/estimate-suggestion', { params: { raw_estimate: rawEstimate, project_id: projectId } }).then(r => r.data)
 
-// Share (public, no auth — uses plain axios to avoid the auth interceptor)
-export const getShareData = (token, scope = 'identity') =>
+// Share (public, no auth — uses plain axios to avoid the auth interceptor).
+// Scopes are `node` (the generic door: identity, custom containers) and `project`.
+// These are the *data* segments; the pages they feed are /share/n/:token and /share/p/:token
+// and must stay distinct from them (ADR-0071).
+export const getShareData = (token, scope = 'node') =>
   axios.get(`/share/${scope}/${token}`, { withCredentials: true }).then(r => r.data)
 export const postShareProjectNote = (scope, token, payload) =>
   axios.post(`/share/${scope}/${token}/notes`, payload, { withCredentials: true }).then(r => r.data)

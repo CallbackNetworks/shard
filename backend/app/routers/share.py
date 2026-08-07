@@ -344,7 +344,9 @@ def _maybe_log_share_view(db: Session, *, meta_key: str, entity_id: str, detail:
         db.rollback()
 
 
-@router.get("/identity/{token}", dependencies=[Depends(share_rate_limit)])
+# Not a route (ADR-0071): an identity is served through the one public door,
+# /share/node/{token}, which dispatches here. Kept as a function because the
+# member_of aggregation an identity page needs is genuinely its own.
 def get_share_identity(token: str, request: Request, db: Session = Depends(get_db)):
     identity = _load_identity(db, token)
     if not identity:
@@ -417,7 +419,7 @@ def _build_container_response(node, view: graph.ProjectView, db: Session):
     return _build_payload(owner, [view], db, scope="node", include_notes=view.allow_guest_notes)
 
 
-@router.get("/n/{token}", dependencies=[Depends(share_rate_limit)])
+@router.get("/node/{token}", dependencies=[Depends(share_rate_limit)])
 def get_share_node(token: str, request: Request, db: Session = Depends(get_db)):
     """Generic share facade for any ``is_shareable`` node (ADR-0039).
 
@@ -469,31 +471,7 @@ class PinVerifyRequest(BaseModel):
     pin: str = Field(..., min_length=4, max_length=6, pattern=r"^\d{4,6}$")
 
 
-@router.post("/identity/{token}/verify", dependencies=[Depends(share_rate_limit)])
-def verify_share_pin(token: str, body: PinVerifyRequest, response: Response, db: Session = Depends(get_db)):
-    identity = _load_identity(db, token)
-    if not identity:
-        raise HTTPException(status_code=404, detail="Share link not found")
-
-    if not identity.share_pin_hash:
-        raise HTTPException(status_code=400, detail="No PIN set for this share link")
-
-    if not check_pin(body.pin, identity.share_pin_hash):
-        raise HTTPException(status_code=403, detail="Invalid PIN")
-
-    ts = int(datetime.now(UTC).timestamp())
-    session_token = _sign_token(identity.id, ts)
-    response.set_cookie(
-        key="share_session",
-        value=session_token,
-        max_age=_PIN_TTL,
-        httponly=True,
-        samesite="lax",
-    )
-    return _build_response(identity, db)
-
-
-@router.post("/n/{token}/verify", dependencies=[Depends(share_rate_limit)])
+@router.post("/node/{token}/verify", dependencies=[Depends(share_rate_limit)])
 def verify_share_node_pin(token: str, body: PinVerifyRequest, response: Response, db: Session = Depends(get_db)):
     """Verify a PIN for a generic shareable node and mint a session cookie (ADR-0039)."""
     node = graph.find_node_by_share_token(db, token)
@@ -513,6 +491,21 @@ def verify_share_node_pin(token: str, body: PinVerifyRequest, response: Response
         httponly=True,
         samesite="lax",
     )
+
+    # Dispatch like the GET does: unlocking a page must hand back that page. Built
+    # as container-only, this returned an identity's *empty* container view — the
+    # projects it aggregates through member_of are not `contains` children.
+    if node.type == graph.NODE_IDENTITY:
+        identity = graph.get_identity(db, node.id)
+        if not identity:
+            raise HTTPException(status_code=404, detail="Share link not found")
+        return _build_response(identity, db)
+    if node.type == graph.NODE_PROJECT:
+        project = graph.get_project(db, node.id)
+        if not project or project.status != "active":
+            raise HTTPException(status_code=404, detail="Share link not found")
+        return _build_project_response(project, db)
+
     view = graph.container_view(db, node.id)
     if not view or view.status != "active":
         raise HTTPException(status_code=404, detail="Share link not found")
@@ -536,31 +529,83 @@ class GuestNoteIn(BaseModel):
         return v
 
 
+def _check_note_access(
+    *,
+    entity_id: str,
+    expires_at,
+    allow_guest_notes: bool,
+    pin_hash: str | None,
+    request: Request,
+) -> None:
+    """The three gates a guest note passes, whichever share it was written on."""
+    if expires_at and datetime.now(UTC) > _as_utc(expires_at):
+        raise HTTPException(status_code=410, detail="Share link has expired")
+    if not allow_guest_notes:
+        raise HTTPException(status_code=403, detail="Guest notes are disabled for this share link")
+    if pin_hash:
+        session_token = request.cookies.get("share_session")
+        if not session_token or not _verify_token(session_token, entity_id):
+            raise HTTPException(status_code=403, detail="PIN verification required")
+
+
 def _resolve_note_target(scope: str, token: str, request: Request, db: Session) -> list[graph.ProjectView]:
-    """Validate a guest-note write against a share token; return the projects it may write to."""
-    if scope == "identity":
-        identity = graph.find_identity_by_share_token(db, token)
-        if not identity:
-            raise HTTPException(status_code=404, detail="Share link not found")
-        if identity.share_expires_at and datetime.now(UTC) > _as_utc(identity.share_expires_at):
-            raise HTTPException(status_code=410, detail="Share link has expired")
-        if not identity.allow_guest_notes:
-            raise HTTPException(status_code=403, detail="Guest notes are disabled for this share link")
-        if identity.share_pin_hash:
-            session_token = request.cookies.get("share_session")
-            if not session_token or not _verify_token(session_token, identity.id):
-                raise HTTPException(status_code=403, detail="PIN verification required")
-        return [p for p in graph.projects_for_identity(db, identity.id) if p.status == "active"]
+    """Validate a guest-note write against a share token; return the projects it may write to.
+
+    ``scope`` is the door the guest came through. ``n`` is the generic one and
+    dispatches on the node's type exactly as ``GET /share/n/{token}`` does — an
+    identity aggregates its ``member_of`` projects, anything else stands for itself.
+    A page that can be read must be writable through the same door: before this
+    dispatch existed, ``/share/n`` served an identity's page and then 404'd its
+    notes (ADR-0070).
+    """
     if scope == "project":
         project = graph.find_project_by_share_token(db, token)
         if not project or project.status != "active":
             raise HTTPException(status_code=404, detail="Share link not found")
-        if project.share_expires_at and datetime.now(UTC) > _as_utc(project.share_expires_at):
-            raise HTTPException(status_code=410, detail="Share link has expired")
-        if not project.allow_guest_notes:
-            raise HTTPException(status_code=403, detail="Guest notes are disabled for this share link")
+        _check_note_access(
+            entity_id=project.id,
+            expires_at=project.share_expires_at,
+            allow_guest_notes=project.allow_guest_notes,
+            pin_hash=None,  # the project share page has never had a PIN gate
+            request=request,
+        )
         return [project]
-    raise HTTPException(status_code=404, detail="Share link not found")
+
+    if scope != "node":
+        raise HTTPException(status_code=404, detail="Share link not found")
+
+    node = graph.find_node_by_share_token(db, token)
+    if not node:
+        raise HTTPException(status_code=404, detail="Share link not found")
+
+    if node.type == graph.NODE_PROJECT:
+        return _resolve_note_target("project", token, request, db)
+
+    if node.type == graph.NODE_IDENTITY:
+        identity = graph.get_identity(db, node.id)
+        if not identity:
+            raise HTTPException(status_code=404, detail="Share link not found")
+        _check_note_access(
+            entity_id=identity.id,
+            expires_at=identity.share_expires_at,
+            allow_guest_notes=identity.allow_guest_notes,
+            pin_hash=identity.share_pin_hash,
+            request=request,
+        )
+        return [p for p in graph.projects_for_identity(db, identity.id) if p.status == "active"]
+
+    view = graph.container_view(db, node.id)
+    if not view or view.status != "active":
+        raise HTTPException(status_code=404, detail="Share link not found")
+    data = node.data or {}
+    _check_note_access(
+        entity_id=node.id,
+        expires_at=data.get("share_expires_at"),
+        allow_guest_notes=view.allow_guest_notes,
+        pin_hash=data.get("share_pin_hash"),
+        request=request,
+    )
+    return [view]
 
 
 def _enforce_note_quota(db: Session, ip_hash: str):
@@ -623,6 +668,10 @@ def create_guest_task_note(
         raise HTTPException(status_code=404, detail="Task not found in this share")
     # Attribute the note to a project inside the share scope — a cross-project
     # task's nearest project may be one the guest was never granted (ADR-0032).
-    member_ids = set(graph.member_project_ids(db, task.id))
-    note_project_id = next(pid for pid in project_ids if pid in member_ids)
+    # A share whose subject is a non-project container has no project of its own
+    # in scope, so the note falls back to the task's own membership rather than
+    # failing: the guest was granted the task, and project_id is bookkeeping.
+    member_ids = graph.member_project_ids(db, task.id)
+    in_scope = [pid for pid in project_ids if pid in set(member_ids)]
+    note_project_id = in_scope[0] if in_scope else (member_ids[0] if member_ids else None)
     return _create_note(db, note_project_id, task.id, body, request)

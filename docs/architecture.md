@@ -596,7 +596,10 @@ Provider selection via LLM_PROVIDER env var:
 ## Share Page Flow
 
 ```
-GET /share/identity/{token} | /share/project/{token} | /share/n/{token}
+Page (SPA route):  /share/n/{token}        | /share/p/{token}
+Data (backend):    GET /share/node/{token} | GET /share/project/{token}
+                   ^ deliberately different segments: a page and the call it makes
+                     must not be the same URL, or the SPA answers its own fetch (ADR-0071)
   → Rate-limited
   → Check expiry (410 if expired)
   → If PIN set and no valid session cookie → return { requires_pin: true }

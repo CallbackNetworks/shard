@@ -227,7 +227,7 @@ def test_rotate_token_on_shareable_node(client, shareable_topic):
     token = r.json()["share_token"]
     assert token
     # The generic share route now resolves it.
-    assert client.get(f"/share/n/{token}").status_code == 200
+    assert client.get(f"/share/node/{token}").status_code == 200
 
 
 def test_share_ops_rejected_on_non_shareable_type(client, topic_type):
@@ -254,10 +254,10 @@ def test_set_guest_notes_on_shareable_node(client, shareable_topic):
     token = client.post(f"/api/nodes/{nid}/share/rotate-token").json()["share_token"]
 
     assert client.post(f"/api/nodes/{nid}/share/set-guest-notes", json={"allowed": True}).status_code == 200
-    assert client.get(f"/share/n/{token}").json()["meta"]["guest_notes_enabled"] is True
+    assert client.get(f"/share/node/{token}").json()["meta"]["guest_notes_enabled"] is True
 
     assert client.post(f"/api/nodes/{nid}/share/set-guest-notes", json={"allowed": False}).status_code == 200
-    assert client.get(f"/share/n/{token}").json()["meta"]["guest_notes_enabled"] is False
+    assert client.get(f"/share/node/{token}").json()["meta"]["guest_notes_enabled"] is False
 
 
 def test_guest_notes_rejected_on_non_shareable_type(client, topic_type):
@@ -269,14 +269,14 @@ def test_guest_notes_rejected_on_non_shareable_type(client, topic_type):
 def test_generic_share_page_records_its_own_views(client, shareable_topic):
     """A count nobody records is a zero that looks like a fact (ADR-0070).
 
-    Before the generic facade logged views, /share/n/{token} on a user-defined
+    Before the generic facade logged views, /share/node/{token} on a user-defined
     shareable type served the page and reported 0 views forever.
     """
     nid = shareable_topic["id"]
     token = client.post(f"/api/nodes/{nid}/share/rotate-token").json()["share_token"]
     assert client.get(f"/api/nodes/{nid}/share-views").json()["view_count"] == 0
 
-    client.get(f"/share/n/{token}")
+    client.get(f"/share/node/{token}")
 
     assert client.get(f"/api/nodes/{nid}/share-views").json()["view_count"] == 1
 

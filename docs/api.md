@@ -985,8 +985,15 @@ data: {"type": "error", "message": "..."}   // on failure
 
 No authentication required. Rate-limited.
 
-#### `GET /share/identity/{share_token}`
-Returns public read-only data for the identity: projects, tasks, recent activity, and summary stats.
+#### `GET /share/node/{share_token}`
+The one public share endpoint (ADR-0070, ADR-0071). Dispatches on the token's node type: an
+identity aggregates the projects it holds through `member_of`, a project serves itself, any
+other shareable container serves its `contains` subtree. Returns public read-only data:
+projects, tasks, recent activity, and summary stats.
+
+The **page** a visitor opens is `/share/n/{token}` — a different path on purpose. The SPA
+serves the page and fetches this endpoint; if the two shared a path the app would answer its
+own request with `index.html` (ADR-0071).
 
 If the identity has a PIN set and no valid session cookie, returns a partial response with `meta.requires_pin: true`.
 
@@ -1017,11 +1024,12 @@ If the share link has expired, returns `410 Gone`.
 }
 ```
 
-#### `GET /share/project/{share_token}` · `GET /share/n/{share_token}`
-The project share page, and the generic share page for any shareable-role node.
+#### `GET /share/project/{share_token}`
+A project's own share endpoint, feeding the `/share/p/{token}` page.
 
-#### `POST /share/identity/{share_token}/verify` · `POST /share/n/{token}/verify`
-Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL).
+#### `POST /share/node/{token}/verify`
+Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL) and returns
+the unlocked page — dispatched by node type, exactly like the `GET`.
 
 ```json
 // Request
@@ -1034,7 +1042,8 @@ Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL)
 #### `POST /share/{scope}/{token}/notes`
 #### `POST /share/{scope}/{token}/tasks/{tid}/notes`
 Guest notes from share-page visitors (ADR-0016), when `allow_guest_notes` is on. `scope` is
-`project` or `identity`. Rate-limited.
+`node` or `project`, matching the read endpoints above — every page that can be read is
+writable through the same door. Rate-limited.
 
 ```json
 { "guest_name": "string", "body": "string" }
@@ -1050,14 +1059,13 @@ Read-only, unauthenticated at the middleware layer — each is gated by an ungue
 #### `GET /ical/all/{token}.ics`
 Every project (global token, rotate via `POST /settings/ical-token/rotate`).
 
-#### `GET /ical/identity/{token}.ics`
-Everything under one identity — reuses that identity's `share_token`.
-
 #### `GET /ical/project/{token}.ics`
 A single project — reuses that project's `share_token`.
 
 #### `GET /ical/node/{token}.ics`
-The `contains` subtree of any node whose type carries the `subscribable` role (ADR-0039).
+The `contains` subtree of any node whose type carries the `subscribable` role (ADR-0039) —
+including an identity, which aggregates its `member_of` projects. Replaced the retired
+`/ical/identity/{token}.ics` (ADR-0071).
 
 ---
 

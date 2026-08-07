@@ -72,3 +72,4 @@
 | [0068](0068-a-project-has-one-size.md) | 一個專案的大小只有一個答案 | Accepted | 2026-08-07 |
 | [0069](0069-the-map-draws-the-level-the-user-inserted.md) | 結構圖畫出使用者插進去的那一層 | Accepted | 2026-08-07 |
 | [0070](0070-one-share-panel-for-every-shareable-node.md) | 分享面板只有一個實作 | Accepted | 2026-08-07 |
+| [0071](0071-one-public-door-and-it-cannot-be-the-page-itself.md) | 只留一扇公開的門，而那扇門不能是頁面本身 | Accepted | 2026-08-07 |

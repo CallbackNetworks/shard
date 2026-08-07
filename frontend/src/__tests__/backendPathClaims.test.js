@@ -78,9 +78,53 @@ describe('backend paths do not claim SPA page routes', () => {
     expect(isClaimed('/webhook/callback/abc')).toBe(true)
     expect(isClaimed('/ws')).toBe(true)
     expect(isClaimed('/health')).toBe(true)
-    expect(isClaimed('/share/identity/tok')).toBe(true)
+    expect(isClaimed('/share/node/tok')).toBe(true)
+    expect(isClaimed('/share/project/tok')).toBe(true)
     // ...while the SPA's own share pages keep falling through to the app.
-    expect(isClaimed('/share/sometoken')).toBe(false)
+    expect(isClaimed('/share/n/sometoken')).toBe(false)
     expect(isClaimed('/share/p/sometoken')).toBe(false)
+  })
+
+  /**
+   * The converse claim, which is where this rule actually broke (ADR-0071).
+   *
+   * The check above only ever asked "is a page route wrongly claimed?". A URL that is
+   * *both* — a page route and the path that page fetches — passes it and still cannot
+   * work: `/share/n/:token` fetching `GET /share/n/{token}` was answered by the SPA's
+   * own index.html, HTTP 200 and `text/html`, so the generic share page never loaded
+   * its data in any browser while every backend test stayed green.
+   */
+  describe('every root-level path the client fetches is claimed', () => {
+    const client = read('src/api/client.js')
+
+    /** Root-level (non-`/api`) request URLs the client builds, as concrete paths. */
+    function rootFetchPaths() {
+      return [...client.matchAll(/axios\.(?:get|post|put|patch|delete)\(`([^`]+)`/g)]
+        .map(m => m[1])
+        // `${scope}` stands for whichever scope the caller passes; both are real paths.
+        .flatMap(u => (u.includes('${scope}') ? ['node', 'project'].map(s => u.replace('${scope}', s)) : [u]))
+        .map(u => u.replace(/\$\{[^}]+\}/g, 'x'))
+        .filter(u => u.startsWith('/'))
+    }
+
+    it('finds the calls it is supposed to be checking', () => {
+      const paths = rootFetchPaths()
+      expect(paths.length).toBeGreaterThan(2)
+      expect(paths).toContain('/share/node/x')
+    })
+
+    it('the dev server proxies each of them to the backend', () => {
+      expect(rootFetchPaths().filter(p => !claimedByBackend(p))).toEqual([])
+    })
+
+    it('production nginx proxies each of them to the backend', () => {
+      const shareRe = /location\s+~\s+\^([^\s{]+)/g
+      const regexLocations = [...read('nginx.conf').matchAll(shareRe)].map(m => new RegExp(m[1]))
+      const plain = nginxLocations()
+      const proxied = (p) =>
+        regexLocations.some(re => re.test(p)) ||
+        plain.some(l => (l.modifier === '=' ? p === l.path : p.startsWith(l.path)))
+      expect(rootFetchPaths().filter(p => !proxied(p))).toEqual([])
+    })
   })
 })

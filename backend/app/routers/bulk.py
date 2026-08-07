@@ -314,10 +314,10 @@ async def import_tasks(
 # Three scoped feeds, all read-only and unauthenticated at the middleware layer
 # (calendar clients cannot log in), so each is gated by an unguessable token:
 #   - /ical/all/{token}.ics       personal, every project (global token, see below)
-#   - /ical/identity/{token}.ics  everything under one identity (Identity.share_token)
 #   - /ical/project/{token}.ics   a single project (Project.share_token)
-# The identity/project feeds reuse the same share_token as their /share/ page, so a
-# calendar and its share page are revoked together (see ADR-0023).
+#   - /ical/node/{token}.ics      any subscribable node, identity included (ADR-0039)
+# The scoped feeds reuse the same share_token as their /share/ page, so a calendar and
+# its share page are revoked together (see ADR-0023).
 
 _ALARM_QUERY = Query(
     30,
@@ -386,20 +386,8 @@ def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(g
     return _render_calendar("All tasks", [graph.task_view(n, db) for n in nodes], alarm)
 
 
-@ical_router.get("/ical/identity/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
-def ical_feed_identity(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
-    """Shared feed: every due-dated task across one identity's projects."""
-    identity = graph.find_identity_by_share_token(db, token)
-    if identity is None:
-        raise HTTPException(status_code=404, detail="Calendar not found")
-    project_ids = graph.project_ids_for_identity(db, identity.id)
-    task_ids = {tid for pid in project_ids for tid in graph.contained_task_ids(db, pid)}
-    nodes = (
-        db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), Node.due_date.isnot(None)).all()
-        if task_ids
-        else []
-    )
-    return _render_calendar(identity.name, [graph.task_view(n, db) for n in nodes], alarm)
+# /ical/identity/{token}.ics was retired with ADR-0071: an identity's feed is
+# /ical/node/{token}.ics below, which aggregates member_of for exactly this type.
 
 
 @ical_router.get("/ical/project/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
@@ -421,8 +409,8 @@ def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depen
 def ical_feed_node(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
     """Generic feed for any ``is_subscribable`` node (ADR-0039).
 
-    Identity aggregates its member_of projects (matching /ical/identity); every
-    other subscribable container yields the due-dated tasks in its own
+    Identity aggregates its member_of projects — this is the only feed that serves
+    one since ADR-0071 — while every other subscribable container yields its own
     ``contains`` subtree. The token is the node's ``share_token`` (same as its
     share facade), so a feed and its share page are revoked together.
     """

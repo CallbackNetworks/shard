@@ -15,7 +15,7 @@ def _reset_share_rate_limit():
 
 
 def test_get_share_valid_token(client, sample_identity, sample_project):
-    resp = client.get(f"/share/identity/{sample_identity.share_token}")
+    resp = client.get(f"/share/node/{sample_identity.share_token}")
     assert resp.status_code == 200
     data = resp.json()
     assert data["identity"]["name"] == "Test User"
@@ -41,7 +41,7 @@ def test_get_project_share_only_returns_that_project(client, db, sample_identity
 
 
 def test_get_share_invalid_token(client):
-    resp = client.get("/share/identity/nonexistent-token")
+    resp = client.get("/share/node/nonexistent-token")
     assert resp.status_code == 404
 
 
@@ -56,12 +56,12 @@ def test_get_share_expired(client, db):
         share_expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db.commit()
-    resp = client.get("/share/identity/expired-token")
+    resp = client.get("/share/node/expired-token")
     assert resp.status_code == 410
 
 
 def test_get_share_pin_required(client, pinned_identity):
-    resp = client.get(f"/share/identity/{pinned_identity.share_token}")
+    resp = client.get(f"/share/node/{pinned_identity.share_token}")
     assert resp.status_code == 200
     data = resp.json()
     assert data["meta"]["requires_pin"] is True
@@ -70,7 +70,7 @@ def test_get_share_pin_required(client, pinned_identity):
 
 def test_verify_pin_correct(client, pinned_identity):
     resp = client.post(
-        f"/share/identity/{pinned_identity.share_token}/verify",
+        f"/share/node/{pinned_identity.share_token}/verify",
         json={"pin": "1234"},
     )
     assert resp.status_code == 200
@@ -96,7 +96,7 @@ def test_verify_pin_handles_naive_due_date(client, db, pinned_identity):
     db.commit()
 
     resp = client.post(
-        f"/share/identity/{pinned_identity.share_token}/verify",
+        f"/share/node/{pinned_identity.share_token}/verify",
         json={"pin": "1234"},
     )
 
@@ -106,7 +106,7 @@ def test_verify_pin_handles_naive_due_date(client, db, pinned_identity):
 
 def test_verify_pin_wrong(client, pinned_identity):
     resp = client.post(
-        f"/share/identity/{pinned_identity.share_token}/verify",
+        f"/share/node/{pinned_identity.share_token}/verify",
         json={"pin": "9999"},
     )
     assert resp.status_code == 403
@@ -114,7 +114,7 @@ def test_verify_pin_wrong(client, pinned_identity):
 
 def test_verify_pin_invalid_format(client, pinned_identity):
     resp = client.post(
-        f"/share/identity/{pinned_identity.share_token}/verify",
+        f"/share/node/{pinned_identity.share_token}/verify",
         json={"pin": "abc"},
     )
     assert resp.status_code == 422
@@ -122,8 +122,8 @@ def test_verify_pin_invalid_format(client, pinned_identity):
 
 def test_view_logging_throttle(client, db, sample_identity, sample_project):
     token = sample_identity.share_token
-    client.get(f"/share/identity/{token}")
-    client.get(f"/share/identity/{token}")
+    client.get(f"/share/node/{token}")
+    client.get(f"/share/node/{token}")
 
     logs = db.query(ActivityLog).filter(ActivityLog.action == "share.viewed").all()
     assert len(logs) == 1  # throttled to 1 per IP per hour
@@ -218,16 +218,77 @@ def test_identity_note_requires_project_in_scope(client, db, sample_identity, sa
     db.commit()
 
     resp = client.post(
-        f"/share/identity/{sample_identity.share_token}/notes",
+        f"/share/node/{sample_identity.share_token}/notes",
         json={"guest_name": "Visitor", "body": "Hi", "project_id": other.id},
     )
     assert resp.status_code == 404
 
     resp = client.post(
-        f"/share/identity/{sample_identity.share_token}/notes",
+        f"/share/node/{sample_identity.share_token}/notes",
         json={"guest_name": "Visitor", "body": "Hi", "project_id": sample_project.id},
     )
     assert resp.status_code == 201
+
+
+def test_verify_through_generic_door_returns_the_identity_page(client, db, pinned_identity, sample_project):
+    """Unlocking a page hands back that page (ADR-0070).
+
+    The generic verify was written container-only, so an identity — whose projects
+    hang off ``member_of``, not ``contains`` — unlocked into an empty page.
+    """
+    graph.link_membership(db, pinned_identity.id, sample_project.id)
+    db.commit()
+
+    resp = client.post(f"/share/node/{pinned_identity.share_token}/verify", json={"pin": "1234"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["requires_pin"] is False
+    assert [p["id"] for p in body["projects"]] == [sample_project.id]
+    # Same page the GET serves once the cookie is set.
+    assert body["projects"] == client.get(f"/share/node/{pinned_identity.share_token}").json()["projects"]
+
+
+def test_retired_identity_paths_are_gone(client, sample_identity):
+    """ADR-0070 retired the identity-flavoured public paths; /share/n and /ical/node serve it."""
+    token = sample_identity.share_token
+
+    assert client.get(f"/share/identity/{token}").status_code == 404
+    assert client.post(f"/share/identity/{token}/verify", json={"pin": "1234"}).status_code == 404
+    assert client.get(f"/ical/identity/{token}.ics").status_code == 404
+
+    assert client.get(f"/share/node/{token}").status_code == 200
+    assert client.get(f"/ical/node/{token}.ics").status_code == 200
+
+
+def test_retired_note_scope_is_gone(client, db, sample_identity, sample_project):
+    graph.update_identity(db, sample_identity.id, allow_guest_notes=True)
+    db.commit()
+    payload = {"guest_name": "Visitor", "body": "Hi", "project_id": sample_project.id}
+
+    assert client.post(f"/share/identity/{sample_identity.share_token}/notes", json=payload).status_code == 404
+    assert client.post(f"/share/node/{sample_identity.share_token}/notes", json=payload).status_code == 201
+
+
+def test_guest_notes_work_on_a_custom_shareable_container(client, db, sample_project):
+    """The generic door must accept writes on every type it serves, not just reads."""
+    from app.models import NodeType
+
+    db.add(NodeType(key="topic", label="Topic", is_builtin=False, roles=["container", "shareable"]))
+    db.commit()
+    node = client.post("/api/nodes", json={"type": "topic", "title": "Launch"}).json()
+    task = make_task(db, project_id=sample_project.id, title="Owned by topic")
+    db.add(task)
+    db.commit()
+    client.post(f"/api/nodes/{node['id']}/edges", json={"target_id": task.id, "rel_type": "contains"})
+    token = client.post(f"/api/nodes/{node['id']}/share/rotate-token").json()["share_token"]
+
+    payload = {"guest_name": "Visitor", "body": "Nice", "project_id": node["id"]}
+    assert client.post(f"/share/node/{token}/notes", json=payload).status_code == 403  # notes off by default
+
+    client.post(f"/api/nodes/{node['id']}/share/set-guest-notes", json={"allowed": True})
+    assert client.post(f"/share/node/{token}/notes", json=payload).status_code == 201
+    assert client.post(f"/share/node/{token}/tasks/{task.id}/notes", json=payload).status_code == 201
 
 
 def test_task_note_outside_scope_rejected(client, db, sample_project):
@@ -252,11 +313,11 @@ def test_pinned_identity_note_requires_session(client, db, pinned_identity, samp
     db.commit()
     payload = {"guest_name": "Visitor", "body": "hello", "project_id": sample_project.id}
 
-    resp = client.post(f"/share/identity/{pinned_identity.share_token}/notes", json=payload)
+    resp = client.post(f"/share/node/{pinned_identity.share_token}/notes", json=payload)
     assert resp.status_code == 403
 
-    client.post(f"/share/identity/{pinned_identity.share_token}/verify", json={"pin": "1234"})
-    resp = client.post(f"/share/identity/{pinned_identity.share_token}/notes", json=payload)
+    client.post(f"/share/node/{pinned_identity.share_token}/verify", json={"pin": "1234"})
+    resp = client.post(f"/share/node/{pinned_identity.share_token}/notes", json=payload)
     assert resp.status_code == 201
 
 
@@ -345,12 +406,15 @@ def test_every_surface_reports_the_same_view_count(client, db, sample_identity, 
     """
     node = sample_identity if entity == "identity" else sample_project
     collection = "identities" if entity == "identity" else "projects"
+    # An identity is served only through the generic door since ADR-0070; a project
+    # still has its own. These are the data paths, not the page URLs (ADR-0071).
+    public_page = "node" if entity == "identity" else "project"
     scoped = f"/api/{collection}/{node.id}/share-views"
     generic = f"/api/nodes/{node.id}/share-views"
 
     assert client.get(scoped).json() == client.get(generic).json() == {"view_count": 0}
 
-    client.get(f"/share/{entity}/{node.share_token}")
+    client.get(f"/share/{public_page}/{node.share_token}")
 
     assert client.get(scoped).json()["view_count"] == 1
     assert client.get(generic).json() == client.get(scoped).json()
@@ -358,7 +422,7 @@ def test_every_surface_reports_the_same_view_count(client, db, sample_identity, 
 
 def test_share_node_serves_custom_shareable_container(client, db):
     # ADR-0039: a user-defined shareable container is served by the generic
-    # /share/n/{token} route with the same payload shape as a project share.
+    # /share/node/{token} route with the same payload shape as a project share.
     from app.models import NodeType
     from app.services import graph
 
@@ -369,7 +433,7 @@ def test_share_node_serves_custom_shareable_container(client, db):
     graph.add_edge(db, topic.id, task.id, graph.REL_CONTAINS)
     db.commit()
 
-    resp = client.get("/share/n/tok-topic")
+    resp = client.get("/share/node/tok-topic")
     assert resp.status_code == 200
     data = resp.json()
     assert data["identity"]["name"] == "Launch"
@@ -380,17 +444,17 @@ def test_share_node_serves_custom_shareable_container(client, db):
 
 def test_share_node_dispatches_identity_and_project(client, sample_identity, sample_project):
     # The generic route delegates identity/project to their existing handlers.
-    ident = client.get(f"/share/n/{sample_identity.share_token}")
+    ident = client.get(f"/share/node/{sample_identity.share_token}")
     assert ident.status_code == 200
     assert ident.json()["meta"]["scope"] == "identity"
 
-    proj = client.get(f"/share/n/{sample_project.share_token}")
+    proj = client.get(f"/share/node/{sample_project.share_token}")
     assert proj.status_code == 200
     assert proj.json()["meta"]["scope"] == "project"
 
 
 def test_share_node_unknown_token_404(client):
-    assert client.get("/share/n/nope").status_code == 404
+    assert client.get("/share/node/nope").status_code == 404
 
 
 def test_share_node_pin_gate_and_verify(client, db):
@@ -407,12 +471,12 @@ def test_share_node_pin_gate_and_verify(client, db):
     )
     db.commit()
 
-    gated = client.get("/share/n/tok-pin")
+    gated = client.get("/share/node/tok-pin")
     assert gated.status_code == 200
     assert gated.json()["meta"]["requires_pin"] is True
 
-    assert client.post("/share/n/tok-pin/verify", json={"pin": "0000"}).status_code == 403
-    ok = client.post("/share/n/tok-pin/verify", json={"pin": "2468"})
+    assert client.post("/share/node/tok-pin/verify", json={"pin": "0000"}).status_code == 403
+    ok = client.post("/share/node/tok-pin/verify", json={"pin": "2468"})
     assert ok.status_code == 200
     assert ok.json()["meta"]["scope"] == "node"
 
@@ -425,4 +489,4 @@ def test_share_node_verify_without_pin_400(client, db):
     db.commit()
     graph.create_node(db, "topic", title="Open", status="active", share_token="tok-nopin")
     db.commit()
-    assert client.post("/share/n/tok-nopin/verify", json={"pin": "1234"}).status_code == 400
+    assert client.post("/share/node/tok-nopin/verify", json={"pin": "1234"}).status_code == 400

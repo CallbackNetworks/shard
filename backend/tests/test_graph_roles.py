@@ -258,4 +258,4 @@ def test_organization_user_defined_type_plays_all_roles(client, db):
 
     # Shareable role: the generic share facade mints a token that resolves publicly.
     token = client.post(f"/api/nodes/{org['id']}/share/rotate-token").json()["share_token"]
-    assert client.get(f"/share/n/{token}").status_code == 200
+    assert client.get(f"/share/node/{token}").status_code == 200

@@ -13,7 +13,7 @@ import ShareFooter from '../components/share/ShareFooter'
 import useBreakpoint from '../components/share/useBreakpoint'
 import EmptyState from '../components/shared/EmptyState'
 
-export default function ShareView({ scope = 'identity' }) {
+export default function ShareView({ scope = 'node' }) {
   const { token } = useParams()
   const bp = useBreakpoint()
   const [now, setNow] = useState(new Date())

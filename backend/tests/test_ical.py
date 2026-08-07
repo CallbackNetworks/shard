@@ -106,14 +106,14 @@ def test_identity_feed_aggregates_projects(client, db, sample_identity, sample_p
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="Under identity", due_date=due)
 
-    resp = client.get(f"/ical/identity/{sample_identity.share_token}.ics")
+    resp = client.get(f"/ical/node/{sample_identity.share_token}.ics")
     assert resp.status_code == 200
     assert "SUMMARY:Under identity" in resp.text
     assert f"X-WR-CALNAME:{sample_identity.name}" in resp.text
 
 
 def test_identity_feed_requires_valid_token(client):
-    assert client.get("/ical/identity/nope.ics").status_code == 404
+    assert client.get("/ical/node/nope.ics").status_code == 404
 
 
 # --- global feed (app-level token from /settings/ical-token) -------------------

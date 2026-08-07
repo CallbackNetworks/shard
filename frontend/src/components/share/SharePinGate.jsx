@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import useBreakpoint from './useBreakpoint'
 
-// Map a share scope to its verify path prefix. Identity keeps its legacy path;
-// generic shareable nodes (ADR-0039) verify under /share/n. Projects have no PIN.
-const VERIFY_PREFIX = { identity: '/share/identity', n: '/share/n' }
+// Every PIN-protected share verifies at the one generic door (ADR-0039, ADR-0070);
+// projects have no PIN gate.
+const VERIFY_PREFIX = { node: '/share/node' }
 
-export default function SharePinGate({ identity, token, scope = 'identity', onVerified }) {
+export default function SharePinGate({ identity, token, scope = 'node', onVerified }) {
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const [pin, setPin] = useState('')
@@ -19,7 +19,7 @@ export default function SharePinGate({ identity, token, scope = 'identity', onVe
     setLoading(true)
     setError('')
     try {
-      const prefix = VERIFY_PREFIX[scope] || VERIFY_PREFIX.identity
+      const prefix = VERIFY_PREFIX[scope] || VERIFY_PREFIX.node
       const res = await fetch(`${prefix}/${token}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

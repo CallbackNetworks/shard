@@ -204,9 +204,8 @@ export default function App() {
             <ToastProvider>
               <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
-                  <Route path="/share/:token" element={<ShareView scope="identity" />} />
                   <Route path="/share/p/:token" element={<ShareView scope="project" />} />
-                  <Route path="/share/n/:token" element={<ShareView scope="n" />} />
+                  <Route path="/share/n/:token" element={<ShareView scope="node" />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/*" element={<IdentityFocusProvider><Layout /></IdentityFocusProvider>} />
                 </Routes>
