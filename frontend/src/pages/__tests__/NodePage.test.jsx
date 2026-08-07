@@ -27,6 +27,8 @@ vi.mock('../../api/client', () => ({
   getNode: vi.fn(), getNodeEdges: vi.fn(), getNodeEvents: vi.fn(),
   getNodeTypes: vi.fn(), getEdgeTypes: vi.fn(), getNodes: vi.fn(),
   updateNode: vi.fn(), deleteNode: vi.fn(), attachNodeEdge: vi.fn(), detachNodeEdge: vi.fn(),
+  rotateNodeShareToken: vi.fn(), setNodeSharePin: vi.fn(), clearNodeSharePin: vi.fn(),
+  setNodeShareExpiry: vi.fn(), setNodeGuestNotes: vi.fn(), getNodeShareViews: vi.fn(),
 }))
 
 import NodePage from '../NodePage'
@@ -35,6 +37,8 @@ const nodeTypes = [
   { key: 'topic', label: 'Topic', is_builtin: false, color: '#f59e0b' },
   { key: 'project', label: 'Project', is_builtin: true, color: '#818cf8' },
   { key: 'task', label: 'Task', is_builtin: true, color: '#22c55e' },
+  // Shareable but *not* a container: this page is its only home (ADR-0039).
+  { key: 'brief', label: 'Brief', is_builtin: false, color: '#f472b6', roles: ['shareable', 'subscribable'] },
 ]
 const edgeTypes = [
   { key: 'contains', label: 'Contains', is_containment: true },
@@ -85,6 +89,17 @@ describe('NodePage', () => {
     expect(screen.getByText('Research')).toBeInTheDocument()
     expect(screen.getAllByText('Topic').length).toBeGreaterThan(0)
     expect(screen.getByText('n1')).toBeInTheDocument()
+  })
+
+  it('offers the share panel to a shareable node, and only to one', () => {
+    // A shareable non-container type never reaches /c/{id}, so before this the token
+    // behind its public page had nowhere to be rotated or protected.
+    setup()
+    expect(screen.queryByText('nodeShare.title')).toBeNull()
+
+    setup({ nodeData: { ...node, type: 'brief', data: { share_token: 'tok' } } })
+    expect(screen.getByText('nodeShare.title')).toBeInTheDocument()
+    expect(screen.getByTitle(`${window.location.origin}/share/n/tok`)).toBeInTheDocument()
   })
 
   it('groups edges by rel_type with containment first and shows neighbor titles', () => {
