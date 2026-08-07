@@ -284,6 +284,11 @@ async def _get_project_detail(project_id: str) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _get_container_subtree(node_id: str) -> str:
+    result = await _get(f"/nodes/{node_id}/subtree")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 async def _bulk_update_tasks(project_id: str, updates: list[dict]) -> str:
     result = await _post(f"/projects/{project_id}/tasks/bulk-update", updates)
     return json.dumps(result) if not isinstance(result, str) else result
@@ -550,6 +555,22 @@ TOOL_DEFINITIONS = [
         },
     ),
     types.Tool(
+        name="get_container_subtree",
+        description=(
+            "Get a container's task rollup over everything it contains, plus the containers "
+            "directly inside it (each with its own rollup). Use this on a project or any "
+            "container to find work that lives one or more levels down: list_tasks and "
+            "get_project_detail only show a container's own tasks, not nested containers."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "node_id": {"type": "string", "description": "Container node ID — a project, goal or custom container (required)"},
+            },
+            "required": ["node_id"],
+        },
+    ),
+    types.Tool(
         name="bulk_update_tasks",
         description="Batch update multiple tasks in one request. Each item needs an 'id' field and the fields to change. Status changes trigger notifications.",
         inputSchema={
@@ -664,6 +685,8 @@ async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent
             result = await _get_project_detail(
                 project_id=args["project_id"],
             )
+        elif name == "get_container_subtree":
+            result = await _get_container_subtree(node_id=args["node_id"])
         elif name == "bulk_update_tasks":
             result = await _bulk_update_tasks(
                 project_id=args["project_id"],

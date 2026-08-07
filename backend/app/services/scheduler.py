@@ -276,7 +276,7 @@ async def _send_daily_summary(db: Session) -> None:
     # Build summary
     project_summaries = []
     for p in projects:
-        p_tasks = graph.tasks_in_project(db, p.id)
+        p_tasks = graph.subtree_task_views(db, p.id)
         sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
         total = sum(1 for t in p_tasks if t.id not in sub)
         done = sum(1 for t in p_tasks if t.status == "done" and t.id not in sub)
@@ -390,7 +390,7 @@ async def _send_weekly_digest(db: Session) -> None:
     project_rows = []
     project_activity = []
     for p in projects:
-        p_tasks = graph.tasks_in_project(db, p.id)
+        p_tasks = graph.subtree_task_views(db, p.id)
         sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
         total = sum(1 for t in p_tasks if t.id not in sub)
         done = sum(1 for t in p_tasks if t.status == "done" and t.id not in sub)

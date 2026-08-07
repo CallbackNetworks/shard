@@ -39,7 +39,9 @@ def api_project_stats(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    tasks = graph.tasks_in_project(db, project.id)
+    # Same project, same numbers as the app's project page (ADR-0065): the whole
+    # subtree, top-level tasks only, so the breakdown below adds up to the total.
+    tasks = graph.subtree_task_views(db, project.id, top_level_only=True)
     total = len(tasks)
     by_status = {}
     by_priority = {}

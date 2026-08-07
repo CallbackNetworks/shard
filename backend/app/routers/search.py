@@ -57,7 +57,9 @@ def search(
         # Projects are node-only (ADR-0033); name (title) / description matched in
         # Python by graph.search_projects. Task membership is via contains edges.
         for p in graph.search_projects(db, q, limit=20):
-            p_task_ids = graph.contained_task_ids(db, p.id)
+            # Subtree scope (ADR-0065): a search hit reports the same size the
+            # project page does, nested containers included.
+            p_task_ids = graph.subtree_task_ids(db, p.id, top_level_only=True)
             total = len(p_task_ids)
             done = (
                 db.query(func.count(Node.id))

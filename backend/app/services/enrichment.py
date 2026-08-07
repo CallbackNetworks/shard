@@ -1,5 +1,15 @@
 from app.models import RecurrenceRule
-from app.schemas import CycleOut, IdentityOut, LabelOut, ProjectOut, RecurrenceRuleOut, TaskOut, TaskPullRequestOut
+from app.schemas import (
+    ContainerSubtree,
+    ContainerSummary,
+    CycleOut,
+    IdentityOut,
+    LabelOut,
+    ProjectOut,
+    RecurrenceRuleOut,
+    TaskOut,
+    TaskPullRequestOut,
+)
 from app.services import graph
 
 
@@ -195,3 +205,41 @@ def enrich_project(project, db) -> ProjectOut:
     ]
 
     return out
+
+
+def container_summary(node, db) -> ContainerSummary:
+    """One container's subtree rollup in the shape both API surfaces serve (ADR-0065)."""
+    stats = graph.container_subtree_stats(db, node.id)
+    return ContainerSummary(
+        id=node.id,
+        type=node.type,
+        title=node.title,
+        status=node.status,
+        total_tasks=stats.total_tasks,
+        done_tasks=stats.done_tasks,
+        progress=stats.progress,
+        direct_task_count=stats.direct_task_count,
+        child_container_count=stats.child_container_count,
+    )
+
+
+def enrich_container_subtree(node, db, *, visible=None) -> ContainerSubtree:
+    """A container's rollup plus its direct child containers, each rolled up (ADR-0065).
+
+    ``visible`` is an optional predicate applied to the children: the external API
+    passes its project-scope check so a restricted key is not handed the titles of
+    containers it may not read. The parent's own rollup is a property of the parent
+    and is not filtered.
+    """
+    children = [db_node for db_node in _child_container_nodes(node, db) if visible is None or visible(db_node)]
+    return ContainerSubtree(
+        **container_summary(node, db).model_dump(),
+        children=[container_summary(child, db) for child in children],
+    )
+
+
+def _child_container_nodes(node, db) -> list:
+    from app.models import Node
+
+    nodes = (db.get(Node, cid) for cid in graph.child_container_ids(db, node.id))
+    return [n for n in nodes if n is not None]

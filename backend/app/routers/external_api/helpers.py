@@ -27,7 +27,8 @@ _PROJECT_FIELDS = (
 
 
 def _enrich_project(project: "graph.ProjectView", db: Session) -> dict:
-    tasks = graph.tasks_in_project(db, project.id)
+    # Subtree scope, top-level tasks (ADR-0065) so v1's counts match the app's.
+    tasks = graph.subtree_task_views(db, project.id, top_level_only=True)
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
     return {

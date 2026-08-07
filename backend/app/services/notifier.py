@@ -161,7 +161,9 @@ def event_has_subscriber(db: Session, event: str, *, source: str = DEFAULT_SOURC
 
 
 def _compute_progress(project: "graph.ProjectView", db: Session) -> tuple[int, int, float]:
-    tasks = graph.tasks_in_project(db, project.id)
+    # Subtree scope, top-level tasks (ADR-0065): a notification reports the project at
+    # the size the app shows it, nested containers included and subtasks not double-counted.
+    tasks = graph.subtree_task_views(db, project.id, top_level_only=True)
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
     progress = round(done / total * 100, 1) if total > 0 else 0.0

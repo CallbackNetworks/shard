@@ -506,13 +506,43 @@ async def test_patch_error_response():
     assert result == "Error 422: Validation error"
 
 
+# ── Tool: get_container_subtree ─────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_get_container_subtree():
+    """ADR-0065: an agent can see the containers below a node, not just its own tasks."""
+    data = {
+        "id": "p1",
+        "type": "project",
+        "title": "Split work",
+        "total_tasks": 8,
+        "done_tasks": 3,
+        "direct_task_count": 6,
+        "child_container_count": 1,
+        "children": [{"id": "a1", "type": "area", "title": "Nested area", "total_tasks": 2}],
+    }
+    with _patch_client("get", _mock_response(json_data=data)) as _:
+        text = await _call("get_container_subtree", {"node_id": "p1"})
+    parsed = json.loads(text)
+    assert parsed["total_tasks"] == 8
+    assert [c["title"] for c in parsed["children"]] == ["Nested area"]
+
+
+@pytest.mark.asyncio
+async def test_get_container_subtree_error():
+    with _patch_client("get", _mock_response(status_code=404, text="node not found")):
+        text = await _call("get_container_subtree", {"node_id": "nope"})
+    assert "Error 404" in text
+
+
 # ── MCP registry: list_tools ────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.list_tools()
-    assert len(tools) == 20
+    assert len(tools) == 21
 
 
 @pytest.mark.asyncio
@@ -525,7 +555,7 @@ async def test_list_tools_names():
         "add_comment", "list_comments", "manage_dependencies", "get_notifications",
         "get_agent_context", "report_progress",
         "list_projects", "create_project", "delete_task",
-        "get_project_detail", "bulk_update_tasks",
+        "get_project_detail", "bulk_update_tasks", "get_container_subtree",
     }
     assert names == expected
 

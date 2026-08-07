@@ -53,7 +53,7 @@ def api_search(
     projects = []
     if not project_id:
         for p in graph.search_projects(db, q, limit=20):
-            p_tasks = graph.tasks_in_project(db, p.id)
+            p_tasks = graph.subtree_task_views(db, p.id, top_level_only=True)
             total = len(p_tasks)
             done = sum(1 for t in p_tasks if t.status == "done")
             projects.append(

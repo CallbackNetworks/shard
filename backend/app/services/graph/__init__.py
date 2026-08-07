@@ -171,6 +171,8 @@ from app.services.graph.tasks import (
     set_parent_task,
     subtask_ids_among,
     subtasks,
+    subtree_task_ids,
+    subtree_task_views,
     task_view,
     task_views_by_ids,
     task_views_for_ids,

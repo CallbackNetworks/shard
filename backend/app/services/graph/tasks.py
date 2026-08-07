@@ -454,6 +454,34 @@ def subtask_ids_among(db: Session, task_ids) -> set[str]:
     return set(rows)
 
 
+def subtree_task_ids(db: Session, container_id: str, *, top_level_only: bool = False) -> list[str]:
+    """Ids of every task anywhere in a container's ``contains`` subtree (ADR-0065).
+
+    The subtree-scoped counterpart of ``contained_task_ids``: "the work that belongs
+    to this container", wherever in the levels below it happens to sit.
+
+    ``top_level_only`` drops subtasks. Pass it wherever the answer is a *size* — how
+    big is this project — because that is the one rule the whole app reports (a parent
+    task and its subtasks are one unit of work). Leave it off for listings, which show
+    whatever their reader needs to act on.
+
+    Membership checks ("is this task in this project?") stay on
+    ``contained_task_ids``: those ask about one edge, not about the subtree.
+    """
+    subtree = descendants_of(db, container_id)
+    if not subtree:
+        return []
+    stmt = select(Node.id).where(Node.type.in_(task_type_keys(db)), Node.id.in_(subtree))
+    if top_level_only:
+        stmt = stmt.where(top_level_task_filter(db))
+    return list(db.execute(stmt.order_by(Node.position, Node.created_at)).scalars())
+
+
+def subtree_task_views(db: Session, container_id: str, *, top_level_only: bool = False) -> list["TaskView"]:
+    """Task views for the whole subtree — the reporting counterpart of ``tasks_in_project``."""
+    return task_views_for_ids(db, subtree_task_ids(db, container_id, top_level_only=top_level_only))
+
+
 @dataclass
 class ContainerStats:
     """Task rollup for a container's whole ``contains`` subtree (ADR-0065)."""

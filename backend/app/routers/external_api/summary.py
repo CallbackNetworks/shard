@@ -53,8 +53,13 @@ def api_summary(
     project_summaries = []
 
     for p in projects:
-        tasks = graph.tasks_in_project(db, p.id)
-        total = len(tasks)
+        # Subtree scope (ADR-0065): includes work held by nested containers. The task
+        # *lists* below keep every task, subtasks included, because an agent asking
+        # "what should I pick up" wants them; the *counts* use the one size rule the
+        # whole app reports (top-level only), so they match every other surface.
+        tasks = graph.subtree_task_views(db, p.id)
+        counted = set(graph.subtree_task_ids(db, p.id, top_level_only=True))
+        total = len(counted)
         done = 0
         in_progress = 0
         failed = 0
@@ -68,14 +73,15 @@ def api_summary(
         priority_order = {"high": 0, "medium": 1, "low": 2}
 
         for t in tasks:
+            counts = t.id in counted
             if t.status == "done":
-                done += 1
+                done += counts
             elif t.status == "in_progress":
-                in_progress += 1
+                in_progress += counts
             elif t.status == "failed":
-                failed += 1
+                failed += counts
             elif t.status == "todo":
-                todo += 1
+                todo += counts
                 todo_tasks.append(
                     {
                         "id": t.id,
@@ -93,7 +99,7 @@ def api_summary(
                 and t.status not in ("done", "failed")
             )
             if is_overdue:
-                overdue += 1
+                overdue += counts
 
             if t.status == "in_progress" or is_overdue:
                 active_tasks.append(

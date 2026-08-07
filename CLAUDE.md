@@ -178,6 +178,9 @@ The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and b
 
 **Container aggregation is subtree-shaped** (`graph.container_subtree_stats`, ADR-0065): a `contains` child may be a task *or* another container, so `progress` / `total_tasks` / `done_tasks` roll up the whole subtree (top-level tasks only, so a parent task and its subtasks count once). `direct_task_count` uses the same rule, so `total - direct` is the work living one level down. `goal_subtree_progress` is an alias for it. The two halves of a container's children have one endpoint each: `GET /api/nodes/{id}/contained-tasks` (its board) and `GET /api/nodes/{id}/subtree` (its child containers, each with its own rollup) — the frontend never re-derives a rollup from the tasks on screen.
 
+**A project's size has one definition**
+ (ADR-0068): top-level tasks in its whole `contains` subtree. Every surface that *reports* a size reads it — project/container/goal pages, internal + v1 search, the public share page, `/api/v1` project reads and `stats`/`summary`, identity hub stats, notification payloads, the daily/weekly emails and the assistant summary — via `graph.subtree_task_ids/subtree_task_views(..., top_level_only=True)` or `container_subtree_stats`. Membership checks ("is this task in this project?") stay on `contained_task_ids`: they ask about one edge. Task *listings* keep their own policy (v1 `summary` still lists subtasks as actionable work); only the counts are pinned. `tests/test_progress_agreement.py` asks every one of those surfaces the same question and fails if any answer differs.
+
 **`log_activity(db, action, *, project_id, task_id, actor, detail, meta)`** in `services/activity.py`: call after every meaningful mutation; does `db.flush()` not `db.commit()`.
 
 **`fire_notifications(db, task, event)`** in `services/notifier.py`: sends to all matching active integrations. Webhook-type integrations get HMAC-SHA256 `X-Signature`/`X-Hub-Signature-256` headers; email integrations use SMTP. Creates a `WebhookDelivery` log row per attempt with retry backoff `[1, 5, 30, 120, 360]` minutes.
@@ -192,7 +195,7 @@ The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and b
 
 **CI/CD adapters** (`services/cicd_adapters.py`): auto-detects CI/CD provider from request headers (GitHub, GitLab, Jenkins, Drone, Bitbucket) and normalizes payloads to a common format. Used by `webhooks.py` for inbound callbacks.
 
-**MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio and Streamable HTTP transport. Provides 20 tools, 4 resources, 1 resource template, and 4 prompts.
+**MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio and Streamable HTTP transport. Provides 21 tools, 4 resources, 1 resource template, and 4 prompts.
 
 ## Frontend architecture (`frontend/src/`)
 

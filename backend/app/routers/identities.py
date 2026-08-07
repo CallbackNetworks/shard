@@ -50,7 +50,7 @@ def get_hub_stats(db: Session = Depends(get_db)):
             projects = graph.projects_by_ids(db, ident_project_ids).values()
             for p in projects:
                 p_stats = {"total_tasks": 0, "done": 0, "in_progress": 0, "todo": 0, "failed": 0, "overdue": 0}
-                for t in graph.tasks_in_project(db, p.id):
+                for t in graph.subtree_task_views(db, p.id, top_level_only=True):
                     p_stats["total_tasks"] += 1
                     if t.status in p_stats:
                         p_stats[t.status] += 1

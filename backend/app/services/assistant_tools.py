@@ -267,7 +267,7 @@ async def _tool_get_summary(db: Session) -> str:
     projects = graph.all_projects(db, status="active")
     result = []
     for p in projects:
-        p_tasks = graph.tasks_in_project(db, p.id)
+        p_tasks = graph.subtree_task_views(db, p.id)
         sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
         total = len([t for t in p_tasks if t.id not in sub])
         done = sum(1 for t in p_tasks if t.status == "done" and t.id not in sub)

@@ -108,10 +108,15 @@ def _serialize_comment(c: Comment):
 
 
 def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
-    task_ids = graph.contained_task_ids(db, p.id)
+    # Subtree scope (ADR-0065): what a share link calls "this project" is the same
+    # set of work the app calls this project — tasks held by a nested container
+    # included, or the shared page would show a smaller project than its owner sees.
+    # The listing keeps every task (subtasks are rendered under their parent below);
+    # the headline numbers come from the one size rule, top-level tasks only.
+    task_ids = graph.subtree_task_ids(db, p.id)
     tasks = graph.task_views_for_ids(db, task_ids) if task_ids else []
-    total = len(tasks)
-    done = sum(1 for t in tasks if t.status == "done")
+    stats = graph.container_subtree_stats(db, p.id)
+    total, done = stats.total_tasks, stats.done_tasks
 
     project_labels = []
     seen_labels = set()

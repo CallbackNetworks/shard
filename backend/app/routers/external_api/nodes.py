@@ -25,9 +25,18 @@ from app.routers.external_api.auth import (
     _node_accessible,
     _require_scope,
 )
-from app.schemas import EdgeCreate, EdgeOut, GraphEventOut, NodeCreate, NodeOut, NodeUpdate, TaskOut
+from app.schemas import (
+    ContainerSubtree,
+    EdgeCreate,
+    EdgeOut,
+    GraphEventOut,
+    NodeCreate,
+    NodeOut,
+    NodeUpdate,
+    TaskOut,
+)
 from app.services import graph, node_data
-from app.services.enrichment import enrich_task
+from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
     dispatch_edge_removed,
@@ -270,6 +279,30 @@ def api_contained_tasks(
     views = graph.tasks_in_project(db, node_id)
     views.sort(key=lambda v: (v.position, v.created_at))
     return [enrich_task(v, db) for v in views]
+
+
+@sub_router.get(
+    "/nodes/{node_id}/subtree",
+    summary="Get a container's rollup and the containers inside it",
+    description=(
+        "Returns this node's task rollup over its whole `contains` subtree plus its direct "
+        "child containers, each with their own rollup. The companion to `contained-tasks`: "
+        "that lists the node's own tasks, this lists the levels below it. Requires `read` scope."
+    ),
+    response_model=ContainerSubtree,
+    responses={**_auth_errors, 404: {"description": "Node not found"}},
+)
+def api_node_subtree(
+    node_id: str,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    node = _load_node_or_404(node_id, db)
+    _check_node_access(api_key, db, node)
+    # A project-scoped key must not learn the titles of containers outside its project,
+    # so the child list is filtered by the same access rule the node reads use.
+    return enrich_container_subtree(node, db, visible=lambda child: _node_accessible(api_key, db, child))
 
 
 # ── Edges ─────────────────────────────────────────────────────────
