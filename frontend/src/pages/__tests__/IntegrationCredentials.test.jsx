@@ -2,9 +2,11 @@
  * Editing an integration must not delete the credentials it was never shown (ADR-0063).
  *
  * The backend withholds a stored credential as `null` and reads `null` back as "unchanged",
- * so the whole safety property rests on the form preserving that null. `|| ''` instead of
- * `?? ''` turns it into an empty string, which the server reads as "clear it" — the form is
- * load-bearing here, so it is tested through the real component rather than around it.
+ * so the property under test is that the null survives the round trip through form state
+ * untouched. Normalising it to `''` anywhere between opening the editor and submitting —
+ * most plausibly when seeding the form — turns "leave it alone" into "clear it". The input
+ * bindings are not what carries this (`v ?? ''` and `v || ''` are identical for null); only
+ * the value actually submitted is, so this runs the real component and reads the payload.
  */
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
