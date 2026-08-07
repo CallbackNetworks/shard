@@ -201,3 +201,85 @@ def test_update_structural_flags_of_custom_edge_type(client):
     r = client.patch("/api/graph-types/edges/groups", json={"is_containment": True})
     assert r.status_code == 200
     assert r.json()["is_containment"] is True
+
+
+# ── Field declarations (ADR-0074) ─────────────────────────────────────────────
+
+
+def test_builtin_types_declare_their_editable_fields(client):
+    """A type says which keys of its nodes' ``data`` belong to the user.
+
+    Identity's three are the point of the exercise: colour, avatar and description are
+    the only reason it still needed a page of its own.
+    """
+    types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
+
+    identity = {f["key"]: f["kind"] for f in types[graph.NODE_IDENTITY]["fields"]}
+    assert identity == {"color": "color", "avatar": "emoji", "description": "longtext"}
+
+    # Every built-in declares something, and none of them declare machinery.
+    from app.services.graph_registry import MANAGED_DATA_KEYS
+
+    for key in (graph.NODE_PROJECT, graph.NODE_TASK, graph.NODE_CYCLE, graph.NODE_GOAL, graph.NODE_LABEL):
+        declared = {f["key"] for f in types[key]["fields"]}
+        assert declared, f"{key} declares no fields"
+        assert not declared & set(MANAGED_DATA_KEYS), f"{key} declares a managed key"
+
+
+def test_custom_type_can_declare_and_redeclare_fields(client):
+    client.post("/api/graph-types/nodes", json={"key": "incident", "label": "Incident"})
+    assert client.get("/api/graph-types/nodes").json()
+
+    r = client.patch(
+        "/api/graph-types/nodes/incident",
+        json={"fields": [{"key": "severity", "label": "Severity", "kind": "text"}]},
+    )
+    assert r.status_code == 200
+    assert [f["key"] for f in r.json()["fields"]] == ["severity"]
+
+    # Declaring replaces the set outright, like roles.
+    r = client.patch(
+        "/api/graph-types/nodes/incident",
+        json={"fields": [{"key": "runbook", "label": "Runbook", "kind": "url"}]},
+    )
+    assert [f["key"] for f in r.json()["fields"]] == ["runbook"]
+
+
+def test_a_type_cannot_declare_machinery_as_editable(client):
+    """The keys a feature owns are not the user's to fill (ADR-0059, ADR-0060).
+
+    A hand-edited callback_token silently breaks every signed callback; a hand-edited
+    share_pin_hash is a lock with a key nobody holds.
+    """
+    client.post("/api/graph-types/nodes", json={"key": "brief", "label": "Brief"})
+
+    for managed in ("callback_token", "webhook_secret", "share_token", "share_pin_hash"):
+        r = client.patch(
+            "/api/graph-types/nodes/brief",
+            json={"fields": [{"key": managed, "label": "x", "kind": "text"}]},
+        )
+        assert r.status_code == 422, managed
+
+    assert client.patch("/api/graph-types/nodes/brief", json={"fields": []}).status_code == 200
+
+
+def test_a_field_kind_must_be_one_the_editor_knows(client):
+    client.post("/api/graph-types/nodes", json={"key": "brief", "label": "Brief"})
+    r = client.patch(
+        "/api/graph-types/nodes/brief",
+        json={"fields": [{"key": "severity", "label": "S", "kind": "wizard"}]},
+    )
+    assert r.status_code == 422
+
+
+def test_fields_can_be_declared_at_create_time(client):
+    r = client.post(
+        "/api/graph-types/nodes",
+        json={
+            "key": "brief",
+            "label": "Brief",
+            "fields": [{"key": "audience", "label": "Audience", "kind": "text"}],
+        },
+    )
+    assert r.status_code == 201
+    assert [f["key"] for f in r.json()["fields"]] == ["audience"]

@@ -983,6 +983,40 @@ def _validate_type_key(value: str) -> str:
     return key
 
 
+class NodeFieldSpec(BaseModel):
+    """One editable key of a node's ``data`` (ADR-0074).
+
+    ``key`` is the key inside ``data``; ``kind`` says how to draw and validate it.
+    A key that is not declared is either feature machinery or an ad-hoc extra — the
+    editor treats those differently, so the declaration has to be explicit rather
+    than inferred from whatever a node happens to be carrying.
+    """
+
+    key: str
+    label: str
+    kind: str = "text"
+    max_length: int | None = None
+    options: list[str] | None = None
+
+    @field_validator("key")
+    @classmethod
+    def _not_managed(cls, v: str) -> str:
+        from app.services.graph_registry import MANAGED_DATA_KEYS
+
+        if v in MANAGED_DATA_KEYS:
+            raise ValueError(f"{v} is written by a feature and cannot be declared editable")
+        return v
+
+    @field_validator("kind")
+    @classmethod
+    def _known_kind(cls, v: str) -> str:
+        from app.services.graph_registry import FIELD_KINDS
+
+        if v not in FIELD_KINDS:
+            raise ValueError(f"unknown field kind {v!r}; expected one of {', '.join(FIELD_KINDS)}")
+        return v
+
+
 class NodeTypeCreate(BaseModel):
     key: str
     label: str
@@ -991,6 +1025,7 @@ class NodeTypeCreate(BaseModel):
     # ADR-0040: capabilities are a roles set (container/task/shareable/subscribable),
     # replacing the four former booleans.
     roles: list[str] | None = None
+    fields: list[NodeFieldSpec] | None = None
     data: dict | None = None
 
     @field_validator("key")
@@ -1006,6 +1041,7 @@ class NodeTypeUpdate(BaseModel):
     # ADR-0040: ``roles`` replaces the set outright. Built-in types reject container/
     # task changes (router guard).
     roles: list[str] | None = None
+    fields: list[NodeFieldSpec] | None = None
     data: dict | None = None
 
 
@@ -1018,8 +1054,14 @@ class NodeTypeOut(BaseModel):
     color: str | None = None
     is_builtin: bool
     roles: list[str] = []
+    fields: list[NodeFieldSpec] = []
     data: dict | None = None
     usage_count: int = 0
+
+    @field_validator("fields", mode="before")
+    @classmethod
+    def _fields_default(cls, v):
+        return v or []
 
     @field_validator("roles", mode="before")
     @classmethod

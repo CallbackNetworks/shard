@@ -422,6 +422,15 @@ class NodeType(Base):
     # expose an iCal feed over its ``contains`` subtree. Adding a new capability is a
     # string in this set + a dispatcher rule — no schema change (ADR-0040).
     roles: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Which keys of a node's ``data`` belong to the user, and what each one holds
+    # (ADR-0074). A JSON array of {key, label, kind, ...} specs. ``data`` is otherwise
+    # a bag with no description — user fields, feature machinery (share_token,
+    # callback_token, reminder_sent_at) and whatever an agent wrote once all sit in it
+    # together, which is why nothing could offer a generic editor. This says which
+    # subset is editable and how to draw it. Its own column rather than a corner of
+    # ``data`` below, for the same reason ``roles`` got one: free-form JSON that
+    # nothing describes is how credentials ended up being served (ADR-0059).
+    fields: Mapped[list | None] = mapped_column(JSON, nullable=True)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # e.g. default hot-field hints
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)

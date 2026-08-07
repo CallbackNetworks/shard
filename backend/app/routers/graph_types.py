@@ -53,6 +53,8 @@ def create_node_type(body: NodeTypeCreate, db: Session = Depends(get_db)):
         color=body.color,
         data=body.data,
         roles=sorted(set(body.roles)) if body.roles else None,
+        # A type may declare which keys of its nodes' ``data`` are the user's (ADR-0074).
+        fields=[f.model_dump(exclude_none=True) for f in body.fields] if body.fields else None,
     )
     db.add(nt)
     db.commit()
@@ -65,9 +67,10 @@ def update_node_type(key: str, body: NodeTypeUpdate, db: Session = Depends(get_d
     nt = db.get(NodeType, key)
     if nt is None:
         raise HTTPException(status_code=404, detail="node type not found")
-    fields = body.model_dump(exclude_unset=True)
-    if "roles" in fields:
-        new_roles = set(fields.pop("roles") or [])
+    # Named ``patch``, not ``fields``: ``fields`` is now a column of its own (ADR-0074).
+    patch = body.model_dump(exclude_unset=True, exclude_none=False)
+    if "roles" in patch:
+        new_roles = set(patch.pop("roles") or [])
         # Built-in container/task membership is immutable (ADR-0034/0035): reject a
         # change to those roles.
         if nt.is_builtin and (
@@ -76,7 +79,10 @@ def update_node_type(key: str, body: NodeTypeUpdate, db: Session = Depends(get_d
         ):
             raise HTTPException(status_code=400, detail="cannot change roles of a built-in node type")
         nt.roles = sorted(new_roles) or None
-    for field, value in fields.items():
+    if "fields" in patch:
+        declared = patch.pop("fields")
+        nt.fields = [{k: v for k, v in f.items() if v is not None} for f in declared] if declared else None
+    for field, value in patch.items():
         setattr(nt, field, value)
     db.commit()
     db.refresh(nt)
