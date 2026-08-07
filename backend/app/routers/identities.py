@@ -9,6 +9,7 @@ from app.models import ActivityLog
 from app.routers.deps import get_identity_or_404
 from app.schemas import IdentityHubOut, IdentityOut
 from app.services import graph
+from app.services.activity import share_view_count
 
 # Reads only. An identity is a ``shareable``/``subscribable`` node whose create/update/
 # delete go through the single graph write surface ``/api/nodes`` (ADR-0041 B — the write
@@ -112,13 +113,4 @@ def get_identity_projects(identity_id: str, db: Session = Depends(get_db)):
 @router.get("/{identity_id}/share-views")
 def get_share_view_count(identity_id: str, db: Session = Depends(get_db)):
     get_identity_or_404(identity_id, db)
-    count = (
-        db.query(ActivityLog)
-        .filter(
-            ActivityLog.action == "share.viewed",
-            ActivityLog.meta.isnot(None),
-            ActivityLog.meta["identity_id"].as_string() == identity_id,
-        )
-        .count()
-    )
-    return {"view_count": count}
+    return {"view_count": share_view_count(db, identity_id)}

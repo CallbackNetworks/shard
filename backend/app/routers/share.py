@@ -309,37 +309,14 @@ def _build_project_response(project: graph.ProjectView, db: Session):
     return _build_payload(owner, [project], db, scope="project", include_notes=project.allow_guest_notes)
 
 
-def _maybe_log_view(db: Session, identity: graph.IdentityView, ip_hash: str):
-    """Log at most one view per IP-hash per hour to avoid bloating activity_logs."""
-    try:
-        one_hour_ago = datetime.now(UTC).replace(microsecond=0)
-        one_hour_ago = one_hour_ago.replace(hour=one_hour_ago.hour, minute=0, second=0)
-        existing = (
-            db.query(ActivityLog.id)
-            .filter(
-                ActivityLog.action == "share.viewed",
-                ActivityLog.actor == f"visitor:{ip_hash}",
-                ActivityLog.meta.isnot(None),
-                ActivityLog.meta["identity_id"].as_string() == identity.id,
-                ActivityLog.created_at >= one_hour_ago,
-            )
-            .first()
-        )
-        if not existing:
-            view_log = ActivityLog(
-                action="share.viewed",
-                actor=f"visitor:{ip_hash}",
-                detail=f"Share page viewed for {identity.name}",
-                meta={"identity_id": identity.id},
-            )
-            db.add(view_log)
-            db.commit()
-    except Exception:
-        db.rollback()
+def _maybe_log_share_view(db: Session, *, meta_key: str, entity_id: str, detail: str, ip_hash: str) -> None:
+    """Log at most one view per IP-hash per hour to avoid bloating activity_logs.
 
-
-def _maybe_log_project_view(db: Session, project: graph.ProjectView, ip_hash: str):
-    """Log at most one project-share view per IP-hash per hour (mirrors identity)."""
+    One implementation for all three facades. ``meta_key`` records which one served
+    the page (``identity_id`` / ``project_id`` / ``node_id``);
+    ``services.activity.share_view_count`` counts all three, so a node viewed through
+    more than one facade still reports a single total.
+    """
     try:
         hour_start = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
         existing = (
@@ -348,7 +325,7 @@ def _maybe_log_project_view(db: Session, project: graph.ProjectView, ip_hash: st
                 ActivityLog.action == "share.viewed",
                 ActivityLog.actor == f"visitor:{ip_hash}",
                 ActivityLog.meta.isnot(None),
-                ActivityLog.meta["project_id"].as_string() == project.id,
+                ActivityLog.meta[meta_key].as_string() == entity_id,
                 ActivityLog.created_at >= hour_start,
             )
             .first()
@@ -358,8 +335,8 @@ def _maybe_log_project_view(db: Session, project: graph.ProjectView, ip_hash: st
                 ActivityLog(
                     action="share.viewed",
                     actor=f"visitor:{ip_hash}",
-                    detail=f"Project share page viewed for {project.name}",
-                    meta={"project_id": project.id},
+                    detail=detail,
+                    meta={meta_key: entity_id},
                 )
             )
             db.commit()
@@ -388,7 +365,13 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
 
     client_ip = request.client.host if request.client else "unknown"
     ip_hash = _hash_ip(client_ip)
-    _maybe_log_view(db, identity, ip_hash)
+    _maybe_log_share_view(
+        db,
+        meta_key="identity_id",
+        entity_id=identity.id,
+        detail=f"Share page viewed for {identity.name}",
+        ip_hash=ip_hash,
+    )
 
     return _build_response(identity, db)
 
@@ -404,7 +387,13 @@ def get_share_project(token: str, request: Request, db: Session = Depends(get_db
 
     client_ip = request.client.host if request.client else "unknown"
     ip_hash = _hash_ip(client_ip)
-    _maybe_log_project_view(db, project, ip_hash)
+    _maybe_log_share_view(
+        db,
+        meta_key="project_id",
+        entity_id=project.id,
+        detail=f"Project share page viewed for {project.name}",
+        ip_hash=ip_hash,
+    )
 
     return _build_project_response(project, db)
 
@@ -461,6 +450,18 @@ def get_share_node(token: str, request: Request, db: Session = Depends(get_db)):
     view = graph.container_view(db, node.id)
     if not view or view.status != "active":
         raise HTTPException(status_code=404, detail="Share link not found")
+
+    # A view count nobody records is a zero that looks like a fact: the generic
+    # facade logs its views like the other two, so /nodes/{id}/share-views can
+    # answer for a user-defined shareable type as well.
+    _maybe_log_share_view(
+        db,
+        meta_key="node_id",
+        entity_id=node.id,
+        detail=f"Share page viewed for {node.title}",
+        ip_hash=_hash_ip(request.client.host if request.client else "unknown"),
+    )
+
     return _build_container_response(node, view, db)
 
 

@@ -249,6 +249,44 @@ def test_share_ops_404_on_missing_node(client):
     assert client.post("/api/nodes/nope/share/rotate-token").status_code == 404
 
 
+def test_set_guest_notes_on_shareable_node(client, shareable_topic):
+    nid = shareable_topic["id"]
+    token = client.post(f"/api/nodes/{nid}/share/rotate-token").json()["share_token"]
+
+    assert client.post(f"/api/nodes/{nid}/share/set-guest-notes", json={"allowed": True}).status_code == 200
+    assert client.get(f"/share/n/{token}").json()["meta"]["guest_notes_enabled"] is True
+
+    assert client.post(f"/api/nodes/{nid}/share/set-guest-notes", json={"allowed": False}).status_code == 200
+    assert client.get(f"/share/n/{token}").json()["meta"]["guest_notes_enabled"] is False
+
+
+def test_guest_notes_rejected_on_non_shareable_type(client, topic_type):
+    node = client.post("/api/nodes", json={"type": "topic", "title": "X"}).json()
+    r = client.post(f"/api/nodes/{node['id']}/share/set-guest-notes", json={"allowed": True})
+    assert r.status_code == 400
+
+
+def test_generic_share_page_records_its_own_views(client, shareable_topic):
+    """A count nobody records is a zero that looks like a fact (ADR-0070).
+
+    Before the generic facade logged views, /share/n/{token} on a user-defined
+    shareable type served the page and reported 0 views forever.
+    """
+    nid = shareable_topic["id"]
+    token = client.post(f"/api/nodes/{nid}/share/rotate-token").json()["share_token"]
+    assert client.get(f"/api/nodes/{nid}/share-views").json()["view_count"] == 0
+
+    client.get(f"/share/n/{token}")
+
+    assert client.get(f"/api/nodes/{nid}/share-views").json()["view_count"] == 1
+
+
+def test_share_views_404_and_400_like_the_other_share_ops(client, topic_type):
+    node = client.post("/api/nodes", json={"type": "topic", "title": "X"}).json()
+    assert client.get(f"/api/nodes/{node['id']}/share-views").status_code == 400
+    assert client.get("/api/nodes/nope/share-views").status_code == 404
+
+
 # --- Role-driven write surface (ADR-0040) -------------------------------------
 # The generic /api/nodes surface used to be a "dumb write": it inserted a Node and
 # returned, skipping notifications / rules / activity that the dedicated routers

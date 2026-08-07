@@ -29,7 +29,7 @@ from app.schemas import (
     TaskOut,
 )
 from app.services import graph, node_data
-from app.services.activity import log_activity
+from app.services.activity import log_activity, share_view_count
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -295,9 +295,10 @@ async def detach_edge(
 
 
 # ── Share facade management (ADR-0039) ───────────────────────────────────────
-# Generic share-token/PIN/expiry operations for any is_shareable node. Identity
-# keeps its own /identities/{id}/... endpoints (behaviourally identical); these
-# make the same facade available to user-defined shareable types (e.g. topic).
+# Every write a share panel makes, for any is_shareable node: token, PIN, expiry,
+# guest notes, plus the view count it reads back. Identity and project both route
+# here — their own routers keep only the enriched entity reads — so the share panel
+# has one implementation instead of one per entity type (ADR-0070).
 
 
 def _load_shareable_node(node_id: str, db: Session) -> Node:
@@ -315,6 +316,10 @@ class SetPinBody(BaseModel):
 
 class SetExpiryBody(BaseModel):
     expires_at: datetime | None
+
+
+class SetGuestNotesBody(BaseModel):
+    allowed: bool
 
 
 @router.post("/{node_id}/share/rotate-token")
@@ -353,6 +358,21 @@ def set_node_share_expiry(node_id: str, body: SetExpiryBody, db: Session = Depen
     graph.update_node(db, node_id, share_expires_at=body.expires_at.isoformat() if body.expires_at else None)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/{node_id}/share/set-guest-notes")
+def set_node_guest_notes(node_id: str, body: SetGuestNotesBody, db: Session = Depends(get_db)):
+    """Let (or stop letting) visitors leave notes on this node's share page (ADR-0016)."""
+    _load_shareable_node(node_id, db)
+    graph.update_node(db, node_id, allow_guest_notes=body.allowed)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/{node_id}/share-views")
+def get_node_share_views(node_id: str, db: Session = Depends(get_db)):
+    _load_shareable_node(node_id, db)
+    return {"view_count": share_view_count(db, node_id)}
 
 
 # --- Inbound webhook credentials (ADR-0060) ----------------------------------

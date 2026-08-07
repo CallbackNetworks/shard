@@ -335,6 +335,27 @@ def test_project_share_view_count(client, db, sample_project):
     assert client.get(f"/api/projects/{sample_project.id}/share-views").json()["view_count"] == 1
 
 
+@pytest.mark.parametrize("entity", ["identity", "project"])
+def test_every_surface_reports_the_same_view_count(client, db, sample_identity, sample_project, entity):
+    """ "How many people saw this?" has one answer per node (ADR-0070).
+
+    The entity-scoped endpoint and the generic node one are two doors onto the same
+    count; a node reached through both facades must not be reported twice or once
+    depending on which door you knock on.
+    """
+    node = sample_identity if entity == "identity" else sample_project
+    collection = "identities" if entity == "identity" else "projects"
+    scoped = f"/api/{collection}/{node.id}/share-views"
+    generic = f"/api/nodes/{node.id}/share-views"
+
+    assert client.get(scoped).json() == client.get(generic).json() == {"view_count": 0}
+
+    client.get(f"/share/{entity}/{node.share_token}")
+
+    assert client.get(scoped).json()["view_count"] == 1
+    assert client.get(generic).json() == client.get(scoped).json()
+
+
 def test_share_node_serves_custom_shareable_container(client, db):
     # ADR-0039: a user-defined shareable container is served by the generic
     # /share/n/{token} route with the same payload shape as a project share.

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Share2, RefreshCw, Copy, Check, Rss, Lock, Clock } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Share2, RefreshCw, Copy, Check, Rss, Lock, Clock, MessageSquare, Eye } from 'lucide-react'
 import {
   rotateNodeShareToken, setNodeSharePin, clearNodeSharePin, setNodeShareExpiry,
+  setNodeGuestNotes, getNodeShareViews,
 } from '../api/client'
 import { DARK } from '../constants/theme'
 
@@ -17,26 +18,45 @@ function toLocalInput(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// Compact share facade for any is_shareable node (ADR-0039). Mirrors the
-// identity/project share controls but driven by the generic /nodes/{id}/share
-// endpoints, so a user-defined shareable type gets the same public page + iCal,
-// PIN protection, and expiry.
-export default function NodeShareFacet({ node, subscribable }) {
+// The same share state reaches this component in two shapes: a raw Node keeps it
+// under `data`, while the enriched entity reads (IdentityOut/ProjectOut) flatten it
+// onto the top level. Read both here rather than making each caller shim its object
+// into the other shape.
+function shareState(node) {
+  const data = node?.data || {}
+  const pick = (key) => (data[key] !== undefined ? data[key] : node?.[key])
+  return {
+    token: pick('share_token') || null,
+    // The hash itself no longer leaves the server (ADR-0059) — only whether one is set.
+    pinSet: !!pick('share_pin_set'),
+    expiresAt: pick('share_expires_at') || null,
+    guestNotes: !!pick('allow_guest_notes'),
+  }
+}
+
+// Compact share panel for any is_shareable node (ADR-0039, ADR-0070). Every share
+// control lives here — public page + iCal, PIN, expiry, guest notes, view count —
+// driven by the generic /nodes/{id}/share endpoints, so identity, project and
+// user-defined shareable types all get the same panel instead of one each.
+export default function NodeShareFacet({ node, subscribable, invalidateKeys }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const [copied, setCopied] = useState(null)
   const [pinInput, setPinInput] = useState('')
-  const [expiryInput, setExpiryInput] = useState(toLocalInput(node?.data?.share_expires_at))
+  const { token, pinSet, expiresAt, guestNotes } = shareState(node)
+  const [expiryInput, setExpiryInput] = useState(toLocalInput(expiresAt))
 
-  const token = node?.data?.share_token || null
-  // The hash itself no longer leaves the server (ADR-0059) — only whether one is set.
-  const pinSet = !!node?.data?.share_pin_set
-  const expiresAt = node?.data?.share_expires_at || null
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const shareUrl = token ? `${origin}/share/n/${token}` : ''
   const icalUrl = token ? `${origin}/ical/node/${token}.ics` : ''
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['node', node.id] })
+  // Callers holding the node under a different query key (an identity list, say)
+  // say so; the node's own key is the default.
+  const invalidate = () => {
+    for (const key of invalidateKeys || [['node', node.id]]) {
+      qc.invalidateQueries({ queryKey: key })
+    }
+  }
   const rotate = useMutation({ mutationFn: () => rotateNodeShareToken(node.id), onSuccess: invalidate })
   const setPin = useMutation({
     mutationFn: () => setNodeSharePin(node.id, pinInput),
@@ -46,6 +66,16 @@ export default function NodeShareFacet({ node, subscribable }) {
   const setExpiry = useMutation({
     mutationFn: () => setNodeShareExpiry(node.id, expiryInput ? new Date(expiryInput).toISOString() : null),
     onSuccess: invalidate,
+  })
+  const toggleGuestNotes = useMutation({
+    mutationFn: (allowed) => setNodeGuestNotes(node.id, allowed),
+    onSuccess: invalidate,
+  })
+
+  const { data: views } = useQuery({
+    queryKey: ['node-share-views', node.id],
+    queryFn: () => getNodeShareViews(node.id),
+    enabled: !!token,
   })
 
   const copy = (value, key) => {
@@ -157,6 +187,31 @@ export default function NodeShareFacet({ node, subscribable }) {
                 {t('nodeShare.expiresAt', { when: new Date(expiresAt).toLocaleString() })}
               </span>
             )}
+          </div>
+
+          {/* Guest notes */}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${DARK.border}` }}>
+            <label style={{ ...subLabel, cursor: 'pointer' }}>
+              <MessageSquare size={12} color={DARK.textDim} />
+              {t('nodeShare.guestNotes')}
+              <input
+                type="checkbox"
+                checked={guestNotes}
+                disabled={toggleGuestNotes.isPending}
+                onChange={e => toggleGuestNotes.mutate(e.target.checked)}
+              />
+            </label>
+            <div style={{ fontSize: 11, color: DARK.textDim, marginTop: 4 }}>
+              {t('nodeShare.guestNotesHint')}
+            </div>
+          </div>
+
+          {/* View count */}
+          <div style={{ marginTop: 12 }}>
+            <span style={subLabel}>
+              <Eye size={12} color={DARK.textDim} />
+              {t('nodeShare.views', { n: views?.view_count ?? 0 })}
+            </span>
           </div>
         </>
       )}

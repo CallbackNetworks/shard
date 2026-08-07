@@ -5,9 +5,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog
 from app.schemas import ProjectOut
 from app.services import graph
+from app.services.activity import share_view_count
 from app.services.enrichment import enrich_project
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -57,13 +57,4 @@ def get_project_share_view_count(project_id: str, db: Session = Depends(get_db))
     project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    count = (
-        db.query(ActivityLog)
-        .filter(
-            ActivityLog.action == "share.viewed",
-            ActivityLog.meta.isnot(None),
-            ActivityLog.meta["project_id"].as_string() == project_id,
-        )
-        .count()
-    )
-    return {"view_count": count}
+    return {"view_count": share_view_count(db, project_id)}

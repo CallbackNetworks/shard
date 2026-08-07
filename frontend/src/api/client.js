@@ -408,14 +408,8 @@ export const postShareProjectNote = (scope, token, payload) =>
   axios.post(`/share/${scope}/${token}/notes`, payload, { withCredentials: true }).then(r => r.data)
 export const postShareTaskNote = (scope, token, taskId, payload) =>
   axios.post(`/share/${scope}/${token}/tasks/${taskId}/notes`, payload, { withCredentials: true }).then(r => r.data)
-// Identity share facade → generic shareable-node endpoints (ADR-0041 B).
-export const rotateShareToken = (identityId) => api.post(`/nodes/${identityId}/share/rotate-token`).then(r => r.data)
-
-// Share PIN & expiry management (authenticated)
-export const setSharePin = (identityId, pin) => api.post(`/nodes/${identityId}/share/set-pin`, { pin }).then(r => r.data)
-export const clearSharePin = (identityId) => api.delete(`/nodes/${identityId}/share/pin`).then(r => r.data)
-export const setShareExpiry = (identityId, expiresAt) => api.post(`/nodes/${identityId}/share/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
-export const getShareViewCount = (identityId) => api.get(`/identities/${identityId}/share-views`).then(r => r.data)
+// An identity's share controls are the generic node ones below — there is no
+// identity-shaped copy of them (ADR-0070).
 export const setProjectShareExpiry = (projectId, expiresAt) => api.post(`/projects/${projectId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
 export const getProjectShareViewCount = (projectId) => api.get(`/projects/${projectId}/share-views`).then(r => r.data)
 
@@ -425,11 +419,14 @@ export const createNodeType = (data) => api.post('/graph-types/nodes', data).the
 export const updateNodeType = (key, data) => api.patch(`/graph-types/nodes/${key}`, data).then(r => r.data)
 export const deleteNodeType = (key) => api.delete(`/graph-types/nodes/${key}`)
 
-// Generic node share facade (ADR-0039)
+// Generic node share facade (ADR-0039, ADR-0070) — every share write for every
+// shareable type, identity and project included.
 export const rotateNodeShareToken = (id) => api.post(`/nodes/${id}/share/rotate-token`).then(r => r.data)
 export const setNodeSharePin = (id, pin) => api.post(`/nodes/${id}/share/set-pin`, { pin }).then(r => r.data)
 export const clearNodeSharePin = (id) => api.delete(`/nodes/${id}/share/pin`).then(r => r.data)
 export const setNodeShareExpiry = (id, expires_at) => api.post(`/nodes/${id}/share/set-expiry`, { expires_at }).then(r => r.data)
+export const setNodeGuestNotes = (id, allowed) => api.post(`/nodes/${id}/share/set-guest-notes`, { allowed }).then(r => r.data)
+export const getNodeShareViews = (id) => api.get(`/nodes/${id}/share-views`).then(r => r.data)
 export const getEdgeTypes = () => api.get('/graph-types/edges').then(r => r.data)
 export const createEdgeType = (data) => api.post('/graph-types/edges', data).then(r => r.data)
 export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)
