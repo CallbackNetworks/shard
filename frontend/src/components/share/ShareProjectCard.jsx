@@ -157,7 +157,6 @@ function TaskRow({ task, index, bp, share }) {
                 NOTES ({(task.comments || []).length})
               </div>
               <GuestNotes
-                scope={share.scope}
                 token={share.token}
                 projectId={share.projectId}
                 taskId={task.id}
@@ -171,7 +170,7 @@ function TaskRow({ task, index, bp, share }) {
   )
 }
 
-export default function ShareProjectCard({ project, index: _index, bp, scope, token, guestNotesEnabled }) {
+export default function ShareProjectCard({ project, index: _index, bp, token, guestNotesEnabled }) {
   const [expanded, setExpanded] = useState(false)
   const [ref, visible] = useScrollReveal(0.1)
   const u = urgencyScore(project)
@@ -266,7 +265,7 @@ export default function ShareProjectCard({ project, index: _index, bp, scope, to
           task={t}
           index={i}
           bp={bp}
-          share={{ scope, token, projectId: project.id, enabled: !!guestNotesEnabled }}
+          share={{ token, projectId: project.id, enabled: !!guestNotesEnabled }}
         />
       ))}
 
@@ -281,7 +280,7 @@ export default function ShareProjectCard({ project, index: _index, bp, scope, to
           <div className="kt-share-mini-label">
             PROJECT NOTES ({(project.notes || []).length})
           </div>
-          <GuestNotes scope={scope} token={token} projectId={project.id} notes={project.notes} />
+          <GuestNotes token={token} projectId={project.id} notes={project.notes} />
         </div>
       )}
     </div>

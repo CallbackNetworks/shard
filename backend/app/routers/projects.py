@@ -1,13 +1,9 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas import ProjectOut
 from app.services import graph
-from app.services.activity import share_view_count
 from app.services.enrichment import enrich_project
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -33,28 +29,6 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 # share controls below stay.
 
 
-# ── Share link expiry and access audit ───────────────────────────
-# Mirrors the identity share-link controls so a public project link can be
-# time-boxed and its views counted. Audit reuses activity_logs (share.viewed).
-
-
-class SetExpiryBody(BaseModel):
-    expires_at: datetime | None
-
-
-@router.post("/{project_id}/set-expiry")
-def set_project_share_expiry(project_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    graph.update_project(db, project_id, share_expires_at=body.expires_at)
-    db.commit()
-    return {"ok": True}
-
-
-@router.get("/{project_id}/share-views")
-def get_project_share_view_count(project_id: str, db: Session = Depends(get_db)):
-    project = graph.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return {"view_count": share_view_count(db, project_id)}
+# The project-shaped share endpoints (set-expiry, share-views) are gone with ADR-0073:
+# a project's share panel is the same NodeShareFacet every other shareable type uses, so
+# it reads and writes the generic /api/nodes/{id}/share* endpoints.

@@ -267,9 +267,7 @@ plain-text templates; **`rate_limiter.py`** — throttling for public share endp
 
 ```
 App
-├── /share/:token       → ShareView (identity scope)
-├── /share/p/:token     → ShareView (project scope)
-├── /share/n/:token     → ShareView (generic node scope)
+├── /share/n/:token     → ShareView (every shareable node: identity, project, container)
 ├── /login              → Login
 └── /*                  → Layout (auth-gated)
       ├── index             → Dashboard
@@ -596,14 +594,14 @@ Provider selection via LLM_PROVIDER env var:
 ## Share Page Flow
 
 ```
-Page (SPA route):  /share/n/{token}        | /share/p/{token}
-Data (backend):    GET /share/node/{token} | GET /share/project/{token}
+Page (SPA route):  /share/n/{token}
+Data (backend):    GET /share/node/{token}   ← dispatches on the token's node type
                    ^ deliberately different segments: a page and the call it makes
                      must not be the same URL, or the SPA answers its own fetch (ADR-0071)
   → Rate-limited
   → Check expiry (410 if expired)
   → If PIN set and no valid session cookie → return { requires_pin: true }
-  → POST /share/{scope}/{token}/verify { pin } → sets session cookie (15 min TTL)
+  → POST /share/node/{token}/verify { pin } → sets session cookie (15 min TTL)
   → Returns: node info, contained projects/tasks, recent activity, summary stats
   → Logs the view (max 1 per IP-hash per hour)
 ```

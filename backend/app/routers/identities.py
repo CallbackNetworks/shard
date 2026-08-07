@@ -9,14 +9,13 @@ from app.models import ActivityLog
 from app.routers.deps import get_identity_or_404
 from app.schemas import IdentityHubOut, IdentityOut
 from app.services import graph
-from app.services.activity import share_view_count
 
 # Reads only. An identity is a ``shareable``/``subscribable`` node whose create/update/
 # delete go through the single graph write surface ``/api/nodes`` (ADR-0041 B — the write
 # core seeds the ``share_token`` for any shareable type); project links are ``member_of``
 # edges via ``/api/nodes/{id}/edges``, and the share facade (rotate-token/PIN/expiry) uses
 # the generic ``/api/nodes/{id}/share/*`` endpoints. This router keeps the enriched identity
-# reads (list, hub stats, linked projects, share-view count) that ``IdentityOut`` callers need.
+# reads (list, hub stats, linked projects) that ``IdentityOut`` callers need.
 router = APIRouter(prefix="/identities", tags=["identities"])
 
 
@@ -107,10 +106,5 @@ def get_identity_projects(identity_id: str, db: Session = Depends(get_db)):
     return [{"id": p.id, "name": p.name, "status": p.status} for p in graph.projects_for_identity(db, identity_id)]
 
 
-# ── Reads: share-view count ───────────────────────────────────────
-
-
-@router.get("/{identity_id}/share-views")
-def get_share_view_count(identity_id: str, db: Session = Depends(get_db)):
-    get_identity_or_404(identity_id, db)
-    return {"view_count": share_view_count(db, identity_id)}
+# The identity-shaped share-view count is gone with ADR-0070/0073 for the same reason
+# as the project one: the share panel reads /api/nodes/{id}/share-views.

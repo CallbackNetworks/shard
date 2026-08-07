@@ -1,7 +1,7 @@
 import { useState, useEffect, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Zap, Bot, Rss, Check, Share2, MessageSquare, CalendarClock } from 'lucide-react'
+import { ArrowLeft, Plus, Zap, Bot, Share2 } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -9,13 +9,12 @@ import {
   reorderTasks,
   bulkUpdateTasks, exportTasks, importTasks,
   getSavedFilters, createSavedFilter,
-  setProjectShareExpiry, getProjectShareViewCount, setNodeSharePin, clearNodeSharePin,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
 import LabelManager, { LabelChip } from '../components/project/LabelManager'
 import TaskFiltersPanel from '../components/project/TaskFiltersPanel'
 import BulkToolbar from '../components/project/BulkToolbar'
-import ShareSettingsPanel from '../components/project/ShareSettingsPanel'
+import NodeShareFacet from '../components/NodeShareFacet'
 import ChildContainersPanel from '../components/ChildContainersPanel'
 import GanttChart from '../components/GanttChart'
 import BoardView from '../components/BoardView'
@@ -64,11 +63,7 @@ export default function ProjectDetail() {
   const [selectedTasks, setSelectedTasks] = useState(new Set())
   const [showImport, setShowImport] = useState(false)
   const [importJson, setImportJson] = useState('')
-  const [copiedIcal, setCopiedIcal] = useState(false)
-  const [copiedShare, setCopiedShare] = useState(false)
   const [shareSettingsOpen, setShareSettingsOpen] = useState(false)
-  const [expiryInput, setExpiryInput] = useState('')
-  const [shareViews, setShareViews] = useState(null)
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -131,33 +126,6 @@ export default function ProjectDetail() {
     mutationFn: () => updateProject(id, { status: project.status === 'archived' ? 'active' : 'archived' }),
     onSuccess: invalidate,
   })
-
-  const guestNotesMut = useMutation({
-    mutationFn: () => updateProject(id, { allow_guest_notes: !project.allow_guest_notes }),
-    onSuccess: invalidate,
-  })
-
-  const setExpiryMut = useMutation({
-    mutationFn: (expiresAt) => setProjectShareExpiry(id, expiresAt),
-    onSuccess: invalidate,
-  })
-
-  // A project is a shareable node, so its PIN uses the same endpoints every other
-  // shareable type does (ADR-0070); the share page enforces it since ADR-0072.
-  const setPinMut = useMutation({ mutationFn: (pin) => setNodeSharePin(id, pin), onSuccess: invalidate })
-  const clearPinMut = useMutation({ mutationFn: () => clearNodeSharePin(id), onSuccess: invalidate })
-
-  const openShareSettings = async () => {
-    const next = !shareSettingsOpen
-    setShareSettingsOpen(next)
-    if (next) {
-      setExpiryInput(project.share_expires_at ? new Date(project.share_expires_at).toISOString().slice(0, 16) : '')
-      try {
-        const data = await getProjectShareViewCount(id)
-        setShareViews(data.view_count)
-      } catch { setShareViews(null) }
-    }
-  }
 
   const saveAgentInstrMut = useMutation({
     mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null, repo_url: repoUrl || null }),
@@ -367,55 +335,18 @@ export default function ProjectDetail() {
                 <div className={s.progressBarFill} style={{ width: `${project.progress}%` }} />
               </div>
             </div>
+            {/* One button, one panel: link, calendar feed, PIN, expiry, guest notes and
+                view count all live in the shared share panel (ADR-0073). */}
             <button
-              onClick={() => {
-                if (!project.share_token) return
-                const url = `${window.location.origin}/ical/project/${project.share_token}.ics`
-                navigator.clipboard.writeText(url)
-                setCopiedIcal(true)
-                setTimeout(() => setCopiedIcal(false), 2000)
-              }}
-              disabled={!project.share_token}
-              className={s.archiveBtn}
-              title="Copy iCal subscribe URL (same token as the share link)"
-            >
-              {copiedIcal ? <Check size={12} /> : <Rss size={12} />}
-              {copiedIcal ? 'Copied!' : 'iCal'}
-            </button>
-            <button
-              onClick={() => {
-                if (!project.share_token) return
-                const url = `${window.location.origin}/share/p/${project.share_token}`
-                navigator.clipboard.writeText(url)
-                setCopiedShare(true)
-                setTimeout(() => setCopiedShare(false), 2000)
-              }}
-              disabled={!project.share_token}
-              className={s.archiveBtn}
-              title="Copy public project share URL"
-            >
-              {copiedShare ? <Check size={12} /> : <Share2 size={12} />}
-              {copiedShare ? 'Copied!' : 'Share'}
-            </button>
-            <button
-              onClick={() => guestNotesMut.mutate()}
-              className={s.archiveBtn}
-              style={project.allow_guest_notes ? { color: '#818cf8', borderColor: 'rgba(129,140,248,0.4)' } : undefined}
-              title={project.allow_guest_notes ? 'Guest notes enabled on share page — click to disable' : 'Allow share-page visitors to leave notes'}
-            >
-              <MessageSquare size={12} />
-              Notes
-            </button>
-            <button
-              onClick={openShareSettings}
+              onClick={() => setShareSettingsOpen(v => !v)}
               className={`${s.archiveBtn}${project.share_expires_at || project.share_pin_set ? ` ${s.archiveBtnActive}` : ''}`}
               title={[
                 project.share_pin_set ? 'PIN protected' : null,
                 project.share_expires_at ? `expires ${new Date(project.share_expires_at).toLocaleString()}` : null,
-              ].filter(Boolean).join(' · ') || 'Set a share-link PIN or expiry, and see the view count'}
+              ].filter(Boolean).join(' · ') || 'Public share link, calendar feed, PIN, expiry and guest notes'}
             >
-              <CalendarClock size={12} />
-              Link
+              <Share2 size={12} />
+              Share
             </button>
             <LabelManager
               labels={labels}
@@ -444,17 +375,7 @@ export default function ProjectDetail() {
         </div>
 
         {shareSettingsOpen && (
-          <ShareSettingsPanel
-            project={project}
-            expiryInput={expiryInput}
-            setExpiryInput={setExpiryInput}
-            shareViews={shareViews}
-            onSetExpiry={(iso) => setExpiryMut.mutate(iso)}
-            isPending={setExpiryMut.isPending}
-            onSetPin={(pin) => setPinMut.mutate(pin)}
-            onClearPin={() => clearPinMut.mutate()}
-            pinPending={setPinMut.isPending || clearPinMut.isPending}
-          />
+          <NodeShareFacet node={project} subscribable invalidateKeys={[['project', id]]} />
         )}
 
         {showAgentInstr && (

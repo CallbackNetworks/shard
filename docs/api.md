@@ -1024,10 +1024,8 @@ If the share link has expired, returns `410 Gone`.
 }
 ```
 
-#### `GET /share/project/{share_token}`
-A project's own share endpoint, feeding the `/share/p/{token}` page. Honours a PIN set
-through `/api/nodes/{id}/share/set-pin` like every other shareable type (ADR-0072);
-unlock at `POST /share/node/{token}/verify`.
+A PIN set through `/api/nodes/{id}/share/set-pin` is honoured for every type, projects
+included (ADR-0072); unlock at `POST /share/node/{token}/verify`.
 
 #### `POST /share/node/{token}/verify`
 Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL) and returns
@@ -1041,11 +1039,12 @@ the unlocked page — dispatched by node type, exactly like the `GET`.
 // Response 403 — invalid PIN
 ```
 
-#### `POST /share/{scope}/{token}/notes`
-#### `POST /share/{scope}/{token}/tasks/{tid}/notes`
-Guest notes from share-page visitors (ADR-0016), when `allow_guest_notes` is on. `scope` is
-`node` or `project`, matching the read endpoints above — every page that can be read is
-writable through the same door. Rate-limited.
+#### `POST /share/node/{token}/notes`
+#### `POST /share/node/{token}/tasks/{tid}/notes`
+Guest notes from share-page visitors (ADR-0016), when `allow_guest_notes` is on — the same
+door the page is read through, so anything readable is writable (ADR-0070, ADR-0073). A share
+holding one project needs no `project_id`; an identity aggregates several, so there it says
+which one. Rate-limited.
 
 ```json
 { "guest_name": "string", "body": "string" }
@@ -1061,13 +1060,11 @@ Read-only, unauthenticated at the middleware layer — each is gated by an ungue
 #### `GET /ical/all/{token}.ics`
 Every project (global token, rotate via `POST /settings/ical-token/rotate`).
 
-#### `GET /ical/project/{token}.ics`
-A single project — reuses that project's `share_token`.
-
 #### `GET /ical/node/{token}.ics`
 The `contains` subtree of any node whose type carries the `subscribable` role (ADR-0039) —
-including an identity, which aggregates its `member_of` projects. Replaced the retired
-`/ical/identity/{token}.ics` (ADR-0071).
+including an identity, which aggregates its `member_of` projects. Reuses the node's
+`share_token`, so a feed and its share page are revoked together. Replaced the retired
+`/ical/identity/` and `/ical/project/` feeds (ADR-0071, ADR-0073).
 
 ---
 

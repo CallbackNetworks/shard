@@ -8,7 +8,7 @@ const NAME_KEY = 'kt-share-guest-name'
  * Guest note thread + submit form for the public share page.
  * Attaches to a task when taskId is given, otherwise to the project.
  */
-export default function GuestNotes({ scope, token, projectId, taskId, notes }) {
+export default function GuestNotes({ token, projectId, taskId, notes }) {
   const [extra, setExtra] = useState([])
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) || '')
   const [body, setBody] = useState('')
@@ -29,8 +29,8 @@ export default function GuestNotes({ scope, token, projectId, taskId, notes }) {
     try {
       const payload = { guest_name: trimmedName, body: trimmedBody, project_id: projectId }
       const created = taskId
-        ? await postShareTaskNote(scope, token, taskId, payload)
-        : await postShareProjectNote(scope, token, payload)
+        ? await postShareTaskNote(token, taskId, payload)
+        : await postShareProjectNote(token, payload)
       localStorage.setItem(NAME_KEY, trimmedName)
       setExtra(prev => [...prev, created])
       setBody('')

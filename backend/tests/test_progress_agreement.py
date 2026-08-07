@@ -86,7 +86,7 @@ def test_internal_search_agrees(client, nested_project):
 
 def test_public_share_page_agrees(client, db, nested_project):
     token = graph.get_project(db, nested_project.id).share_token
-    body = client.get(f"/share/project/{token}").json()
+    body = client.get(f"/share/node/{token}").json()
     project = next(p for p in body["projects"] if p["id"] == nested_project.id)
     assert (project["total_tasks"], project["done_tasks"]) == (EXPECTED_TOTAL, EXPECTED_DONE)
     # The share page's own header sums the projects it shows, so it agrees too.

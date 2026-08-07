@@ -93,6 +93,6 @@ def test_share_view_count(client, sample_identity, sample_project):
     # Access the share page to generate a view log
     client.get(f"/share/node/{sample_identity.share_token}")
 
-    resp = client.get(f"/api/identities/{sample_identity.id}/share-views")
+    resp = client.get(f"/api/nodes/{sample_identity.id}/share-views")
     assert resp.status_code == 200
     assert resp.json()["view_count"] >= 1

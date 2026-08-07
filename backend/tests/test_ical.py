@@ -17,14 +17,14 @@ def _add_task(db, project, **kwargs):
 
 
 def test_project_feed_requires_valid_token(client, sample_project):
-    assert client.get("/ical/project/does-not-exist.ics").status_code == 404
+    assert client.get("/ical/node/does-not-exist.ics").status_code == 404
 
 
 def test_project_feed_served_by_share_token(client, db, sample_project):
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="Ship it", due_date=due)
 
-    resp = client.get(f"/ical/project/{sample_project.share_token}.ics")
+    resp = client.get(f"/ical/node/{sample_project.share_token}.ics")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/calendar")
     body = resp.text
@@ -37,7 +37,7 @@ def test_events_are_timed_not_all_day(client, db, sample_project):
     due = datetime(2026, 7, 11, 14, 30, tzinfo=UTC)
     _add_task(db, sample_project, title="Timed", due_date=due)
 
-    body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
+    body = client.get(f"/ical/node/{sample_project.share_token}.ics").text
     assert "DTSTART:20260711T143000Z" in body
     assert "VALUE=DATE" not in body
 
@@ -46,7 +46,7 @@ def test_alarm_present_for_open_tasks(client, db, sample_project):
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="Open", due_date=due, status="todo")
 
-    body = client.get(f"/ical/project/{sample_project.share_token}.ics?alarm=45").text
+    body = client.get(f"/ical/node/{sample_project.share_token}.ics?alarm=45").text
     assert "BEGIN:VALARM" in body
     assert "TRIGGER:-PT45M" in body
 
@@ -55,7 +55,7 @@ def test_alarm_disabled_with_zero(client, db, sample_project):
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="Open", due_date=due, status="todo")
 
-    body = client.get(f"/ical/project/{sample_project.share_token}.ics?alarm=0").text
+    body = client.get(f"/ical/node/{sample_project.share_token}.ics?alarm=0").text
     assert "BEGIN:VALARM" not in body
 
 
@@ -63,7 +63,7 @@ def test_no_alarm_for_completed_tasks(client, db, sample_project):
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="Done", due_date=due, status="done")
 
-    body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
+    body = client.get(f"/ical/node/{sample_project.share_token}.ics").text
     assert "BEGIN:VALARM" not in body
 
 
@@ -74,7 +74,7 @@ def test_no_status_field_for_cross_client_parity(client, db, sample_project):
     _add_task(db, sample_project, title="A", due_date=due, status="done")
     _add_task(db, sample_project, title="B", due_date=due, status="failed")
 
-    body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
+    body = client.get(f"/ical/node/{sample_project.share_token}.ics").text
     assert "STATUS:" not in body
 
 
@@ -85,7 +85,7 @@ def test_long_cjk_summary_is_folded(client, db, sample_project):
     long_title = "工作" * 20  # 40 CJK chars ~= 120 octets
     _add_task(db, sample_project, title=long_title, due_date=due)
 
-    body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
+    body = client.get(f"/ical/node/{sample_project.share_token}.ics").text
     assert "\r\n " in body  # folded continuation line present
     for line in body.split("\r\n"):
         assert len(line.encode("utf-8")) <= 75
@@ -95,7 +95,7 @@ def test_special_characters_are_escaped(client, db, sample_project):
     due = datetime.now(UTC) + timedelta(days=1)
     _add_task(db, sample_project, title="A, B; C\\D", due_date=due)
 
-    body = client.get(f"/ical/project/{sample_project.share_token}.ics").text
+    body = client.get(f"/ical/node/{sample_project.share_token}.ics").text
     assert "SUMMARY:A\\, B\\; C\\\\D" in body
 
 

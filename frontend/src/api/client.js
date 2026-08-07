@@ -402,19 +402,17 @@ export const getEstimationCalibration = (params = {}) => api.get('/analytics/est
 export const getEstimateSuggestion = (rawEstimate, projectId) => api.get('/analytics/estimate-suggestion', { params: { raw_estimate: rawEstimate, project_id: projectId } }).then(r => r.data)
 
 // Share (public, no auth — uses plain axios to avoid the auth interceptor).
-// Scopes are `node` (the generic door: identity, custom containers) and `project`.
-// These are the *data* segments; the pages they feed are /share/n/:token and /share/p/:token
-// and must stay distinct from them (ADR-0071).
-export const getShareData = (token, scope = 'node') =>
-  axios.get(`/share/${scope}/${token}`, { withCredentials: true }).then(r => r.data)
-export const postShareProjectNote = (scope, token, payload) =>
-  axios.post(`/share/${scope}/${token}/notes`, payload, { withCredentials: true }).then(r => r.data)
-export const postShareTaskNote = (scope, token, taskId, payload) =>
-  axios.post(`/share/${scope}/${token}/tasks/${taskId}/notes`, payload, { withCredentials: true }).then(r => r.data)
-// An identity's share controls are the generic node ones below — there is no
-// identity-shaped copy of them (ADR-0070).
-export const setProjectShareExpiry = (projectId, expiresAt) => api.post(`/projects/${projectId}/set-expiry`, { expires_at: expiresAt }).then(r => r.data)
-export const getProjectShareViewCount = (projectId) => api.get(`/projects/${projectId}/share-views`).then(r => r.data)
+// One door for every shareable node (ADR-0073); the server dispatches on the token's
+// node type. `/share/node/...` is the *data* path — the page it feeds is /share/n/:token
+// and the two must stay distinct (ADR-0071).
+export const getShareData = (token) =>
+  axios.get(`/share/node/${token}`, { withCredentials: true }).then(r => r.data)
+export const postShareProjectNote = (token, payload) =>
+  axios.post(`/share/node/${token}/notes`, payload, { withCredentials: true }).then(r => r.data)
+export const postShareTaskNote = (token, taskId, payload) =>
+  axios.post(`/share/node/${token}/tasks/${taskId}/notes`, payload, { withCredentials: true }).then(r => r.data)
+// Identity and project share controls are the generic node ones below — there is no
+// entity-shaped copy of any of them (ADR-0070, ADR-0073).
 
 // Graph type registries (ADR-0033)
 export const getNodeTypes = () => api.get('/graph-types/nodes').then(r => r.data)

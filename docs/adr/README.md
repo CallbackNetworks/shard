@@ -74,3 +74,4 @@
 | [0070](0070-one-share-panel-for-every-shareable-node.md) | 分享面板只有一個實作 | Accepted | 2026-08-07 |
 | [0071](0071-one-public-door-and-it-cannot-be-the-page-itself.md) | 只留一扇公開的門，而那扇門不能是頁面本身 | Accepted | 2026-08-07 |
 | [0072](0072-a-lock-that-can-be-set-is-a-lock-that-is-enforced.md) | 設得上去的鎖，就必須是會擋人的鎖 | Accepted | 2026-08-07 |
+| [0073](0073-a-project-is-shared-like-everything-else.md) | 專案跟其他東西用同一套分享 | Accepted | 2026-08-07 |

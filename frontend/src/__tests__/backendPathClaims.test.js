@@ -79,10 +79,8 @@ describe('backend paths do not claim SPA page routes', () => {
     expect(isClaimed('/ws')).toBe(true)
     expect(isClaimed('/health')).toBe(true)
     expect(isClaimed('/share/node/tok')).toBe(true)
-    expect(isClaimed('/share/project/tok')).toBe(true)
-    // ...while the SPA's own share pages keep falling through to the app.
+    // ...while the SPA's own share page keeps falling through to the app.
     expect(isClaimed('/share/n/sometoken')).toBe(false)
-    expect(isClaimed('/share/p/sometoken')).toBe(false)
   })
 
   /**
@@ -101,8 +99,6 @@ describe('backend paths do not claim SPA page routes', () => {
     function rootFetchPaths() {
       return [...client.matchAll(/axios\.(?:get|post|put|patch|delete)\(`([^`]+)`/g)]
         .map(m => m[1])
-        // `${scope}` stands for whichever scope the caller passes; both are real paths.
-        .flatMap(u => (u.includes('${scope}') ? ['node', 'project'].map(s => u.replace('${scope}', s)) : [u]))
         .map(u => u.replace(/\$\{[^}]+\}/g, 'x'))
         .filter(u => u.startsWith('/'))
     }

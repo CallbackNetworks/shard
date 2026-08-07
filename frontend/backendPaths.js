@@ -14,8 +14,8 @@
  * under `/api` precisely so page routes could not collide; the collision came back through
  * the matching rule instead of the namespace (ADR-0061).
  *
- * Share data is claimed one segment deeper (`/share/node`, `/share/project`) so the SPA's
- * own share *pages* (`/share/n/:token`, `/share/p/:token`) still fall through to the app.
+ * Share data is claimed one segment deeper (`/share/node`) so the SPA's own share *page*
+ * (`/share/n/:token`) still falls through to the app.
  * The data path and the page it feeds must never be the same URL: the generic share page
  * was `/share/n/:token` fetching `GET /share/n/{token}`, so the SPA answered its own fetch
  * with index.html — HTTP 200, `text/html`, and a share page that could never load (ADR-0071,
@@ -24,7 +24,7 @@
  * `src/__tests__/backendPathClaims.test.js` checks both against the router.
  */
 export const BACKEND_PATHS = [
-  '/api', '/webhook', '/share/node', '/share/project',
+  '/api', '/webhook', '/share/node',
   '/ical', '/ws', '/health', '/docs', '/openapi.json', '/redoc',
 ]
 

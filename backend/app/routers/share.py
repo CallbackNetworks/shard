@@ -378,7 +378,9 @@ def get_share_identity(token: str, request: Request, db: Session = Depends(get_d
     return _build_response(identity, db)
 
 
-@router.get("/project/{token}", dependencies=[Depends(share_rate_limit)])
+# Not a route (ADR-0073), like get_share_identity above: a project is served through
+# the one public door, /share/node/{token}, which dispatches here. The dedicated
+# serialization stays — a project page is genuinely its own shape.
 def get_share_project(token: str, request: Request, db: Session = Depends(get_db)):
     project = _load_project(db, token)
     if not project or project.status != "active":
@@ -559,38 +561,34 @@ def _check_note_access(
             raise HTTPException(status_code=403, detail="PIN verification required")
 
 
-def _resolve_note_target(scope: str, token: str, request: Request, db: Session) -> list[graph.ProjectView]:
+def _project_note_target(project: graph.ProjectView, request: Request) -> list[graph.ProjectView]:
+    _check_note_access(
+        entity_id=project.id,
+        expires_at=project.share_expires_at,
+        allow_guest_notes=project.allow_guest_notes,
+        pin_hash=project.share_pin_hash,
+        request=request,
+    )
+    return [project]
+
+
+def _resolve_note_target(token: str, request: Request, db: Session) -> list[graph.ProjectView]:
     """Validate a guest-note write against a share token; return the projects it may write to.
 
-    ``scope`` is the door the guest came through. ``n`` is the generic one and
-    dispatches on the node's type exactly as ``GET /share/n/{token}`` does — an
+    Dispatches on the node's type exactly as ``GET /share/node/{token}`` does — an
     identity aggregates its ``member_of`` projects, anything else stands for itself.
-    A page that can be read must be writable through the same door: before this
-    dispatch existed, ``/share/n`` served an identity's page and then 404'd its
-    notes (ADR-0070).
+    A page that can be read must be writable through the same door (ADR-0070); there
+    is only one door left to be read through (ADR-0071, ADR-0073).
     """
-    if scope == "project":
-        project = graph.find_project_by_share_token(db, token)
-        if not project or project.status != "active":
-            raise HTTPException(status_code=404, detail="Share link not found")
-        _check_note_access(
-            entity_id=project.id,
-            expires_at=project.share_expires_at,
-            allow_guest_notes=project.allow_guest_notes,
-            pin_hash=project.share_pin_hash,
-            request=request,
-        )
-        return [project]
-
-    if scope != "node":
-        raise HTTPException(status_code=404, detail="Share link not found")
-
     node = graph.find_node_by_share_token(db, token)
     if not node:
         raise HTTPException(status_code=404, detail="Share link not found")
 
     if node.type == graph.NODE_PROJECT:
-        return _resolve_note_target("project", token, request, db)
+        project = graph.get_project(db, node.id)
+        if not project or project.status != "active":
+            raise HTTPException(status_code=404, detail="Share link not found")
+        return _project_note_target(project, request)
 
     if node.type == graph.NODE_IDENTITY:
         identity = graph.get_identity(db, node.id)
@@ -653,25 +651,26 @@ def _create_note(db: Session, project_id: str, task_id: str | None, body: GuestN
     return _serialize_comment(note)
 
 
-@router.post("/{scope}/{token}/notes", status_code=201, dependencies=[Depends(share_rate_limit)])
-def create_guest_project_note(
-    scope: str, token: str, body: GuestNoteIn, request: Request, db: Session = Depends(get_db)
-):
-    projects = _resolve_note_target(scope, token, request, db)
-    if scope == "project":
-        project = projects[0]
-    else:
+@router.post("/node/{token}/notes", status_code=201, dependencies=[Depends(share_rate_limit)])
+def create_guest_project_note(token: str, body: GuestNoteIn, request: Request, db: Session = Depends(get_db)):
+    projects = _resolve_note_target(token, request, db)
+    # A share holding exactly one project (a project's own page, a container) needs no
+    # ``project_id`` to disambiguate; an identity aggregates several, so there it says
+    # which one. Was a per-scope branch until the scopes collapsed to one (ADR-0073).
+    if body.project_id:
         project = next((p for p in projects if p.id == body.project_id), None)
+    else:
+        project = projects[0] if len(projects) == 1 else None
     if not project:
         raise HTTPException(status_code=404, detail="Project not found in this share")
     return _create_note(db, project.id, None, body, request)
 
 
-@router.post("/{scope}/{token}/tasks/{task_id}/notes", status_code=201, dependencies=[Depends(share_rate_limit)])
+@router.post("/node/{token}/tasks/{task_id}/notes", status_code=201, dependencies=[Depends(share_rate_limit)])
 def create_guest_task_note(
-    scope: str, token: str, task_id: str, body: GuestNoteIn, request: Request, db: Session = Depends(get_db)
+    token: str, task_id: str, body: GuestNoteIn, request: Request, db: Session = Depends(get_db)
 ):
-    projects = _resolve_note_target(scope, token, request, db)
+    projects = _resolve_note_target(token, request, db)
     project_ids = [p.id for p in projects]
     task_ids = {tid for pid in project_ids for tid in graph.contained_task_ids(db, pid)}
     task = graph.get_task(db, task_id) if task_id in task_ids else None

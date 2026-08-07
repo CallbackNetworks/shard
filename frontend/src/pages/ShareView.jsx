@@ -13,7 +13,9 @@ import ShareFooter from '../components/share/ShareFooter'
 import useBreakpoint from '../components/share/useBreakpoint'
 import EmptyState from '../components/shared/EmptyState'
 
-export default function ShareView({ scope = 'node' }) {
+// One public share page for every shareable node (ADR-0071, ADR-0073): the data
+// endpoint dispatches on the token's node type, so this page needs no scope.
+export default function ShareView() {
   const { token } = useParams()
   const bp = useBreakpoint()
   const [now, setNow] = useState(new Date())
@@ -26,8 +28,8 @@ export default function ShareView({ scope = 'node' }) {
   }, [])
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['share', scope, token],
-    queryFn: () => getShareData(token, scope),
+    queryKey: ['share', token],
+    queryFn: () => getShareData(token),
     refetchInterval: pinData ? false : 30000,
     retry: false,
   })
@@ -132,7 +134,6 @@ export default function ShareView({ scope = 'node' }) {
               project={p}
               index={i}
               bp={bp}
-              scope={scope}
               token={token}
               guestNotesEnabled={meta.guest_notes_enabled === true}
             />

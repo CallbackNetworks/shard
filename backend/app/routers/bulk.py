@@ -314,8 +314,8 @@ async def import_tasks(
 # Three scoped feeds, all read-only and unauthenticated at the middleware layer
 # (calendar clients cannot log in), so each is gated by an unguessable token:
 #   - /ical/all/{token}.ics       personal, every project (global token, see below)
-#   - /ical/project/{token}.ics   a single project (Project.share_token)
-#   - /ical/node/{token}.ics      any subscribable node, identity included (ADR-0039)
+#   - /ical/node/{token}.ics      any subscribable node — project and identity
+#                                 included since ADR-0073 (ADR-0039)
 # The scoped feeds reuse the same share_token as their /share/ page, so a calendar and
 # its share page are revoked together (see ADR-0023).
 
@@ -388,21 +388,6 @@ def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(g
 
 # /ical/identity/{token}.ics was retired with ADR-0071: an identity's feed is
 # /ical/node/{token}.ics below, which aggregates member_of for exactly this type.
-
-
-@ical_router.get("/ical/project/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
-def ical_feed_project(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
-    """Shared feed: a single project's due-dated tasks (same token as its share page)."""
-    project = graph.find_project_by_share_token(db, token)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Calendar not found")
-    task_ids = graph.contained_task_ids(db, project.id)
-    nodes = (
-        db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), Node.due_date.isnot(None)).all()
-        if task_ids
-        else []
-    )
-    return _render_calendar(project.name, [graph.task_view(n, db) for n in nodes], alarm)
 
 
 @ical_router.get("/ical/node/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
