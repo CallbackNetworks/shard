@@ -1,5 +1,6 @@
 import { STATUS_COLOR } from '../../constants/theme'
 import { riskColor } from './core'
+import { buildContainerForest } from '../containerTree'
 
 // Standard top-down tidy tree for the "tree" (formerly lines) style:
 // identities form the roots, projects sit centered under their owning
@@ -29,23 +30,31 @@ export function buildTreeLayout({ visibleProjects, visibleIdentityNodes, visible
     tasksByProject.get(task.projectId).push(task)
   })
 
-  // One subtree per identity; a project hangs under its first visible owner
-  // (extra owners still get link edges), ownerless projects form a trailing
-  // rootless cluster.
+  // One subtree per identity; a *root* container hangs under its first visible
+  // owner (extra owners still get link edges), ownerless ones form a trailing
+  // rootless cluster. A nested container follows its parent instead (ADR-0069):
+  // its place in the tree is where it sits in the graph, not who owns it.
+  const forest = buildContainerForest(visibleProjects)
   const identityIdSet = new Set(visibleIdentityNodes.map(identity => identity.id))
   const clusters = visibleIdentityNodes.map(identity => ({ identity, projects: [] }))
   const clusterByIdentity = new Map(clusters.map(cluster => [cluster.identity.id, cluster]))
   const unowned = { identity: null, projects: [] }
-  visibleProjects.forEach(project => {
+  forest.roots.forEach(project => {
     const ownerId = (project.identityIds || []).find(id => identityIdSet.has(id))
     ;(clusterByIdentity.get(ownerId) || unowned).projects.push(project)
   })
   if (unowned.projects.length > 0) clusters.push(unowned)
 
+  // Width bottom-up over the whole subtree: a container is as wide as its own
+  // card or as everything hanging under it (child containers *and* tasks).
   const projectSubW = (project) => {
     const count = tasksByProject.get(project.id)?.length || 0
     const tasksW = count > 0 ? count * taskW + (count - 1) * siblingGap : 0
-    return Math.max(projectW, tasksW)
+    const children = forest.childrenOf(project.id)
+    const childrenW = children.reduce((sum, child) => sum + projectSubW(child), 0)
+      + Math.max(0, children.length - 1) * siblingGap
+    const innerW = tasksW + childrenW + (tasksW > 0 && childrenW > 0 ? siblingGap : 0)
+    return Math.max(projectW, innerW)
   }
   clusters.forEach(cluster => {
     cluster.innerW = cluster.projects.reduce((sum, project) => sum + projectSubW(project), 0)
@@ -64,14 +73,84 @@ export function buildTreeLayout({ visibleProjects, visibleIdentityNodes, visible
 
   const identityY = pad.y + goalAreaH
   const projectY = identityY + identityH + levelGap
-  const taskY = projectY + projectH + levelGap
 
   const nodes = []
   const links = []
   const identityColorById = new Map(visibleIdentityNodes.map(identity => [identity.id, identity.color]))
 
   let cursor = pad.x
-  let anyTasks = false
+  let deepestBottom = projectY + projectH
+
+  // Place a container and everything under it. Child containers and tasks share
+  // the row below their parent, so an inserted level pushes the work it holds
+  // down one row instead of standing beside it.
+  const placeContainer = (project, x, y) => {
+    const subW = projectSubW(project)
+    nodes.push({
+      id: `project:${project.id}`,
+      type: 'project',
+      name: project.name,
+      x: x + (subW - projectW) / 2,
+      y,
+      w: projectW,
+      h: projectH,
+      color: riskColor(project.risk),
+      data: project,
+    })
+    project.identityIds.forEach(identityId => {
+      links.push({
+        from: `identity:${identityId}`,
+        to: `project:${project.id}`,
+        color: identityColorById.get(identityId) || '#64748b',
+        type: 'owns',
+      })
+    })
+
+    const children = forest.childrenOf(project.id)
+    const tasks = tasksByProject.get(project.id) || []
+    const tasksW = tasks.length > 0 ? tasks.length * taskW + (tasks.length - 1) * siblingGap : 0
+    const childrenW = children.reduce((sum, child) => sum + projectSubW(child), 0)
+      + Math.max(0, children.length - 1) * siblingGap
+    const innerW = tasksW + childrenW + (tasksW > 0 && childrenW > 0 ? siblingGap : 0)
+    const childY = y + projectH + levelGap
+    let childCursor = x + (subW - innerW) / 2
+
+    children.forEach(child => {
+      const childW = projectSubW(child)
+      links.push({
+        from: `project:${project.id}`,
+        to: `project:${child.id}`,
+        color: '#64748b',
+        type: 'contains',
+      })
+      placeContainer(child, childCursor, childY)
+      childCursor += childW + siblingGap
+    })
+
+    tasks.forEach(task => {
+      nodes.push({
+        id: `task:${task.id}`,
+        type: 'task',
+        name: task.name,
+        x: childCursor,
+        y: childY,
+        w: taskW,
+        h: taskH,
+        color: task.color,
+        data: task,
+      })
+      links.push({
+        from: `project:${project.id}`,
+        to: `task:${task.id}`,
+        color: viewMode === 'dependencies' ? '#737373' : riskColor(task.risk),
+        type: task.risk,
+      })
+      childCursor += taskW + siblingGap
+      deepestBottom = Math.max(deepestBottom, childY + taskH)
+    })
+    deepestBottom = Math.max(deepestBottom, y + projectH)
+  }
+
   clusters.forEach(cluster => {
     if (cluster.identity) {
       nodes.push({
@@ -88,51 +167,8 @@ export function buildTreeLayout({ visibleProjects, visibleIdentityNodes, visible
     }
     let projectCursor = cursor + (cluster.w - cluster.innerW) / 2
     cluster.projects.forEach(project => {
-      const subW = projectSubW(project)
-      nodes.push({
-        id: `project:${project.id}`,
-        type: 'project',
-        name: project.name,
-        x: projectCursor + (subW - projectW) / 2,
-        y: projectY,
-        w: projectW,
-        h: projectH,
-        color: riskColor(project.risk),
-        data: project,
-      })
-      project.identityIds.forEach(identityId => {
-        links.push({
-          from: `identity:${identityId}`,
-          to: `project:${project.id}`,
-          color: identityColorById.get(identityId) || '#64748b',
-          type: 'owns',
-        })
-      })
-      const tasks = tasksByProject.get(project.id) || []
-      const tasksW = tasks.length > 0 ? tasks.length * taskW + (tasks.length - 1) * siblingGap : 0
-      let taskCursor = projectCursor + (subW - tasksW) / 2
-      tasks.forEach(task => {
-        anyTasks = true
-        nodes.push({
-          id: `task:${task.id}`,
-          type: 'task',
-          name: task.name,
-          x: taskCursor,
-          y: taskY,
-          w: taskW,
-          h: taskH,
-          color: task.color,
-          data: task,
-        })
-        links.push({
-          from: `project:${project.id}`,
-          to: `task:${task.id}`,
-          color: viewMode === 'dependencies' ? '#737373' : riskColor(task.risk),
-          type: task.risk,
-        })
-        taskCursor += taskW + siblingGap
-      })
-      projectCursor += subW + siblingGap
+      placeContainer(project, projectCursor, projectY)
+      projectCursor += projectSubW(project) + siblingGap
     })
     cursor += cluster.w + clusterGap
   })
@@ -174,7 +210,9 @@ export function buildTreeLayout({ visibleProjects, visibleIdentityNodes, visible
     }))
   })
 
-  const bodyBottom = anyTasks ? taskY + taskH : projectY + projectH
+  // The body is as deep as the deepest level actually placed — container nesting
+  // makes that a property of the data, not a constant (ADR-0069).
+  const bodyBottom = deepestBottom
   const decisionTop = bodyBottom + 40 + labelH
   const decisionColCount = Math.min(decisionLane.length, bandCols) || 1
   const totalDecW = decisionColCount * goalW + (decisionColCount - 1) * goalGapH

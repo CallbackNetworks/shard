@@ -117,9 +117,28 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
     decisionsByContainer.get(d.projectId).push(d)
   }
 
+  // Tasks anywhere below a container, top-level ones only — the size rule the
+  // server reports (ADR-0068), applied here because the map derives its own
+  // enrichment from the graph slice (ADR-0037). A card that counted only direct
+  // children would contradict the project page the moment anything is nested.
+  const subtreeTasksOf = (id, seen = new Set()) => {
+    if (seen.has(id)) return []
+    seen.add(id)
+    const out = []
+    for (const child of childrenOf.get(id) || []) {
+      if (isTask(child)) {
+        if (!taskParentOf(child.id)) out.push(child)
+      } else if (isContainer(child)) {
+        out.push(...subtreeTasksOf(child.id, seen))
+      }
+    }
+    return out
+  }
+
   // --- Containers ("project" cards; enrichment computed from the graph)
   const projectNodes = nodes.filter(isContainer).map(n => {
-    const taskChildren = (childrenOf.get(n.id) || []).filter(isTask)
+    const directTasks = (childrenOf.get(n.id) || []).filter(isTask)
+    const taskChildren = subtreeTasksOf(n.id)
     const failed = taskChildren.filter(x => x.status === 'failed').length
     const overdue = taskChildren.filter(x => taskRisk(x, now) === 'overdue').length
     const inProgress = taskChildren.filter(x => x.status === 'in_progress').length
@@ -140,6 +159,9 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
       progress: taskChildren.length ? Math.round((done / taskChildren.length) * 100) : 0,
       totalTasks: taskChildren.length,
       doneTasks: done,
+      // What this container holds itself, so a card can say how much of its
+      // total lives in the containers below it.
+      directTaskCount: directTasks.filter(x => !taskParentOf(x.id)).length,
       failed,
       overdue,
       inProgress,

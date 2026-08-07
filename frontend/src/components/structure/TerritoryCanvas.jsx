@@ -132,8 +132,12 @@ export default function TerritoryCanvas({
     setExpanded(prev => (prev.has(project.id) ? prev : new Set(prev).add(project.id)))
   }
 
-  const renderCard = (project) => {
+  // A container nested under another is drawn inside its parent's card (ADR-0069):
+  // the map's job is to show where a thing sits, and "inside" is the whole point of
+  // the level the user inserted.
+  const renderCard = (project, depth = 0) => {
     const key = `project:${project.id}`
+    const children = model.childrenByProject?.get(project.id) || []
     const isOpen = expanded.has(project.id)
     const tasks = model.tasksByProject.get(project.id) || []
     const decisions = model.decisionsByProject.get(project.id) || []
@@ -145,7 +149,12 @@ export default function TerritoryCanvas({
       <div
         key={project.id}
         ref={registerNode(key)}
-        className={cx(s.card, selectedNodeKey === key && s.active, isProjectMuted(project.id) && s.muted)}
+        className={cx(
+          s.card,
+          depth > 0 && s.nestedCard,
+          selectedNodeKey === key && s.active,
+          isProjectMuted(project.id) && s.muted,
+        )}
         style={{ '--node-color': riskColor(project.risk) }}
       >
         <button
@@ -173,6 +182,11 @@ export default function TerritoryCanvas({
         <span className={s.progress}><i style={{ width: `${project.progress}%` }} /></span>
         <em className={s.meta}>
           {project.doneTasks}/{project.totalTasks} {t('done')} · {project.progress}%
+          {project.totalTasks > (project.directTaskCount ?? project.totalTasks) && (
+            <b className={s.nestedNote}>
+              {t('containers.nestedNote', { n: project.totalTasks - project.directTaskCount })}
+            </b>
+          )}
         </em>
         {(tasks.length > 0 || decisions.length > 0) && (
           <button
@@ -213,6 +227,11 @@ export default function TerritoryCanvas({
             )}
           </div>
         )}
+        {children.length > 0 && (
+          <div className={s.nested} aria-label={t('containers.children', { count: children.length })}>
+            {children.map(child => renderCard(child, depth + 1))}
+          </div>
+        )}
         {isOpen && decisions.length > 0 && (
           <div className={s.chips} aria-label={t('structure.decisionsLabel')}>
             {decisions.map(decision => {
@@ -248,7 +267,8 @@ export default function TerritoryCanvas({
     <section key={key} className={cx(s.territory, className)} style={style}>
       {header}
       <div className={s.cards}>
-        {projects.map(renderCard)}
+        {/* map passes the index as the second argument — depth must not come from it */}
+        {projects.map(project => renderCard(project))}
         {projects.length === 0 && emptyHint && <span className={s.laneEmpty}>{emptyHint}</span>}
       </div>
     </section>

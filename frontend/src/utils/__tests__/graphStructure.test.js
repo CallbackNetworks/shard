@@ -68,15 +68,29 @@ describe('deriveGraphStructure', () => {
 
   it('computes container enrichment from the graph', () => {
     const p1 = graph.projectNodes.find(p => p.id === 'p1')
-    expect(p1.totalTasks).toBe(3) // t1, t2, t3 (flat containment includes subtasks)
+    // Top-level tasks only, matching the size rule the server reports (ADR-0068):
+    // t1 + t2, with t3 counted as part of t1 rather than as a third task.
+    expect(p1.totalTasks).toBe(2)
     expect(p1.doneTasks).toBe(1)
-    expect(p1.progress).toBe(33)
+    expect(p1.progress).toBe(50)
+    expect(p1.directTaskCount).toBe(2)
     expect(p1.risk).toBe('active')
     expect(p1.identityIds).toEqual(['i1'])
     expect(p1.decisionCount).toBe(1)
     expect(p1.pendingDecisionCount).toBe(1)
     expect(p1.dependencyCount).toBe(1)
     expect(p1.parentContainerId).toBe('c1') // nested containers survive
+  })
+
+  it('rolls a container card up over the containers nested inside it', () => {
+    // c1 holds one ticket of its own and contains p1, whose two tasks are still
+    // c1's work (ADR-0065/0069) — the card must not stop at its direct children.
+    const c1 = graph.projectNodes.find(p => p.id === 'c1')
+    expect(c1.totalTasks).toBe(3) // k1 + p1's t1, t2
+    expect(c1.doneTasks).toBe(1)
+    expect(c1.directTaskCount).toBe(1) // only the ticket sits on its own board
+    // A goal is a container too, so the same rollup reaches through it.
+    expect(graph.projectNodes.find(p => p.id === 'g1').totalTasks).toBe(2)
   })
 
   it('includes custom task-like nodes as tasks and skips subtasks', () => {

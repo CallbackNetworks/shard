@@ -198,6 +198,28 @@
   transition: opacity 0.15s, border-color 0.15s;
 }
 
+/* A container nested inside another (ADR-0069): drawn in its parent's card,
+   pulled in and dimmed a step so the level reads at a glance. */
+.nested {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 3px;
+  padding-left: 8px;
+  border-left: 1px solid color-mix(in srgb, var(--node-color) 40%, var(--kt-line));
+}
+
+.nestedCard {
+  background: color-mix(in srgb, var(--kt-surface) 88%, var(--kt-bg));
+}
+
+.nestedNote {
+  margin-left: 5px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--kt-hit);
+}
+
 .card.active {
   border-color: var(--kt-hit);
   box-shadow: 0 0 0 1px var(--kt-hit);

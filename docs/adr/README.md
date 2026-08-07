@@ -70,3 +70,4 @@
 | [0066](0066-one-control-with-n-values-is-not-n-nav-entries.md) | 一個控制項的 N 個值，不是 N 個導航入口 | Accepted | 2026-08-07 |
 | [0067](0067-fast-switching-does-not-need-permanent-screen-space.md) | 快速切換不需要永久佔著畫面 | Accepted | 2026-08-07 |
 | [0068](0068-a-project-has-one-size.md) | 一個專案的大小只有一個答案 | Accepted | 2026-08-07 |
+| [0069](0069-the-map-draws-the-level-the-user-inserted.md) | 結構圖畫出使用者插進去的那一層 | Accepted | 2026-08-07 |

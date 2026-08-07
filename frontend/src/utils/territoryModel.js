@@ -1,4 +1,5 @@
 import { taskWeight } from './structureMapLayout'
+import { buildContainerForest } from './containerTree'
 
 const PROJECT_RISK_RANK = { failed: 0, overdue: 1, active: 2, normal: 3 }
 
@@ -31,10 +32,21 @@ export function buildTerritoryModel({ projects = [], identities = [], tasks = []
     decisionsByProject.get(decision.projectId).push(decision)
   }
 
+  // Only root containers get a lane slot (ADR-0069); a nested container is drawn
+  // inside its parent's card, where the graph says it lives. Ownership decides
+  // *which* territory a root lands in, but never lifts a child out of its parent.
+  const forest = buildContainerForest(projects)
+  const childrenByProject = new Map(
+    projects.map(project => [project.id, [...forest.childrenOf(project.id)].sort(byRisk)])
+  )
+  const parentByProject = new Map(
+    projects.map(project => [project.id, forest.parentOf(project.id)]).filter(([, parent]) => parent)
+  )
+
   const ownedByIdentity = new Map(identities.map(identity => [identity.id, []]))
   const shared = []
   const unowned = []
-  for (const project of projects) {
+  for (const project of forest.roots) {
     const ownerIds = (project.identityIds || []).filter(id => identityIds.has(id))
     if (ownerIds.length === 0) unowned.push(project)
     else if (ownerIds.length === 1) ownedByIdentity.get(ownerIds[0]).push(project)
@@ -67,7 +79,18 @@ export function buildTerritoryModel({ projects = [], identities = [], tasks = []
   for (const group of decisionsByProject.values()) for (const decision of group) keys.add(`decision:${decision.id}`)
   for (const goal of goalNodes) keys.add(`goal:${goal.id}`)
 
-  return { territories, shared, unowned, tasksByProject, decisionsByProject, goals: goalNodes, projectById, keys }
+  return {
+    territories,
+    shared,
+    unowned,
+    tasksByProject,
+    decisionsByProject,
+    childrenByProject,
+    parentByProject,
+    goals: goalNodes,
+    projectById,
+    keys,
+  }
 }
 
 // Resolves which node keys stay lit for the current selection; everything else
@@ -83,6 +106,24 @@ export function computeTerritoryHighlight(selected, model, dependencyLinks = [])
     const project = model.projectById.get(projectId)
     for (const id of project?.identityIds || []) identityIds.add(id)
   }
+  // A nested card is drawn inside its parent, so an ancestor that went dark
+  // would take its highlighted child with it; and picking a container means
+  // picking what it contains.
+  const addAncestors = (projectId) => {
+    let cursor = model.parentByProject?.get(projectId)
+    while (cursor && !projectIds.has(cursor)) {
+      projectIds.add(cursor)
+      addProjectOwners(cursor)
+      cursor = model.parentByProject?.get(cursor)
+    }
+  }
+  const addDescendants = (projectId) => {
+    for (const child of model.childrenByProject?.get(projectId) || []) {
+      if (projectIds.has(child.id)) continue
+      projectIds.add(child.id)
+      addDescendants(child.id)
+    }
+  }
   const addGoalsTouching = () => {
     for (const goal of model.goals) {
       if (goal.linkedProjectIds.some(id => projectIds.has(id))) goalIds.add(goal.id)
@@ -94,10 +135,13 @@ export function computeTerritoryHighlight(selected, model, dependencyLinks = [])
     for (const [projectId, project] of model.projectById) {
       if ((project.identityIds || []).includes(selected.id)) projectIds.add(projectId)
     }
+    for (const projectId of [...projectIds]) addDescendants(projectId)
     addGoalsTouching()
   } else if (selected.type === 'project') {
     projectIds.add(selected.id)
     addProjectOwners(selected.id)
+    addAncestors(selected.id)
+    addDescendants(selected.id)
     addGoalsTouching()
   } else if (selected.type === 'goal') {
     goalIds.add(selected.id)
@@ -123,6 +167,7 @@ export function computeTerritoryHighlight(selected, model, dependencyLinks = [])
       if (group.some(task => chipKeys.has(`task:${task.id}`))) {
         projectIds.add(projectId)
         addProjectOwners(projectId)
+        addAncestors(projectId)
       }
     }
   }

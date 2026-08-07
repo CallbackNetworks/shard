@@ -1,6 +1,7 @@
 import { STATUS_COLOR } from '../../constants/theme'
 import { riskColor, resolveOverlaps } from './core'
 import { assignSankeySlots } from './ribbon'
+import { buildContainerForest, flattenContainerForest } from '../containerTree'
 
 export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks, viewMode }) {
   const pad = { x: 56, y: 46 }
@@ -40,13 +41,20 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
 
   const bodyTop = pad.y + goalAreaH + labelH + 6
 
+  // Rows follow the container hierarchy depth-first (ADR-0069): a nested
+  // container sits directly under its parent and is indented into the column,
+  // so the middle column reads as levels rather than one flat list.
+  const forest = buildContainerForest(visibleProjects)
+  const indentStep = 18
+  const maxIndent = colDef.project.w - 96
+
   const projectRowData = []
   let bodyY = bodyTop
-  visibleProjects.forEach(project => {
+  flattenContainerForest(forest).forEach(({ container: project, depth }) => {
     const tasks = tasksByProject.get(project.id) || []
     const stackH = tasks.length > 0 ? tasks.length * (taskH + taskGapV) - taskGapV : 0
     const rowH = Math.max(projectH, stackH) + rowPad
-    projectRowData.push({ project, y: bodyY, h: rowH, tasks })
+    projectRowData.push({ project, y: bodyY, h: rowH, tasks, indent: Math.min(depth * indentStep, maxIndent) })
     bodyY += rowH
   })
 
@@ -59,9 +67,9 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
       id: `project:${row.project.id}`,
       type: 'project',
       name: row.project.name,
-      x: colDef.project.x,
+      x: colDef.project.x + row.indent,
       y: py,
-      w: colDef.project.w,
+      w: colDef.project.w - row.indent,
       h: projectH,
       color: riskColor(row.project.risk),
       data: row.project,
@@ -96,6 +104,18 @@ export function buildMindMapLayout({ visibleProjects, visibleIdentityNodes, visi
       color: identity.color,
       data: { ...identity, type: 'identity' },
     })
+  })
+
+  visibleProjects.forEach(project => {
+    for (const child of forest.childrenOf(project.id)) {
+      links.push({
+        from: `project:${project.id}`,
+        to: `project:${child.id}`,
+        color: '#64748b',
+        type: 'contains',
+        flow: true,
+      })
+    }
   })
 
   const identityColorById = new Map(visibleIdentityNodes.map(identity => [identity.id, identity.color]))

@@ -100,3 +100,44 @@ describe('computeTerritoryHighlight', () => {
     expect(highlight.projectIds.has('p4')).toBe(true)
   })
 })
+
+// A container nested under another (ADR-0069): drawn inside its parent's card,
+// so it must not also take a lane slot of its own.
+const nestedProjects = [
+  { id: 'root', type: 'project', name: 'Root', risk: 'normal', identityIds: ['i1'] },
+  { id: 'inner', type: 'project', name: 'Inner', risk: 'failed', identityIds: ['i2'], parentContainerId: 'root' },
+  { id: 'deep', type: 'project', name: 'Deep', risk: 'normal', identityIds: [], parentContainerId: 'inner' },
+]
+const nestedTasks = [
+  { id: 'nt', type: 'task', projectId: 'deep', name: 'Deep task', risk: 'normal', blockedBy: [], blocking: [] },
+]
+
+describe('nested containers (ADR-0069)', () => {
+  const model = buildTerritoryModel({ projects: nestedProjects, identities, tasks: nestedTasks, goals: [], decisions: [] })
+
+  it('gives a lane slot to roots only, and hangs the rest off their parent', () => {
+    expect(model.territories[0].projects.map(p => p.id)).toEqual(['root'])
+    // Owned by i2, but its place is inside its parent — ownership does not lift it out.
+    expect(model.territories[1].projects).toEqual([])
+    expect(model.shared).toEqual([])
+    expect(model.unowned).toEqual([])
+    expect(model.childrenByProject.get('root').map(p => p.id)).toEqual(['inner'])
+    expect(model.childrenByProject.get('inner').map(p => p.id)).toEqual(['deep'])
+  })
+
+  it('still keys every container so selection can reach a nested card', () => {
+    expect(model.keys.has('project:deep')).toBe(true)
+  })
+
+  it('lights the whole chain when a container is selected', () => {
+    const highlight = computeTerritoryHighlight({ type: 'project', id: 'inner' }, model, [])
+    // Its parent stays lit (a dark parent would hide the lit child drawn inside it)
+    // and what it contains is part of what was selected.
+    expect([...highlight.projectIds].sort()).toEqual(['deep', 'inner', 'root'])
+  })
+
+  it('lights the ancestors of a selected nested task', () => {
+    const highlight = computeTerritoryHighlight({ type: 'task', id: 'nt' }, model, [])
+    expect([...highlight.projectIds].sort()).toEqual(['deep', 'inner', 'root'])
+  })
+})

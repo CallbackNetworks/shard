@@ -148,3 +148,75 @@ describe('buildTreeLayout', () => {
     expect(again.nodes.map(n => [n.id, n.x, n.y])).toEqual(layout.nodes.map(n => [n.id, n.x, n.y]))
   })
 })
+
+// A container nested inside another: the level a user inserts (ADR-0069).
+const nestedParams = {
+  visibleProjects: [
+    { id: 'root', name: 'Root', risk: 'normal', progress: 0, doneTasks: 0, totalTasks: 3, directTaskCount: 1, failed: 0, overdue: 0, pendingDecisionCount: 0, identityIds: ['i0'], parentContainerId: null },
+    { id: 'mid', name: 'Mid', risk: 'normal', progress: 0, doneTasks: 0, totalTasks: 2, directTaskCount: 0, failed: 0, overdue: 0, pendingDecisionCount: 0, identityIds: [], parentContainerId: 'root' },
+    { id: 'leaf', name: 'Leaf', risk: 'normal', progress: 0, doneTasks: 0, totalTasks: 2, directTaskCount: 2, failed: 0, overdue: 0, pendingDecisionCount: 0, identityIds: [], parentContainerId: 'mid' },
+  ],
+  visibleIdentityNodes: [{ id: 'i0', name: 'Me', color: '#818cf8' }],
+  visibleTaskNodes: [
+    { id: 'tr', name: 'Root task', projectId: 'root', risk: 'active', status: 'in_progress', color: '#facc15', blockedBy: [], blocking: [] },
+    { id: 'tl', name: 'Leaf task', projectId: 'leaf', risk: 'active', status: 'in_progress', color: '#facc15', blockedBy: [], blocking: [] },
+  ],
+  laneNodes: [],
+  dependencyLinks: [],
+  viewMode: 'map',
+}
+
+describe('nested containers (ADR-0069)', () => {
+  it('tree: each level sits a row below the container that holds it', () => {
+    const layout = buildTreeLayout(nestedParams)
+    const y = (id) => layout.nodeById.get(`project:${id}`).y
+    expect(y('root')).toBeLessThan(y('mid'))
+    expect(y('mid')).toBeLessThan(y('leaf'))
+    // Its tasks share the row with the containers at the same level, never above.
+    expect(layout.nodeById.get('task:tl').y).toBeGreaterThan(y('leaf'))
+    expect(layout.nodeById.get('task:tr').y).toBe(y('mid'))
+  })
+
+  it('tree: a nested container is linked from its parent, not from an identity', () => {
+    const layout = buildTreeLayout(nestedParams)
+    const into = layout.links.filter(l => l.to === 'project:mid')
+    expect(into.map(l => [l.from, l.type])).toEqual([['project:root', 'contains']])
+    // The owner still owns the root it owns.
+    expect(layout.links.some(l => l.from === 'identity:i0' && l.to === 'project:root')).toBe(true)
+  })
+
+  it('tree: the parent stays centered over everything below it and nothing overlaps', () => {
+    const layout = buildTreeLayout(nestedParams)
+    const root = layout.nodeById.get('project:root')
+    const below = [layout.nodeById.get('project:mid'), layout.nodeById.get('task:tr')]
+    const left = Math.min(...below.map(n => n.x))
+    const right = Math.max(...below.map(n => n.x + n.w))
+    expect(root.x + root.w / 2).toBeCloseTo((left + right) / 2, 5)
+    expect(countOverlaps(layout.nodes)).toBe(0)
+  })
+
+  it('sankey: rows run depth-first and each level is indented further', () => {
+    const layout = buildMindMapLayout(nestedParams)
+    const rows = layout.nodes
+      .filter(n => n.type === 'project')
+      .sort((a, b) => a.y - b.y)
+    expect(rows.map(n => n.data.id)).toEqual(['root', 'mid', 'leaf'])
+    expect(rows[0].x).toBeLessThan(rows[1].x)
+    expect(rows[1].x).toBeLessThan(rows[2].x)
+    expect(layout.links.some(l => l.from === 'project:mid' && l.to === 'project:leaf' && l.type === 'contains')).toBe(true)
+  })
+
+  it('every style keeps drawing a flat graph the way it always did', () => {
+    // Same input with the nesting removed: no contains links appear.
+    const flat = {
+      ...nestedParams,
+      visibleProjects: nestedParams.visibleProjects.map(p => ({ ...p, parentContainerId: null })),
+    }
+    for (const build of [buildTreeLayout, buildMindMapLayout]) {
+      const layout = build(flat)
+      expect(layout.links.some(l => l.type === 'contains')).toBe(false)
+      const ys = layout.nodes.filter(n => n.type === 'project').map(n => n.y)
+      if (build === buildTreeLayout) expect(new Set(ys).size).toBe(1) // one row again
+    }
+  })
+})
