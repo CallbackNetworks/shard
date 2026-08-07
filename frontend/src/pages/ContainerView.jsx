@@ -14,9 +14,10 @@ import EmptyState from '../components/shared/EmptyState'
 
 // Container view for user-defined container types (ADR-0037): the same
 // board/table machinery as ProjectDetail, fed from the generic
-// /nodes/{id}/contained-tasks endpoint. Project-only features (cycles, labels,
-// share, integrations) are deliberately absent — projects keep their richer
-// dedicated page.
+// /nodes/{id}/contained-tasks endpoint. Sharing is *not* project-only — a
+// shareable container gets the same panel every other type does (ADR-0039,
+// ADR-0073), rendered below. Cycles, labels and integrations still are: a
+// project keeps its richer dedicated page.
 
 export default function ContainerView() {
   const { id } = useParams()
