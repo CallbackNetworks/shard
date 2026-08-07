@@ -10,14 +10,12 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-// Registry query for the dynamic container-types group (ADR-0037).
-const mockNodeTypes = vi.hoisted(() => ({ data: [] }))
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: mockNodeTypes.data }),
+  useQuery: () => ({ data: [] }),
 }))
-vi.mock('../../api/client', () => ({ getNodeTypes: vi.fn() }))
 
 import Sidebar from '../Sidebar'
+import { NAV_GROUPS } from '../../constants/nav'
 
 function setup(options = {}) {
   const { onOpenPalette = vi.fn() } = options
@@ -66,30 +64,36 @@ describe('Sidebar', () => {
   it('renders language switcher with EN and Chinese buttons', () => {
     setup()
     expect(screen.getByText('EN')).toBeTruthy()
-    expect(screen.getByText('nav.language')).toBeTruthy()
-  })
-
-  it('renders the status page link', () => {
-    setup()
     expect(screen.getByText('nav.statusPage')).toBeTruthy()
   })
 
-  it('shows a dynamic group entry per custom container type (ADR-0037)', () => {
-    mockNodeTypes.data = [
-      { key: 'topic', label: 'Topics', roles: ['container'], is_builtin: false, color: '#f59e0b' },
-      { key: 'project', label: 'Project', roles: ['container'], is_builtin: true },
-      { key: 'note', label: 'Note', roles: [], is_builtin: false },
-    ]
+  // ADR-0066: container types are unbounded, so the rail carries one fixed
+  // door to their listing rather than one entry per type.
+  it('reaches every container type through a single fixed nav entry', () => {
     setup()
-    // Only the custom container type gets an entry — not built-ins, not plain types.
-    const link = screen.getByText('Topics').closest('a')
-    expect(link.getAttribute('href')).toBe('/t/topic')
-    expect(screen.queryByText('Note')).toBeNull()
-    mockNodeTypes.data = []
+    const link = screen.getByText('nav.containers').closest('a')
+    expect(link.getAttribute('href')).toBe('/containers')
   })
 
-  it('hides the dynamic container group when there are no custom container types', () => {
-    setup()
-    expect(screen.queryByText('nav.containers')).toBeNull()
+  // The whole point of the redesign: every rail row is a declared module, so
+  // no unbounded collection can push the fixed nav below the fold.
+  it('renders exactly the declared nav modules and nothing per-entity', () => {
+    const { container } = setup()
+    const declared = NAV_GROUPS.reduce((n, g) => n + g.items.length, 0)
+    expect(container.querySelectorAll('.kt-mini-nav-button').length).toBe(declared)
+  })
+
+  // The module list is the only scrolling row, so the search, the focus
+  // control and the bottom actions can never be scrolled out of reach.
+  it('scrolls only the module list', () => {
+    const { container } = setup()
+    const scrollers = container.querySelectorAll('.kt-mini-rail > *')
+    expect(Array.from(scrollers).map(el => el.className)).toEqual([
+      'kt-mini-brand',
+      'kt-mini-search',
+      'kt-mini-focus-slot',
+      'kt-mini-nav',
+      'kt-mini-actions',
+    ])
   })
 })

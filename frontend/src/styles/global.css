@@ -1192,7 +1192,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-width: 72px;
   height: 100vh;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  /* brand / search / focus / modules / actions — only the module list scrolls,
+     so nothing above or below it can be pushed out of reach. */
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 8px;
   padding: 10px 8px;
   border-right: 1px solid var(--kt-line);
@@ -1357,11 +1359,10 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   border-top: 1px solid var(--kt-line);
   padding-top: 8px;
 }
-.kt-focus-group {
-  padding-bottom: 6px;
-}
-.kt-focus-btn {
-  cursor: pointer;
+/* Always rendered — an identity-less slot collapses to zero height, but it
+   keeps holding its grid track so the module list stays the `1fr` row. */
+.kt-mini-focus-slot {
+  display: grid;
 }
 .kt-focus-avatar {
   width: 23px;
@@ -1377,29 +1378,10 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   border: 1px solid var(--kt-line);
   transition: color 0.14s ease, background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
-.kt-focus-btn:hover .kt-focus-avatar {
+.kt-mini-nav-button:hover .kt-focus-avatar {
   color: var(--kt-ink);
   border-color: color-mix(in srgb, var(--focus-color, var(--kt-muted)) 55%, var(--kt-line));
   background: color-mix(in srgb, var(--focus-color, var(--kt-muted)) 12%, transparent);
-}
-.kt-focus-btn.is-focused {
-  color: var(--kt-ink);
-  background: var(--kt-hover);
-}
-.kt-focus-btn.is-focused .kt-focus-avatar {
-  color: #0b0b0f;
-  background: var(--focus-color, var(--kt-hit));
-  border-color: var(--focus-color, var(--kt-hit));
-  box-shadow: 0 0 0 2px var(--kt-bg), 0 0 0 3px var(--focus-color);
-}
-.kt-focus-btn.is-focused::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  background: var(--focus-color);
 }
 .kt-mini-action {
   min-height: 32px;
@@ -1416,19 +1398,26 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
     z-index: 90;
     transition: width 0.2s cubic-bezier(.2,.8,.2,1), box-shadow 0.2s ease;
   }
-  .kt-mini-rail:hover {
+  /* A popover anchored to the rail outlives the pointer that opened it, so an
+     open menu holds the rail expanded rather than collapsing behind it. */
+  .kt-mini-rail:hover,
+  .kt-mini-rail.is-menu-open {
     width: var(--rail-open);
     box-shadow: 14px 0 36px rgba(0,0,0,0.5);
   }
   .kt-mini-rail:hover .kt-rail-label,
-  .kt-mini-rail:hover .kt-rail-kbd {
+  .kt-mini-rail:hover .kt-rail-kbd,
+  .kt-mini-rail.is-menu-open .kt-rail-label,
+  .kt-mini-rail.is-menu-open .kt-rail-kbd {
     opacity: 1;
     transform: none;
   }
-  .kt-mini-rail:hover .kt-rail-grouplabel {
+  .kt-mini-rail:hover .kt-rail-grouplabel,
+  .kt-mini-rail.is-menu-open .kt-rail-grouplabel {
     color: var(--kt-faint);
   }
-  .kt-mini-rail:hover .kt-rail-grouplabel::before {
+  .kt-mini-rail:hover .kt-rail-grouplabel::before,
+  .kt-mini-rail.is-menu-open .kt-rail-grouplabel::before {
     opacity: 0;
   }
 }

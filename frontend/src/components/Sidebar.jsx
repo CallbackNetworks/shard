@@ -1,93 +1,18 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
-import { ExternalLink, Search, Sun, Moon, CircleSlash, Boxes } from 'lucide-react'
+import { ExternalLink, Search, Sun, Moon } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
-import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
 import { useUiPrefs } from '../utils/uiPrefs'
-import { getNodeTypes } from '../api/client'
-import { hasNodeRole } from '../constants/nodeRoles'
-
-// Registry-driven nav group (ADR-0037): one entry per user-defined container
-// type, landing on its node listing. Individual nodes never enter the rail.
-function ContainerTypesRail({ isActive }) {
-  const { t } = useTranslation()
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
-  const containerTypes = nodeTypes.filter(nt => hasNodeRole(nt, 'container') && !nt.is_builtin)
-  if (containerTypes.length === 0) return null
-
-  return (
-    <div className="kt-mini-group">
-      <div className="kt-rail-grouplabel" aria-hidden="true">{t('nav.containers')}</div>
-      {containerTypes.map(nt => {
-        const to = `/t/${nt.key}`
-        return (
-          <Link
-            key={nt.key}
-            to={to}
-            className={isActive(to) ? 'kt-mini-nav-button is-active' : 'kt-mini-nav-button'}
-            aria-label={nt.label}
-            title={nt.label}
-          >
-            <span className="kt-rail-ico"><Boxes size={16} color={nt.color || undefined} /></span>
-            <span className="kt-rail-label">{nt.label}</span>
-          </Link>
-        )
-      })}
-    </div>
-  )
-}
-
-function FocusRail() {
-  const { t } = useTranslation()
-  const { identities, focusId, toggleFocus, clearFocus } = useIdentityFocus()
-  if (identities.length === 0) return null
-
-  return (
-    <div className="kt-mini-group kt-focus-group">
-      <div className="kt-rail-grouplabel" aria-hidden="true">{t('focus.title')}</div>
-      {identities.map(identity => {
-        const focused = focusId === identity.id
-        return (
-          <button
-            key={identity.id}
-            type="button"
-            onClick={() => toggleFocus(identity.id)}
-            className={focused ? 'kt-mini-nav-button kt-focus-btn is-focused' : 'kt-mini-nav-button kt-focus-btn'}
-            style={{ '--focus-color': identity.color }}
-            aria-pressed={focused}
-            aria-label={focused ? t('focus.clear') : t('focus.focusOn', { name: identity.name })}
-            title={focused ? t('focus.clear') : t('focus.focusOn', { name: identity.name })}
-          >
-            <span className="kt-rail-ico">
-              <span className="kt-focus-avatar">{identity.avatar || identity.name.charAt(0)}</span>
-            </span>
-            <span className="kt-rail-label">{identity.name}</span>
-          </button>
-        )
-      })}
-      {focusId && (
-        <button
-          type="button"
-          onClick={clearFocus}
-          className="kt-mini-nav-button kt-focus-btn"
-          aria-label={t('focus.clear')}
-          title={t('focus.clear')}
-        >
-          <span className="kt-rail-ico"><CircleSlash size={16} /></span>
-          <span className="kt-rail-label">{t('focus.clear')}</span>
-        </button>
-      )}
-    </div>
-  )
-}
+import FocusSwitcher from './FocusSwitcher'
 
 export default function Sidebar({ onOpenPalette }) {
   const { mode, toggle: toggleTheme } = useTheme()
   const location = useLocation()
   const { t, i18n } = useTranslation()
   const prefs = useUiPrefs()
+  const [focusOpen, setFocusOpen] = useState(false)
 
   const isActive = (path) =>
     location.pathname === path || location.pathname.startsWith(path + '/')
@@ -101,7 +26,10 @@ export default function Sidebar({ onOpenPalette }) {
     .filter(g => g.items.length > 0)
 
   return (
-    <aside className="kt-sidebar kt-mini-rail" aria-label="Sidebar navigation">
+    <aside
+      className={focusOpen ? 'kt-sidebar kt-mini-rail is-menu-open' : 'kt-sidebar kt-mini-rail'}
+      aria-label="Sidebar navigation"
+    >
       <div className="kt-mini-brand" title="Shard">
         <span className="kt-rail-logo">S</span>
         <b className="kt-rail-word">SHARD</b>
@@ -118,9 +46,13 @@ export default function Sidebar({ onOpenPalette }) {
         <kbd className="kt-rail-kbd">⌘K</kbd>
       </button>
 
+      {/* Its own grid row, above the scrolling nav: the focus control must
+          stay reachable no matter how far the module list runs. */}
+      <div className="kt-mini-focus-slot">
+        <FocusSwitcher open={focusOpen} onOpenChange={setFocusOpen} />
+      </div>
+
       <nav className="kt-mini-nav" aria-label="Rail module groups">
-        <FocusRail />
-        <ContainerTypesRail isActive={isActive} />
         {groups.map(group => (
           <div key={group.label} className="kt-mini-group">
             <div className="kt-rail-grouplabel" aria-hidden="true">{group.label}</div>

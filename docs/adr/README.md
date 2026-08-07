@@ -67,3 +67,4 @@
 | [0063](0063-an-integrations-configuration-is-credentials.md) | 整合設定裡裝的就是憑證 | Accepted | 2026-08-06 |
 | [0064](0064-the-schema-upgrade-needs-a-home.md) | 升級 schema 這件事需要一個歸屬 | Accepted | 2026-08-06 |
 | [0065](0065-a-containers-numbers-count-its-whole-subtree.md) | 容器的數字要算到它底下的每一層 | Accepted | 2026-08-07 |
+| [0066](0066-one-control-with-n-values-is-not-n-nav-entries.md) | 一個控制項的 N 個值，不是 N 個導航入口 | Accepted | 2026-08-07 |
