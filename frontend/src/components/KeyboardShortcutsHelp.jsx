@@ -11,6 +11,7 @@ const SHORTCUTS = [
   { keys: ['g', 'a'], i18nKey: 'shortcuts.goAnalytics' },
   { keys: ['g', 'i'], i18nKey: 'shortcuts.goIdentities' },
   { keys: ['g', 'g'], i18nKey: 'shortcuts.goGoals' },
+  { keys: ['g', 'p'], i18nKey: 'shortcuts.switchProject' },
 ]
 
 function KeyBadge({ children }) {

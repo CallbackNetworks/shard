@@ -60,17 +60,21 @@ function Layout() {
   const { isAuthenticated, authRequired, isLoading } = useAuth()
   const { theme } = useTheme()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [paletteMode, setPaletteMode] = useState('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
   useRealtimeSync()
 
   const nav = useNavigate()
-  const openPalette = useCallback(() => setPaletteOpen(true), [])
+  const openPalette = useCallback(() => { setPaletteMode('all'); setPaletteOpen(true) }, [])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
+  // Project switching lives here rather than in the rail (ADR-0067).
+  const openProjectSwitcher = useCallback(() => { setPaletteMode('projects'); setPaletteOpen(true) }, [])
 
   useKeyboardShortcuts({
     onSearch: openPalette,
     onShowHelp: () => setShortcutsHelpOpen(v => !v),
+    onSwitchProject: openProjectSwitcher,
     navigate: nav,
   })
 
@@ -78,6 +82,7 @@ function Layout() {
     const handleKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
+        setPaletteMode('all')
         setPaletteOpen(v => !v)
       }
     }
@@ -180,7 +185,7 @@ function Layout() {
           </Suspense>
         </div>
       </main>
-      <CommandPalette open={paletteOpen} onClose={closePalette} />
+      <CommandPalette open={paletteOpen} onClose={closePalette} mode={paletteMode} />
       <NotificationCenter />
       <AssistantPanel />
       <PWAInstallPrompt />

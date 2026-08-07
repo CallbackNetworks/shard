@@ -1,4 +1,4 @@
-import { useState, useDeferredValue } from 'react'
+import { useState, useEffect, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Zap, Bot, Rss, Check, Share2, MessageSquare, CalendarClock } from 'lucide-react'
@@ -26,6 +26,7 @@ import CyclePanel from '../components/CyclePanel'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { getUiPrefs } from '../utils/uiPrefs'
+import { touchProject } from '../utils/recentProjects'
 import { filterTasks } from '../utils/taskFilters'
 import s from './ProjectDetail.module.css'
 
@@ -73,6 +74,10 @@ export default function ProjectDetail() {
     queryKey: ['project', id],
     queryFn: () => getProject(id),
   })
+
+  // Feeds the palette's recency order (ADR-0067). Keyed on the loaded project,
+  // not the route param, so a bad id never enters the switcher.
+  useEffect(() => { if (project?.id) touchProject(project.id) }, [project?.id])
 
   const tasks = project?.tasks || []
   const labels = project?.labels || []

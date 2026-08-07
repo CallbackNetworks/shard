@@ -210,7 +210,9 @@ The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and b
 
 **`ProjectDetail.jsx`**: loads full project (tasks + labels + cycles), supports board/table/gantt/calendar views, client-side search filter on task title. Features: bulk actions (multi-select status/priority/pin), saved filter views, JSON import/export, board WIP limits.
 
-**Keyboard shortcuts** (`hooks/useKeyboardShortcuts.js` + `components/KeyboardShortcutsHelp.jsx`): global single-key (`c`, `n`, `/`, `?`) and chord (`g→h`, `g→a`, `g→i`, `g→g`) shortcuts. `?` toggles the help modal.
+**Keyboard shortcuts** (`hooks/useKeyboardShortcuts.js` + `components/KeyboardShortcutsHelp.jsx`): global single-key (`c`, `n`, `/`, `?`) and chord (`g→h`, `g→a`, `g→i`, `g→g`, `g→p`) shortcuts. `?` toggles the help modal. `g→p` opens the palette instead of navigating — which project you want is a choice, not a fixed destination.
+
+**Project switching lives in the palette, not the rail** (`components/CommandPalette.jsx`, ADR-0067): `mode='projects'` makes it a switcher — projects only, most-recently-visited first (`utils/recentProjects.js`, ids only, localStorage, not cross-device), and it omits the project you are currently in so `g→p`+Enter is always alt-tab. Both modes apply `filterProjects` from the identity focus, including to search-API hits.
 
 **Offline support** (`api/offlineQueue.js` + `hooks/useOfflineSync.js` + `components/OfflineIndicator.jsx`): IndexedDB queue for pending mutations when offline. The producer is the axios response interceptor in `api/client.js` — every write passes through it, so no per-mutation wiring is needed (ADR-0062). `FormData` uploads are not queued. `useOfflineSync` drains the queue through the same axios instance on reconnect, in insertion order, dropping actions the server refuses with a 4xx. Bottom-center indicator shows offline status and pending count.
 

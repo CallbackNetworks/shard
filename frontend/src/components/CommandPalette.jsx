@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash, Boxes } from 'lucide-react'
 import { getProjects, search, getNodes, getNodeTypes } from '../api/client'
 import { BRAND, DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
+import { useIdentityFocus } from '../context/IdentityFocusContext'
+import { orderByRecent, useRecentProjectIds } from '../utils/recentProjects'
 
 const BACKDROP = 'rgba(0,0,0,0.8)'
 const PANEL_BG = DARK.surface
@@ -82,20 +84,36 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
   )
 }
 
-export default function CommandPalette({ open, onClose }) {
+// `mode` picks what the palette is for: 'all' is the general command bar,
+// 'projects' is the dedicated switcher (ADR-0067) — projects only, so the
+// recency order is not diluted by nav commands, tasks and nodes.
+export default function CommandPalette({ open, onClose, mode = 'all' }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [query, setQuery]     = useState('')
   const [activeIdx, setActive] = useState(0)
   const inputRef = useRef(null)
   const debouncedQ = useDebounce(query, 200)
+  const projectsOnly = mode === 'projects'
 
-  const { data: projects = [] } = useQuery({
+  const { filterProjects } = useIdentityFocus()
+  const recentIds = useRecentProjectIds()
+
+  // Alt-tab semantics: the switcher never offers the project you are already
+  // in, so Enter always lands somewhere new (ADR-0067).
+  const { pathname } = useLocation()
+  const currentProjectId = pathname.startsWith('/projects/') ? pathname.slice('/projects/'.length) : null
+
+  const { data: allProjects = [] } = useQuery({
     queryKey: ['projects'],
     queryFn: getProjects,
     staleTime: 30000,
     enabled: open,
   })
+
+  // The palette offers the same projects the rest of the app is showing —
+  // a focused identity narrows it here too.
+  const projects = useMemo(() => filterProjects(allProjects), [filterProjects, allProjects])
 
   const { data: searchResults } = useQuery({
     queryKey: ['palette-search', debouncedQ],
@@ -122,23 +140,42 @@ export default function CommandPalette({ open, onClose }) {
   const items = useMemo(() => {
     const list = []
     const q = query.trim().toLowerCase()
-    const resolvedStatic = STATIC_COMMANDS.map(c => ({ ...c, label: t(c.labelKey) }))
+    const resolvedStatic = STATIC_COMMANDS.map(c => ({ ...c, label: t(c.labelKey), section: t('palette.sectionNavigation') }))
+
+    const projectItem = (p, section) => ({
+      id: `proj-${p.id}`,
+      label: p.name,
+      section,
+      icon: <FolderOpen size={14}/>,
+      meta: p.status === 'archived'
+        ? t('palette.archived')
+        : (p.total_tasks > 0 ? t('palette.taskCount', { count: p.total_tasks }) : undefined),
+      path: `/projects/${p.id}`,
+    })
+
+    // Projects you were just in come first, whatever their status — that is
+    // what makes this a switcher rather than a directory. Everything behind
+    // them stays limited to active projects, as before.
+    const pushProjects = (limit) => {
+      const named = q ? projects.filter(p => p.name.toLowerCase().includes(q)) : projects
+      const matched = projectsOnly ? named.filter(p => p.id !== currentProjectId) : named
+      const { recent, rest } = orderByRecent(matched, recentIds)
+      recent.forEach(p => list.push(projectItem(p, t('palette.sectionRecent'))))
+      rest
+        .filter(p => p.status === 'active')
+        .slice(0, Math.max(0, limit - recent.length))
+        .forEach(p => list.push(projectItem(p, t('palette.sectionProjects'))))
+    }
+
+    if (projectsOnly) {
+      pushProjects(20)
+      return list
+    }
 
     if (!q) {
-      // No query: show static nav + all projects
+      // No query: show static nav + recent and active projects
       resolvedStatic.forEach(c => list.push(c))
-
-      if (projects.length > 0) {
-        const activeProjects = projects.filter(p => p.status === 'active').slice(0, 8)
-        activeProjects.forEach(p => list.push({
-          id: `proj-${p.id}`,
-          label: p.name,
-          section: 'Projects',
-          icon: <FolderOpen size={14}/>,
-          meta: p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined,
-          path: `/projects/${p.id}`,
-        }))
-      }
+      pushProjects(8)
     } else {
       // With query: filter static commands
       const matchedStatic = resolvedStatic.filter(c =>
@@ -146,41 +183,30 @@ export default function CommandPalette({ open, onClose }) {
       )
       matchedStatic.forEach(c => list.push(c))
 
-      // Filter projects by name
-      const matchedProjects = projects.filter(p =>
-        p.name.toLowerCase().includes(q)
-      ).slice(0, 6)
-      matchedProjects.forEach(p => list.push({
-        id: `proj-${p.id}`,
-        label: p.name,
-        section: 'Projects',
-        icon: <FolderOpen size={14}/>,
-        meta: p.status === 'archived' ? 'archived' : (p.total_tasks > 0 ? `${p.total_tasks} tasks` : undefined),
-        path: `/projects/${p.id}`,
-      }))
+      pushProjects(6)
 
       // Search results (tasks)
       if (searchResults?.tasks?.length > 0) {
         searchResults.tasks.slice(0, 8).forEach(task => list.push({
           id: `task-${task.id}`,
           label: task.title,
-          section: 'Tasks',
+          section: t('palette.sectionTasks'),
           icon: <Hash size={14}/>,
           meta: task.status,
           path: `/projects/${task.project_id}`,
         }))
       }
 
-      // Search results (projects from search API)
+      // Search results (projects from search API): these match on more than the
+      // name, but they bypass the identity filter, so only projects already
+      // visible here may come through.
       if (searchResults?.projects?.length > 0) {
         const alreadyIds = new Set(list.filter(i => i.id.startsWith('proj-')).map(i => i.id.replace('proj-', '')))
-        searchResults.projects.filter(p => !alreadyIds.has(p.id)).slice(0, 4).forEach(p => list.push({
-          id: `proj-${p.id}`,
-          label: p.name,
-          section: 'Projects',
-          icon: <FolderOpen size={14}/>,
-          path: `/projects/${p.id}`,
-        }))
+        const visibleById = new Map(projects.map(p => [p.id, p]))
+        searchResults.projects
+          .filter(p => !alreadyIds.has(p.id) && visibleById.has(p.id))
+          .slice(0, 4)
+          .forEach(p => list.push(projectItem(visibleById.get(p.id), t('palette.sectionProjects'))))
       }
 
       // Custom graph nodes (ADR-0037): containers open their task view, the rest
@@ -192,7 +218,7 @@ export default function CommandPalette({ open, onClose }) {
           list.push({
             id: `node-${n.id}`,
             label: n.title || n.id,
-            section: 'Nodes',
+            section: t('palette.sectionNodes'),
             icon: <Boxes size={14}/>,
             meta: nt.label,
             path: hasNodeRole(nt, 'container') ? `/c/${n.id}` : `/n/${n.id}`,
@@ -202,7 +228,7 @@ export default function CommandPalette({ open, onClose }) {
     }
 
     return list
-  }, [query, t, projects, searchResults, nodeTypes, nodeHits])
+  }, [query, t, projects, recentIds, projectsOnly, currentProjectId, searchResults, nodeTypes, nodeHits])
 
   // Group items by section for rendering
   const grouped = []
@@ -287,7 +313,8 @@ export default function CommandPalette({ open, onClose }) {
             ref={inputRef}
             value={query}
             onChange={e => { setQuery(e.target.value); setActive(0) }}
-            placeholder={t('palette.placeholder')}
+            placeholder={projectsOnly ? t('palette.switchProject') : t('palette.placeholder')}
+            aria-label={projectsOnly ? t('palette.switchProject') : t('palette.placeholder')}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
               color: DARK.text, fontSize: 15, fontWeight: 400,
