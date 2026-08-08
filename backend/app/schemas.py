@@ -60,6 +60,9 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     status: str
+    # A project's own colour (ADR-0074). Absent on every project until one is set —
+    # readers fall back to a linked identity's, which is what they used to do outright.
+    color: str | None = None
     share_token: str | None = None
     # Whether a PIN protects the share page, never the hash itself (ADR-0059).
     share_pin_set: bool = False

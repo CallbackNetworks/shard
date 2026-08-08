@@ -39,7 +39,8 @@ export default function ProjectCard({ project, onDelete, index }) {
   const inProgress = tasks.filter(t => t.status === 'in_progress').length
   const failed = tasks.filter(t => t.status === 'failed').length
   const pct = Math.round(project.progress || 0)
-  const identColor = project.identities?.[0]?.color || BRAND
+  // Own colour first, then a linked identity's (ADR-0074) — see ProjectDetail.
+  const identColor = project.color || project.identities?.[0]?.color || BRAND
 
   return (
     <div

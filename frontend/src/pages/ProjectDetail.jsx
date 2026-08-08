@@ -283,7 +283,10 @@ export default function ProjectDetail() {
 
   if (!project) return <div className={s.notFound}>Project not found</div>
 
-  const identColor = project.identities?.[0]?.color || BRAND
+  // The project's own colour first (ADR-0074). Falling back to a linked identity's
+  // keeps every existing project looking the same, but 'first identity' is edge-creation
+  // order — an arbitrary one of the two when a project has two.
+  const identColor = project.color || project.identities?.[0]?.color || BRAND
 
   return (
     <div className={s.container}>

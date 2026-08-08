@@ -1,3 +1,4 @@
+from app.services import graph
 from tests.factories import make_task
 
 
@@ -143,3 +144,18 @@ def test_progress_excludes_subtasks(client, db, sample_project):
     assert data["total_tasks"] == 1
     assert data["done_tasks"] == 0
     assert data["progress"] == 0.0
+
+
+def test_a_project_carries_its_own_colour(client, db, sample_project):
+    """Declared in ADR-0074 and now actually readable.
+
+    Without it the UI reads the first linked identity's colour, where "first" is
+    edge-creation order — so a project with two identities showed an arbitrary one.
+    """
+    assert client.get(f"/api/projects/{sample_project.id}").json()["color"] is None
+
+    graph.update_project(db, sample_project.id, color="#22c55e")
+    db.commit()
+
+    assert client.get(f"/api/projects/{sample_project.id}").json()["color"] == "#22c55e"
+    assert any(p["color"] == "#22c55e" for p in client.get("/api/projects").json())

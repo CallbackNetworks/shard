@@ -38,6 +38,7 @@ class ProjectView:
     name: str
     description: str | None
     status: str
+    color: str | None
     share_token: str | None
     share_expires_at: datetime | None
     # A project is a shareable node, so /api/nodes/{id}/share/set-pin has always
@@ -60,6 +61,7 @@ def _project_view(node: Node) -> ProjectView:
         name=node.title,
         description=data.get("description"),
         status=node.status or "active",
+        color=data.get("color"),
         share_token=data.get("share_token"),
         share_expires_at=_parse_dt(data.get("share_expires_at")),
         share_pin_hash=data.get("share_pin_hash"),
