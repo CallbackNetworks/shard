@@ -19,9 +19,11 @@ from app.services import graph
 # able to tell the three apart, and only ``data`` itself never could.
 #
 # ``kind`` is drawn from what the live data actually contains, not from a type system
-# invented up front: text / longtext / color / emoji / number / url / bool / json.
+# invented up front. ``enum`` carries its own ``options``: a fixed set the editor must
+# render as a picker, because a value outside it is not a preference but a mistake
+# (the same distinction ADR-0056 draws for rule values).
 
-FIELD_KINDS = ("text", "longtext", "color", "emoji", "number", "url", "bool", "json")
+FIELD_KINDS = ("text", "longtext", "color", "emoji", "number", "url", "bool", "json", "enum")
 
 _DESCRIPTION = {"key": "description", "label": "Description", "kind": "longtext"}
 
@@ -60,6 +62,10 @@ BUILTIN_NODE_TYPES: list[dict] = [
         "roles": [graph.ROLE_CONTAINER, graph.ROLE_SHAREABLE, graph.ROLE_SUBSCRIBABLE],
         "fields": [
             _DESCRIPTION,
+            # A project's own colour. Without one the UI borrows its first identity's,
+            # and "first" is edge-creation order — a project with two identities gets
+            # an arbitrary one of the two.
+            {"key": "color", "label": "Colour", "kind": "color"},
             {"key": "repo_url", "label": "Repository URL", "kind": "url"},
             {"key": "agent_instructions", "label": "Agent instructions", "kind": "longtext"},
             {"key": "wip_limits", "label": "WIP limits", "kind": "json"},
@@ -117,14 +123,20 @@ BUILTIN_NODE_TYPES: list[dict] = [
         "label": "Label",
         "icon": "tag",
         "color": "#a78bfa",
-        # ``type``/``decision_status``/``source`` carry the decisions-as-labels
-        # convention (ADR-0004); they are the user's to set, so they are declared.
+        # ``type``/``decision_status`` carry the decisions-as-labels convention
+        # (ADR-0004). Both are closed sets in the live data, so they are pickers, not
+        # free text. ``source`` (manual/frontend/assistant) is *not* declared: it records
+        # which surface created the row, which is the system's note to itself.
         "fields": [
             {"key": "color", "label": "Colour", "kind": "color"},
             _DESCRIPTION,
-            {"key": "type", "label": "Kind", "kind": "text"},
-            {"key": "decision_status", "label": "Decision status", "kind": "text"},
-            {"key": "source", "label": "Source", "kind": "text"},
+            {"key": "type", "label": "Kind", "kind": "enum", "options": ["label", "decision"]},
+            {
+                "key": "decision_status",
+                "label": "Decision status",
+                "kind": "enum",
+                "options": ["proposed", "accepted", "superseded"],
+            },
         ],
     },
 ]

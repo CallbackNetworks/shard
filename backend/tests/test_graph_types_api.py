@@ -283,3 +283,52 @@ def test_fields_can_be_declared_at_create_time(client):
     )
     assert r.status_code == 201
     assert [f["key"] for f in r.json()["fields"]] == ["audience"]
+
+
+def test_a_picker_and_its_options_travel_together(client):
+    """An enum with no options is a picker with nothing in it (ADR-0056, ADR-0074).
+
+    ``options`` originally shipped alongside a kind list that had no ``enum`` in it, so
+    the vocabulary slot existed and nothing could ever use it.
+    """
+    client.post("/api/graph-types/nodes", json={"key": "brief", "label": "Brief"})
+
+    r = client.patch(
+        "/api/graph-types/nodes/brief",
+        json={"fields": [{"key": "audience", "label": "Audience", "kind": "enum"}]},
+    )
+    assert r.status_code == 422
+
+    r = client.patch(
+        "/api/graph-types/nodes/brief",
+        json={"fields": [{"key": "audience", "label": "Audience", "kind": "text", "options": ["a", "b"]}]},
+    )
+    assert r.status_code == 422
+
+    r = client.patch(
+        "/api/graph-types/nodes/brief",
+        json={"fields": [{"key": "audience", "label": "Audience", "kind": "enum", "options": ["a", "b"]}]},
+    )
+    assert r.status_code == 200
+    assert r.json()["fields"][0]["options"] == ["a", "b"]
+
+
+def test_closed_sets_are_declared_as_pickers_not_text(client):
+    """Label's decision vocabulary is fixed (ADR-0004), so it is an enum."""
+    types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
+    label = {f["key"]: f for f in types[graph.NODE_LABEL]["fields"]}
+
+    assert label["type"]["kind"] == "enum"
+    assert set(label["type"]["options"]) == {"label", "decision"}
+    assert label["decision_status"]["kind"] == "enum"
+    assert set(label["decision_status"]["options"]) == {"proposed", "accepted", "superseded"}
+
+    # `source` records which surface created the row — the system's note, not a field.
+    assert "source" not in label
+
+
+def test_a_project_has_its_own_colour(client):
+    """Borrowing the first linked identity's colour makes it edge-creation order."""
+    types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
+    project = {f["key"]: f["kind"] for f in types[graph.NODE_PROJECT]["fields"]}
+    assert project["color"] == "color"

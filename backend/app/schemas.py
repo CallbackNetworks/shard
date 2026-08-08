@@ -1016,6 +1016,20 @@ class NodeFieldSpec(BaseModel):
             raise ValueError(f"unknown field kind {v!r}; expected one of {', '.join(FIELD_KINDS)}")
         return v
 
+    @model_validator(mode="after")
+    def _enum_carries_its_options(self):
+        """The two halves of a picker travel together, or neither is any use.
+
+        An ``enum`` with no options is a picker with nothing in it; options on any other
+        kind is a vocabulary nothing reads — which is how ``options`` shipped in the
+        first place, alongside a kind list that had no ``enum`` in it at all.
+        """
+        if self.kind == "enum" and not self.options:
+            raise ValueError("an enum field must list its options")
+        if self.kind != "enum" and self.options:
+            raise ValueError(f"options are only meaningful on an enum field, not {self.kind!r}")
+        return self
+
 
 class NodeTypeCreate(BaseModel):
     key: str
