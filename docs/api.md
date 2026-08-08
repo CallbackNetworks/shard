@@ -1027,6 +1027,11 @@ If the share link has expired, returns `410 Gone`.
 A PIN set through `/api/nodes/{id}/share/set-pin` is honoured for every type, projects
 included (ADR-0072); unlock at `POST /share/node/{token}/verify`.
 
+The owner-side share endpoints are the same six for every shareable type, and the
+`/api/v1` surface mirrors them exactly: `share/rotate-token`, `share/set-pin`,
+`share/pin` (DELETE), `share/set-expiry`, `share/set-guest-notes` (all `write` scope)
+and `share-views` (`read`).
+
 #### `POST /share/node/{token}/verify`
 Verify the PIN for a protected share link. Sets a session cookie (15-minute TTL) and returns
 the unlocked page — dispatched by node type, exactly like the `GET`.

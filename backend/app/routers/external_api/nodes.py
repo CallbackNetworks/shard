@@ -36,6 +36,7 @@ from app.schemas import (
     TaskOut,
 )
 from app.services import graph, node_data
+from app.services.activity import share_view_count
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -420,6 +421,10 @@ class SetExpiryBody(BaseModel):
     expires_at: datetime | None
 
 
+class SetGuestNotesBody(BaseModel):
+    allowed: bool
+
+
 def _load_shareable(node_id: str, db: Session, api_key: ApiKey) -> Node:
     node = _load_node_or_404(node_id, db)
     _check_node_access(api_key, db, node)
@@ -471,3 +476,29 @@ def api_set_share_expiry(
     graph.update_node(db, node_id, share_expires_at=body.expires_at.isoformat() if body.expires_at else None)
     db.commit()
     return {"ok": True}
+
+
+@sub_router.post(
+    "/nodes/{node_id}/share/set-guest-notes",
+    summary="Allow or stop guest notes on a node's share page",
+    responses=_auth_errors,
+)
+def api_set_share_guest_notes(
+    node_id: str, body: SetGuestNotesBody, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
+):
+    _require_scope(api_key, "write")
+    _load_shareable(node_id, db, api_key)
+    graph.update_node(db, node_id, allow_guest_notes=body.allowed)
+    db.commit()
+    return {"ok": True}
+
+
+@sub_router.get(
+    "/nodes/{node_id}/share-views",
+    summary="How many times a node's share page has been viewed",
+    responses=_auth_errors,
+)
+def api_get_share_views(node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
+    _require_scope(api_key, "read")
+    _load_shareable(node_id, db, api_key)
+    return {"view_count": share_view_count(db, node_id)}

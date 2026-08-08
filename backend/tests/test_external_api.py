@@ -5,6 +5,7 @@ import hashlib
 import pytest
 
 from app.models import ApiKey
+from app.services import graph
 from tests.factories import make_project, make_task
 
 
@@ -559,3 +560,67 @@ class TestExternalApiMutationPipeline:
         )
         assert r.status_code == 201
         assert "task.created" in events
+
+
+# ── Share facade parity (ADR-0070, ADR-0073) ──────────────────────────────────
+
+
+class TestV1ShareFacade:
+    """The v1 share surface mirrors the internal one, or an agent can do half a job.
+
+    Guest notes and the view count were added internally with ADR-0070 and not
+    mirrored here, so a key could rotate a token and set a PIN but could neither
+    open the share page to notes nor read how often it had been seen.
+    """
+
+    def test_guest_notes_toggle_needs_write_and_takes_effect(self, client, db, sample_project, api_key_write):
+        raw, _ = api_key_write
+        nid = sample_project.id
+
+        r = client.post(
+            f"/api/v1/nodes/{nid}/share/set-guest-notes",
+            json={"allowed": True},
+            headers={"X-API-Key": raw},
+        )
+        assert r.status_code == 200
+        assert graph.get_project(db, nid).allow_guest_notes is True
+
+        client.post(
+            f"/api/v1/nodes/{nid}/share/set-guest-notes",
+            json={"allowed": False},
+            headers={"X-API-Key": raw},
+        )
+        assert graph.get_project(db, nid).allow_guest_notes is False
+
+    def test_guest_notes_toggle_refused_to_a_read_key(self, client, sample_project, api_key_read):
+        raw, _ = api_key_read
+        r = client.post(
+            f"/api/v1/nodes/{sample_project.id}/share/set-guest-notes",
+            json={"allowed": True},
+            headers={"X-API-Key": raw},
+        )
+        assert r.status_code == 403
+
+    def test_share_views_readable_with_a_read_key(self, client, sample_project, api_key_read):
+        raw, _ = api_key_read
+        endpoint = f"/api/v1/nodes/{sample_project.id}/share-views"
+
+        assert client.get(endpoint, headers={"X-API-Key": raw}).json() == {"view_count": 0}
+
+        client.get(f"/share/node/{sample_project.share_token}")
+
+        assert client.get(endpoint, headers={"X-API-Key": raw}).json()["view_count"] == 1
+
+    def test_both_refuse_a_type_that_is_not_shareable(self, client, db, sample_project, api_key_write):
+        raw, _ = api_key_write
+        task_id = client.post(
+            "/api/nodes", json={"type": "task", "container_id": sample_project.id, "title": "T"}
+        ).json()["id"]
+
+        r = client.post(
+            f"/api/v1/nodes/{task_id}/share/set-guest-notes",
+            json={"allowed": True},
+            headers={"X-API-Key": raw},
+        )
+        assert r.status_code == 400
+        assert client.get(f"/api/v1/nodes/{task_id}/share-views", headers={"X-API-Key": raw}).status_code == 400
