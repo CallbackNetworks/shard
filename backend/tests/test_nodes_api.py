@@ -366,3 +366,38 @@ def test_task_delete_via_nodes_cleans_subtree(client, db):
     assert db.get(Node, parent) is None
     assert db.get(Node, child) is None
     assert "task.deleted" in _activity_actions(db, parent)
+
+
+# --- Credentials are not writable through the generic bag (ADR-0074) --------------
+
+
+@pytest.mark.parametrize("key", ["share_token", "share_pin_hash", "callback_token", "webhook_secret"])
+@pytest.mark.parametrize("shape", ["nested", "flat"])
+def test_credentials_cannot_be_written_through_the_node_bag(client, sample_project, key, shape):
+    """ADR-0059 stopped these being served and left the write direction open.
+
+    Both ``data`` and top-level extras fold into ``node.data`` (ADR-0040), so the key
+    had two ways in. Setting a signing secret to a value you chose is worth as much as
+    reading it; setting share_pin_hash unlocks the page ADR-0072 locked.
+    """
+    body = {"data": {key: "chosen-by-caller"}} if shape == "nested" else {key: "chosen-by-caller"}
+
+    assert client.patch(f"/api/nodes/{sample_project.id}", json=body).status_code == 422
+    assert client.post("/api/nodes", json={"type": "task", "title": "x", **body}).status_code == 422
+
+
+def test_the_endpoint_that_owns_a_credential_still_sets_it(client, shareable_topic):
+    """The guard refuses the generic bag, not the operation."""
+    nid = shareable_topic["id"]
+    assert client.post(f"/api/nodes/{nid}/share/rotate-token").status_code == 200
+    assert client.post(f"/api/nodes/{nid}/share/set-pin", json={"pin": "4321"}).status_code == 200
+
+
+def test_a_derived_projection_does_not_persist_as_a_junk_key(client, sample_project):
+    """``share_pin_set`` is computed on read; PATCHing a node straight back kept it."""
+    r = client.patch(f"/api/nodes/{sample_project.id}", json={"data": {"share_pin_set": True, "repo_url": "x"}})
+    assert r.status_code == 200
+
+    node = client.get(f"/api/nodes/{sample_project.id}").json()
+    assert node["data"]["repo_url"] == "x"
+    assert node["data"].get("share_pin_set") in (None, False)

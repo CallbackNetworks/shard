@@ -60,6 +60,23 @@ def strip_derived(data: dict | None) -> dict | None:
     return {k: v for k, v in data.items() if k not in DERIVED}
 
 
+# What is never served is never written here either (ADR-0074). ADR-0059 stopped these
+# leaving the server and left the other direction open: the generic node write accepted
+# any key, so ``PATCH /nodes/{id}`` with ``{"data": {"webhook_secret": "..."}}`` set the
+# signing key to a value of the caller's choosing — which for a signature is worth as
+# much as reading it, and for ``share_pin_hash`` unlocks the page ADR-0072 just locked.
+# Every one of these has its own endpoint that logs and rotates properly; none of them
+# has any business arriving through the generic bag.
+NOT_WRITABLE_HERE = tuple(NEVER_SERVED) + tuple(TOKENS)
+
+
+def rejected_write_keys(data: dict | None) -> list[str]:
+    """Credential keys present in an inbound ``data`` bag, in a stable order."""
+    if not data:
+        return []
+    return [k for k in NOT_WRITABLE_HERE if k in data]
+
+
 def strip_tokens(payload):
     """Remove token keys from an already-serialised response, at any depth.
 

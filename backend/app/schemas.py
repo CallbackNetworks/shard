@@ -1121,7 +1121,41 @@ class EdgeTypeOut(BaseModel):
 # --- Generic graph nodes / edges (ADR-0033) ---
 
 
-class NodeCreate(BaseModel):
+class _NodeDataWriteGuard:
+    """What never leaves the server never arrives through the generic bag either.
+
+    ADR-0059 stopped credentials being *served*; the write direction stayed open. Both
+    ``data`` and top-level extras fold into ``node.data`` (ADR-0040), so
+    ``{"data": {"webhook_secret": "..."}}`` — or the same key sent flat — set the signing
+    key to a value the caller picked. For a signature that is worth as much as reading
+    it, and ``share_pin_hash`` set by hand unlocks the page ADR-0072 just locked. Each of
+    these has its own endpoint that rotates and logs; refuse them here (ADR-0074).
+
+    ``share_pin_set`` is the mirror case: derived on read, so a client that GETs a node
+    and PATCHes it straight back would otherwise persist it as a junk key.
+    """
+
+    @model_validator(mode="after")
+    def _guard_data_keys(self):
+        offered = dict(self.__pydantic_extra__ or {})
+        if self.data:
+            offered.update(self.data)
+
+        refused = node_data.rejected_write_keys(offered)
+        if refused:
+            raise ValueError(
+                f"{', '.join(refused)} cannot be set here; use the endpoint that owns it "
+                "(share/rotate-token, share/set-pin, webhook/rotate-secret)"
+            )
+
+        if self.data:
+            self.data = node_data.strip_derived(self.data)
+        for key in node_data.DERIVED:
+            (self.__pydantic_extra__ or {}).pop(key, None)
+        return self
+
+
+class NodeCreate(_NodeDataWriteGuard, BaseModel):
     # Extra fields are allowed and folded into ``data`` by the endpoint (ADR-0040):
     # a task written here may carry description/assignee/... flat, like the retired
     # TaskCreate surface, without enumerating every task-role field here.
@@ -1143,7 +1177,7 @@ class NodeCreate(BaseModel):
     parent_id: str | None = None
 
 
-class NodeUpdate(BaseModel):
+class NodeUpdate(_NodeDataWriteGuard, BaseModel):
     # Extra fields fold into ``data`` (ADR-0040), mirroring NodeCreate.
     model_config = ConfigDict(extra="allow")
 
