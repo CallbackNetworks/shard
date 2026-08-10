@@ -66,6 +66,15 @@ function FieldInput({ spec, value, onChange }) {
       </div>
     )
   }
+  if (spec.kind === 'date') {
+    // datetime-local wants "YYYY-MM-DDTHH:mm"; the API speaks ISO.
+    const local = value ? new Date(value).toISOString().slice(0, 16) : ''
+    return (
+      <input {...common} type="datetime-local" value={local} aria-label={spec.label}
+        style={{ ...common.style, width: 220, colorScheme: 'dark' }}
+        onChange={e => onChange(e.target.value ? new Date(e.target.value).toISOString() : null)} />
+    )
+  }
   if (spec.kind === 'json') {
     return (
       <textarea {...common} rows={3} aria-label={spec.label}
@@ -100,23 +109,34 @@ export default function NodeFieldsPanel({ node, typeMeta, invalidateKeys }) {
     staleTime: 600000,
   })
 
-  const declaredKeys = new Set(specs.map(f => f.key))
+  const declaredKeys = new Set(specs.filter(f => f.store !== 'column').map(f => f.key))
   const managedKeys = new Set(managed?.keys || [])
   const extras = Object.keys(data).filter(k => !declaredKeys.has(k) && !managedKeys.has(k)).sort()
 
-  const valueOf = (key) => (key in draft ? draft[key] : data[key])
-  const dirty = Object.keys(draft).some(k => draft[k] !== (data[k] ?? null))
+  const stored = (key) => {
+    const spec = specs.find(f => f.key === key)
+    return spec?.store === 'column' ? node?.[key] : data[key]
+  }
+  const valueOf = (key) => (key in draft ? draft[key] : stored(key))
+  const dirty = Object.keys(draft).some(k => draft[k] !== (stored(k) ?? null))
 
   const save = useMutation({
     mutationFn: () => {
       // `json` fields are edited as text; send the parsed value or fail loudly rather
       // than silently persisting a string where a dict is expected.
-      const payload = {}
+      // A field says where it lives (ADR-0074): a column goes at the top level, a
+      // `data` key inside `data`. Sending a column key inside `data` would write a
+      // same-named key into the bag and leave the column untouched.
+      const body = {}
+      const data = {}
       for (const [k, v] of Object.entries(draft)) {
         const spec = specs.find(f => f.key === k)
-        payload[k] = spec?.kind === 'json' && typeof v === 'string' ? JSON.parse(v || 'null') : v
+        const value = spec?.kind === 'json' && typeof v === 'string' ? JSON.parse(v || 'null') : v
+        if (spec?.store === 'column') body[k] = value
+        else data[k] = value
       }
-      return updateNode(node.id, { data: payload })
+      if (Object.keys(data).length) body.data = data
+      return updateNode(node.id, body)
     },
     onSuccess: () => {
       for (const key of invalidateKeys || [['node', node.id]]) qc.invalidateQueries({ queryKey: key })

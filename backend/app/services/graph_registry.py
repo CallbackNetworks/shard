@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import EdgeType, NodeType
 from app.services import graph
+from app.services.rules_engine import ACTION_VALUE_ENUMS
 
 # ── Field declarations (ADR-0074) ────────────────────────────────────────────
 # What a type says about its own ``data``: which keys are the user's to fill and what
@@ -23,9 +24,22 @@ from app.services import graph
 # render as a picker, because a value outside it is not a preference but a mistake
 # (the same distinction ADR-0056 draws for rule values).
 
-FIELD_KINDS = ("text", "longtext", "color", "emoji", "number", "url", "bool", "json", "enum")
+FIELD_KINDS = ("text", "longtext", "color", "emoji", "number", "url", "bool", "json", "enum", "date")
+
+# Where a declared field lives. Most are keys in ``data``; a few are real columns on
+# ``nodes`` (title, status, priority, dates). Without this the declaration described
+# only half a node, so every page still had to hand-roll a name box — and a task
+# editor drawn from the declaration would have offered assignee and estimate while
+# leaving status and due date to some other surface (ADR-0074).
+FIELD_STORES = ("data", "column")
 
 _DESCRIPTION = {"key": "description", "label": "Description", "kind": "longtext"}
+
+
+def _name(label: str = "Name") -> dict:
+    """Every node's user-facing name is the ``title`` column, not a key in ``data``."""
+    return {"key": "title", "label": label, "kind": "text", "store": "column"}
+
 
 # Keys no editor may write, whatever a type declares. A share token *is* the public URL
 # and a callback token *is* the authority to post a build result (ADR-0059, ADR-0060);
@@ -61,6 +75,7 @@ BUILTIN_NODE_TYPES: list[dict] = [
         "color": "#818cf8",
         "roles": [graph.ROLE_CONTAINER, graph.ROLE_SHAREABLE, graph.ROLE_SUBSCRIBABLE],
         "fields": [
+            _name(),
             _DESCRIPTION,
             # A project's own colour. Without one the UI borrows its first identity's,
             # and "first" is edge-creation order — a project with two identities gets
@@ -77,7 +92,29 @@ BUILTIN_NODE_TYPES: list[dict] = [
         "icon": "check-square",
         "color": "#38bdf8",
         "roles": [graph.ROLE_TASK],
+        # Half of a task's editable surface is columns (ADR-0074): declaring only the
+        # ``data`` half would have drawn a form offering assignee and estimate while
+        # status and due date lived somewhere else entirely. Status and priority take
+        # their values from the engine's own enums so the picker and the writer cannot
+        # disagree (ADR-0056).
         "fields": [
+            _name("Title"),
+            {
+                "key": "status",
+                "label": "Status",
+                "kind": "enum",
+                "store": "column",
+                "options": list(ACTION_VALUE_ENUMS["set_status"]),
+            },
+            {
+                "key": "priority",
+                "label": "Priority",
+                "kind": "enum",
+                "store": "column",
+                "options": list(ACTION_VALUE_ENUMS["set_priority"]),
+            },
+            {"key": "start_date", "label": "Start date", "kind": "date", "store": "column"},
+            {"key": "due_date", "label": "Due date", "kind": "date", "store": "column"},
             _DESCRIPTION,
             {"key": "assignee", "label": "Assignee", "kind": "text"},
             {"key": "time_estimate", "label": "Estimate (min)", "kind": "number"},
@@ -95,6 +132,7 @@ BUILTIN_NODE_TYPES: list[dict] = [
         # The whole reason the Identity page still exists: three fields no generic
         # surface could draw. Declared, they stop being a reason for a page.
         "fields": [
+            _name(),
             {"key": "color", "label": "Colour", "kind": "color"},
             {"key": "avatar", "label": "Avatar", "kind": "emoji", "max_length": 2},
             _DESCRIPTION,
@@ -109,14 +147,14 @@ BUILTIN_NODE_TYPES: list[dict] = [
         # ``contains`` children. Kept ``is_builtin`` so it stays out of the custom-container
         # nav (it has its own Goals view) while still traversing/aggregating like a container.
         "roles": [graph.ROLE_CONTAINER],
-        "fields": [_DESCRIPTION],
+        "fields": [_name(), _DESCRIPTION],
     },
     {
         "key": graph.NODE_CYCLE,
         "label": "Cycle",
         "icon": "repeat",
         "color": "#fbbf24",
-        "fields": [_DESCRIPTION],
+        "fields": [_name(), _DESCRIPTION],
     },
     {
         "key": graph.NODE_LABEL,
@@ -128,6 +166,7 @@ BUILTIN_NODE_TYPES: list[dict] = [
         # free text. ``source`` (manual/frontend/assistant) is *not* declared: it records
         # which surface created the row, which is the system's note to itself.
         "fields": [
+            _name(),
             {"key": "color", "label": "Colour", "kind": "color"},
             _DESCRIPTION,
             {"key": "type", "label": "Kind", "kind": "enum", "options": ["label", "decision"]},

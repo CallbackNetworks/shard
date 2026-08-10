@@ -30,6 +30,7 @@ from app.services.graph.core import (
     ROLE_SUBSCRIBABLE,
     ROLE_TASK,
     ROLES,
+    WRITABLE_COLUMNS,
     _apply_task_data_defaults,
     _iso,
     _log_event,

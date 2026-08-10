@@ -215,7 +215,7 @@ def test_builtin_types_declare_their_editable_fields(client):
     types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
 
     identity = {f["key"]: f["kind"] for f in types[graph.NODE_IDENTITY]["fields"]}
-    assert identity == {"color": "color", "avatar": "emoji", "description": "longtext"}
+    assert identity == {"title": "text", "color": "color", "avatar": "emoji", "description": "longtext"}
 
     # Every built-in declares something, and none of them declare machinery.
     from app.services.graph_registry import MANAGED_DATA_KEYS
@@ -332,3 +332,47 @@ def test_a_project_has_its_own_colour(client):
     types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
     project = {f["key"]: f["kind"] for f in types[graph.NODE_PROJECT]["fields"]}
     assert project["color"] == "color"
+
+
+def test_a_field_may_live_in_a_column_and_must_name_a_real_one(client):
+    """Half a task's editable surface is columns, so a declaration must reach them.
+
+    A column key the writer does not recognise would be routed into ``data`` under the
+    same name: the field would look saved and the column would never change.
+    """
+    types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
+    task = {f["key"]: f for f in types[graph.NODE_TASK]["fields"]}
+
+    assert task["title"]["store"] == "column"
+    assert task["status"]["store"] == "column"
+    assert task["due_date"]["kind"] == "date"
+    # The picker takes the engine's own vocabulary, not a second copy of it.
+    from app.services.rules_engine import ACTION_VALUE_ENUMS
+
+    assert task["status"]["options"] == list(ACTION_VALUE_ENUMS["set_status"])
+    assert task["priority"]["options"] == list(ACTION_VALUE_ENUMS["set_priority"])
+    # A key in `data` keeps the default store.
+    assert task["assignee"]["store"] == "data"
+
+    client.post("/api/graph-types/nodes", json={"key": "brief", "label": "Brief"})
+    r = client.patch(
+        "/api/graph-types/nodes/brief",
+        json={"fields": [{"key": "severity", "label": "S", "kind": "text", "store": "column"}]},
+    )
+    assert r.status_code == 422
+
+    r = client.patch(
+        "/api/graph-types/nodes/brief",
+        json={"fields": [{"key": "status", "label": "Status", "kind": "text", "store": "column"}]},
+    )
+    assert r.status_code == 200
+
+
+def test_every_builtin_names_itself_through_the_title_column(client):
+    """The name was the last thing every page had to hand-roll a box for."""
+    for t in client.get("/api/graph-types/nodes").json():
+        if not t["is_builtin"]:
+            continue
+        title = next((f for f in t["fields"] if f["key"] == "title"), None)
+        assert title, f"{t['key']} declares no name field"
+        assert title["store"] == "column"

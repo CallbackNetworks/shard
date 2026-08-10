@@ -998,8 +998,19 @@ class NodeFieldSpec(BaseModel):
     key: str
     label: str
     kind: str = "text"
+    # Where the key lives: a ``data`` key, or a real column on ``nodes`` (ADR-0074).
+    store: str = "data"
     max_length: int | None = None
     options: list[str] | None = None
+
+    @field_validator("store")
+    @classmethod
+    def _known_store(cls, v: str) -> str:
+        from app.services.graph_registry import FIELD_STORES
+
+        if v not in FIELD_STORES:
+            raise ValueError(f"unknown field store {v!r}; expected one of {', '.join(FIELD_STORES)}")
+        return v
 
     @field_validator("key")
     @classmethod
@@ -1018,6 +1029,21 @@ class NodeFieldSpec(BaseModel):
         if v not in FIELD_KINDS:
             raise ValueError(f"unknown field kind {v!r}; expected one of {', '.join(FIELD_KINDS)}")
         return v
+
+    @model_validator(mode="after")
+    def _a_column_field_names_a_real_column(self):
+        """A declared column the writer does not recognise would land in ``data``.
+
+        Same name, different place, and nothing would say so — the field would appear
+        to save and the column would never change.
+        """
+        from app.services.graph import WRITABLE_COLUMNS
+
+        if self.store == "column" and self.key not in WRITABLE_COLUMNS:
+            raise ValueError(
+                f"{self.key!r} is not a writable node column; expected one of " f"{', '.join(sorted(WRITABLE_COLUMNS))}"
+            )
+        return self
 
     @model_validator(mode="after")
     def _enum_carries_its_options(self):

@@ -102,6 +102,35 @@ describe('NodeFieldsPanel', () => {
     expect(container.firstChild).toBeNull()
   })
 
+  it('reads and writes a column field at the top level, not inside data', () => {
+    // `title` is a real column. Sent inside `data` it would write a same-named key
+    // into the bag and leave the column untouched — saved-looking and not saved.
+    const taskType = {
+      key: 'task',
+      fields: [
+        { key: 'title', label: 'Title', kind: 'text', store: 'column' },
+        { key: 'status', label: 'Status', kind: 'enum', store: 'column', options: ['todo', 'done'] },
+        { key: 'assignee', label: 'Assignee', kind: 'text' },
+      ],
+    }
+    render(<NodeFieldsPanel
+      node={{ id: 't1', title: 'Ship it', status: 'todo', data: { assignee: 'me' } }}
+      typeMeta={taskType} />)
+
+    // The column's value comes off the node itself.
+    expect(screen.getByLabelText('Title').value).toBe('Ship it')
+    expect(screen.getByLabelText('Status').value).toBe('todo')
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Ship it twice' } })
+    fireEvent.change(screen.getByLabelText('Assignee'), { target: { value: 'you' } })
+    fireEvent.click(screen.getByText('save'))
+
+    expect(mocks.updateNode).toHaveBeenCalledWith('t1', {
+      title: 'Ship it twice',
+      data: { assignee: 'you' },
+    })
+  })
+
   it('forgets a half-typed edit when the node changes underneath it', () => {
     const { rerender } = render(
       <NodeFieldsPanel node={{ id: 'n1', data: { avatar: 'AA' } }} typeMeta={identityType} />)

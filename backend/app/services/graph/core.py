@@ -276,11 +276,18 @@ def ensure_node(db: Session, node_id: str, node_type: str, *, title: str = "") -
     return node
 
 
+# The node fields that are real columns rather than keys in ``data``. Named once so a
+# type's field declaration can say "this one is a column" and be checked against the
+# same list the write below routes by (ADR-0074) — otherwise a declared column the
+# writer does not recognise would land silently in ``data`` under the same name.
+WRITABLE_COLUMNS = frozenset({"title", "status", "priority", "start_date", "due_date", "position", "is_pinned"})
+
+
 def update_node(db: Session, node_id: str, **fields) -> Node | None:
     node = db.get(Node, node_id)
     if node is None:
         return None
-    columns = {"title", "status", "priority", "start_date", "due_date", "position", "is_pinned"}
+    columns = WRITABLE_COLUMNS
     data = dict(node.data or {})
     for key, value in fields.items():
         if key in columns:
