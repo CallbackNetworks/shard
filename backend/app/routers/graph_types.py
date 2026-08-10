@@ -20,7 +20,7 @@ from app.schemas import (
     NodeTypeOut,
     NodeTypeUpdate,
 )
-from app.services import graph
+from app.services import graph, node_data
 
 router = APIRouter(prefix="/graph-types", tags=["graph-types"])
 
@@ -39,6 +39,21 @@ def list_node_types(db: Session = Depends(get_db)):
     for nt in types:
         nt.usage_count = counts.get(nt.key, 0)
     return types
+
+
+@router.get("/data-keys/managed")
+def list_managed_data_keys():
+    """Keys of a node's ``data`` that belong to a feature, not to the user (ADR-0074).
+
+    Served rather than mirrored in the client: a second copy of a vocabulary is how the
+    rules editor ended up offering values the engine rejected (ADR-0056) and how the
+    rule-name list drifted (ADR-0058). The field editor needs this to tell the third
+    bucket — machinery — apart from a key somebody wrote by hand, and it must be the
+    same list the write guard enforces.
+    """
+    from app.services.graph_registry import MANAGED_DATA_KEYS
+
+    return {"keys": sorted(set(MANAGED_DATA_KEYS) | set(node_data.DERIVED))}
 
 
 @router.post("/nodes", response_model=NodeTypeOut, status_code=status.HTTP_201_CREATED)

@@ -10,6 +10,7 @@ import {
 import { DARK, STATUS_COLOR } from '../constants/theme'
 import NodeCombobox from '../components/shared/NodeCombobox'
 import NodeShareFacet from '../components/NodeShareFacet'
+import NodeFieldsPanel from '../components/NodeFieldsPanel'
 import EmptyState from '../components/shared/EmptyState'
 import { hasNodeRole } from '../constants/nodeRoles'
 
@@ -236,6 +237,9 @@ export default function NodePage() {
           <code style={{ fontSize: 11, color: DARK.textDim }}>{node.id}</code>
         </div>
       </div>
+
+      {/* The type's own fields (ADR-0074), drawn from its declaration. */}
+      <NodeFieldsPanel node={node} typeMeta={typeMeta} />
 
       {/* Share (ADR-0039, ADR-0070): the universal node page is the only home a
           shareable node has when its type is not a container — without this its

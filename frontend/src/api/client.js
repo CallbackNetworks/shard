@@ -428,6 +428,9 @@ export const clearNodeSharePin = (id) => api.delete(`/nodes/${id}/share/pin`).th
 export const setNodeShareExpiry = (id, expires_at) => api.post(`/nodes/${id}/share/set-expiry`, { expires_at }).then(r => r.data)
 export const setNodeGuestNotes = (id, allowed) => api.post(`/nodes/${id}/share/set-guest-notes`, { allowed }).then(r => r.data)
 export const getNodeShareViews = (id) => api.get(`/nodes/${id}/share-views`).then(r => r.data)
+// Which data keys belong to a feature rather than the user (ADR-0074). Served, not
+// mirrored here — a second copy of a vocabulary is exactly what ADR-0056/0058 cost.
+export const getManagedDataKeys = () => api.get('/graph-types/data-keys/managed').then(r => r.data)
 export const getEdgeTypes = () => api.get('/graph-types/edges').then(r => r.data)
 export const createEdgeType = (data) => api.post('/graph-types/edges', data).then(r => r.data)
 export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)

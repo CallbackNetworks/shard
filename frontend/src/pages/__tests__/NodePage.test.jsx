@@ -29,6 +29,7 @@ vi.mock('../../api/client', () => ({
   updateNode: vi.fn(), deleteNode: vi.fn(), attachNodeEdge: vi.fn(), detachNodeEdge: vi.fn(),
   rotateNodeShareToken: vi.fn(), setNodeSharePin: vi.fn(), clearNodeSharePin: vi.fn(),
   setNodeShareExpiry: vi.fn(), setNodeGuestNotes: vi.fn(), getNodeShareViews: vi.fn(),
+  getManagedDataKeys: vi.fn(),
 }))
 
 import NodePage from '../NodePage'
@@ -71,6 +72,7 @@ function setup({ nodeData = node } = {}) {
     if (queryKey[0] === 'node-types') return { data: nodeTypes }
     if (queryKey[0] === 'edge-types') return { data: edgeTypes }
     if (queryKey[0] === 'node-search') return { data: [] }
+    if (queryKey[0] === 'managed-data-keys') return { data: { keys: ['share_token', 'share_pin_set'] } }
     return { data: [] }
   })
   mockUseMutation.mockImplementation(({ mutationFn, onSuccess }) => ({

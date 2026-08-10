@@ -974,5 +974,9 @@
   "membership.linkContainer": "連結到容器…",
   "membership.otherRelations": "其他關聯",
   "membership.pickRelation": "— 關係型別 —",
-  "membership.linkRelation": "連結到節點…"
+  "membership.linkRelation": "連結到節點…",
+  "nodeFields.title": "欄位",
+  "nodeFields.saved": "已儲存",
+  "nodeFields.undeclared": "這個型別沒有宣告的鍵",
+  "nodeFields.undeclaredHint": "這個節點上有值，但不屬於它的型別。此處唯讀。"
 }

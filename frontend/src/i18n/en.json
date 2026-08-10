@@ -970,5 +970,9 @@
   "membership.linkContainer": "Link to a container…",
   "membership.otherRelations": "Other relations",
   "membership.pickRelation": "— relation type —",
-  "membership.linkRelation": "Link to a node…"
+  "membership.linkRelation": "Link to a node…",
+  "nodeFields.title": "Fields",
+  "nodeFields.saved": "Saved",
+  "nodeFields.undeclared": "Not declared by this type",
+  "nodeFields.undeclaredHint": "Present on this node but not part of its type. Read-only here."
 }
