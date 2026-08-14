@@ -1,7 +1,10 @@
-# Pinned exactly, like backend/requirements.txt: a floating `mcp>=1.0.0` let a
-# fresh image pick up mcp 2.0, whose Server API dropped `list_tools`, so the
-# server died at import while the long-running dev container kept working.
-mcp==1.28.0
+# Pinned exactly, like backend/requirements.txt. The pin is what stopped a fresh
+# image from silently picking up 2.0, whose low-level `Server` dropped the
+# `list_tools`/`call_tool` decorators this server was built on — it would have
+# died at import while the long-running dev container kept working. We are now
+# *on* 2.0, deliberately, via `MCPServer` (ADR-0077); the pin still matters for
+# the same reason.
+mcp==2.0.0
 httpx==0.28.1
 pytest==9.1.0
 pytest-asyncio==1.4.0

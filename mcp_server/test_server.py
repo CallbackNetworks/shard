@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 import pytest_asyncio
+from mcp.server.mcpserver.exceptions import ResourceNotFoundError, ToolError
 
 import server as mcp_server
 
@@ -35,10 +36,16 @@ def _patch_client(method, response):
 
 
 async def _call(tool_name, arguments=None):
-    """Call a tool and return the text result."""
-    result = await mcp_server.call_tool(tool_name, arguments)
-    assert len(result) == 1
-    return result[0].text
+    """Call a tool through the real registry and return the text result.
+
+    Goes through ``mcp.call_tool`` rather than a module-level dispatch function:
+    after ADR-0077 there is no dispatch to call: the registry the SDK builds from
+    the decorators *is* the thing under test, so this exercises argument
+    validation and routing too, not just the implementation behind them.
+    """
+    result = await mcp_server.mcp.call_tool(tool_name, arguments or {})
+    assert len(result.content) == 1
+    return result.content[0].text
 
 
 # ── Tool: get_summary ───────────────────────────────────────────────
@@ -163,8 +170,15 @@ async def test_manage_labels_list():
 
 @pytest.mark.asyncio
 async def test_manage_labels_list_no_project():
-    text = await _call("manage_labels", {"action": "list"})
-    assert "project_id required" in text
+    """A missing required argument is refused before the tool body runs.
+
+    The old dispatch read arguments with `.get()` and let the body return the
+    string "project_id required for list action" as a *successful* result, even
+    though the declared schema already marked it required. The schema is now
+    enforced (ADR-0077), so the contract and the behaviour agree.
+    """
+    with pytest.raises(ToolError):
+        await _call("manage_labels", {"action": "list"})
 
 
 @pytest.mark.asyncio
@@ -195,8 +209,9 @@ async def test_manage_labels_remove():
 
 @pytest.mark.asyncio
 async def test_manage_labels_unknown_action():
-    text = await _call("manage_labels", {"action": "rename", "project_id": "p1"})
-    assert "Unknown label action" in text
+    """A value outside the declared enum is refused, not answered."""
+    with pytest.raises(ToolError):
+        await _call("manage_labels", {"action": "rename", "project_id": "p1"})
 
 
 # ── Tool: analyze_workload ──────────────────────────────────────────
@@ -324,10 +339,10 @@ async def test_manage_dependencies_remove():
 
 @pytest.mark.asyncio
 async def test_manage_dependencies_unknown_action():
-    text = await _call("manage_dependencies", {
-        "action": "reorder", "project_id": "p1", "task_id": "t1"
-    })
-    assert "Unknown dependency action" in text
+    with pytest.raises(ToolError):
+        await _call("manage_dependencies", {
+            "action": "reorder", "project_id": "p1", "task_id": "t1"
+        })
 
 
 # ── Tool: get_notifications ─────────────────────────────────────────
@@ -455,8 +470,9 @@ async def test_delete_task_not_found():
 
 @pytest.mark.asyncio
 async def test_unknown_tool():
-    text = await _call("nonexistent_tool", {})
-    assert "Unknown tool" in text
+    """An unknown tool is an error, not a result whose text says "Unknown tool"."""
+    with pytest.raises(ToolError):
+        await _call("nonexistent_tool", {})
 
 
 # ── Tool error handling ─────────────────────────────────────────────
@@ -464,9 +480,16 @@ async def test_unknown_tool():
 
 @pytest.mark.asyncio
 async def test_tool_exception_handling():
+    """A failing tool reports failure.
+
+    The catch-all used to turn any exception into the text "Tool error: ..." on
+    an otherwise successful result — a failure a client could only detect by
+    reading the prose. It now surfaces as an error (ADR-0077), the same
+    distinction ADR-0051 drew for unrecognised webhook statuses.
+    """
     with patch("server._get_summary", side_effect=Exception("connection refused")):
-        text = await _call("get_summary")
-    assert "Tool error" in text
+        with pytest.raises(ToolError, match="connection refused"):
+            await _call("get_summary")
 
 
 # ── HTTP helper: _post 204 ──────────────────────────────────────────
@@ -541,13 +564,13 @@ async def test_get_container_subtree_error():
 
 @pytest.mark.asyncio
 async def test_list_tools_count():
-    tools = await mcp_server.list_tools()
+    tools = await mcp_server.mcp.list_tools()
     assert len(tools) == 21
 
 
 @pytest.mark.asyncio
 async def test_list_tools_names():
-    tools = await mcp_server.list_tools()
+    tools = await mcp_server.mcp.list_tools()
     names = {t.name for t in tools}
     expected = {
         "get_summary", "list_tasks", "create_task", "update_task", "create_subtask",
@@ -565,7 +588,7 @@ async def test_list_tools_names():
 
 @pytest.mark.asyncio
 async def test_list_resources():
-    resources = await mcp_server.list_resources()
+    resources = await mcp_server.mcp.list_resources()
     assert len(resources) == 4
     uris = {str(r.uri) for r in resources}
     assert "todo://summary" in uris
@@ -579,9 +602,9 @@ async def test_list_resources():
 
 @pytest.mark.asyncio
 async def test_list_resource_templates():
-    templates = await mcp_server.list_resource_templates()
+    templates = await mcp_server.mcp.list_resource_templates()
     assert len(templates) == 1
-    assert "project_id" in templates[0].uriTemplate
+    assert "project_id" in templates[0].uri_template
 
 
 # ── MCP: read_resource ──────────────────────────────────────────────
@@ -591,9 +614,9 @@ async def test_list_resource_templates():
 async def test_read_resource_summary():
     data = {"total_projects": 2}
     with _patch_client("get", _mock_response(json_data=data)):
-        result = await mcp_server.read_resource("todo://summary")
+        result = list(await mcp_server.mcp.read_resource("todo://summary"))
     assert len(result) == 1
-    parsed = json.loads(result[0].text)
+    parsed = json.loads(result[0].content)
     assert parsed["total_projects"] == 2
 
 
@@ -601,16 +624,21 @@ async def test_read_resource_summary():
 async def test_read_resource_project():
     data = {"id": "p1", "name": "Test", "tasks": []}
     with _patch_client("get", _mock_response(json_data=data)):
-        result = await mcp_server.read_resource("todo://projects/p1")
-    parsed = json.loads(result[0].text)
+        result = list(await mcp_server.mcp.read_resource("todo://projects/p1"))
+    parsed = json.loads(result[0].content)
     assert parsed["id"] == "p1"
 
 
 @pytest.mark.asyncio
 async def test_read_resource_unknown():
-    result = await mcp_server.read_resource("todo://nope")
-    parsed = json.loads(result[0].text)
-    assert "error" in parsed
+    """An unregistered URI is an error, not a resource whose body says "error".
+
+    The hand-rolled reader fell through to `{"error": ...}` with a 200-shaped
+    result, so a client had to parse the body to find out the read failed.
+    The registry raises instead (ADR-0077).
+    """
+    with pytest.raises(ResourceNotFoundError):
+        await mcp_server.mcp.read_resource("todo://nope")
 
 
 # ── MCP: list_prompts ───────────────────────────────────────────────
@@ -618,7 +646,7 @@ async def test_read_resource_unknown():
 
 @pytest.mark.asyncio
 async def test_list_prompts():
-    prompts = await mcp_server.list_prompts()
+    prompts = await mcp_server.mcp.list_prompts()
     assert len(prompts) == 4
     names = {p.name for p in prompts}
     assert names == {"plan-my-day", "project-review", "triage-inbox", "weekly-summary"}
@@ -629,21 +657,22 @@ async def test_list_prompts():
 
 @pytest.mark.asyncio
 async def test_get_prompt_plan_my_day():
-    result = await mcp_server.get_prompt("plan-my-day")
+    result = await mcp_server.mcp.get_prompt("plan-my-day")
     assert len(result.messages) == 1
     assert "overdue" in result.messages[0].content.text.lower()
 
 
 @pytest.mark.asyncio
 async def test_get_prompt_project_review():
-    result = await mcp_server.get_prompt("project-review", {"project_name": "Alpha"})
+    result = await mcp_server.mcp.get_prompt("project-review", {"project_name": "Alpha"})
     assert "Alpha" in result.messages[0].content.text
 
 
 @pytest.mark.asyncio
 async def test_get_prompt_unknown():
-    result = await mcp_server.get_prompt("nonexistent-prompt")
-    assert "Unknown prompt" in result.messages[0].content.text
+    """An unregistered prompt raises rather than returning a prompt that says so."""
+    with pytest.raises(ValueError, match="Unknown prompt"):
+        await mcp_server.mcp.get_prompt("nonexistent-prompt")
 
 
 # ── HTTP client config ──────────────────────────────────────────────
