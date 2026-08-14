@@ -37,6 +37,27 @@ REL_IN_CYCLE = "in_cycle"  # task -> cycle
 _IN_CHUNK = 500
 
 
+# A container's status has one rule (ADR-0075). The ``status`` column is optional — the
+# generic node write surface (``POST /api/v1/nodes``) has no reason to invent one — so a
+# container row can carry NULL, and every view reads that as "active". A filter comparing
+# the column directly does not, which is how ``/api/v1/projects`` could list a project
+# that ``/api/v1/agent-context`` reported did not exist. Read the default and filter for
+# it through this pair, never by hand.
+CONTAINER_DEFAULT_STATUS = "active"
+
+
+def container_status(node: Node) -> str:
+    """The status a container presents: its column, or the default when unset."""
+    return node.status or CONTAINER_DEFAULT_STATUS
+
+
+def container_status_filter(status: str):
+    """Criterion matching ``status`` the way :func:`container_status` reads it."""
+    if status == CONTAINER_DEFAULT_STATUS:
+        return or_(Node.status == status, Node.status.is_(None))
+    return Node.status == status
+
+
 # --- Capability roles (registry-driven; ADR-0033 A5, ADR-0040) ---------------
 
 # Role vocabulary carried by ``node_types.roles`` (ADR-0040). Nouns, no ``-like``.

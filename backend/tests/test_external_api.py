@@ -450,6 +450,29 @@ class TestAgentContext:
         names = [proj["name"] for proj in data["projects"]]
         assert "Active Proj" in names
 
+    def test_agent_context_sees_a_project_created_through_the_write_surface(self, client, api_key_write, api_key_read):
+        """A project an agent created must be visible to the endpoint agents start from.
+
+        ``POST /api/v1/nodes`` has no reason to send a status, so the column stays NULL.
+        Every view reads NULL as "active"; the listing filter used to compare the column,
+        so ``/api/v1/projects`` returned the project while ``/api/v1/agent-context``
+        reported an empty platform (ADR-0075). The test creates it the way an agent does
+        rather than passing ``status`` in, which is what hid this.
+        """
+        raw_write, _ = api_key_write
+        created = client.post(
+            "/api/v1/nodes",
+            json={"type": "project", "title": "Made by an agent"},
+            headers={"X-API-Key": raw_write},
+        )
+        assert created.status_code == 201
+
+        raw_read, _ = api_key_read
+        listed = client.get("/api/v1/projects", headers={"X-API-Key": raw_read}).json()
+        context = client.get("/api/v1/agent-context", headers={"X-API-Key": raw_read}).json()
+        assert [p["name"] for p in listed] == [p["name"] for p in context["projects"]]
+        assert "Made by an agent" in [p["name"] for p in context["projects"]]
+
 
 # ── Summary ──────────────────────────────────────────────────────────────
 

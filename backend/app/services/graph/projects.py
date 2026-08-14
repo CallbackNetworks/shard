@@ -26,6 +26,8 @@ from app.services.graph.core import (
     _iso,
     _parse_dt,
     children_of,
+    container_status,
+    container_status_filter,
     container_type_keys,
     create_node,
     task_type_keys,
@@ -60,7 +62,7 @@ def _project_view(node: Node) -> ProjectView:
         id=node.id,
         name=node.title,
         description=data.get("description"),
-        status=node.status or "active",
+        status=container_status(node),
         color=data.get("color"),
         share_token=data.get("share_token"),
         share_expires_at=_parse_dt(data.get("share_expires_at")),
@@ -133,7 +135,7 @@ def all_projects(db: Session, *, status: str | None = None) -> list[ProjectView]
     """All project nodes, newest first, optionally filtered by status."""
     query = db.query(Node).filter(Node.type == NODE_PROJECT)
     if status is not None:
-        query = query.filter(Node.status == status)
+        query = query.filter(container_status_filter(status))
     rows = query.order_by(Node.created_at.desc()).all()
     return [_project_view(node) for node in rows]
 

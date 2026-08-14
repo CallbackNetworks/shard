@@ -76,3 +76,4 @@
 | [0072](0072-a-lock-that-can-be-set-is-a-lock-that-is-enforced.md) | 設得上去的鎖，就必須是會擋人的鎖 | Accepted | 2026-08-07 |
 | [0073](0073-a-project-is-shared-like-everything-else.md) | 專案跟其他東西用同一套分享 | Accepted | 2026-08-07 |
 | [0074](0074-a-type-declares-which-fields-are-the-users.md) | 型別自己宣告哪些欄位是使用者的 | Accepted | 2026-08-07 |
+| [0075](0075-a-container-status-has-one-rule.md) | 容器的狀態只有一套規則 | Accepted | 2026-08-14 |

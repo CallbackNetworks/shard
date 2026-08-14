@@ -13,6 +13,7 @@ reaches labels/cycles via deferred imports.
 
 from app.services.graph.core import (
     _TASK_DATA_SCALARS,
+    CONTAINER_DEFAULT_STATUS,
     NODE_CYCLE,
     NODE_GOAL,
     NODE_IDENTITY,
@@ -38,6 +39,8 @@ from app.services.graph.core import (
     add_edge,
     ancestors_of,
     children_of,
+    container_status,
+    container_status_filter,
     container_type_keys,
     create_node,
     delete_node,

@@ -21,6 +21,8 @@ from app.services.graph.core import (
     NODE_PROJECT,
     REL_CONTAINS,
     add_edge,
+    container_status,
+    container_status_filter,
     create_node,
     delete_node,
     ensure_node,
@@ -82,7 +84,7 @@ def _goal_view(node: Node) -> GoalView:
         id=node.id,
         title=node.title,
         description=data.get("description"),
-        status=node.status or "active",
+        status=container_status(node),
         target_date=node.due_date,
         created_at=node.created_at,
         updated_at=node.updated_at,
@@ -149,6 +151,6 @@ def all_goals(db: Session, *, status: str | None = None) -> list[GoalView]:
     """All goal nodes, newest first, optionally filtered by status."""
     query = db.query(Node).filter(Node.type == NODE_GOAL)
     if status is not None:
-        query = query.filter(Node.status == status)
+        query = query.filter(container_status_filter(status))
     rows = query.order_by(Node.created_at.desc()).all()
     return [_goal_view(node) for node in rows]

@@ -91,3 +91,26 @@ def test_goal_project_replacement_keeps_direct_tasks(client, db):
     assert graph.project_ids_for_goal(db, goal_id) == [b]
     # The directly-held task survives the project swap.
     assert direct["id"] in graph.descendants_of(db, goal_id)
+
+
+def test_status_default_is_the_same_rule_for_listing_and_reading(client, db):
+    """A container created without a status must still list as active (ADR-0075).
+
+    ``/api/nodes`` sends no status, so the column is NULL and every view renders it
+    "active". ``all_projects``/``all_goals`` filtered the column instead, so a container
+    could read as active and be missing from the active listing at the same time.
+    """
+    from app.services import graph
+
+    pid = _project(client, "no status given")
+    goal_id = _goal(client, "no status either")
+
+    assert graph.get_project(db, pid).status == "active"
+    assert graph.get_goal(db, goal_id).status == "active"
+    assert pid in [p.id for p in graph.all_projects(db, status="active")]
+    assert goal_id in [g.id for g in graph.all_goals(db, status="active")]
+
+    # An explicit status still filters exactly, and does not pick up the NULL rows.
+    client.patch(f"/api/nodes/{pid}", json={"status": "archived"})
+    assert pid not in [p.id for p in graph.all_projects(db, status="active")]
+    assert pid in [p.id for p in graph.all_projects(db, status="archived")]
