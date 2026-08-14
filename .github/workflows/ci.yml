@@ -185,6 +185,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ci-builder
     steps:
+      # The backend and frontend steps only re-tag images the integration job
+      # left on the runner, so this job used to need no source at all. Building
+      # the MCP image here does need it — without the checkout the compose file
+      # is missing and publish fails *after* pushing backend and frontend, which
+      # takes the deploy down with it.
+      - uses: actions/checkout@v4
+
       - name: Login to registry
         env:
           REGISTRY_URL: ${{ vars.REGISTRY_URL }}
