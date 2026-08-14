@@ -209,6 +209,17 @@ jobs:
           docker push $IMAGE_PREFIX/frontend:${{ github.sha }}
           docker push $IMAGE_PREFIX/frontend:latest
 
+      # Built here rather than reused from the integration stack: the MCP server has no
+      # part in that stack (its tests mock every HTTP call), but the image has to exist
+      # in the registry for a deployment that enables remote MCP (ADR-0076).
+      - name: Build, tag and push MCP server
+        run: |
+          docker compose -f docker-compose.ci.yml -p ci-publish build mcp
+          docker tag ci-publish-mcp:latest $IMAGE_PREFIX/mcp:${{ github.sha }}
+          docker tag ci-publish-mcp:latest $IMAGE_PREFIX/mcp:latest
+          docker push $IMAGE_PREFIX/mcp:${{ github.sha }}
+          docker push $IMAGE_PREFIX/mcp:latest
+
   deploy:
     name: Deploy to production
     needs: [publish]
@@ -259,6 +270,8 @@ jobs:
           LLM_MODEL: ${{ vars.LLM_MODEL }}
           SUMMARY_HOUR: ${{ vars.SUMMARY_HOUR }}
           AGENT_CONTEXT_INSTRUCTIONS: ${{ vars.AGENT_CONTEXT_INSTRUCTIONS }}
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+          MCP_HTTP_TOKEN: ${{ secrets.MCP_HTTP_TOKEN }}
         run: |
           mkdir -p "$DEPLOY_DIR"
           cat > "$DEPLOY_DIR/.env" <<ENVEOF
@@ -285,7 +298,21 @@ jobs:
           LLM_MODEL=${LLM_MODEL:-}
           SUMMARY_HOUR=${SUMMARY_HOUR:-8}
           AGENT_CONTEXT_INSTRUCTIONS=${AGENT_CONTEXT_INSTRUCTIONS:-}
+          MCP_API_KEY=${MCP_API_KEY:-}
+          MCP_HTTP_TOKEN=${MCP_HTTP_TOKEN:-}
           ENVEOF
+
+          # Whether this deployment serves remote MCP at all. Both halves are required:
+          # the API key it acts with, and the bearer token that guards the endpoint
+          # (ADR-0076). Missing either, the service is left out of the compose file
+          # entirely rather than deployed in a half-configured state.
+          if [ -n "${MCP_API_KEY:-}" ] && [ -n "${MCP_HTTP_TOKEN:-}" ]; then
+            echo "MCP_ENABLED=1" >> $GITHUB_ENV
+            echo "Remote MCP: enabled"
+          else
+            echo "MCP_ENABLED=0" >> $GITHUB_ENV
+            echo "Remote MCP: disabled (set both MCP_API_KEY and MCP_HTTP_TOKEN secrets to enable)"
+          fi
 
       - name: Generate compose file
         env:
@@ -322,6 +349,37 @@ jobs:
               restart: unless-stopped
               networks:
                 - app-network
+          EOF
+
+          # Remote MCP (ADR-0076): reachable only from the frontend's nginx over the
+          # internal network — no host port. The only way in is https://<host>/mcp with
+          # the bearer token, so the endpoint has exactly one door, like every other
+          # public surface here.
+          if [ "$MCP_ENABLED" = "1" ]; then
+            cat >> "$DEPLOY_DIR/docker-compose.yml" <<EOF
+            mcp:
+              image: $IMAGE_PREFIX/mcp:$IMAGE_TAG
+              container_name: ${REPO_NAME}-mcp
+              expose:
+                - "8001"
+              environment:
+                - MCP_TRANSPORT=http
+                - MCP_HTTP_PORT=8001
+                - API_BASE_URL=http://backend:8000
+                - API_KEY=\${MCP_API_KEY}
+                - MCP_HTTP_TOKEN=\${MCP_HTTP_TOKEN}
+              env_file:
+                - .env
+              depends_on:
+                backend:
+                  condition: service_healthy
+              restart: unless-stopped
+              networks:
+                - app-network
+          EOF
+          fi
+
+          cat >> "$DEPLOY_DIR/docker-compose.yml" <<EOF
           networks:
             app-network:
           EOF
@@ -370,6 +428,29 @@ jobs:
           done
           echo "Frontend verification failed"
           docker logs $REPO_NAME-frontend --tail 50
+          exit 1
+
+      # Negative control: the endpoint has to be reachable *and* closed. A 200 here would
+      # mean either the SPA answered its own path with index.html (ADR-0071) or the token
+      # check is not running; a 502 means nginx has no mcp container to reach.
+      - name: Verify remote MCP is reachable and refuses an unauthenticated call
+        run: |
+          [ "$MCP_ENABLED" = "1" ] || { echo "Remote MCP disabled; nothing to verify"; exit 0; }
+          i=1
+          while [ $i -le 15 ]; do
+            out=$(docker exec $REPO_NAME-frontend wget -q -O - \
+              --header='Content-Type: application/json' --post-data='{}' \
+              http://127.0.0.1:80/mcp 2>&1 || true)
+            case "$out" in
+              *401*) echo "MCP endpoint up and refusing unauthenticated calls"; exit 0 ;;
+              *502*) echo "Attempt $i: nginx cannot reach the mcp container yet" ;;
+              *) echo "Attempt $i: unexpected response: $out" ;;
+            esac
+            i=$((i + 1))
+            sleep 2
+          done
+          echo "Remote MCP verification failed"
+          docker logs $REPO_NAME-mcp --tail 50
           exit 1
 
       - name: Show deployment status

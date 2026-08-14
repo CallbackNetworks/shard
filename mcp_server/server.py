@@ -9,6 +9,7 @@ broadcasts) is applied consistently.  See ADR-0005 for rationale.
 import asyncio
 import json
 import os
+import secrets
 
 import httpx
 import mcp.types as types
@@ -918,10 +919,22 @@ def create_http_app():
     from starlette.middleware import Middleware
     from starlette.middleware.cors import CORSMiddleware
     from starlette.requests import Request
-    from starlette.responses import JSONResponse, Response
-    from starlette.routing import Mount, Route
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
 
+    # The token is mandatory here, not optional (ADR-0076). Over stdio the client owns
+    # the process and the OS is the boundary; over HTTP the endpoint is reachable by
+    # anyone who can route to it, and every tool behind it carries the server's own API
+    # key. ``if http_token:`` used to mean an unset variable published all 21 tools
+    # unauthenticated — the same shape as the webhook signature that opened with
+    # ``if not secret: return True`` (ADR-0060). Refuse to start instead.
     http_token = os.environ.get("MCP_HTTP_TOKEN", "")
+    if not http_token:
+        raise SystemExit(
+            "MCP_HTTP_TOKEN is required for MCP_TRANSPORT=http: the HTTP endpoint "
+            "exposes every tool to anyone who can reach it. Set a token, or use the "
+            "default stdio transport, where the client owns the process."
+        )
 
     session_manager = StreamableHTTPSessionManager(
         app=server,
@@ -930,21 +943,34 @@ def create_http_app():
     )
 
     async def auth_check(request: Request):
-        if http_token:
-            auth = request.headers.get("authorization", "")
-            token = auth.removeprefix("Bearer ").strip()
-            if token != http_token:
-                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        # No ``if http_token`` guard: the app does not exist without one.
+        #
+        # The scheme is required and compared case-insensitively (RFC 7235 makes it so):
+        # ``removeprefix("Bearer ")`` alone accepted a bare token as well, which is a
+        # second undocumented way in, and rejected the equally valid ``bearer``.
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        if scheme.lower() != "bearer" or not secrets.compare_digest(token.strip(), http_token):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
         return None
 
-    async def handle_mcp(request: Request):
-        err = await auth_check(request)
-        if err:
-            return err
-        await session_manager.handle_request(
-            request.scope, request.receive, request._send
-        )
-        return Response()
+    # A raw ASGI app, not a request/response handler. The session manager writes the
+    # response itself — it owns the stream it keeps open — so a handler that also returns
+    # a ``Response`` sends a second ``http.response.start`` for every successful call.
+    # Nothing caught it because nothing had ever exercised the authenticated path; the
+    # transport had never run anywhere (ADR-0076).
+    #
+    # A class rather than a function because that is how Starlette tells the two apart:
+    # ``Route`` wraps a *function* endpoint in request/response plumbing and passes
+    # anything else straight through as ASGI. ``Mount`` would also pass it through, but
+    # only matches ``/mcp/...`` — the exact ``/mcp`` an MCP client posts to becomes a 307
+    # to the slash form, or a 404 with redirects off.
+    class McpEndpoint:
+        async def __call__(self, scope, receive, send):
+            err = await auth_check(Request(scope, receive))
+            if err is not None:
+                await err(scope, receive, send)
+                return
+            await session_manager.handle_request(scope, receive, send)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -954,7 +980,7 @@ def create_http_app():
     app = Starlette(
         lifespan=lifespan,
         routes=[
-            Route("/mcp", endpoint=handle_mcp, methods=["GET", "POST", "DELETE"]),
+            Route("/mcp", endpoint=McpEndpoint(), methods=["GET", "POST", "DELETE"]),
         ],
         middleware=[
             Middleware(

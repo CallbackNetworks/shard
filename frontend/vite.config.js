@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { BACKEND_PATHS, claimedByBackend } from './backendPaths.js'
 
 const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000'
+const mcpUrl = process.env.MCP_URL || 'http://localhost:8001'
 
 export default defineConfig({
   test: {
@@ -89,7 +90,10 @@ export default defineConfig({
     proxy: Object.fromEntries(
       BACKEND_PATHS.map(p => [
         `^${p.replace(/[.]/g, '\\.')}(?:[/?]|$)`,
-        p === '/ws' ? { target: backendUrl, ws: true } : backendUrl,
+        // /ws upgrades, and /mcp is served by the mcp container rather than the backend
+        // (ADR-0076) — pointing it at the backend would 404 and look like a broken
+        // MCP server. Only reachable in dev with `--profile mcp` up.
+        p === '/ws' ? { target: backendUrl, ws: true } : p === '/mcp' ? mcpUrl : backendUrl,
       ]),
     )
   }

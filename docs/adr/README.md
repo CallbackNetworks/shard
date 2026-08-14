@@ -77,3 +77,4 @@
 | [0073](0073-a-project-is-shared-like-everything-else.md) | 專案跟其他東西用同一套分享 | Accepted | 2026-08-07 |
 | [0074](0074-a-type-declares-which-fields-are-the-users.md) | 型別自己宣告哪些欄位是使用者的 | Accepted | 2026-08-07 |
 | [0075](0075-a-container-status-has-one-rule.md) | 容器的狀態只有一套規則 | Accepted | 2026-08-14 |
+| [0076](0076-remote-mcp-through-the-existing-door.md) | 遠端 MCP 走既有那扇門，而且那扇門一定上鎖 | Accepted | 2026-08-14 |

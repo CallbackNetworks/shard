@@ -660,3 +660,59 @@ def test_client_headers_include_api_key():
     client = mcp_server._get_client()
     assert "X-API-Key" in client.headers
     assert client.headers["Content-Type"] == "application/json"
+
+
+# ── HTTP transport (ADR-0076) ────────────────────────────────────────
+
+
+def test_http_app_refuses_to_start_without_a_token(monkeypatch):
+    """An HTTP MCP endpoint without a token publishes every tool to anyone who can reach it.
+
+    Over stdio the client owns the process; over HTTP the door is open to the network, and
+    each tool acts with the server's own API key. The check used to be ``if http_token:``,
+    so an unset variable meant no check at all — the shape ADR-0060 removed from webhook
+    signatures. Refusing to boot is the only state that cannot be reached by forgetting.
+    """
+    monkeypatch.delenv("MCP_HTTP_TOKEN", raising=False)
+    with pytest.raises(SystemExit) as exc:
+        mcp_server.create_http_app()
+    assert "MCP_HTTP_TOKEN" in str(exc.value)
+
+    monkeypatch.setenv("MCP_HTTP_TOKEN", "")
+    with pytest.raises(SystemExit):
+        mcp_server.create_http_app()
+
+
+@pytest.mark.asyncio
+async def test_http_endpoint_rejects_wrong_and_missing_tokens(monkeypatch):
+    """Every unauthenticated shape is refused, and the right token gets past the check."""
+    from starlette.testclient import TestClient
+
+    monkeypatch.setenv("MCP_HTTP_TOKEN", "s3cret-token")
+    app = mcp_server.create_http_app()
+
+    with TestClient(app) as client:
+        for headers in (
+            {},
+            {"Authorization": "Bearer wrong-token"},
+            {"Authorization": "Bearer "},
+            {"Authorization": "s3cret-token"},  # right token, no scheme: still refused
+            {"Authorization": "Basic s3cret-token"},
+        ):
+            r = client.post("/mcp", json={}, headers=headers)
+            assert r.status_code == 401, headers
+            assert r.json() == {"error": "Unauthorized"}
+
+        # The right token gets past the guard, in either casing of the scheme (RFC 7235).
+        # What the MCP session layer then makes of the request is its own business — the
+        # assertion is only that the door opened.
+        for scheme in ("Bearer", "bearer"):
+            r = client.post(
+                "/mcp",
+                json={},
+                headers={
+                    "Authorization": f"{scheme} s3cret-token",
+                    "Accept": "application/json, text/event-stream",
+                },
+            )
+            assert r.status_code != 401, scheme

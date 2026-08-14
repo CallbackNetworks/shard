@@ -26,6 +26,10 @@
 export const BACKEND_PATHS = [
   '/api', '/webhook', '/share/node',
   '/ical', '/ws', '/health', '/docs', '/openapi.json', '/redoc',
+  // Remote MCP (ADR-0076). Not served by the backend container but by the mcp one —
+  // this list is about which paths the SPA must not answer, and an MCP client asking
+  // for /mcp must never be handed index.html (ADR-0071).
+  '/mcp',
 ]
 
 export const claimedByBackend = (url) =>

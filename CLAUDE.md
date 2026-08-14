@@ -71,7 +71,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up
 | `MCP_API_KEY` | API key for MCP server to authenticate with backend |
 | `MCP_TRANSPORT` | `stdio` (default) or `http` for remote access |
 | `MCP_HTTP_PORT` | Port for MCP HTTP transport (default `8001`) |
-| `MCP_HTTP_TOKEN` | Bearer token to protect MCP HTTP endpoint |
+| `MCP_HTTP_TOKEN` | Bearer token for the MCP HTTP endpoint. **Required** when `MCP_TRANSPORT=http` — the server refuses to start without one (ADR-0076) |
 
 ## Testing
 
@@ -203,6 +203,8 @@ The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and b
 **CI/CD adapters** (`services/cicd_adapters.py`): auto-detects CI/CD provider from request headers (GitHub, GitLab, Jenkins, Drone, Bitbucket) and normalizes payloads to a common format. Used by `webhooks.py` for inbound callbacks.
 
 **MCP Server** (`mcp_server/server.py`): proxies all operations through `/api/v1` via httpx (see ADR-0005). Supports stdio and Streamable HTTP transport. Provides 21 tools, 4 resources, 1 resource template, and 4 prompts.
+
+**Remote MCP is served through the frontend's nginx** (ADR-0076): production exposes it at `https://<host>/mcp`, proxied to the `mcp` container over the internal network — no host port, one door. The deploy step only writes the `mcp` service into the generated compose file when **both** `MCP_API_KEY` and `MCP_HTTP_TOKEN` secrets are set; a half-configured public endpoint is not a state worth deploying. The nginx upstream is a variable with a `resolver`, not a literal: a literal is resolved at boot, so a deployment without the mcp container would fail nginx's own startup and take the whole site down. `/mcp` is in `frontend/backendPaths.js` so the SPA never answers an MCP client with `index.html`.
 
 ## Frontend architecture (`frontend/src/`)
 
