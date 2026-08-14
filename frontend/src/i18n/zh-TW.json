@@ -252,16 +252,12 @@
   "identities.title": "角色",
   "identities.subtitle": "管理您在各專案中的角色",
   "identities.new": "新增角色",
-  "identities.avatarPlaceholder": "例如 R",
   "identities.namePlaceholder": "例如 研究員",
-  "identities.descriptionPlaceholder": "例如 CGCG 計算物理組",
   "identities.empty": "尚無角色",
   "identities.emptyHint": "建立角色以代表您扮演的不同職責（研究員、開發者、維護者...）",
   "identities.settings": "設定",
   "identities.projects": "專案",
   "identities.linkUnlinkProjects": "連結 / 取消連結專案",
-  "identities.color": "顏色",
-  "identities.avatar": "頭像",
   "analytics.title": "分析",
   "analytics.subtitle": "從任務活動中獲取洞察",
   "analytics.allProjects": "所有專案",
@@ -978,5 +974,6 @@
   "nodeFields.title": "欄位",
   "nodeFields.saved": "已儲存",
   "nodeFields.undeclared": "這個型別沒有宣告的鍵",
-  "nodeFields.undeclaredHint": "這個節點上有值，但不屬於它的型別。此處唯讀。"
+  "nodeFields.undeclaredHint": "這個節點上有值，但不屬於它的型別。此處唯讀。",
+  "close": "關閉"
 }

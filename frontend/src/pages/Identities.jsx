@@ -3,72 +3,56 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit3, Trash2, Link2, Unlink, Shield } from 'lucide-react'
 import {
-  getIdentities, createIdentity, updateIdentity, deleteIdentity,
+  getIdentities, createIdentity, deleteIdentity, getNode, getNodeTypes,
   getProjects, linkProjectIdentity, unlinkProjectIdentity,
 } from '../api/client'
 import { BRAND, DARK } from '../constants/theme'
 import NodeShareFacet from '../components/NodeShareFacet'
+import NodeFieldsPanel from '../components/NodeFieldsPanel'
 import EmptyState from '../components/shared/EmptyState'
 
-const COLORS = [
-  '#5e6ad2', '#facc15', '#facc15', '#f59e0b', '#3b82f6',
-  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316',
-  '#14b8a6', '#a855f7', '#e11d48', '#0ea5e9',
-]
-
-function IdentityForm({ initial, onSave, onCancel }) {
+// Editing an identity is the shared field editor (ADR-0074): name, colour, avatar and
+// description are all declared by the identity type, so the form this replaced was a
+// second implementation of a form the app already has. It reads the node itself rather
+// than the enriched IdentityOut — a column field's value lives on the node.
+function IdentityFields({ identityId, onDone }) {
   const { t } = useTranslation()
-  const [form, setForm] = useState(initial || { name: '', color: '#5e6ad2', description: '', avatar: '' })
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const { data: node } = useQuery({ queryKey: ['node', identityId], queryFn: () => getNode(identityId) })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const typeMeta = nodeTypes.find(nt => nt.key === 'identity')
 
+  if (!node) return <p className="kt-muted" style={{ padding: 12 }}>{t('loading')}</p>
   return (
-    <div className="kt-panel" style={{ padding: 20, marginBottom: 16 }}>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <label style={{ fontSize: 13, fontWeight: 700, color: DARK.text, flex: '0 0 auto' }}>
-          {t('identities.avatar')}
-          <input value={form.avatar} onChange={e => set('avatar', e.target.value)}
-            placeholder={t('identities.avatarPlaceholder')}
-            maxLength={2}
-            className="kt-input"
-            style={{ width: 48, textAlign: 'center', fontSize: 16, marginTop: 4 }} />
-        </label>
-        <label style={{ fontSize: 13, fontWeight: 700, color: DARK.text, flex: '1 1 160px' }}>
-          {t('name')} *
-          <input value={form.name} onChange={e => set('name', e.target.value)}
-            placeholder={t('identities.namePlaceholder')}
-            className="kt-input" style={{ marginTop: 4 }} />
-        </label>
-        <label style={{ fontSize: 13, fontWeight: 600, color: DARK.text, flex: '2 1 200px' }}>
-          {t('description')}
-          <input value={form.description} onChange={e => set('description', e.target.value)}
-            placeholder={t('identities.descriptionPlaceholder')}
-            className="kt-input" style={{ marginTop: 4 }} />
-        </label>
-      </div>
-      <div style={{ marginTop: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: DARK.text }}>{t('identities.color')}</span>
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-          {COLORS.map(c => (
-            <button key={c} onClick={() => set('color', c)} style={{
-              width: 24, height: 24, borderRadius: 0, background: c,
-              border: form.color === c ? '2px solid #fff' : '2px solid transparent',
-              cursor: 'pointer', transition: 'border 0.1s',
-            }} />
-          ))}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-        <button onClick={() => onSave(form)} disabled={!form.name}
-          className="kt-btn kt-btn-primary" style={{ opacity: form.name ? 1 : 0.5 }}>
-          {t('save')}
-        </button>
-        <button onClick={onCancel} className="kt-btn">
-          {t('cancel')}
-        </button>
-      </div>
+    <div style={{ marginTop: 12 }}>
+      <NodeFieldsPanel node={node} typeMeta={typeMeta}
+        invalidateKeys={[['identities'], ['projects'], ['node', identityId]]} />
+      <button onClick={onDone} className="kt-btn">{t('close')}</button>
     </div>
   )
 }
+
+
+// Creating one only needs a name; everything else is filled in the editor above, which
+// cannot run until the node exists.
+function NewIdentity({ onCreate, onCancel, pending }) {
+  const { t } = useTranslation()
+  const [name, setName] = useState('')
+  return (
+    <div className="kt-panel" style={{ padding: 16, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
+      <input
+        className="kt-input" style={{ flex: '1 1 240px' }} autoFocus
+        value={name} onChange={e => setName(e.target.value)}
+        placeholder={t('identities.namePlaceholder')}
+        aria-label={t('name')}
+        onKeyDown={e => { if (e.key === 'Enter' && name.trim()) onCreate(name.trim()) }}
+      />
+      <button onClick={() => onCreate(name.trim())} disabled={!name.trim() || pending}
+        className="kt-btn kt-btn-primary">{t('create')}</button>
+      <button onClick={onCancel} className="kt-btn">{t('cancel')}</button>
+    </div>
+  )
+}
+
 
 export default function Identities() {
   const { t } = useTranslation()
@@ -86,12 +70,13 @@ export default function Identities() {
   }
 
   const createMut = useMutation({
-    mutationFn: createIdentity,
-    onSuccess: () => { invalidate(); setShowCreate(false) },
-  })
-  const updateMut = useMutation({
-    mutationFn: ({ id, data }) => updateIdentity(id, data),
-    onSuccess: () => { invalidate(); setEditingId(null) },
+    mutationFn: (name) => createIdentity({ name }),
+    onSuccess: (created) => {
+      invalidate()
+      setShowCreate(false)
+      // Straight into the editor: a new identity has a name and nothing else yet.
+      if (created?.id) setEditingId(created.id)
+    },
   })
   const deleteMut = useMutation({ mutationFn: deleteIdentity, onSuccess: invalidate })
   const linkMut = useMutation({
@@ -126,9 +111,10 @@ export default function Identities() {
       </div>
 
       {showCreate && (
-        <IdentityForm
-          onSave={data => createMut.mutate(data)}
+        <NewIdentity
+          onCreate={name => createMut.mutate(name)}
           onCancel={() => setShowCreate(false)}
+          pending={createMut.isPending}
         />
       )}
 
@@ -140,17 +126,6 @@ export default function Identities() {
             const linked = linkedProjectIds(identity.id)
             const isEditing = editingId === identity.id
             const isLinking = linkingId === identity.id
-
-            if (isEditing) {
-              return (
-                <IdentityForm
-                  key={identity.id}
-                  initial={{ name: identity.name, color: identity.color, description: identity.description || '', avatar: identity.avatar || '' }}
-                  onSave={data => updateMut.mutate({ id: identity.id, data })}
-                  onCancel={() => setEditingId(null)}
-                />
-              )
-            }
 
             return (
               <div key={identity.id} className="kt-card" style={{ padding: '16px 20px' }}>
@@ -200,7 +175,7 @@ export default function Identities() {
                     </button>
                     <button onClick={() => { if (confirm(`Delete persona "${identity.name}"?`)) deleteMut.mutate(identity.id) }}
                       title={t('delete')} aria-label={t('delete')}
-                      className="kt-btn" style={{ background: 'none', border: '1px solid rgba(250,204,21,0.4)', color: '#facc15', padding: '6px 8px' }}>
+                      className="kt-btn kt-btn-danger" style={{ padding: '6px 8px' }}>
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -219,6 +194,11 @@ export default function Identities() {
                       </span>
                     ))}
                   </div>
+                )}
+
+                {/* Fields — the shared editor (ADR-0074), not a second form. */}
+                {isEditing && (
+                  <IdentityFields identityId={identity.id} onDone={() => setEditingId(null)} />
                 )}
 
                 {/* Share settings panel — the same component every other shareable

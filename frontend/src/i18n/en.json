@@ -252,16 +252,12 @@
   "identities.title": "Personas",
   "identities.subtitle": "Manage your roles and personas across projects",
   "identities.new": "New Persona",
-  "identities.avatarPlaceholder": "e.g. R",
   "identities.namePlaceholder": "e.g. Researcher",
-  "identities.descriptionPlaceholder": "e.g. CGCG computational physics group",
   "identities.empty": "No personas yet",
   "identities.emptyHint": "Create personas to represent different roles you play (researcher, developer, maintainer...)",
   "identities.settings": "Settings",
   "identities.projects": "Projects",
   "identities.linkUnlinkProjects": "Link / Unlink Projects",
-  "identities.color": "Color",
-  "identities.avatar": "Avatar",
   "analytics.title": "Analytics",
   "analytics.subtitle": "Insights from your task activity",
   "analytics.allProjects": "All Projects",
@@ -974,5 +970,6 @@
   "nodeFields.title": "Fields",
   "nodeFields.saved": "Saved",
   "nodeFields.undeclared": "Not declared by this type",
-  "nodeFields.undeclaredHint": "Present on this node but not part of its type. Read-only here."
+  "nodeFields.undeclaredHint": "Present on this node but not part of its type. Read-only here.",
+  "close": "Close"
 }
