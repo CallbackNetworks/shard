@@ -1112,11 +1112,28 @@ class NodeTypeOut(BaseModel):
         return v or []
 
 
+class EdgeEndpointRule(BaseModel):
+    """What may sit at one end of a relation (ADR-0078).
+
+    ``types`` and ``roles`` are alternatives — a node qualifies by matching either —
+    and an empty rule constrains nothing. Naming ``roles`` is what lets a
+    user-defined node type join a relation without editing the built-in seed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    types: list[str] = []
+    roles: list[str] = []
+
+
 class EdgeTypeCreate(BaseModel):
     key: str
     label: str
+    description: str | None = None
     is_containment: bool = False
     is_symmetric: bool = False
+    allowed_source: EdgeEndpointRule | None = None
+    allowed_target: EdgeEndpointRule | None = None
     data: dict | None = None
 
     @field_validator("key")
@@ -1127,8 +1144,11 @@ class EdgeTypeCreate(BaseModel):
 
 class EdgeTypeUpdate(BaseModel):
     label: str | None = None
+    description: str | None = None
     is_containment: bool | None = None
     is_symmetric: bool | None = None
+    allowed_source: EdgeEndpointRule | None = None
+    allowed_target: EdgeEndpointRule | None = None
     data: dict | None = None
 
 
@@ -1137,9 +1157,12 @@ class EdgeTypeOut(BaseModel):
 
     key: str
     label: str
+    description: str | None = None
     is_builtin: bool
     is_containment: bool
     is_symmetric: bool
+    allowed_source: dict | None = None
+    allowed_target: dict | None = None
     data: dict | None = None
     usage_count: int = 0
 

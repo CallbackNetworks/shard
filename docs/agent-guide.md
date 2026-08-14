@@ -233,8 +233,13 @@ POST /api/v1/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}
 ### Link nodes directly
 
 Anything the named sub-resources do not cover is an edge. `rel_type` is one of `contains`,
-`member_of`, `assigned_to`, `depends_on`, `labeled`, `in_cycle`, or any type registered in
-the edge-type vocabulary.
+`owns`, `depends_on`, `labeled`, `in_cycle`, or any type registered in the edge-type
+vocabulary — read it, with the node types allowed at each end, from
+`GET /api/v1/edge-types`. Those endpoint rules are enforced: an edge whose endpoints do
+not satisfy the declaration is refused with a 400 naming the relation you probably meant
+(ADR-0078). The two that get confused: `contains` says *where a node lives* and drives
+every rollup, `owns` says *which identity it belongs to*. A node may have any number of
+parents — `container_id` on create is just the first one.
 
 ```
 POST /api/v1/nodes/{node_id}/edges

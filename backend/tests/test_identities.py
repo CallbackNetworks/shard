@@ -1,7 +1,7 @@
 """Identity reads + write/share via the generic node surface (ADR-0041 B).
 
 Identity create/update/delete go through ``/api/nodes`` (the write core seeds the
-``share_token`` for any shareable type), project links are ``member_of`` edges via
+``share_token`` for any shareable type), project links are ``owns`` edges via
 ``/api/nodes/{id}/edges``, and the share facade uses ``/api/nodes/{id}/share/*``.
 The ``/identities`` router keeps only the enriched reads.
 """
@@ -83,7 +83,7 @@ def test_link_project(client, sample_identity, db):
 
     resp = client.post(
         f"/api/nodes/{sample_identity.id}/edges",
-        json={"target_id": project.id, "rel_type": "member_of"},
+        json={"target_id": project.id, "rel_type": "owns"},
     )
     assert resp.status_code == 201
     assert project.id in [p["id"] for p in client.get(f"/api/identities/{sample_identity.id}/projects").json()]

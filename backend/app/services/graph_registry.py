@@ -181,14 +181,81 @@ BUILTIN_NODE_TYPES: list[dict] = [
 ]
 
 # Built-in edge types. ``is_containment`` marks relations traversed like ``contains``.
+#
+# Each relation declares what may sit at its ends (ADR-0078): ``allowed_source`` /
+# ``allowed_target`` are ``{"types": [...], "roles": [...]}`` allow-lists — either key
+# may match, and an absent key constrains nothing. Prefer ``roles``: a user-defined
+# type that opts into ``container`` joins ``contains`` with no change here. The
+# ``description`` is the text an agent reads (``GET /api/v1/edge-types``, and the
+# ``conventions.relations`` block of ``/api/v1/agent-context`` is generated from it),
+# so it says *when to reach for this relation*, not what its name means.
 BUILTIN_EDGE_TYPES: list[dict] = [
-    {"key": graph.REL_CONTAINS, "label": "Contains", "is_containment": True},
-    {"key": graph.REL_MEMBER_OF, "label": "Member of"},
-    {"key": graph.REL_ASSIGNED_TO, "label": "Assigned to"},
-    {"key": graph.REL_DEPENDS_ON, "label": "Depends on"},
-    {"key": graph.REL_LABELED, "label": "Labeled"},
-    {"key": graph.REL_IN_CYCLE, "label": "In cycle"},
+    {
+        "key": graph.REL_CONTAINS,
+        "label": "Contains",
+        "is_containment": True,
+        "description": (
+            "Parent -> child: where a node lives. The aggregation skeleton — progress, "
+            "project size and every subtree rollup follow it. A type that declares roles "
+            "must hold 'container' or 'task' to be the source, so an identity cannot be a "
+            "parent here: use 'owns' to say whose work something is. A type declaring no "
+            "roles is generic and may nest freely."
+        ),
+    },
+    {
+        "key": graph.REL_OWNS,
+        "label": "Owns",
+        "description": (
+            "Identity -> the container it owns: whose work this is, not where it lives. "
+            "A container may be owned by several identities and still live in exactly "
+            "one place, which is why this is not 'contains'."
+        ),
+        "allowed_source": {"types": [graph.NODE_IDENTITY]},
+        "allowed_target": {"roles": [graph.ROLE_CONTAINER]},
+    },
+    {
+        "key": graph.REL_DEPENDS_ON,
+        "label": "Depends on",
+        "description": "Blocked task -> the task blocking it. Source is blocked until target is done.",
+        "allowed_source": {"roles": [graph.ROLE_TASK]},
+        "allowed_target": {"roles": [graph.ROLE_TASK]},
+    },
+    {
+        "key": graph.REL_LABELED,
+        "label": "Labeled",
+        "description": "Node -> label. Also how a decision record (a label with data.type='decision') attaches.",
+        "allowed_target": {"types": [graph.NODE_LABEL]},
+    },
+    {
+        "key": graph.REL_IN_CYCLE,
+        "label": "In cycle",
+        "description": "Task -> the cycle/sprint it belongs to.",
+        "allowed_source": {"roles": [graph.ROLE_TASK]},
+        "allowed_target": {"types": [graph.NODE_CYCLE]},
+    },
 ]
+
+
+def relation_vocabulary(db: Session) -> list[dict]:
+    """The relation vocabulary as an agent needs to read it (ADR-0078).
+
+    One renderer behind ``GET /api/v1/edge-types`` and the ``conventions.relations``
+    block of ``/api/v1/agent-context``: what an agent is told about a relation is
+    generated from the registry the write path enforces, never written out a second
+    time by hand — a hand-copied vocabulary is how the rules editor came to offer
+    values the engine rejected (ADR-0056).
+    """
+    return [
+        {
+            "key": et.key,
+            "label": et.label,
+            "description": et.description,
+            "is_containment": et.is_containment,
+            "allowed_source": et.allowed_source,
+            "allowed_target": et.allowed_target,
+        }
+        for et in db.query(EdgeType).order_by(EdgeType.is_builtin.desc(), EdgeType.key).all()
+    ]
 
 
 def seed_builtin_types(db: Session) -> None:

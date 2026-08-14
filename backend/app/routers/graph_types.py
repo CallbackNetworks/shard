@@ -129,10 +129,31 @@ def list_edge_types(db: Session = Depends(get_db)):
     return types
 
 
+def _check_endpoint_rules(db: Session, body) -> None:
+    """Reject an endpoint declaration naming a role or node type that does not exist.
+
+    A rule carrying a typo constrains nothing and says nothing about why — the same
+    silent-empty-set trap ADR-0056 closed for condition values, applied to ADR-0078's
+    endpoint declarations.
+    """
+    known_types = {key for (key,) in db.query(NodeType.key).all()}
+    for side in ("allowed_source", "allowed_target"):
+        rule = getattr(body, side, None)
+        if rule is None:
+            continue
+        unknown_roles = [r for r in rule.roles if r not in graph.ROLES]
+        if unknown_roles:
+            raise HTTPException(status_code=422, detail=f"{side}: unknown role(s) {', '.join(unknown_roles)}")
+        unknown_types = [t for t in rule.types if t not in known_types]
+        if unknown_types:
+            raise HTTPException(status_code=422, detail=f"{side}: unknown node type(s) {', '.join(unknown_types)}")
+
+
 @router.post("/edges", response_model=EdgeTypeOut, status_code=status.HTTP_201_CREATED)
 def create_edge_type(body: EdgeTypeCreate, db: Session = Depends(get_db)):
     if db.get(EdgeType, body.key) is not None:
         raise HTTPException(status_code=409, detail=f"edge type '{body.key}' already exists")
+    _check_endpoint_rules(db, body)
     et = EdgeType(is_builtin=False, **body.model_dump())
     db.add(et)
     db.commit()
@@ -145,6 +166,7 @@ def update_edge_type(key: str, body: EdgeTypeUpdate, db: Session = Depends(get_d
     et = db.get(EdgeType, key)
     if et is None:
         raise HTTPException(status_code=404, detail="edge type not found")
+    _check_endpoint_rules(db, body)
     fields = body.model_dump(exclude_unset=True)
     # Built-in structural flags are immutable — mirroring the node-type role
     # guard: flipping contains' is_containment would collapse the containment

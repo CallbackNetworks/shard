@@ -387,14 +387,14 @@ def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(g
 
 
 # /ical/identity/{token}.ics was retired with ADR-0071: an identity's feed is
-# /ical/node/{token}.ics below, which aggregates member_of for exactly this type.
+# /ical/node/{token}.ics below, which aggregates owns for exactly this type.
 
 
 @ical_router.get("/ical/node/{token}.ics", tags=["ical"], response_class=PlainTextResponse)
 def ical_feed_node(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(get_db)):
     """Generic feed for any ``is_subscribable`` node (ADR-0039).
 
-    Identity aggregates its member_of projects — this is the only feed that serves
+    Identity aggregates its owns projects — this is the only feed that serves
     one since ADR-0071 — while every other subscribable container yields its own
     ``contains`` subtree. The token is the node's ``share_token`` (same as its
     share facade), so a feed and its share page are revoked together.

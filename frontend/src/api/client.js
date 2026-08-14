@@ -193,7 +193,7 @@ export const getAgentSummary = () => api.get('/api-keys/agents/summary').then(r 
 // Identities — reads stay on /identities (enriched: project_count, share state,
 // hub stats); writes go through the generic node/edge surface (ADR-0041 B). An
 // identity is a shareable node; the write core seeds its share_token on create,
-// and project links are `identity -> project` `member_of` edges.
+// and project links are `identity -> project` `owns` edges.
 export const getIdentities = () => api.get('/identities').then(r => r.data)
 export const createIdentity = ({ name, ...rest }) => createNode({ type: 'identity', title: name, data: rest })
 export const updateIdentity = (id, { name, ...rest }) => {
@@ -203,8 +203,8 @@ export const updateIdentity = (id, { name, ...rest }) => {
   return updateNode(id, patch)
 }
 export const deleteIdentity = (id) => deleteNode(id)
-export const linkProjectIdentity = (identityId, projectId) => attachNodeEdge(identityId, { target_id: projectId, rel_type: 'member_of' })
-export const unlinkProjectIdentity = (identityId, projectId) => detachNodeEdge(identityId, projectId, 'member_of')
+export const linkProjectIdentity = (identityId, projectId) => attachNodeEdge(identityId, { target_id: projectId, rel_type: 'owns' })
+export const unlinkProjectIdentity = (identityId, projectId) => detachNodeEdge(identityId, projectId, 'owns')
 export const getIdentityHubStats = () => api.get('/identities/hub-stats').then(r => r.data)
 
 // Activity

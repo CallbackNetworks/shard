@@ -21,7 +21,7 @@ to one of three kinds:
     A comment body, a person's name. Nothing to offer; a plain box is the honest control.
 
 Each spec also says *who coined* the values it carries, in ``vocabulary``. The engine
-names things for itself — ``in_progress``, ``changed_field``, ``member_of`` — and the
+names things for itself — ``in_progress``, ``changed_field``, ``owns`` — and the
 editor is free to show those as words; a label, an event or an assignee is the user's own
 string and must be shown back exactly as typed. Only the server knows which is which, and
 saying so here is what keeps a condition field added tomorrow from arriving on the wrong

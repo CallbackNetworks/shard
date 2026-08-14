@@ -12,7 +12,7 @@ from app.services import graph
 
 # Reads only. An identity is a ``shareable``/``subscribable`` node whose create/update/
 # delete go through the single graph write surface ``/api/nodes`` (ADR-0041 B — the write
-# core seeds the ``share_token`` for any shareable type); project links are ``member_of``
+# core seeds the ``share_token`` for any shareable type); project links are ``owns``
 # edges via ``/api/nodes/{id}/edges``, and the share facade (rotate-token/PIN/expiry) uses
 # the generic ``/api/nodes/{id}/share/*`` endpoints. This router keeps the enriched identity
 # reads (list, hub stats, linked projects) that ``IdentityOut`` callers need.

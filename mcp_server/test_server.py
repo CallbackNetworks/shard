@@ -559,13 +559,56 @@ async def test_get_container_subtree_error():
     assert "Error 404" in text
 
 
+# ── Tools: list_edge_types / manage_edges (ADR-0078) ────────────────
+
+
+@pytest.mark.asyncio
+async def test_list_edge_types():
+    relations = {"relations": [{"key": "owns", "description": "Identity -> container"}]}
+    with _patch_client("get", _mock_response(json_data=relations)):
+        text = await _call("list_edge_types", {})
+    assert json.loads(text)["relations"][0]["key"] == "owns"
+
+
+@pytest.mark.asyncio
+async def test_manage_edges_list():
+    with _patch_client("get", _mock_response(json_data=[{"rel_type": "contains"}])):
+        text = await _call("manage_edges", {"action": "list", "node_id": "n1"})
+    assert json.loads(text)[0]["rel_type"] == "contains"
+
+
+@pytest.mark.asyncio
+async def test_manage_edges_add():
+    with _patch_client("post", _mock_response(json_data={"rel_type": "owns"})):
+        text = await _call("manage_edges", {
+            "action": "add", "node_id": "i1", "target_id": "p1", "rel_type": "owns"
+        })
+    assert json.loads(text)["rel_type"] == "owns"
+
+
+@pytest.mark.asyncio
+async def test_manage_edges_add_without_a_relation_says_so():
+    """The backend would refuse it anyway; failing here costs no round trip."""
+    text = await _call("manage_edges", {"action": "add", "node_id": "i1", "target_id": "p1"})
+    assert "rel_type" in text
+
+
+@pytest.mark.asyncio
+async def test_manage_edges_remove():
+    with _patch_client("delete", _mock_response(status_code=204)):
+        text = await _call("manage_edges", {
+            "action": "remove", "node_id": "i1", "target_id": "p1", "rel_type": "owns"
+        })
+    assert json.loads(text)["status"] == "deleted"
+
+
 # ── MCP registry: list_tools ────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 21
+    assert len(tools) == 23
 
 
 @pytest.mark.asyncio
@@ -579,6 +622,9 @@ async def test_list_tools_names():
         "get_agent_context", "report_progress",
         "list_projects", "create_project", "delete_task",
         "get_project_detail", "bulk_update_tasks", "get_container_subtree",
+        # ADR-0078: edges had no tool at all, so an agent could only ever set the one
+        # container_id a node was created with.
+        "list_edge_types", "manage_edges",
     }
     assert names == expected
 

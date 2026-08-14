@@ -12,6 +12,7 @@ from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.schemas import AgentContextOut, AgentProjectInfo, AgentProjectTaskInfo
 from app.services import graph
+from app.services.graph_registry import relation_vocabulary
 
 sub_router = APIRouter()
 
@@ -100,8 +101,15 @@ def api_agent_context(
             "write_surface": (
                 "Every entity (task, project, label, cycle, goal, identity) is a node: create with "
                 "POST /api/v1/nodes {type, title, container_id}, update with PATCH /api/v1/nodes/{id}, "
-                "delete with DELETE /api/v1/nodes/{id}. Relationships are edges."
+                "delete with DELETE /api/v1/nodes/{id}. Relationships are edges: attach with "
+                "POST /api/v1/nodes/{source_id}/edges {target_id, rel_type} — see relations below. "
+                "A node may have any number of parents; container_id on create is only the first one."
             ),
+            # Generated from the edge-type registry the write path enforces (ADR-0078),
+            # never restated here: the one endpoint an agent is told to call first said
+            # only "Relationships are edges", so choosing between contains and owns was
+            # a guess whose only feedback was a silently useless edge.
+            "relations": relation_vocabulary(db),
         },
         projects=project_infos,
         quick_start=(

@@ -336,13 +336,14 @@ An identity is a top-level `Node(type="identity")` — no container. Creation se
 ```
 
 #### Linking a project to an identity
-Membership is a `member_of` edge from the project to the identity:
+Ownership is an `owns` edge **from the identity to the project** — source is the owner
+(ADR-0078). Not `contains`: that is where a node lives, and an identity is not a place.
 
 ```json
-// POST /nodes/{project_id}/edges
-{ "target_id": "<identity id>", "rel_type": "member_of" }
+// POST /nodes/{identity_id}/edges
+{ "target_id": "<project id>", "rel_type": "owns" }
 
-// DELETE /nodes/{project_id}/edges?target_id=<identity id>&rel_type=member_of
+// DELETE /nodes/{identity_id}/edges?target_id=<project id>&rel_type=owns
 ```
 
 #### `GET /identities/{id}/projects`
@@ -987,7 +988,7 @@ No authentication required. Rate-limited.
 
 #### `GET /share/node/{share_token}`
 The one public share endpoint (ADR-0070, ADR-0071). Dispatches on the token's node type: an
-identity aggregates the projects it holds through `member_of`, a project serves itself, any
+identity aggregates the projects it holds through `owns`, a project serves itself, any
 other shareable container serves its `contains` subtree. Returns public read-only data:
 projects, tasks, recent activity, and summary stats.
 
@@ -1067,7 +1068,7 @@ Every project (global token, rotate via `POST /settings/ical-token/rotate`).
 
 #### `GET /ical/node/{token}.ics`
 The `contains` subtree of any node whose type carries the `subscribable` role (ADR-0039) —
-including an identity, which aggregates its `member_of` projects. Reuses the node's
+including an identity, which aggregates its `owns` projects. Reuses the node's
 `share_token`, so a feed and its share page are revoked together. Replaced the retired
 `/ical/identity/` and `/ical/project/` feeds (ADR-0071, ADR-0073).
 
@@ -1374,7 +1375,7 @@ unlinked.
 
 #### `POST /api/v1/nodes/{id}/edges` — requires `write`
 ```json
-{ "target_id": "uuid", "rel_type": "contains | member_of | assigned_to | depends_on | labeled | in_cycle",
+{ "target_id": "uuid", "rel_type": "contains | owns | depends_on | labeled | in_cycle",
   "position": 0, "data": null }
 ```
 

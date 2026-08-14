@@ -86,7 +86,7 @@ def _as_utc(value: datetime | str | None) -> datetime | None:
 
 
 def _load_identity(db: Session, token: str) -> graph.IdentityView | None:
-    # An identity's projects are resolved via member_of edges (see _build_response).
+    # An identity's projects are resolved via owns edges (see _build_response).
     return graph.find_identity_by_share_token(db, token)
 
 
@@ -346,7 +346,7 @@ def _maybe_log_share_view(db: Session, *, meta_key: str, entity_id: str, detail:
 
 # Not a route (ADR-0071): an identity is served through the one public door,
 # /share/node/{token}, which dispatches here. Kept as a function because the
-# member_of aggregation an identity page needs is genuinely its own.
+# owns aggregation an identity page needs is genuinely its own.
 def get_share_identity(token: str, request: Request, db: Session = Depends(get_db)):
     identity = _load_identity(db, token)
     if not identity:
@@ -418,7 +418,7 @@ def _build_container_response(node, view: graph.ProjectView, db: Session):
 
     Mirrors ``_build_project_response`` but for a generic container: the node's
     own contained task-like children are serialized as a single project-like
-    group. Identity keeps its aggregate (member_of) behaviour via delegation.
+    group. Identity keeps its aggregate (owns) behaviour via delegation.
     """
     idents = graph.identities_for_project(db, node.id)
     identity = idents[0] if idents else None
@@ -507,7 +507,7 @@ def verify_share_node_pin(token: str, body: PinVerifyRequest, response: Response
 
     # Dispatch like the GET does: unlocking a page must hand back that page. Built
     # as container-only, this returned an identity's *empty* container view — the
-    # projects it aggregates through member_of are not `contains` children.
+    # projects it aggregates through owns are not `contains` children.
     if node.type == graph.NODE_IDENTITY:
         identity = graph.get_identity(db, node.id)
         if not identity:
@@ -576,7 +576,7 @@ def _resolve_note_target(token: str, request: Request, db: Session) -> list[grap
     """Validate a guest-note write against a share token; return the projects it may write to.
 
     Dispatches on the node's type exactly as ``GET /share/node/{token}`` does — an
-    identity aggregates its ``member_of`` projects, anything else stands for itself.
+    identity aggregates its ``owns`` projects, anything else stands for itself.
     A page that can be read must be writable through the same door (ADR-0070); there
     is only one door left to be read through (ADR-0071, ADR-0073).
     """

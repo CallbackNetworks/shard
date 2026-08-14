@@ -15,7 +15,7 @@ const nodeTypes = [
 ]
 const edgeTypes = [
   { key: 'contains', label: 'Contains', is_builtin: true, is_containment: true },
-  { key: 'member_of', label: 'Member of', is_builtin: true, is_containment: false },
+  { key: 'owns', label: 'Owns', is_builtin: true, is_containment: false },
   { key: 'depends_on', label: 'Depends on', is_builtin: true, is_containment: false },
   { key: 'labeled', label: 'Labeled', is_builtin: true, is_containment: false },
   { key: 'references', label: 'References', is_builtin: false, is_containment: false },
@@ -36,7 +36,7 @@ function fixture() {
     { id: 'n1', type: 'note', title: 'Design note', data: {} },
   ]
   const edges = [
-    { id: 'e1', source_id: 'i1', target_id: 'p1', rel_type: 'member_of' },
+    { id: 'e1', source_id: 'i1', target_id: 'p1', rel_type: 'owns' },
     { id: 'e2', source_id: 'c1', target_id: 'p1', rel_type: 'contains' },
     { id: 'e3', source_id: 'p1', target_id: 't1', rel_type: 'contains' },
     { id: 'e4', source_id: 'p1', target_id: 't2', rel_type: 'contains' },

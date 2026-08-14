@@ -41,10 +41,10 @@ def test_membership_edge_via_helper(db):
 
     graph.link_membership(db, ident.id, p.id)
     db.commit()
-    assert _edge(db, ident.id, p.id, "member_of") is not None
+    assert _edge(db, ident.id, p.id, "owns") is not None
     assert graph.unlink_membership(db, ident.id, p.id) is True
     db.commit()
-    assert _edge(db, ident.id, p.id, "member_of") is None
+    assert _edge(db, ident.id, p.id, "owns") is None
 
 
 def test_entity_delete_clears_membership_edge(db):
@@ -57,9 +57,9 @@ def test_entity_delete_clears_membership_edge(db):
 
     graph.delete_identity(db, ident.id)
     db.commit()
-    # Deleting the identity node drops the touching member_of edge.
+    # Deleting the identity node drops the touching owns edge.
     assert db.get(Node, ident.id) is None
-    assert _edge(db, ident.id, p.id, "member_of") is None
+    assert _edge(db, ident.id, p.id, "owns") is None
 
 
 def test_task_create_mirrors_node_and_contains_edge(db):

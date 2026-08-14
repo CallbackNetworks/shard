@@ -13,7 +13,7 @@ import { hasNodeRole } from '../constants/nodeRoles'
 // Map-role `type` stays 'project'/'task'/… for the renderers; the real type
 // key travels alongside as `typeKey`/`typeLabel`/`typeColor`.
 
-const KNOWN_RELS = new Set(['member_of', 'depends_on', 'labeled', 'in_cycle', 'assigned_to'])
+const KNOWN_RELS = new Set(['owns', 'depends_on', 'labeled', 'in_cycle'])
 
 export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now = new Date()) {
   const nodes = slice?.nodes || []
@@ -50,7 +50,7 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
       parentsOf.get(dst.id).push(src)
       if (!childrenOf.has(src.id)) childrenOf.set(src.id, [])
       childrenOf.get(src.id).push(dst)
-    } else if (e.rel_type === 'member_of' && src.type === 'identity') {
+    } else if (e.rel_type === 'owns' && src.type === 'identity') {
       if (!memberOf.has(dst.id)) memberOf.set(dst.id, [])
       memberOf.get(dst.id).push(src.id)
     } else if (e.rel_type === 'depends_on') {

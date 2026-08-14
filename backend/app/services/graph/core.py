@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, GraphEvent, Node, NodeType
+from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
 
 # Node types. Every first-class entity is node-only (ADR-0033 Phase B complete):
 # these are the built-in ``node_types`` seed keys, not backing-table markers.
@@ -24,10 +24,10 @@ NODE_GOAL = "goal"
 NODE_CYCLE = "cycle"
 NODE_LABEL = "label"
 
-# Edge relationship types (canonical direction: source -> target)
-REL_CONTAINS = "contains"  # parent (project/task) -> child task; replaces project_id + parent_id
-REL_MEMBER_OF = "member_of"  # identity -> project
-REL_ASSIGNED_TO = "assigned_to"  # task -> identity
+# Edge relationship types (canonical direction: source -> target). What may sit at
+# each end is declared on ``edge_types`` and enforced below (ADR-0078).
+REL_CONTAINS = "contains"  # parent (container/task) -> child; replaces project_id + parent_id
+REL_OWNS = "owns"  # identity -> container it owns (whose work this is, not where it lives)
 REL_DEPENDS_ON = "depends_on"  # blocked task -> prerequisite task
 REL_LABELED = "labeled"  # task -> label
 REL_IN_CYCLE = "in_cycle"  # task -> cycle
@@ -333,6 +333,86 @@ def delete_node(db: Session, node_id: str, *, actor: str | None = None) -> bool:
     return True
 
 
+# --- Edge endpoint rules (ADR-0078) ------------------------------------------
+
+
+def _endpoint_allowed(db: Session, allow: dict | None, type_key: str) -> bool:
+    """Does ``type_key`` satisfy an ``{"types": [...], "roles": [...]}`` allow-list?
+
+    ``None`` (or a spec with neither key populated) means unconstrained. The two
+    keys are alternatives, not both required: naming ``roles`` is what lets a
+    user-defined type join a relation without touching the seed (ADR-0078).
+    """
+    if not allow:
+        return True
+    types, roles = allow.get("types") or [], allow.get("roles") or []
+    if not types and not roles:
+        return True
+    return type_key in types or any(has_role(db, type_key, role) for role in roles)
+
+
+def _declares_roles(db: Session, type_key: str) -> bool:
+    """Whether a node type has said what shape it is (ADR-0078)."""
+    nt = db.get(NodeType, type_key)
+    return nt is not None and bool(nt.roles)
+
+
+def _accepts_endpoints(db: Session, et: EdgeType, source_type: str, target_type: str) -> bool:
+    """Whether relation ``et`` would accept a ``source_type -> target_type`` edge.
+
+    The containment rule below is a safety net over an otherwise unconstrained
+    relation, so it binds a type only once that type has *declared* a shape: identity
+    says ``shareable``/``subscribable`` and never ``container``, so it cannot be a
+    containment parent, while a user's undeclared type stays generic scaffolding and
+    may nest freely (ADR-0033's free-form graph, which the node explorer exposes).
+    The explicit allow-lists are declarations rather than safety nets and stay strict.
+    """
+    if (
+        et.is_containment
+        and _declares_roles(db, source_type)
+        and not (has_role(db, source_type, ROLE_CONTAINER) or has_role(db, source_type, ROLE_TASK))
+    ):
+        return False
+    return _endpoint_allowed(db, et.allowed_source, source_type) and _endpoint_allowed(
+        db, et.allowed_target, target_type
+    )
+
+
+def _suggest_relations(db: Session, source_type: str, target_type: str, exclude: str) -> list[str]:
+    """Relations that *would* accept this pair of endpoints, for the error message.
+
+    The whole point of the check is that a caller who guessed wrong learns the right
+    answer from the refusal — an agent always reads the error, not always the docs.
+    """
+    return [
+        et.key
+        for et in db.query(EdgeType).order_by(EdgeType.key).all()
+        if et.key != exclude and _accepts_endpoints(db, et, source_type, target_type)
+    ]
+
+
+def check_edge_endpoints(db: Session, source: Node, target: Node, rel_type: str) -> None:
+    """Raise ``ValueError`` unless ``rel_type`` accepts these endpoint types (ADR-0078).
+
+    Enforced here rather than in the routers so internal writes, ``/api/nodes`` and
+    ``/api/v1/nodes`` are all covered by one rule — both routers already turn a
+    ``ValueError`` from this module into a 400.
+    """
+    et = db.get(EdgeType, rel_type)
+    if et is None or _accepts_endpoints(db, et, source.type, target.type):
+        return
+    reason = (
+        f"a {rel_type} source must be a container or a task"
+        if et.is_containment
+        else f"'{rel_type}' does not accept these endpoint types"
+    )
+    detail = f"{source.type} -> {target.type} is not valid for '{rel_type}' ({reason})"
+    alternatives = _suggest_relations(db, source.type, target.type, rel_type)
+    if alternatives:
+        detail += "; use " + " or ".join(f"'{k}'" for k in alternatives) + " instead"
+    raise ValueError(detail)
+
+
 # --- Edge CRUD ---------------------------------------------------------------
 
 
@@ -348,10 +428,14 @@ def add_edge(
 ) -> Edge:
     """Create an edge if it does not already exist; otherwise return the existing one.
 
-    For ``contains`` edges this guards against introducing a cycle.
+    For ``contains`` edges this guards against introducing a cycle, and every
+    relation's declared endpoint types are enforced (ADR-0078).
     """
     if rel_type == REL_CONTAINS and detect_cycle(db, source_id, target_id):
         raise ValueError(f"adding contains edge {source_id} -> {target_id} would create a cycle")
+    source, target = db.get(Node, source_id), db.get(Node, target_id)
+    if source is not None and target is not None:
+        check_edge_endpoints(db, source, target, rel_type)
     existing = db.execute(
         select(Edge).where(Edge.source_id == source_id, Edge.target_id == target_id, Edge.rel_type == rel_type)
     ).scalar_one_or_none()

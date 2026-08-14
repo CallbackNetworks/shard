@@ -3,10 +3,12 @@
 A project is a ``Node(type="project")``: ``title`` = name and ``status`` is a
 real hot column; every other field (description/share_token/share_expires_at/
 allow_guest_notes/agent_instructions/repo_url/wip_limits) lives in ``data``.
-``share_expires_at`` is a datetime stored as an ISO string in JSON. Projects are
-top-level containers — tasks/labels/cycles attach to them via ``contains`` edges
-and identities via ``member_of`` — so a project has no incoming containment edge
-of its own. ``ProjectView`` exposes the historical ``Project`` attribute surface
+``share_expires_at`` is a datetime stored as an ISO string in JSON. Tasks, labels
+and cycles attach to a project via ``contains`` edges and identities via ``owns``.
+A project is *not* necessarily top-level: since ADR-0041 made goal a container it
+may itself be contained, by any number of parents — the two axes are independent,
+so a project can live under an area and be owned by several identities at once
+(ADR-0078). ``ProjectView`` exposes the historical ``Project`` attribute surface
 so ``ProjectOut.model_validate`` keeps working. This was the last entity-backed
 type; after B6 the ``projects`` table is dropped and ``graph_sync`` is retired.
 """

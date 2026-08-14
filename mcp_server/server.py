@@ -312,6 +312,32 @@ async def _bulk_update_tasks(project_id: str, updates: list[dict]) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _list_edge_types() -> str:
+    result = await _get("/edge-types")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_edges(
+    action: str,
+    node_id: str,
+    target_id: str | None = None,
+    rel_type: str | None = None,
+) -> str:
+    if action == "list":
+        result = await _get(f"/nodes/{node_id}/edges")
+    elif action == "add":
+        if not target_id or not rel_type:
+            return "Error: target_id and rel_type are required to add an edge"
+        result = await _post(f"/nodes/{node_id}/edges", {"target_id": target_id, "rel_type": rel_type})
+    elif action == "remove":
+        if not target_id or not rel_type:
+            return "Error: target_id and rel_type are required to remove an edge"
+        result = await _delete(f"/nodes/{node_id}/edges?target_id={target_id}&rel_type={rel_type}")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 # ── MCP tools ────────────────────────────────────────────────────────
 #
 # One decorated function per tool (ADR-0077). The schema is derived from the
@@ -572,6 +598,36 @@ async def get_container_subtree(node_id: str) -> str:
 async def bulk_update_tasks(project_id: str, updates: list[dict]) -> str:
     """Each update is an object with 'id' plus fields to change: status, priority, title, ..."""
     return await _bulk_update_tasks(project_id=project_id, updates=updates)
+
+
+@mcp.tool(
+    description=(
+        "List the relation vocabulary: every edge type, what it means, and which node "
+        "types/roles may sit at each end. Call this before manage_edges — the endpoint "
+        "rules are enforced on write, so an edge with the wrong relation is refused."
+    )
+)
+async def list_edge_types() -> str:
+    """No arguments; returns the relations an edge may declare."""
+    return await _list_edge_types()
+
+
+@mcp.tool(
+    description=(
+        "List, attach or detach a node's relationships. Direction is source -> target, "
+        "so call it on the *parent* to file a child under it. 'contains' says where a "
+        "node lives (it drives every rollup) and 'owns' says which identity it belongs "
+        "to — a node may have any number of parents. See list_edge_types for the rest."
+    )
+)
+async def manage_edges(
+    action: ManageAction,
+    node_id: str,
+    target_id: str | None = None,
+    rel_type: str | None = None,
+) -> str:
+    """node_id is the edge's source; target_id + rel_type are required for add/remove."""
+    return await _manage_edges(action=action, node_id=node_id, target_id=target_id, rel_type=rel_type)
 
 
 # ── MCP resources ────────────────────────────────────────────────────

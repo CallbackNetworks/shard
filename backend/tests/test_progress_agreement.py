@@ -60,7 +60,7 @@ def nested_project(client, db, sample_identity):
         client.post("/api/nodes", json={"type": "task", "title": title, "status": status, "container_id": area["id"]})
     client.post(
         f"/api/nodes/{sample_identity.id}/edges",
-        json={"target_id": project.id, "rel_type": "member_of"},
+        json={"target_id": project.id, "rel_type": "owns"},
     )
     db.commit()
     return project

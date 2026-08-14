@@ -3,7 +3,7 @@
 An identity is a ``Node(type="identity")``: ``title`` = name and every other
 field (color/description/avatar/share_token/share_pin_hash/share_expires_at/
 allow_guest_notes) lives in ``data`` -- identities carry only a title in the hot
-columns. Like goals they are top-level (projects attach via ``member_of``
+columns. Like goals they are top-level (projects attach via ``owns``
 edges), so there is no containing ``contains`` edge. ``share_expires_at`` is a
 datetime stored as an ISO string in JSON. ``IdentityView`` exposes the historical
 ``Identity`` attribute surface so ``IdentityOut.model_validate`` keeps working.
@@ -19,7 +19,7 @@ from app.models import Edge, Node
 from app.services.graph.core import (
     NODE_IDENTITY,
     NODE_PROJECT,
-    REL_MEMBER_OF,
+    REL_OWNS,
     _iso,
     _parse_dt,
     add_edge,
@@ -32,27 +32,23 @@ from app.services.graph.projects import ProjectView, projects_by_ids
 
 
 def link_membership(db: Session, identity_id: str, project_id: str) -> None:
-    """Attach an identity to a project as a ``member_of`` edge (idempotent)."""
+    """Attach an identity to a project as a ``owns`` edge (idempotent)."""
     ensure_node(db, identity_id, NODE_IDENTITY)
     ensure_node(db, project_id, NODE_PROJECT)
-    add_edge(db, identity_id, project_id, REL_MEMBER_OF)
+    add_edge(db, identity_id, project_id, REL_OWNS)
 
 
 def unlink_membership(db: Session, identity_id: str, project_id: str) -> bool:
-    return remove_edge(db, identity_id, project_id, REL_MEMBER_OF)
+    return remove_edge(db, identity_id, project_id, REL_OWNS)
 
 
 def project_ids_for_identity(db: Session, identity_id: str) -> list[str]:
-    rows = db.execute(
-        select(Edge.target_id).where(Edge.source_id == identity_id, Edge.rel_type == REL_MEMBER_OF)
-    ).scalars()
+    rows = db.execute(select(Edge.target_id).where(Edge.source_id == identity_id, Edge.rel_type == REL_OWNS)).scalars()
     return list(rows)
 
 
 def identity_ids_for_project(db: Session, project_id: str) -> list[str]:
-    rows = db.execute(
-        select(Edge.source_id).where(Edge.target_id == project_id, Edge.rel_type == REL_MEMBER_OF)
-    ).scalars()
+    rows = db.execute(select(Edge.source_id).where(Edge.target_id == project_id, Edge.rel_type == REL_OWNS)).scalars()
     return list(rows)
 
 
@@ -103,7 +99,7 @@ def create_identity(
     avatar: str | None = None,
     actor: str | None = None,
 ) -> IdentityView:
-    """Create a top-level identity node (projects attach via ``member_of``).
+    """Create a top-level identity node (projects attach via ``owns``).
 
     ``share_token`` is seeded by the write core for any shareable-role type
     (ADR-0041 B); the remaining share fields default to absent (read as None/False).
@@ -137,7 +133,7 @@ def update_identity(db: Session, identity_id: str, **fields) -> IdentityView | N
 
 
 def delete_identity(db: Session, identity_id: str, *, actor: str | None = None) -> bool:
-    """Delete an identity node and every edge touching it (member_of, assigned_to)."""
+    """Delete an identity node and every edge touching it (``owns``)."""
     node = db.get(Node, identity_id)
     if node is None or node.type != NODE_IDENTITY:
         return False

@@ -12,6 +12,7 @@ from app.routers.external_api.agent_context import sub_router as agent_context_r
 from app.routers.external_api.analytics import sub_router as analytics_router
 from app.routers.external_api.comments import sub_router as comments_router
 from app.routers.external_api.dependencies import sub_router as dependencies_router
+from app.routers.external_api.edge_types import sub_router as edge_types_router
 from app.routers.external_api.email import sub_router as email_router
 from app.routers.external_api.labels import sub_router as labels_router
 from app.routers.external_api.nodes import sub_router as nodes_router
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/api/v1", tags=["External API v1"], dependencies=[Dep
 
 # Graph-native node/edge write surface (ADR-0042): the canonical entity write path.
 router.include_router(nodes_router)
+router.include_router(edge_types_router)
 router.include_router(projects_router)
 router.include_router(tasks_router)
 router.include_router(stats_router)

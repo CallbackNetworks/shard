@@ -379,7 +379,8 @@ Edge:
   id         UUID  PK
   source_id  FK → Node  (CASCADE)
   target_id  FK → Node  (CASCADE)
-  rel_type   str        # contains | member_of | assigned_to | depends_on | labeled | in_cycle
+  rel_type   str        # contains | owns | depends_on | labeled | in_cycle
+                        # allowed endpoint types declared on EdgeType (ADR-0078)
   position   int
   data       JSON (nullable)
   created_at datetime

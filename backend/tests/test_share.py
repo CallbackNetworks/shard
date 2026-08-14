@@ -286,7 +286,7 @@ def test_verify_through_generic_door_returns_the_identity_page(client, db, pinne
     """Unlocking a page hands back that page (ADR-0070).
 
     The generic verify was written container-only, so an identity — whose projects
-    hang off ``member_of``, not ``contains`` — unlocked into an empty page.
+    hang off ``owns``, not ``contains`` — unlocked into an empty page.
     """
     graph.link_membership(db, pinned_identity.id, sample_project.id)
     db.commit()

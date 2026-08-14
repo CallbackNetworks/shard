@@ -17,7 +17,7 @@ def now_utc():
 # ``status`` are real hot columns; description/share_token/share_expires_at/
 # allow_guest_notes/agent_instructions/repo_url/wip_limits live in the node's JSON
 # ``data`` bag. Containment (tasks/labels/cycles) is expressed as ``contains`` edges
-# and identity membership as ``member_of`` edges. The dedicated ``projects`` table
+# and identity membership as ``owns`` edges. The dedicated ``projects`` table
 # was dropped; reads go through ``graph.ProjectView`` and writes through
 # ``graph.create_project``/``update_project``. With B6 done the graph mirror
 # (``graph_sync``) was retired — every first-class entity is now node-only.
@@ -103,9 +103,10 @@ class Integration(Base):
 # ``Identity`` was collapsed to a node-only entity in ADR-0033 Phase B: an identity
 # is a ``Node(type="identity")`` (name in ``title``; color/description/avatar/
 # share_token/share_pin_hash/share_expires_at/allow_guest_notes in ``data``).
-# Identities are top-level (not project-scoped); projects attach via ``member_of``
-# edges and tasks via ``assigned_to`` edges. The dedicated ``identities`` table was
-# dropped; see the identity helpers in ``services/graph.py``.
+# Identities are top-level (not project-scoped); the containers they own attach via
+# ``owns`` edges (ADR-0078 — never ``contains``, which is where a node lives, not
+# whose it is). The dedicated ``identities`` table was dropped; see the identity
+# helpers in ``services/graph.py``.
 
 
 class ActivityLog(Base):
@@ -386,7 +387,8 @@ class Edge(Base):
     target_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # contains / member_of / assigned_to / depends_on / labeled / in_cycle
+    # contains / owns / depends_on / labeled / in_cycle (what may sit at each end
+    # of a given rel_type is declared on EdgeType and enforced in add_edge, ADR-0078)
     rel_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -442,20 +444,30 @@ class NodeType(Base):
 class EdgeType(Base):
     """Registry of relationship (edge) vocabulary, data-driven (see ADR-0033).
 
-    Built-in relations (contains/member_of/assigned_to/depends_on/labeled/
-    in_cycle) are seeded with ``is_builtin=True``; users may invent their
-    own (e.g. ``blocks``, ``relates_to``). ``is_containment`` marks the relations
-    that participate in ``contains``-style traversal; ``is_symmetric`` marks
-    undirected relations. ``key`` is the string written into ``edges.rel_type``.
+    Built-in relations (contains/owns/depends_on/labeled/in_cycle) are seeded
+    with ``is_builtin=True``; users may invent their own (e.g. ``blocks``,
+    ``relates_to``). ``is_containment`` marks the relations that participate in
+    ``contains``-style traversal; ``is_symmetric`` marks undirected relations.
+    ``key`` is the string written into ``edges.rel_type``.
+
+    A relation declares what may sit at each end (ADR-0078): ``allowed_source``
+    and ``allowed_target`` are ``{"types": [...], "roles": [...]}`` allow-lists
+    (either key matches, ``NULL`` means unconstrained) enforced by
+    ``graph.add_edge``, and ``description`` says when to reach for this relation
+    rather than another. Before ADR-0078 the vocabulary named its relations and
+    described none of them, so picking the wrong one wrote a silent no-op edge.
     """
 
     __tablename__ = "edge_types"
 
     key: Mapped[str] = mapped_column(String(30), primary_key=True)
     label: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_containment: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_symmetric: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    allowed_source: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    allowed_target: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)

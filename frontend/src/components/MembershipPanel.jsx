@@ -12,7 +12,7 @@ import { hasNodeRole } from '../constants/nodeRoles'
 
 // Relations managed by dedicated panels/UI; everything else (custom edge
 // types) surfaces in the "other relations" section below (ADR-0037).
-const CORE_RELS = new Set(['contains', 'depends_on', 'labeled', 'in_cycle', 'assigned_to', 'member_of'])
+const CORE_RELS = new Set(['contains', 'depends_on', 'labeled', 'in_cycle', 'owns'])
 
 // Cross-project membership management (ADR-0032): a task can belong to multiple
 // projects via graph contains edges. ``projectId`` is the project this row is
