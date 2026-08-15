@@ -36,6 +36,12 @@ services:
       - BACKUP_HOUR=${BACKUP_HOUR:-3}
       - BACKUP_KEEP=${BACKUP_KEEP:-7}
       - BACKUP_DIR=${BACKUP_DIR:-/app/data/backups}
+      # Remote MCP, served by this process (ADR-0080). No token, no /mcp route.
+      # API_BASE_URL points at this same process on purpose: the tools stay
+      # ``/api/v1`` clients, so the API key's scope is what bounds the endpoint.
+      - MCP_HTTP_TOKEN=${MCP_HTTP_TOKEN:-}
+      - API_BASE_URL=${MCP_API_BASE_URL:-http://localhost:8000}
+      - API_KEY=${MCP_API_KEY:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

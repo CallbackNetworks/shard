@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
@@ -12,6 +12,7 @@ from sqlalchemy import inspect as sa_inspect
 
 logger = logging.getLogger(__name__)
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.routing import Route
 
 from app import db_schema
 from app.database import engine
@@ -60,6 +61,28 @@ from app.services.search_backend import get_search_backend
 from app.services.usage_tracker import UsageTrackingMiddleware
 
 
+def _build_mcp_transport():
+    """Remote MCP, served by this process (ADR-0080).
+
+    Registered only when `MCP_HTTP_TOKEN` is set. ADR-0076's rule is unchanged —
+    a half-configured public endpoint is not a state worth serving — only where it
+    is enforced: the route is never registered rather than the service never being
+    generated. The failure mode improves with it: the path is *absent* (404), not
+    present with nothing behind it (502).
+
+    The import is inside the branch so a deployment without remote MCP does not pay
+    for the SDK at startup.
+    """
+    if not os.environ.get("MCP_HTTP_TOKEN"):
+        return None
+    from app.mcp_server.server import create_http_app
+
+    return create_http_app()
+
+
+_mcp_transport = _build_mcp_transport()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Creating a schema is the only half of this the application does. Upgrading an
@@ -88,7 +111,15 @@ async def lifespan(app: FastAPI):
     app.state.search_backend = search_backend
 
     _scheduler_task = asyncio.create_task(due_date_reminder_loop())
-    yield
+
+    # The MCP session manager is started by the transport app's own lifespan, and a
+    # route endpoint never sees a lifespan scope — so this process has to enter it.
+    # Skipping it is not a startup failure: every /mcp request fails at runtime with
+    # no manager to route to.
+    async with AsyncExitStack() as stack:
+        if _mcp_transport is not None:
+            await stack.enter_async_context(_mcp_transport.lifespan())
+        yield
     _scheduler_task.cancel()
 
 
@@ -146,6 +177,9 @@ _AUTH_BYPASS = (
     "/redoc",
     "/ws",
     "/api/v1/",
+    # Remote MCP carries its own bearer token (ADR-0076) and its clients are not
+    # browsers — the SPA's password gate has no session to offer them.
+    "/mcp",
 )
 
 
@@ -277,6 +311,14 @@ app.include_router(external_api.router)  # /api/v1/* external API (X-API-Key aut
 app.include_router(share.router)  # /share/* public share pages
 app.include_router(bulk.ical_router)  # /ical/* calendar subscriptions
 app.include_router(ws_router.router)  # /ws websocket
+
+# Remote MCP (ADR-0080). A `Route` with an ASGI endpoint, not a `Mount` and not a
+# handler function: a `Mount` answers the client's exact `/mcp` with a 307 and a
+# redirect is not a transport, while a *function* endpoint would be called as
+# `func(request) -> response` and the session manager writes its own response.
+# `BearerGuard` is a class for exactly that reason.
+if _mcp_transport is not None:
+    app.router.routes.append(Route("/mcp", endpoint=_mcp_transport, methods=["GET", "POST", "DELETE"], name="mcp"))
 
 
 @app.exception_handler(Exception)

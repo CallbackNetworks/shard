@@ -14,11 +14,15 @@ import asyncio
 import json
 import os
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Literal
 
 import httpx
 from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 # Value vocabularies the backend already enforces. Declared once here so the
 # generated tool schemas carry the same enums the hand-written ones did — a
@@ -778,34 +782,75 @@ def weekly_summary() -> str:
 # ── Transports ───────────────────────────────────────────────────────
 
 
-def create_http_app():
-    """The SDK's Streamable HTTP app with a bearer-token guard in front of it.
+class HttpTransport:
+    """The HTTP transport: a bearer-guarded door, and the lifespan behind it.
+
+    Mount it as a route endpoint and enter `lifespan()` — the same two steps for
+    either host (ADR-0080). Three shapes here are load-bearing:
+
+    **A class, not a function.** `starlette.routing.Route` decides what an endpoint
+    is by asking `inspect.isfunction`: a function is called as
+    ``func(request) -> response``, and only a non-function is treated as an ASGI
+    app. The session manager writes its own response, so handed a function
+    Starlette would wait for a `Response` that never comes.
+
+    **A route, not a `Mount`.** ADR-0076 already paid for this: a `Mount` matches
+    only ``/mcp/...`` and answers the client's exact ``/mcp`` with a 307, and **a
+    redirect is not a transport**. The SDK's own middleware tier is not the place
+    either — it runs per JSON-RPC message, after the request has been accepted.
+
+    **A fresh transport app per startup.** The SDK's session manager may be run
+    exactly once per instance, so one app built at import and re-entered breaks
+    every startup after the first — which in a test suite is every test after the
+    first, all at once and nowhere near the cause.
+    """
+
+    def __init__(self, token: str) -> None:
+        self._token = token
+        self._inner = None
+
+    @asynccontextmanager
+    async def lifespan(self) -> AsyncIterator[None]:
+        """Start the session manager. A host that skips this serves a broken door."""
+        inner = _build_transport_app()
+        self._inner = inner
+        try:
+            async with inner.router.lifespan_context(inner):
+                yield
+        finally:
+            self._inner = None
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            raise RuntimeError(
+                f"HttpTransport is mounted on a route and only handles http scopes, got {scope['type']!r}"
+            )
+        # The scheme is required and compared case-insensitively (RFC 7235): a bare
+        # token would be a second undocumented way in, and ``bearer`` is as valid as
+        # ``Bearer``.
+        request = Request(scope, receive)
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        if scheme.lower() != "bearer" or not secrets.compare_digest(token.strip(), self._token):
+            await JSONResponse({"error": "Unauthorized"}, status_code=401)(scope, receive, send)
+            return
+        # Checked *after* the token on purpose: a misconfigured host is a fact about
+        # this deployment, and an unauthenticated caller does not get to learn it.
+        if self._inner is None:
+            raise RuntimeError(
+                "MCP transport reached with no session manager running: the host mounted "
+                "the route but never entered HttpTransport.lifespan()."
+            )
+        await self._inner(scope, receive, send)
+
+
+def _build_transport_app():
+    """The SDK's Streamable HTTP app, one per startup.
 
     The SDK owns the transport now (ADR-0077): the hand-rolled ASGI endpoint, the
     session-manager lifespan and the exact-path routing that ADR-0076 had to get
     right by hand are all ``streamable_http_app()``. What stays ours is the door.
-
-    The guard is a plain ASGI wrapper rather than a route or a ``Mount`` around
-    the app: a ``Mount`` only matches ``/mcp/...`` and answers the client's exact
-    ``/mcp`` with a 307 — the same redirect ADR-0076 removed, and a redirect is
-    not a transport. Wrapping delegates every path, including the lifespan scope,
-    to the app that already knows its own routing. The SDK's own middleware tier
-    is not the place either: it runs per JSON-RPC message, after the HTTP request
-    has already been accepted.
     """
     from starlette.middleware.cors import CORSMiddleware
-    from starlette.requests import Request
-    from starlette.responses import JSONResponse
-
-    # Mandatory, as in ADR-0076: over HTTP the endpoint is reachable by anyone who
-    # can route to it, and every tool behind it carries the server's own API key.
-    http_token = os.environ.get("MCP_HTTP_TOKEN", "")
-    if not http_token:
-        raise SystemExit(
-            "MCP_HTTP_TOKEN is required for MCP_TRANSPORT=http: the HTTP endpoint "
-            "exposes every tool to anyone who can reach it. Set a token, or use the "
-            "default stdio transport, where the client owns the process."
-        )
 
     # ``host`` defaults to 127.0.0.1, and that default silently switches DNS-rebinding
     # protection *on* with an allow-list of localhost only — behind nginx every request
@@ -823,32 +868,43 @@ def create_http_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    return inner
 
-    async def guarded(scope, receive, send):
-        # Lifespan (and anything else non-HTTP) belongs to the app being wrapped.
-        if scope["type"] != "http":
-            await inner(scope, receive, send)
-            return
-        # The scheme is required and compared case-insensitively (RFC 7235): a bare
-        # token would be a second undocumented way in, and ``bearer`` is as valid as
-        # ``Bearer``.
-        request = Request(scope, receive)
-        scheme, _, token = request.headers.get("authorization", "").partition(" ")
-        if scheme.lower() != "bearer" or not secrets.compare_digest(token.strip(), http_token):
-            await JSONResponse({"error": "Unauthorized"}, status_code=401)(scope, receive, send)
-            return
-        await inner(scope, receive, send)
 
-    return guarded
+def create_http_app() -> HttpTransport:
+    """The transport, or a refusal to serve one unguarded."""
+    # Mandatory, as in ADR-0076: over HTTP the endpoint is reachable by anyone who
+    # can route to it, and every tool behind it carries the server's own API key.
+    http_token = os.environ.get("MCP_HTTP_TOKEN", "")
+    if not http_token:
+        raise SystemExit(
+            "MCP_HTTP_TOKEN is required for MCP_TRANSPORT=http: the HTTP endpoint "
+            "exposes every tool to anyone who can reach it. Set a token, or use the "
+            "default stdio transport, where the client owns the process."
+        )
+    return HttpTransport(http_token)
+
+
+def create_standalone_app(transport: HttpTransport):
+    """Host the transport in an app of its own — the same two steps the backend takes.
+
+    Kept symmetric on purpose: whatever the backend has to do to mount this
+    correctly, this path does too, so a mistake in either shows up in both.
+    """
+    from starlette.applications import Starlette
+    from starlette.routing import Route
+
+    return Starlette(
+        routes=[Route("/mcp", endpoint=transport, methods=["GET", "POST", "DELETE"], name="mcp")],
+        lifespan=lambda _app: transport.lifespan(),
+    )
 
 
 if __name__ == "__main__":
-    transport = os.environ.get("MCP_TRANSPORT", "stdio")
-    if transport == "http":
+    if os.environ.get("MCP_TRANSPORT", "stdio") == "http":
         import uvicorn
 
-        app = create_http_app()
         port = int(os.environ.get("MCP_HTTP_PORT", "8001"))
-        uvicorn.run(app, host="0.0.0.0", port=port)
+        uvicorn.run(create_standalone_app(create_http_app()), host="0.0.0.0", port=port)
     else:
         asyncio.run(mcp.run_stdio_async())

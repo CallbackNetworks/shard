@@ -794,9 +794,9 @@ async def test_http_endpoint_rejects_wrong_and_missing_tokens(monkeypatch):
     from starlette.testclient import TestClient
 
     monkeypatch.setenv("MCP_HTTP_TOKEN", "s3cret-token")
-    app = mcp_server.create_http_app()
+    transport = mcp_server.create_http_app()
 
-    with TestClient(app) as client:
+    with TestClient(mcp_server.create_standalone_app(transport)) as client:
         for headers in (
             {},
             {"Authorization": "Bearer wrong-token"},
@@ -821,3 +821,149 @@ async def test_http_endpoint_rejects_wrong_and_missing_tokens(monkeypatch):
                 },
             )
             assert r.status_code != 401, scheme
+
+
+# ── Mounted in the backend process (ADR-0080) ────────────────────────
+
+
+def _mounted_app(transport):
+    """A host that mounts the transport the way `app.main` does.
+
+    Deliberately built by hand rather than by reloading `app.main`: what is under
+    test is the *shape* of the mount — a `Route` with an ASGI endpoint, and a
+    lifespan the host enters itself — and reloading the real module would test the
+    import machinery instead.
+    """
+    from contextlib import asynccontextmanager
+
+    from fastapi import FastAPI
+    from starlette.routing import Route
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with transport.lifespan():
+            yield
+
+    host = FastAPI(lifespan=lifespan)
+    host.router.routes.append(Route("/mcp", endpoint=transport, methods=["GET", "POST", "DELETE"], name="mcp"))
+    return host
+
+
+def test_the_guard_is_mounted_as_an_asgi_app_not_a_handler(monkeypatch):
+    """`Route` must hand the request to the guard, not call it as `func(request)`.
+
+    `starlette.routing.Route` asks `inspect.isfunction` and wraps a function as
+    `func(request) -> response`. The session manager writes its own response, so a
+    function endpoint would leave Starlette waiting for a `Response` that never
+    comes. Turning `BearerGuard` back into a closure fails here rather than in
+    production, where the symptom is a hung MCP client.
+    """
+    from starlette.routing import Route
+
+    monkeypatch.setenv("MCP_HTTP_TOKEN", "s3cret-token")
+    transport = mcp_server.create_http_app()
+
+    assert Route("/mcp", endpoint=transport).app is transport
+
+
+def test_mounted_endpoint_refuses_unauthenticated_and_completes_a_handshake(monkeypatch):
+    """The door still guards it when the host is the backend, and the transport works."""
+    from starlette.testclient import TestClient
+
+    monkeypatch.setenv("MCP_HTTP_TOKEN", "s3cret-token")
+    transport = mcp_server.create_http_app()
+
+    with TestClient(_mounted_app(transport)) as client:
+        assert client.post("/mcp", json={}).status_code == 401
+
+        r = client.post(
+            "/mcp",
+            headers={
+                "Authorization": "bearer s3cret-token",
+                "Accept": "application/json, text/event-stream",
+            },
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            },
+        )
+        assert r.status_code == 200
+        assert '"serverInfo"' in r.text and '"shard"' in r.text
+
+
+def test_a_host_that_skips_the_lifespan_serves_a_broken_endpoint(monkeypatch):
+    """Negative control: forgetting the lifespan is a runtime failure, not a startup one.
+
+    A route endpoint never sees a lifespan scope, so the session manager the SDK
+    starts there is only running if the host entered `transport.lifespan()`. Without
+    it the app boots clean and every authenticated call fails — the shape worth
+    pinning, because the symptom appears nowhere near the omission.
+    """
+    from fastapi import FastAPI
+    from starlette.routing import Route
+    from starlette.testclient import TestClient
+
+    monkeypatch.setenv("MCP_HTTP_TOKEN", "s3cret-token")
+    transport = mcp_server.create_http_app()
+
+    host = FastAPI()  # no lifespan: the session manager is never started
+    host.router.routes.append(Route("/mcp", endpoint=transport, methods=["GET", "POST", "DELETE"], name="mcp"))
+
+    with TestClient(host, raise_server_exceptions=False) as client:
+        # The guard still answers — it is the transport behind it that is not running.
+        assert client.post("/mcp", json={}).status_code == 401
+        r = client.post(
+            "/mcp",
+            headers={
+                "Authorization": "bearer s3cret-token",
+                "Accept": "application/json, text/event-stream",
+            },
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        )
+        assert r.status_code >= 500
+
+
+def test_the_backend_mcp_route_follows_the_token(client):
+    """The route exists exactly when a token configures it, and never unguarded.
+
+    ADR-0076's rule — never a half-configured public endpoint — moves from "the
+    deploy does not generate the service" to "the app does not register the route".
+    Asserted as the rule rather than as one environment's answer: CI has no token
+    and a developer's `.env` may well have one, and a test that only passes in the
+    first is a test that fails for the wrong reason in the second.
+    """
+    from app import main
+
+    status = client.post("/mcp", json={}).status_code
+    if main._mcp_transport is None:
+        # Absent, not broken: a 502 would mean the path exists with nothing behind it.
+        assert status == 404
+    else:
+        assert status == 401
+
+
+def test_mcp_bypasses_the_spa_password_gate(client, monkeypatch):
+    """An MCP client has no browser session to offer, and its own token to present.
+
+    Distinguished by *body*, not status: the SPA gate and the MCP door both answer
+    401, so a status assertion alone would pass even if the gate had swallowed the
+    request. `{"detail": ...}` is the gate; `{"error": ...}` is the door.
+    """
+    from app.routers import auth as auth_mod
+
+    monkeypatch.setattr(auth_mod, "auth_enabled", lambda: True)
+
+    r = client.post("/mcp", json={})
+    assert r.status_code in (404, 401)
+    if r.status_code == 401:
+        assert r.json() == {"error": "Unauthorized"}
+
+    gated = client.get("/api/projects")
+    assert gated.status_code == 401
+    assert gated.json() == {"detail": "Unauthorized"}
