@@ -14,17 +14,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Isolate this run's compose project
+        run: echo "COMPOSE_PROJECT_NAME=ci-backend-checks-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+
       - name: Build backend image
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks build backend
+        run: docker compose -f docker-compose.ci.yml build backend
 
       - name: Lint
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend ruff check app/ tests/
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps backend ruff check app/ tests/
 
       - name: Format check
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend ruff format --check app/ tests/
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps backend ruff format --check app/ tests/
 
       - name: Security audit
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend sh -c "pip install pip-audit && pip-audit --strict"
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps backend sh -c "pip install pip-audit && pip-audit --strict"
 
       # No separate MCP image or suite: the server is a module inside the backend
       # package now (ADR-0080), so `tests/test_mcp_server.py` runs in the backend
@@ -33,7 +36,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-backend-checks down -v
+          docker compose -f docker-compose.ci.yml down -v
           docker image prune -f
 
   # The two databases are first-class, symmetric test targets: same suite,
@@ -44,19 +47,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Isolate this run's compose project
+        run: echo "COMPOSE_PROJECT_NAME=ci-backend-sqlite-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+
       - name: Build backend image
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-sqlite build backend
+        run: docker compose -f docker-compose.ci.yml build backend
 
       - name: Run tests with coverage
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-backend-sqlite run --rm --no-deps \
+          docker compose -f docker-compose.ci.yml run --rm --no-deps \
             -e TEST_DATABASE_URL=sqlite:///:memory: \
             backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=78
 
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-backend-sqlite down -v
+          docker compose -f docker-compose.ci.yml down -v
           docker image prune -f
 
   backend-postgres:
@@ -65,33 +71,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Isolate this run's compose project
+        run: echo "COMPOSE_PROJECT_NAME=ci-backend-pg-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+
       - name: Build backend image
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest build backend
+        run: docker compose -f docker-compose.ci.yml --profile pgtest build backend
 
       - name: Start PostgreSQL
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest up -d postgres
+        run: docker compose -f docker-compose.ci.yml --profile pgtest up -d postgres
 
       - name: Wait for PostgreSQL health
         run: |
           for i in $(seq 1 30); do
-            docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest exec -T postgres \
+            docker compose -f docker-compose.ci.yml --profile pgtest exec -T postgres \
               pg_isready -U todo -d shard_test 2>/dev/null && exit 0
             sleep 2
           done
           echo "PostgreSQL failed to become healthy"
-          docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest logs postgres
+          docker compose -f docker-compose.ci.yml --profile pgtest logs postgres
           exit 1
 
       - name: Run tests with coverage
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest run --rm --no-deps \
+          docker compose -f docker-compose.ci.yml --profile pgtest run --rm --no-deps \
             -e TEST_DATABASE_URL=postgresql+psycopg://todo:todo_dev@postgres:5432/shard_test \
             backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=78
 
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-backend-pg --profile pgtest down -v
+          docker compose -f docker-compose.ci.yml --profile pgtest down -v
           docker image prune -f
 
   frontend:
@@ -100,25 +109,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Isolate this run's compose project
+        run: echo "COMPOSE_PROJECT_NAME=ci-frontend-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+
       - name: Build frontend image
-        run: docker compose -f docker-compose.ci.yml -p ci-frontend build frontend
+        run: docker compose -f docker-compose.ci.yml build frontend
 
       - name: Lint
-        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npm run lint -- --max-warnings 10
+        run: docker compose -f docker-compose.ci.yml run --rm frontend npm run lint -- --max-warnings 10
 
       - name: Run tests
-        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npx vitest run
+        run: docker compose -f docker-compose.ci.yml run --rm frontend npx vitest run
 
       - name: Security audit
-        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npm audit --audit-level=moderate
+        run: docker compose -f docker-compose.ci.yml run --rm frontend npm audit --audit-level=moderate
 
       - name: Build
-        run: docker compose -f docker-compose.ci.yml -p ci-frontend run --rm frontend npx vite build
+        run: docker compose -f docker-compose.ci.yml run --rm frontend npx vite build
 
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-frontend down -v
+          docker compose -f docker-compose.ci.yml down -v
           docker image prune -f
 
   integration:
@@ -128,52 +140,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Isolate this run's compose project
+        run: echo "COMPOSE_PROJECT_NAME=ci-integration-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+
       - name: Build production images
-        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration build backend-prod frontend-prod
+        run: docker compose -f docker-compose.ci.yml --profile integration build backend-prod frontend-prod
 
       - name: Start services
-        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration up -d backend-prod frontend-prod
+        run: docker compose -f docker-compose.ci.yml --profile integration up -d backend-prod frontend-prod
 
       - name: Wait for backend health
         run: |
           for i in $(seq 1 30); do
-            docker compose -f docker-compose.ci.yml -p ci-integration --profile integration exec backend-prod \
+            docker compose -f docker-compose.ci.yml --profile integration exec backend-prod \
               python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null && exit 0
             sleep 2
           done
           echo "Backend health check failed"
-          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration logs backend-prod
+          docker compose -f docker-compose.ci.yml --profile integration logs backend-prod
           exit 1
 
       - name: Wait for frontend health
         run: |
           for i in $(seq 1 30); do
-            status=$(docker inspect --format='{{.State.Health.Status}}' ci-integration-frontend-prod-1 2>/dev/null || echo "not found")
+            status=$(docker inspect --format='{{.State.Health.Status}}' "$COMPOSE_PROJECT_NAME-frontend-prod-1" 2>/dev/null || echo "not found")
             echo "Attempt $i: frontend-prod health=$status"
             [ "$status" = "healthy" ] && exit 0
             sleep 2
           done
           echo "Frontend health check failed"
-          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration logs frontend-prod
+          docker compose -f docker-compose.ci.yml --profile integration logs frontend-prod
           exit 1
 
       - name: Smoke test frontend
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration exec frontend-prod \
+          docker compose -f docker-compose.ci.yml --profile integration exec frontend-prod \
             wget -qO- http://127.0.0.1/ > /dev/null
 
       - name: Build e2e image
-        run: docker compose -f docker-compose.ci.yml -p ci-integration --profile integration build e2e
+        run: docker compose -f docker-compose.ci.yml --profile integration build e2e
 
       - name: Run Playwright e2e suite
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration \
+          docker compose -f docker-compose.ci.yml --profile integration \
             run --rm --no-deps e2e npx playwright test --reporter=line
 
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.ci.yml -p ci-integration --profile integration down -v
+          docker compose -f docker-compose.ci.yml --profile integration down -v
           docker image prune -f
           docker builder prune -f --filter until=48h
 
@@ -200,17 +215,24 @@ jobs:
       - name: Compute image prefix
         run: echo "IMAGE_PREFIX=$(echo '${{ vars.REGISTRY_URL }}/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      # Compose names a built image `<project>-<service>`, and the integration job's
+      # project is now per-run. Without this, two overlapping runs both produced
+      # `ci-integration-backend-prod:latest` and publish could push the *other*
+      # run's image — the wrong artifact reaching production, silently.
+      - name: Name the images the integration job built
+        run: echo "INTEGRATION_PROJECT=ci-integration-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+
       - name: Tag and push backend
         run: |
-          docker tag ci-integration-backend-prod:latest $IMAGE_PREFIX/backend:${{ github.sha }}
-          docker tag ci-integration-backend-prod:latest $IMAGE_PREFIX/backend:latest
+          docker tag $INTEGRATION_PROJECT-backend-prod:latest $IMAGE_PREFIX/backend:${{ github.sha }}
+          docker tag $INTEGRATION_PROJECT-backend-prod:latest $IMAGE_PREFIX/backend:latest
           docker push $IMAGE_PREFIX/backend:${{ github.sha }}
           docker push $IMAGE_PREFIX/backend:latest
 
       - name: Tag and push frontend
         run: |
-          docker tag ci-integration-frontend-prod:latest $IMAGE_PREFIX/frontend:${{ github.sha }}
-          docker tag ci-integration-frontend-prod:latest $IMAGE_PREFIX/frontend:latest
+          docker tag $INTEGRATION_PROJECT-frontend-prod:latest $IMAGE_PREFIX/frontend:${{ github.sha }}
+          docker tag $INTEGRATION_PROJECT-frontend-prod:latest $IMAGE_PREFIX/frontend:latest
           docker push $IMAGE_PREFIX/frontend:${{ github.sha }}
           docker push $IMAGE_PREFIX/frontend:latest
 
