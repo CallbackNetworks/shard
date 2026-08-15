@@ -573,6 +573,38 @@ def descendants_of(db: Session, node_id: str) -> set[str]:
     return seen
 
 
+def reachable_project_ids(db: Session, node_id: str) -> set[str]:
+    """Project ids reachable from ``node_id`` by following ``contains``/``owns`` edges
+    forward, any depth (Focus, ADR-0081).
+
+    A project is a leaf for this walk — its own ``contains`` children are tasks, not
+    further owners/containers, so expansion stops there rather than descending into
+    them. Level-batched like :func:`descendants_of`.
+    """
+    seen: set[str] = {node_id}
+    frontier: list[str] = [node_id]
+    project_ids: set[str] = set()
+    while frontier:
+        next_frontier: list[str] = []
+        for start in range(0, len(frontier), _IN_CHUNK):
+            rows = db.execute(
+                select(Edge.target_id, Node.type)
+                .join(Node, Node.id == Edge.target_id)
+                .where(
+                    Edge.rel_type.in_((REL_CONTAINS, REL_OWNS)),
+                    Edge.source_id.in_(frontier[start : start + _IN_CHUNK]),
+                )
+            ).all()
+            for target_id, target_type in rows:
+                if target_type == NODE_PROJECT:
+                    project_ids.add(target_id)
+                elif target_id not in seen:
+                    seen.add(target_id)
+                    next_frontier.append(target_id)
+        frontier = next_frontier
+    return project_ids
+
+
 def detect_cycle(db: Session, source_id: str, target_id: str) -> bool:
     """Would adding ``contains`` edge source -> target create a cycle?
 

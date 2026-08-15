@@ -33,6 +33,22 @@ class IdentityOut(BaseModel):
     project_count: int = 0
 
 
+# --- Focus (ADR-0081) ---
+
+
+class FocusTargetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    type: str
+    type_label: str
+    color: str | None
+    avatar: str | None
+    project_ids: list[str]
+    project_count: int
+
+
 # --- Label ---
 
 

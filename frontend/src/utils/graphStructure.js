@@ -312,20 +312,40 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
     customLinks,
     dependencyLinks,
     stats,
+    // Raw containment index, kept for focusGraph (ADR-0081): a focus target may
+    // be any container-role node, not just identity, so narrowing needs a real
+    // downward contains-walk rather than a single identity-id match.
+    childrenOf,
   }
 }
 
-// Narrow a derived graph to one identity's world (focus rail). Containers
-// owned by the identity survive; everything else is filtered transitively.
+// Narrow a derived graph to one focus target's world (focus rail, ADR-0081):
+// the target itself, everything nested under it via `contains` (sub-containers,
+// identities, directly-filed projects), and every project owned (`owns`) by an
+// identity in that branch.
 export function focusGraph(graph, focusId) {
   if (!focusId) return graph
-  const projectNodes = graph.projectNodes.filter(p => p.identityIds.includes(focusId))
+  const branch = new Set([focusId])
+  const queue = [focusId]
+  while (queue.length) {
+    const current = queue.shift()
+    for (const child of graph.childrenOf?.get(current) || []) {
+      if (!branch.has(child.id)) {
+        branch.add(child.id)
+        queue.push(child.id)
+      }
+    }
+  }
+  const identityIdsInBranch = new Set(graph.identityNodes.filter(i => branch.has(i.id)).map(i => i.id))
+  const projectNodes = graph.projectNodes.filter(
+    p => branch.has(p.id) || p.identityIds.some(id => identityIdsInBranch.has(id))
+  )
   const keep = new Set(projectNodes.map(p => p.id))
   const taskNodes = graph.taskNodes.filter(t => keep.has(t.projectId))
   const allTaskNodes = graph.allTaskNodes.filter(t => keep.has(t.projectId))
   const dependencyTaskNodes = graph.dependencyTaskNodes.filter(t => keep.has(t.projectId))
   const keptTaskIds = new Set(dependencyTaskNodes.map(t => t.id))
-  const identityNodes = graph.identityNodes.filter(i => i.id === focusId)
+  const identityNodes = graph.identityNodes.filter(i => identityIdsInBranch.has(i.id))
   // Goals render as container cards (ADR-0041); no dedicated goal-node set remains.
   const goalNodes = []
   const decisionNodes = graph.decisionNodes.filter(d => d.projectId && keep.has(d.projectId))

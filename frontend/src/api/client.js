@@ -207,6 +207,11 @@ export const linkProjectIdentity = (identityId, projectId) => attachNodeEdge(ide
 export const unlinkProjectIdentity = (identityId, projectId) => detachNodeEdge(identityId, projectId, 'owns')
 export const getIdentityHubStats = () => api.get('/identities/hub-stats').then(r => r.data)
 
+// Focus (ADR-0081): every identity plus every non-project container-role node
+// (e.g. a custom "organization" type), each with the project ids it reaches via
+// contains/owns. Backs the sidebar Focus control.
+export const getFocusTargets = () => api.get('/focus-targets').then(r => r.data)
+
 // Activity
 export const getActivity = (params = {}) => api.get('/activity', { params }).then(r => r.data)
 

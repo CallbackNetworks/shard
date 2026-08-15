@@ -1,20 +1,21 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getIdentities, getPreference, setPreference } from '../api/client'
+import { getFocusTargets, getPreference, setPreference } from '../api/client'
 
 const IdentityFocusContext = createContext(null)
 
 const PREF_KEY = 'identity-focus'
 
-// Focus mode: pick one identity and the app narrows to that identity's
-// projects. The selection is persisted as a user preference so it survives
-// reloads and other devices.
+// Focus mode: pick one node — an identity, or any other non-project
+// container-role node (e.g. a custom "organization" type, ADR-0081) — and the
+// app narrows to the projects it reaches via contains/owns. The selection is
+// persisted as a user preference so it survives reloads and other devices.
 export function IdentityFocusProvider({ children }) {
   const [focusId, setFocusIdState] = useState(null)
 
-  const { data: identities = [] } = useQuery({
-    queryKey: ['identities'],
-    queryFn: getIdentities,
+  const { data: focusTargets = [] } = useQuery({
+    queryKey: ['focus-targets'],
+    queryFn: getFocusTargets,
     staleTime: 60000,
   })
 
@@ -42,29 +43,28 @@ export function IdentityFocusProvider({ children }) {
 
   const clearFocus = useCallback(() => setFocusId(null), [setFocusId])
 
-  const focusIdentity = useMemo(
-    () => identities.find(identity => identity.id === focusId) || null,
-    [identities, focusId]
+  const focusTarget = useMemo(
+    () => focusTargets.find(target => target.id === focusId) || null,
+    [focusTargets, focusId]
   )
 
-  // Narrow a project list to the focused identity. Projects without any
-  // identity stay visible only when no focus is active.
+  // Narrow a project list to the focused target's reachable projects. Projects
+  // outside that set stay visible only when no focus is active.
   const filterProjects = useCallback((projects) => {
-    if (!focusId) return projects
-    return projects.filter(project =>
-      (project.identities || []).some(identity => identity.id === focusId)
-    )
-  }, [focusId])
+    if (!focusTarget) return projects
+    const ids = new Set(focusTarget.project_ids)
+    return projects.filter(project => ids.has(project.id))
+  }, [focusTarget])
 
   const value = useMemo(() => ({
-    identities,
-    focusId: focusIdentity ? focusId : null,
-    focusIdentity,
+    focusTargets,
+    focusId: focusTarget ? focusId : null,
+    focusTarget,
     setFocusId,
     toggleFocus,
     clearFocus,
     filterProjects,
-  }), [identities, focusId, focusIdentity, setFocusId, toggleFocus, clearFocus, filterProjects])
+  }), [focusTargets, focusId, focusTarget, setFocusId, toggleFocus, clearFocus, filterProjects])
 
   return (
     <IdentityFocusContext.Provider value={value}>
@@ -78,9 +78,9 @@ export function useIdentityFocus() {
   if (!ctx) {
     // Allow components to render outside the provider (tests, share views).
     return {
-      identities: [],
+      focusTargets: [],
       focusId: null,
-      focusIdentity: null,
+      focusTarget: null,
       setFocusId: () => {},
       toggleFocus: () => {},
       clearFocus: () => {},

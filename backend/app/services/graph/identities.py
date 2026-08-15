@@ -15,7 +15,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Edge, Node
+from app.models import Edge, Node, NodeType
 from app.services.graph.core import (
     NODE_IDENTITY,
     NODE_PROJECT,
@@ -23,9 +23,11 @@ from app.services.graph.core import (
     _iso,
     _parse_dt,
     add_edge,
+    container_type_keys,
     create_node,
     delete_node,
     ensure_node,
+    reachable_project_ids,
     remove_edge,
 )
 from app.services.graph.projects import ProjectView, projects_by_ids
@@ -171,3 +173,50 @@ def identities_for_project(db: Session, project_id: str) -> list[IdentityView]:
         return []
     by_id = {n.id: n for n in db.query(Node).filter(Node.id.in_(ids), Node.type == NODE_IDENTITY).all()}
     return [_identity_view(by_id[i]) for i in ids if i in by_id]
+
+
+@dataclass
+class FocusTargetView:
+    id: str
+    name: str
+    type: str
+    type_label: str
+    color: str | None
+    avatar: str | None
+    project_ids: list[str]
+    project_count: int
+
+
+def all_focus_targets(db: Session) -> list[FocusTargetView]:
+    """Every node the sidebar Focus control can narrow by (ADR-0081): every identity,
+    plus every non-project container-role node (e.g. a custom ``organization`` type) —
+    each with the project ids reachable from it via ``contains``/``owns``.
+
+    Container-role eligibility is registry-driven (``container_type_keys``, ADR-0040),
+    so a new custom container type becomes a valid focus target with no code change.
+    """
+    eligible_types = {NODE_IDENTITY, *(container_type_keys(db) - {NODE_PROJECT})}
+    nodes = db.query(Node).filter(Node.type.in_(eligible_types)).order_by(Node.created_at.asc()).all()
+    type_rows = {nt.key: nt for nt in db.query(NodeType).filter(NodeType.key.in_(eligible_types)).all()}
+
+    targets = []
+    for node in nodes:
+        data = node.data or {}
+        nt = type_rows.get(node.type)
+        project_ids = sorted(reachable_project_ids(db, node.id))
+        targets.append(
+            FocusTargetView(
+                id=node.id,
+                name=node.title,
+                type=node.type,
+                type_label=nt.label if nt else node.type,
+                # A node's own data.color wins (e.g. identity, which declares a per-node
+                # color field); most container types have no such field, so fall back to
+                # the type's registry color rather than leaving the picker uncolored.
+                color=data.get("color") or (nt.color if nt else None),
+                avatar=data.get("avatar"),
+                project_ids=project_ids,
+                project_count=len(project_ids),
+            )
+        )
+    return targets

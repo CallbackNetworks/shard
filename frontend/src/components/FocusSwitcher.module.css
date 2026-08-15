@@ -137,6 +137,17 @@
   white-space: nowrap;
 }
 
+.optionType {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px solid var(--kt-line);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--kt-faint);
+}
+
 .optionCount {
   flex-shrink: 0;
   font-size: 10px;

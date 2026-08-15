@@ -60,6 +60,7 @@ from app.services.graph.core import (
     parents_of,
     prerequisite_ids,
     project_container_map,
+    reachable_project_ids,
     remove_edge,
     remove_edges,
     shareable_type_keys,
@@ -98,8 +99,10 @@ from app.services.graph.goals import (
     update_goal,
 )
 from app.services.graph.identities import (
+    FocusTargetView,
     IdentityView,
     _identity_view,
+    all_focus_targets,
     all_identities,
     create_identity,
     delete_identity,

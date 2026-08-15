@@ -161,3 +161,36 @@ describe('focusGraph', () => {
     expect(focused.links.every(l => !l.from.includes('c1') && !l.to.includes('c1'))).toBe(true)
   })
 })
+
+// ADR-0081: a focus target is not only identity — any container-role node
+// (e.g. a custom "organization" type sitting above identity) is a valid
+// target, and narrowing walks contains+owns rather than matching one id.
+describe('focusGraph — non-identity targets (ADR-0081)', () => {
+  const orgNodeTypes = [
+    ...nodeTypes,
+    { key: 'organization', label: 'Organization', is_builtin: false, roles: ['container'], color: '#f59e0b' },
+  ]
+
+  function orgFixture() {
+    const nodes = [
+      { id: 'org1', type: 'organization', title: 'CGCG', data: {} },
+      { id: 'i1', type: 'identity', title: 'Me', data: { color: '#abc' } },
+      { id: 'p1', type: 'project', title: 'Owned via identity', status: 'active', data: {} },
+      { id: 'p2', type: 'project', title: 'Filed directly under the org', status: 'active', data: {} },
+      { id: 'p3', type: 'project', title: 'Unrelated', status: 'active', data: {} },
+    ]
+    const edges = [
+      { id: 'e1', source_id: 'org1', target_id: 'i1', rel_type: 'contains' },
+      { id: 'e2', source_id: 'i1', target_id: 'p1', rel_type: 'owns' },
+      { id: 'e3', source_id: 'org1', target_id: 'p2', rel_type: 'contains' },
+    ]
+    return { nodes, edges }
+  }
+
+  it('narrows to every project reachable via contains and owns beneath the organization', () => {
+    const graph = deriveGraphStructure(orgFixture(), orgNodeTypes, edgeTypes)
+    const focused = focusGraph(graph, 'org1')
+    expect(focused.projectNodes.map(p => p.id).sort()).toEqual(['org1', 'p1', 'p2'])
+    expect(focused.identityNodes.map(i => i.id)).toEqual(['i1'])
+  })
+})

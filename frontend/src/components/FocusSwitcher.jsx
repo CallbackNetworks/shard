@@ -6,13 +6,15 @@ import s from './FocusSwitcher.module.css'
 
 const PANEL_MAX_HEIGHT = 380
 
-// Identity focus is one control with N mutually exclusive values, not N nav
-// destinations — so it occupies one rail row whatever the identity count, and
-// the values live in a searchable popover. Rendering it as a list per identity
-// is what used to push the fixed nav below the fold (ADR-0066).
+// Focus is one control with N mutually exclusive values, not N nav
+// destinations — so it occupies one rail row whatever the target count, and
+// the values live in a searchable popover. Rendering it as a list per target
+// is what used to push the fixed nav below the fold (ADR-0066). Values are not
+// only identities — any non-project container-role node (e.g. a custom
+// "organization" type) is a valid target too (ADR-0081).
 export default function FocusSwitcher({ open, onOpenChange }) {
   const { t } = useTranslation()
-  const { identities, focusId, focusIdentity, setFocusId } = useIdentityFocus()
+  const { focusTargets, focusId, focusTarget, setFocusId } = useIdentityFocus()
   const [query, setQuery] = useState('')
   const [highlight, setHighlight] = useState(0)
   const [top, setTop] = useState(0)
@@ -21,14 +23,14 @@ export default function FocusSwitcher({ open, onOpenChange }) {
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return identities
-    return identities.filter(identity => identity.name.toLowerCase().includes(q))
-  }, [identities, query])
+    if (!q) return focusTargets
+    return focusTargets.filter(target => target.name.toLowerCase().includes(q))
+  }, [focusTargets, query])
 
   // The "no focus" row is a value of the same control, so it joins the option
   // list and takes part in keyboard navigation.
   const options = useMemo(
-    () => [{ id: null, name: t('focus.allIdentities') }, ...matches],
+    () => [{ id: null, name: t('focus.allTargets') }, ...matches],
     [matches, t]
   )
 
@@ -57,7 +59,7 @@ export default function FocusSwitcher({ open, onOpenChange }) {
     }
   }, [open, onOpenChange])
 
-  if (identities.length === 0) return null
+  if (focusTargets.length === 0) return null
 
   const pick = (id) => {
     setFocusId(id)
@@ -77,8 +79,8 @@ export default function FocusSwitcher({ open, onOpenChange }) {
     }
   }
 
-  const triggerLabel = focusIdentity
-    ? t('focus.focusedOn', { name: focusIdentity.name })
+  const triggerLabel = focusTarget
+    ? t('focus.focusedOn', { name: focusTarget.name })
     : t('focus.title')
 
   return (
@@ -87,24 +89,24 @@ export default function FocusSwitcher({ open, onOpenChange }) {
         ref={triggerRef}
         type="button"
         onClick={() => onOpenChange(!open)}
-        className={`kt-mini-nav-button ${s.trigger} ${focusIdentity ? s.isFocused : ''}`}
-        style={focusIdentity ? { '--focus-color': focusIdentity.color } : undefined}
+        className={`kt-mini-nav-button ${s.trigger} ${focusTarget ? s.isFocused : ''}`}
+        style={focusTarget ? { '--focus-color': focusTarget.color } : undefined}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={triggerLabel}
         title={triggerLabel}
       >
         <span className="kt-rail-ico">
-          {focusIdentity ? (
+          {focusTarget ? (
             <span className="kt-focus-avatar">
-              {focusIdentity.avatar || focusIdentity.name.charAt(0)}
+              {focusTarget.avatar || focusTarget.name.charAt(0)}
             </span>
           ) : (
             <Users size={16} />
           )}
         </span>
         <span className={`kt-rail-label ${s.triggerLabel}`}>
-          {focusIdentity ? focusIdentity.name : t('focus.title')}
+          {focusTarget ? focusTarget.name : t('focus.title')}
         </span>
         <ChevronRight size={13} className={`kt-rail-kbd ${s.chevron}`} />
       </button>
@@ -142,6 +144,11 @@ export default function FocusSwitcher({ open, onOpenChange }) {
                     {option.id ? (option.avatar || option.name.charAt(0)) : <Users size={13} />}
                   </span>
                   <span className={s.optionName}>{option.name}</span>
+                  {option.id && (
+                    <span className={s.optionType}>
+                      {option.type === 'identity' ? t('focus.typeIdentity') : option.type_label}
+                    </span>
+                  )}
                   {option.id && option.project_count !== undefined && (
                     <span className={s.optionCount}>{option.project_count}</span>
                   )}

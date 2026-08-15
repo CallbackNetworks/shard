@@ -30,6 +30,7 @@ from app.routers import (
     cycles,
     decisions,
     external_api,
+    focus,
     goals,
     graph_types,
     identities,
@@ -282,6 +283,7 @@ api_router.include_router(cycles.router)
 api_router.include_router(api_keys.router)
 api_router.include_router(activity.router)
 api_router.include_router(identities.router)
+api_router.include_router(focus.router)
 api_router.include_router(comments.router)
 api_router.include_router(search.router)
 api_router.include_router(recurring.router)

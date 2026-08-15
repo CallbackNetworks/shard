@@ -30,7 +30,7 @@ export default function Dashboard() {
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
   useUiPrefs() // re-render on list-density / timestamp preference changes
-  const { focusIdentity, filterProjects, clearFocus } = useIdentityFocus()
+  const { focusTarget, filterProjects, clearFocus } = useIdentityFocus()
   const { data: allProjects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const projects = filterProjects(allProjects)
   const { data: activities = [] } = useQuery({
@@ -117,22 +117,22 @@ export default function Dashboard() {
           <div className={s.headerStats}>
             <span className={s.headerStatsActive}>{active.length}</span> {t('active')} ·{' '}
             <span className={s.headerStatsArchived}>{archived.length}</span> {t('archived')}
-            {focusIdentity && (
+            {focusTarget && (
               <button
                 onClick={clearFocus}
                 title={t('focus.clear')}
                 style={{
                   marginLeft: 10, display: 'inline-flex', alignItems: 'center', gap: 6,
-                  background: `${focusIdentity.color}1a`, border: `1px solid ${focusIdentity.color}55`,
+                  background: `${focusTarget.color}1a`, border: `1px solid ${focusTarget.color}55`,
                   borderRadius: 9999, padding: '2px 10px', cursor: 'pointer',
-                  fontSize: 11, fontWeight: 700, color: focusIdentity.color,
+                  fontSize: 11, fontWeight: 700, color: focusTarget.color,
                 }}
               >
                 <span style={{
                   width: 8, height: 8, borderRadius: '50%',
-                  background: focusIdentity.color, boxShadow: `0 0 6px ${focusIdentity.color}`,
+                  background: focusTarget.color, boxShadow: `0 0 6px ${focusTarget.color}`,
                 }} />
-                {t('focus.focusedOn', { name: focusIdentity.name })}
+                {t('focus.focusedOn', { name: focusTarget.name })}
                 <span aria-hidden="true">✕</span>
               </button>
             )}
@@ -317,8 +317,8 @@ export default function Dashboard() {
               {displayed.length === 0 ? (
                 <div className={s.emptyState}>
                   <FolderOpen size={36} className={s.emptyIcon} />
-                  <p className={s.emptyTitle}>{focusIdentity ? t('focus.empty') : t('dashboard.noProjectsEmpty')}</p>
-                  <p className={s.emptySubtitle}>{focusIdentity ? t('focus.focusedOn', { name: focusIdentity.name }) : t('dashboard.createFirstProject')}</p>
+                  <p className={s.emptyTitle}>{focusTarget ? t('focus.empty') : t('dashboard.noProjectsEmpty')}</p>
+                  <p className={s.emptySubtitle}>{focusTarget ? t('focus.focusedOn', { name: focusTarget.name }) : t('dashboard.createFirstProject')}</p>
                 </div>
               ) : (
                 <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
