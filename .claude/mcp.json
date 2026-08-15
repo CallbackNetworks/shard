@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "shard": {
-      "command": "docker",
-      "args": ["compose", "exec", "-T", "backend", "python", "-m", "app.mcp_server.server"],
+      "command": "scripts/mcp-stdio.sh",
       "cwd": "/home/chungchen/20260318"
     }
   }
