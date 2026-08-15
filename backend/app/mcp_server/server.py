@@ -23,6 +23,7 @@ from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 # Value vocabularies the backend already enforces. Declared once here so the
 # generated tool schemas carry the same enums the hand-written ones did — a
@@ -885,6 +886,18 @@ def create_http_app() -> HttpTransport:
     return HttpTransport(http_token)
 
 
+def mcp_route(transport: HttpTransport) -> Route:
+    """The mount, defined once because its exact shape is the thing that matters.
+
+    `HttpTransport`'s docstring argues at length that `Route` (not `Mount`) and an
+    ASGI-app endpoint (not a function) are load-bearing. A shape worth that much
+    explanation is worth having one definition: every host — the backend, the
+    standalone app, and the tests that exist to catch a regression in this very
+    shape — mounts through here, so none of them can drift from the others.
+    """
+    return Route("/mcp", endpoint=transport, methods=["GET", "POST", "DELETE"], name="mcp")
+
+
 def create_standalone_app(transport: HttpTransport):
     """Host the transport in an app of its own — the same two steps the backend takes.
 
@@ -892,12 +905,8 @@ def create_standalone_app(transport: HttpTransport):
     correctly, this path does too, so a mistake in either shows up in both.
     """
     from starlette.applications import Starlette
-    from starlette.routing import Route
 
-    return Starlette(
-        routes=[Route("/mcp", endpoint=transport, methods=["GET", "POST", "DELETE"], name="mcp")],
-        lifespan=lambda _app: transport.lifespan(),
-    )
+    return Starlette(routes=[mcp_route(transport)], lifespan=lambda _app: transport.lifespan())
 
 
 if __name__ == "__main__":

@@ -12,7 +12,6 @@ from sqlalchemy import inspect as sa_inspect
 
 logger = logging.getLogger(__name__)
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.routing import Route
 
 from app import db_schema
 from app.database import engine
@@ -314,13 +313,13 @@ app.include_router(share.router)  # /share/* public share pages
 app.include_router(bulk.ical_router)  # /ical/* calendar subscriptions
 app.include_router(ws_router.router)  # /ws websocket
 
-# Remote MCP (ADR-0080). A `Route` with an ASGI endpoint, not a `Mount` and not a
-# handler function: a `Mount` answers the client's exact `/mcp` with a 307 and a
-# redirect is not a transport, while a *function* endpoint would be called as
-# `func(request) -> response` and the session manager writes its own response.
-# `BearerGuard` is a class for exactly that reason.
+# Remote MCP (ADR-0080). Appended as a raw route rather than an `include_router`
+# because the endpoint is an ASGI app, not an `APIRouter`; `mcp_route` owns the
+# exact shape (a `Route`, not a `Mount`; a class, not a function) and explains why.
 if _mcp_transport is not None:
-    app.router.routes.append(Route("/mcp", endpoint=_mcp_transport, methods=["GET", "POST", "DELETE"], name="mcp"))
+    from app.mcp_server.server import mcp_route
+
+    app.router.routes.append(mcp_route(_mcp_transport))
 
 
 @app.exception_handler(Exception)

@@ -826,26 +826,28 @@ async def test_http_endpoint_rejects_wrong_and_missing_tokens(monkeypatch):
 # ── Mounted in the backend process (ADR-0080) ────────────────────────
 
 
-def _mounted_app(transport):
+def _mounted_app(transport, *, with_lifespan=True):
     """A host that mounts the transport the way `app.main` does.
 
-    Deliberately built by hand rather than by reloading `app.main`: what is under
-    test is the *shape* of the mount — a `Route` with an ASGI endpoint, and a
-    lifespan the host enters itself — and reloading the real module would test the
-    import machinery instead.
+    The host is built by hand rather than by reloading `app.main`, because what is
+    under test is the *shape* of a host — a route plus a lifespan the host enters
+    itself — and reloading the real module would test the import machinery instead.
+    The route comes from `mcp_route`, though: mounting a hand-copied `Route` here
+    would let this test keep passing against a shape production no longer uses.
+
+    `with_lifespan=False` builds the host that forgot to start the session manager.
     """
     from contextlib import asynccontextmanager
 
     from fastapi import FastAPI
-    from starlette.routing import Route
 
     @asynccontextmanager
     async def lifespan(app):
         async with transport.lifespan():
             yield
 
-    host = FastAPI(lifespan=lifespan)
-    host.router.routes.append(Route("/mcp", endpoint=transport, methods=["GET", "POST", "DELETE"], name="mcp"))
+    host = FastAPI(lifespan=lifespan) if with_lifespan else FastAPI()
+    host.router.routes.append(mcp_server.mcp_route(transport))
     return host
 
 
@@ -905,15 +907,13 @@ def test_a_host_that_skips_the_lifespan_serves_a_broken_endpoint(monkeypatch):
     it the app boots clean and every authenticated call fails — the shape worth
     pinning, because the symptom appears nowhere near the omission.
     """
-    from fastapi import FastAPI
-    from starlette.routing import Route
     from starlette.testclient import TestClient
 
     monkeypatch.setenv("MCP_HTTP_TOKEN", "s3cret-token")
     transport = mcp_server.create_http_app()
 
-    host = FastAPI()  # no lifespan: the session manager is never started
-    host.router.routes.append(Route("/mcp", endpoint=transport, methods=["GET", "POST", "DELETE"], name="mcp"))
+    # Same mount as every other host; the only difference is the lifespan nobody entered.
+    host = _mounted_app(transport, with_lifespan=False)
 
     with TestClient(host, raise_server_exceptions=False) as client:
         # The guard still answers — it is the transport behind it that is not running.
