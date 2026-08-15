@@ -112,8 +112,8 @@ The management UI at `/app` requires login; the public status page at `/` is alw
 | `LLM_PROVIDER` | `stub` | LLM provider: `claude`, `openai`, or `stub` |
 | `LLM_API_KEY` | _(empty)_ | API key for the chosen LLM provider |
 | `LLM_MODEL` | _(varies)_ | Model name (e.g. `claude-sonnet-4-6`, `gpt-4o`) |
-| `MCP_TRANSPORT` | `stdio` | MCP server transport: `stdio` or `http` |
-| `MCP_API_KEY` | _(empty)_ | API key for MCP server to call backend |
+| `MCP_HTTP_TOKEN` | _(empty)_ | Bearer token for `/mcp`. Set it and the backend serves remote MCP; leave it empty and the route does not exist |
+| `MCP_API_KEY` | _(empty)_ | API key the MCP tools call the backend with |
 | `SUMMARY_HOUR` | `8` | Hour (UTC) to send daily summary email |
 
 Copy `.env.example` to `.env` in the project root and adjust:

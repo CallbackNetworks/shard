@@ -79,33 +79,6 @@ services:
     networks:
       - app-network
 
-  mcp:
-    # Off by default: the stdio transport is launched on demand by an MCP client,
-    # not run as a standing service. Start explicitly for HTTP transport:
-    #   MCP_TRANSPORT=http docker compose --profile mcp up mcp
-    profiles: ["mcp"]
-    # Same image as the backend: the MCP server is a module inside that package
-    # now (ADR-0080), not a separate build context. This service is what is left
-    # of the standalone container while the HTTP transport still runs on its own
-    # port; the stdio entry point is the same module, launched by the client.
-    build: ./backend
-    command: python -m app.mcp_server.server
-    volumes:
-      - ./backend:/app
-      - backend_venv:/app/.venv
-    environment:
-      - API_BASE_URL=${MCP_API_BASE_URL:-http://backend:8000}
-      - API_KEY=${MCP_API_KEY:-}
-      - MCP_TRANSPORT=${MCP_TRANSPORT:-stdio}
-      - MCP_HTTP_PORT=${MCP_HTTP_PORT:-8001}
-      - MCP_HTTP_TOKEN=${MCP_HTTP_TOKEN:-}
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - app-network
-
   postgres:
     image: postgres:16-alpine
     profiles: ["postgres"]

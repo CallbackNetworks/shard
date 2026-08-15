@@ -40,8 +40,7 @@ docker compose up --build
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-# MCP server only starts with explicit profile:
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up -d
+# Remote MCP needs no extra service: the backend serves /mcp when MCP_HTTP_TOKEN is set (ADR-0080).
 ```
 
 ### Environment variables (`.env` in project root)
@@ -68,10 +67,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile mcp up
 | `BACKUP_KEEP` | How many backup archives to retain (default `7`; runtime-adjustable) |
 | `BACKUP_DIR` | Where backup archives are written (default `/app/data/backups`) |
 | `AGENT_CONTEXT_INSTRUCTIONS` | Global instructions for AI agents (shown in `/api/v1/agent-context`) |
-| `MCP_API_KEY` | API key for MCP server to authenticate with backend |
-| `MCP_TRANSPORT` | `stdio` (default) or `http` for remote access |
-| `MCP_HTTP_PORT` | Port for MCP HTTP transport (default `8001`) |
-| `MCP_HTTP_TOKEN` | Bearer token for the MCP HTTP endpoint. **Required** when `MCP_TRANSPORT=http` — the server refuses to start without one (ADR-0076) |
+| `MCP_HTTP_TOKEN` | Bearer token for `/mcp`. Also the switch: **no token, no route** (ADR-0080). Standalone, the server refuses to start without one (ADR-0076) |
+| `MCP_API_KEY` | API key the MCP tools act with against `/api/v1`. Its scope is what bounds the endpoint |
+| `MCP_API_BASE_URL` | Where those tools send their calls (default `http://localhost:8000` — this same process) |
+| `MCP_TRANSPORT` | Only for the standalone entry point (`python -m app.mcp_server.server`): `stdio` (default) or `http` |
+| `MCP_HTTP_PORT` | Port for the standalone HTTP transport (default `8001`) |
 
 ## Testing
 
@@ -206,9 +206,9 @@ The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and b
 
 **CI/CD adapters** (`services/cicd_adapters.py`): auto-detects CI/CD provider from request headers (GitHub, GitLab, Jenkins, Drone, Bitbucket) and normalizes payloads to a common format. Used by `webhooks.py` for inbound callbacks.
 
-**MCP Server** (`backend/app/mcp_server/server.py`): a module inside the backend package, not a separate build (ADR-0080) — the standalone container was a requirement of the stdio era, and remote HTTP (ADR-0076) retired it. Both entry points run the same module: `python -m app.mcp_server.server` for stdio (the client owns the process), `MCP_TRANSPORT=http` for the HTTP transport. It proxies all operations through `/api/v1` via httpx (see ADR-0005) — co-locating processes is a deployment decision, not a data-path one, and the API key's scope is what bounds the public endpoint. Supports stdio and Streamable HTTP transport. Provides 25 tools, 4 resources, 1 resource template, and 4 prompts — all declared with `MCPServer` decorators on `mcp` SDK 2.0, so a tool's **signature is its schema** (ADR-0077). There is no hand-written `inputSchema` and no `if name == ...` dispatch to keep in step; the thin decorated wrappers sit on top of the `_`-prefixed implementations, which are what the test suite mocks httpx against. A missing argument, an out-of-enum value or a failing tool is a protocol error, not a successful result whose text says "error".
+**MCP Server** (`backend/app/mcp_server/server.py`): a module inside the backend package, not a separate build (ADR-0080) — the standalone container was a requirement of the stdio era, and remote HTTP (ADR-0076) retired it. Both entry points run the same module: `python -m app.mcp_server.server` for stdio (the client owns the process), `MCP_TRANSPORT=http` for the HTTP transport. It proxies all operations through `/api/v1` via httpx (see ADR-0005) — co-locating processes is a deployment decision, not a data-path one, and the API key's scope is what bounds the public endpoint. Provides 25 tools, 4 resources, 1 resource template, and 4 prompts — all declared with `MCPServer` decorators on `mcp` SDK 2.0, so a tool's **signature is its schema** (ADR-0077). There is no hand-written `inputSchema` and no `if name == ...` dispatch to keep in step; the thin decorated wrappers sit on top of the `_`-prefixed implementations, which are what the test suite mocks httpx against. A missing argument, an out-of-enum value or a failing tool is a protocol error, not a successful result whose text says "error".
 
-**Remote MCP is served through the frontend's nginx** (ADR-0076): production exposes it at `https://<host>/mcp`, proxied to the `mcp` container over the internal network — no host port, one door. The deploy step only writes the `mcp` service into the generated compose file when **both** `MCP_API_KEY` and `MCP_HTTP_TOKEN` secrets are set; a half-configured public endpoint is not a state worth deploying. The nginx upstream is a variable with a `resolver`, not a literal: a literal is resolved at boot, so a deployment without the mcp container would fail nginx's own startup and take the whole site down. `/mcp` is in `frontend/backendPaths.js` so the SPA never answers an MCP client with `index.html`.
+**Remote MCP is a route on the backend, behind the frontend's nginx** (ADR-0076 → ADR-0080): production exposes it at `https://<host>/mcp`, proxied to `backend:8000` — one door, no extra container. `main.py` registers the route **iff `MCP_HTTP_TOKEN` is set**, and its lifespan enters the transport's; a half-configured public endpoint is not a state worth serving, so the path is *absent* (404) rather than present-but-empty (502). Three shapes are load-bearing and each has a test that fails if undone: the endpoint is a **class** (`Route` calls a *function* as `func(request) -> response`, and the session manager writes its own response); the **host must enter `HttpTransport.lifespan()`** (a route endpoint never sees a lifespan scope, and skipping it fails at request time, not startup); and the transport app is **built per startup** (the SDK's session manager may be run once per instance). `/mcp` is in `frontend/backendPaths.js` so the SPA never answers an MCP client with `index.html`.
 
 ## Frontend architecture (`frontend/src/`)
 
