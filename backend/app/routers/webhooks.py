@@ -7,13 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import WebhookEvent
+from app.models import Node, WebhookEvent
 from app.schemas import TaskOut, WebhookEventOut
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.cicd_adapters import PROVIDER_PARSERS, normalize_webhook_payload
 from app.services.enrichment import enrich_task
 from app.services.task_mutations import apply_task_update
+from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,8 @@ UNMAPPED_STATUS = "unmapped"
 MAX_TIMESTAMP_AGE_SECONDS = 300
 
 
-def _verify_signature(task: "graph.TaskView", request_body: bytes, headers: dict[str, str]) -> bool:
-    """Prove the caller holds this task's signing key.
+def _verify_signature(secret: str | None, request_body: bytes, headers: dict[str, str]) -> bool:
+    """Prove the caller holds this node's signing key.
 
     Supports GitHub HMAC-SHA256, GitLab's plain token, and a generic HMAC header.
 
@@ -36,9 +37,10 @@ def _verify_signature(task: "graph.TaskView", request_body: bytes, headers: dict
     the entire credential: anyone who read it out of a browser history, a proxy log, a
     screenshot or a pasted CI config could post build results. Every task is issued a
     secret at creation now, so a missing one means a node predating that change or one
-    cleared by hand — neither is a reason to accept an unsigned write (ADR-0060).
+    cleared by hand — neither is a reason to accept an unsigned write (ADR-0060). A
+    container gets one lazily on first reveal (``GET /api/nodes/{id}/webhook``), so a
+    missing secret there means nobody has configured it yet — same refusal applies.
     """
-    secret = task.webhook_secret
     if not secret:
         return False
 
@@ -82,21 +84,26 @@ def _check_replay(headers: dict[str, str]) -> bool:
         return True  # Malformed timestamp = skip check
 
 
-@router.post("/callback/{callback_token}", response_model=TaskOut)
+@router.post("/callback/{callback_token}")
 async def webhook_callback(
     callback_token: str,
     request: Request,
     db: Session = Depends(get_db),
     provider: str | None = Query(
-        None, description="Force CI/CD provider detection (github, gitlab, jenkins, drone, bitbucket)"
+        None, description="Force CI/CD provider detection (github, gitlab, jenkins, drone, bitbucket, gitea)"
     ),
-):
+) -> TaskOut | WebhookEventOut:
     """
     Inbound CI/CD webhook callback.
 
     Accepts either the simple format {"status": "done", "message": "..."} or
-    native payloads from GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket Pipelines.
-    The provider is auto-detected from headers, or can be forced via ?provider= query param.
+    native payloads from GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket Pipelines,
+    or Gitea (push and Actions run/job events). The provider is auto-detected from
+    headers, or can be forced via ?provider= query param.
+
+    The token may belong to a task (a build outcome drives its status, unchanged since
+    ADR-0060) or a container/project (there is no status to drive — every event is only
+    logged, see the role branch below; ADR-0082).
     """
     # A misspelled hint used to fall through to generic parsing, so ?provider=githbu
     # quietly parsed a GitHub payload with the wrong adapter and reported whatever that
@@ -107,8 +114,8 @@ async def webhook_callback(
             detail=f"Unknown provider {provider!r}; expected one of {sorted(PROVIDER_PARSERS)}",
         )
 
-    task = graph.find_task_by_callback_token(db, callback_token)
-    if not task:
+    node = graph.find_node_by_callback_token(db, callback_token)
+    if not node:
         raise HTTPException(status_code=404, detail="Invalid callback token")
 
     # Read raw body for signature verification
@@ -116,7 +123,7 @@ async def webhook_callback(
     headers = dict(request.headers)
 
     # Signature verification
-    if not _verify_signature(task, body_bytes, headers):
+    if not _verify_signature((node.data or {}).get("webhook_secret"), body_bytes, headers):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     # Replay protection
@@ -136,7 +143,7 @@ async def webhook_callback(
 
     # Store webhook event for build history (committed below).
     webhook_event = WebhookEvent(
-        task_id=task.id,
+        task_id=node.id,
         provider=normalized.get("provider", "generic"),
         event_type=normalized.get("event_type"),
         status=normalized["status"] or UNMAPPED_STATUS,
@@ -152,6 +159,30 @@ async def webhook_callback(
     )
     db.add(webhook_event)
 
+    if node.type not in graph.task_type_keys(db):
+        # A container (project) has no build outcome to apply — a push carries none to
+        # begin with, and a build-status event's outcome describes the *build*, not the
+        # project. Every callback here is only logged, never mutates the node (ADR-0082).
+        log_activity(
+            db,
+            action="webhook.container_event",
+            project_id=node.id,
+            task_id=None,
+            actor="webhook",
+            detail=normalized.get("message") or f"Callback received from {normalized.get('provider', 'generic')}",
+            meta={
+                "provider": normalized.get("provider"),
+                "event_type": normalized.get("event_type"),
+                "status": normalized["status"],
+                "branch": normalized.get("branch"),
+                "commit_sha": normalized.get("commit_sha"),
+            },
+        )
+        db.commit()
+        db.refresh(webhook_event)
+        await ws_manager.broadcast("project.webhook_event", {"project_id": node.id})
+        return WebhookEventOut.model_validate(webhook_event)
+
     if normalized["status"] is None:
         # The payload carried no outcome this system recognises. Record what arrived and
         # leave the task where it is: guessing used to mean "done", so a timed-out build
@@ -161,8 +192,8 @@ async def webhook_callback(
         log_activity(
             db,
             action="webhook.unmapped_status",
-            project_id=graph.project_id_of_task(db, task.id),
-            task_id=task.id,
+            project_id=graph.project_id_of_task(db, node.id),
+            task_id=node.id,
             actor="webhook",
             detail=(
                 f"Callback from {normalized.get('provider', 'generic')} carried no status this "
@@ -171,13 +202,13 @@ async def webhook_callback(
             meta={"provider": normalized.get("provider"), "raw_status": raw},
         )
         db.commit()
-        return enrich_task(graph.get_task(db, task.id), db)
+        return enrich_task(graph.get_task(db, node.id), db)
 
     # sync_external=False: the change originated externally, echoing it back
     # to the external issue would loop.
     task = await apply_task_update(
         db,
-        task.id,
+        node.id,
         {"status": normalized["status"]},
         actor="webhook",
         source="webhook",
@@ -200,9 +231,10 @@ def get_webhook_events(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Get build history (webhook events) for a task."""
-    if graph.get_task(db, task_id) is None:
-        raise HTTPException(status_code=404, detail="Task not found")
+    """Get build history (webhook events) for a task or a container/project."""
+    node = db.get(Node, task_id)
+    if node is None or node.type not in graph.webhookable_type_keys(db):
+        raise HTTPException(status_code=404, detail="Node not found")
     return (
         db.query(WebhookEvent)
         .filter(WebhookEvent.task_id == task_id)

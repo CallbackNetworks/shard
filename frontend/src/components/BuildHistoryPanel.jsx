@@ -23,6 +23,7 @@ const PROVIDER_ICONS = {
   jenkins: '⚙️',
   drone: '🚁',
   bitbucket: '🪣',
+  gitea: '🍵',
   generic: '🔗',
 }
 

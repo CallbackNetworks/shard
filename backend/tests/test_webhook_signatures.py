@@ -189,6 +189,103 @@ class TestTheOwnerCanReadTheKey:
         )
         assert resp.status_code == 401
 
-    def test_a_node_that_receives_no_callbacks_has_no_config(self, client, sample_project):
+    def test_a_container_gets_credentials_lazily(self, client, sample_project):
+        """A project never gets callback_token/webhook_secret at creation, unlike a
+        task — the first reveal provisions them (ADR-0082)."""
         resp = client.get(f"/api/nodes/{sample_project.id}/webhook")
+        assert resp.status_code == 200
+        config = resp.json()
+        assert config["callback_token"]
+        assert config["secret"]
+
+        # Provisioning is idempotent: a second reveal returns the same credentials.
+        again = client.get(f"/api/nodes/{sample_project.id}/webhook").json()
+        assert again["callback_token"] == config["callback_token"]
+        assert again["secret"] == config["secret"]
+
+    def test_a_node_with_no_webhook_role_has_no_config(self, client, sample_identity):
+        resp = client.get(f"/api/nodes/{sample_identity.id}/webhook")
         assert resp.status_code == 400
+
+
+class TestContainerCallbacksNeverMutateTheProject:
+    """A project has no build outcome to apply (ADR-0082): its callback only logs."""
+
+    @pytest.fixture()
+    def project_webhook(self, client, sample_project):
+        return client.get(f"/api/nodes/{sample_project.id}/webhook").json()
+
+    def test_signature_is_still_required(self, client, sample_project, project_webhook):
+        body = _body({"status": "done"})
+        resp = client.post(
+            f"/webhook/callback/{project_webhook['callback_token']}",
+            content=body,
+            headers={"X-Hub-Signature-256": f"sha256={_hmac('wrong-secret', body)}"},
+        )
+        assert resp.status_code == 401
+
+    def test_a_push_event_is_logged_and_the_project_is_untouched(self, db, client, sample_project, project_webhook):
+        from app.models import ActivityLog, Node
+
+        status_before = db.get(Node, sample_project.id).status
+        push = {
+            "ref": "refs/heads/main",
+            "after": "abc1234",
+            "commits": [{"message": "fix: tighten the thing"}],
+            "pusher": {"login": "chungchen"},
+            "repository": {"html_url": "https://gitea.callbacknetwork.com/CallbackNetwork/shard"},
+        }
+        body = _body(push)
+        resp = client.post(
+            f"/webhook/callback/{project_webhook['callback_token']}",
+            content=body,
+            headers={
+                "X-Gitea-Event": "push",
+                "X-Hub-Signature-256": f"sha256={_hmac(project_webhook['secret'], body)}",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["provider"] == "gitea"
+        assert data["branch"] == "main"
+        assert data["commit_sha"] == "abc1234"
+        assert "fix: tighten the thing" in data["message"]
+        # No task-shaped fields (status/title/id-as-task) leaked into the response.
+        assert "title" not in data
+
+        node = db.get(Node, sample_project.id)
+        assert node.status == status_before  # push carries no outcome to apply
+
+        row = db.query(ActivityLog).filter(ActivityLog.action == "webhook.container_event").one()
+        assert row.project_id == sample_project.id
+        assert row.task_id is None
+
+    def test_a_build_status_event_is_recorded_but_does_not_apply(self, client, sample_project, project_webhook):
+        payload = {"action": "completed", "workflow_run": {"conclusion": "success", "head_branch": "main"}}
+        body = _body(payload)
+        resp = client.post(
+            f"/webhook/callback/{project_webhook['callback_token']}",
+            content=body,
+            headers={
+                "X-Gitea-Event": "workflow_run",
+                "X-Hub-Signature-256": f"sha256={_hmac(project_webhook['secret'], body)}",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # The build's own outcome is recorded in the event history...
+        assert data["status"] == "done"
+        assert data["provider"] == "gitea"
+        # ...but there is no task response shape here, because there is no task.
+        assert "id" in data and "task_id" in data
+
+    def test_events_show_up_in_the_same_build_history_endpoint_as_a_task(self, client, sample_project, project_webhook):
+        body = _body({"status": "done"})
+        client.post(
+            f"/webhook/callback/{project_webhook['callback_token']}",
+            content=body,
+            headers={"X-Hub-Signature-256": f"sha256={_hmac(project_webhook['secret'], body)}"},
+        )
+        resp = client.get(f"/webhook/events/{sample_project.id}")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1

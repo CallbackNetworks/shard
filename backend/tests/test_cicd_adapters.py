@@ -6,6 +6,7 @@ from app.services.cicd_adapters import (
     parse_bitbucket,
     parse_drone,
     parse_generic,
+    parse_gitea,
     parse_github,
     parse_gitlab,
     parse_jenkins,
@@ -44,6 +45,17 @@ class TestDetectProvider:
 
     def test_drone_by_source_header(self):
         assert detect_provider({"X-Drone-Source": "drone"}, {}) == "drone"
+
+    def test_gitea_by_event_header(self):
+        assert detect_provider({"X-Gitea-Event": "push"}, {}) == "gitea"
+
+    def test_gitea_by_delivery_header(self):
+        assert detect_provider({"X-Gitea-Delivery": "uuid-123"}, {}) == "gitea"
+
+    def test_gitea_takes_priority_over_github_body_heuristics(self):
+        # Gitea Actions run payloads carry a "workflow_run" key just like GitHub's, so
+        # the header must win over the body-shape fallback.
+        assert detect_provider({"X-Gitea-Event": "workflow_run"}, {"workflow_run": {}}) == "gitea"
 
     def test_github_by_body_workflow_run(self):
         assert detect_provider({}, {"workflow_run": {}}) == "github"
@@ -366,6 +378,68 @@ class TestParseDrone:
         body = {"status": "pending", "number": 18}
         r = parse_drone({}, body)
         assert r["status"] == "todo"
+
+
+# ── parse_gitea ──────────────────────────────────────────────────────────
+
+
+class TestParseGitea:
+    def test_push_event(self):
+        body = {
+            "ref": "refs/heads/main",
+            "after": "deadbeef",
+            "commits": [
+                {"message": "wip"},
+                {"message": "fix: the actual bug\n\nlonger body"},
+            ],
+            "pusher": {"login": "chungchen"},
+            "repository": {"html_url": "https://gitea.callbacknetwork.com/CallbackNetwork/shard"},
+        }
+        r = parse_gitea({"X-Gitea-Event": "push"}, body)
+        assert r["provider"] == "gitea"
+        assert r["status"] is None  # a push carries no build outcome
+        assert r["branch"] == "main"
+        assert r["commit_sha"] == "deadbeef"
+        assert r["triggered_by"] == "chungchen"
+        assert "2 commits pushed to main" in r["message"]
+        assert "fix: the actual bug" in r["message"]
+
+    def test_push_event_single_commit_singular_noun(self):
+        body = {"ref": "refs/heads/main", "commits": [{"message": "one"}]}
+        r = parse_gitea({"X-Gitea-Event": "push"}, body)
+        assert "1 commit pushed" in r["message"]
+
+    def test_push_event_no_commits(self):
+        body = {"ref": "refs/heads/main", "commits": []}
+        r = parse_gitea({"X-Gitea-Event": "push"}, body)
+        assert r["status"] is None
+        assert r["message"] == "Push to main"
+
+    def test_workflow_run_success(self):
+        body = {"action": "completed", "workflow_run": {"conclusion": "success", "head_branch": "main"}}
+        r = parse_gitea({"X-Gitea-Event": "workflow_run"}, body)
+        assert r["status"] == "done"
+        assert r["branch"] == "main"
+
+    def test_workflow_run_failure(self):
+        body = {"action": "completed", "workflow_run": {"conclusion": "failure"}}
+        r = parse_gitea({"X-Gitea-Event": "workflow_run"}, body)
+        assert r["status"] == "failed"
+
+    def test_workflow_run_in_progress(self):
+        body = {"action": "in_progress", "workflow_run": {"status": "in_progress"}}
+        r = parse_gitea({"X-Gitea-Event": "workflow_run"}, body)
+        assert r["status"] == "in_progress"
+
+    def test_workflow_job_success(self):
+        body = {"action": "completed", "workflow_job": {"conclusion": "success", "name": "test"}}
+        r = parse_gitea({"X-Gitea-Event": "workflow_job"}, body)
+        assert r["status"] == "done"
+
+    def test_unrecognised_event_falls_back(self):
+        r = parse_gitea({"X-Gitea-Event": "issues"}, {"action": "opened"})
+        assert r["status"] is None
+        assert r["provider"] == "gitea"
 
 
 # ── parse_generic ────────────────────────────────────────────────────────

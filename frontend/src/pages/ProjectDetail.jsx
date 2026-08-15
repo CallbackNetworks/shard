@@ -1,7 +1,7 @@
 import { useState, useEffect, useDeferredValue } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Zap, Bot, Share2 } from 'lucide-react'
+import { ArrowLeft, Plus, Zap, Bot, Share2, Webhook } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
@@ -15,6 +15,8 @@ import LabelManager, { LabelChip } from '../components/project/LabelManager'
 import TaskFiltersPanel from '../components/project/TaskFiltersPanel'
 import BulkToolbar from '../components/project/BulkToolbar'
 import NodeShareFacet from '../components/NodeShareFacet'
+import WebhookPanel from '../components/WebhookPanel'
+import BuildHistoryPanel from '../components/BuildHistoryPanel'
 import ChildContainersPanel from '../components/ChildContainersPanel'
 import GanttChart from '../components/GanttChart'
 import BoardView from '../components/BoardView'
@@ -64,6 +66,7 @@ export default function ProjectDetail() {
   const [showImport, setShowImport] = useState(false)
   const [importJson, setImportJson] = useState('')
   const [shareSettingsOpen, setShareSettingsOpen] = useState(false)
+  const [cicdOpen, setCicdOpen] = useState(false)
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -351,6 +354,14 @@ export default function ProjectDetail() {
               <Share2 size={12} />
               Share
             </button>
+            <button
+              onClick={() => setCicdOpen(v => !v)}
+              className={`${s.archiveBtn}${cicdOpen ? ` ${s.archiveBtnActive}` : ''}`}
+              title="Push and build events from this project's repo (ADR-0082)"
+            >
+              <Webhook size={12} />
+              CI/CD
+            </button>
             <LabelManager
               labels={labels}
               onCreateLabel={data => createLabelMut.mutate(data)}
@@ -379,6 +390,21 @@ export default function ProjectDetail() {
 
         {shareSettingsOpen && (
           <NodeShareFacet node={project} subscribable invalidateKeys={[['project', id]]} />
+        )}
+
+        {cicdOpen && (
+          <div className={s.agentInstrPanel}>
+            <div className={s.agentInstrTitle}>CI/CD</div>
+            <div className={s.agentInstrDesc}>
+              Point your repo's webhooks at this project's own callback URL to see pushes and
+              build results here — a project has no build outcome to apply, so every event is
+              only recorded, never changes the project itself (ADR-0082).
+            </div>
+            <WebhookPanel taskId={project.id} />
+            <div style={{ marginTop: 12 }}>
+              <BuildHistoryPanel taskId={project.id} />
+            </div>
+          </div>
         )}
 
         {showAgentInstr && (

@@ -128,8 +128,8 @@ def node_is_subscribable(db: Session, node: Node) -> bool:
     return node.type in subscribable_type_keys(db)
 
 
-def _find_node_by_token(db: Session, token: str, type_keys: set[str]) -> Node | None:
-    """Scan nodes of ``type_keys`` for a ``data.share_token`` match.
+def _find_node_by_token(db: Session, token: str, type_keys: set[str], data_key: str = "share_token") -> Node | None:
+    """Scan nodes of ``type_keys`` for a ``data[data_key]`` match.
 
     Python-side scan because the token lives in the JSON ``data`` bag (no indexed
     column); node counts are small at personal-tool scale.
@@ -137,7 +137,7 @@ def _find_node_by_token(db: Session, token: str, type_keys: set[str]) -> Node | 
     if not token or not type_keys:
         return None
     for node in db.query(Node).filter(Node.type.in_(type_keys)).all():
-        if (node.data or {}).get("share_token") == token:
+        if (node.data or {}).get(data_key) == token:
             return node
     return None
 
@@ -155,6 +155,25 @@ def find_node_by_share_token(db: Session, token: str) -> Node | None:
 def find_subscribable_node_by_share_token(db: Session, token: str) -> Node | None:
     """Locate any ``is_subscribable`` node by its ``share_token`` (ADR-0039)."""
     return _find_node_by_token(db, token, subscribable_type_keys(db))
+
+
+def webhookable_type_keys(db: Session) -> set[str]:
+    """Node-type keys that may receive an inbound CI/CD callback.
+
+    Task role: a build outcome drives the task's status (the original behaviour).
+    Container role: a project has no build-outcome semantics, so its callback only
+    logs the event — see ``webhook_callback``'s role branch.
+    """
+    return task_type_keys(db) | container_type_keys(db)
+
+
+def find_node_by_callback_token(db: Session, token: str) -> Node | None:
+    """Locate any task- or container-role node by its ``callback_token``.
+
+    Returns the raw ``Node`` (not a ``TaskView``) so the caller can branch on
+    ``node.type``'s role before deciding whether a build outcome applies.
+    """
+    return _find_node_by_token(db, token, webhookable_type_keys(db), data_key="callback_token")
 
 
 # --- Shared JSON datetime helpers --------------------------------------------

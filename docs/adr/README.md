@@ -83,3 +83,4 @@
 | [0079](0079-a-layer-can-be-created-through-the-api.md) | 新增一個層級，不能只有 UI 做得到 | Accepted | 2026-08-15 |
 | [0080](0080-a-protocol-adapter-lives-in-the-process-it-wraps.md) | 協定外皮住在它包裝的那個行程裡 | Accepted | 2026-08-15 |
 | [0081](0081-focus-follows-ownership-and-containment.md) | 聚焦沿著擁有和包含關係走，不是寫死在身分上 | Accepted | 2026-08-15 |
+| [0082](0082-a-container-can-log-inbound-cicd-events-too.md) | 容器也能收 CI/CD 回呼，但只記錄不套用 | Accepted | 2026-08-15 |

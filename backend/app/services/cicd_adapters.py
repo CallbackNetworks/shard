@@ -4,7 +4,7 @@ CI/CD payload adapters: auto-detect and normalize payloads from various CI/CD pl
 Each adapter extracts a normalized result dict:
   - status: todo | in_progress | done | failed
   - message: human-readable summary
-  - provider: github | gitlab | bitbucket | jenkins | drone | generic
+  - provider: github | gitlab | bitbucket | jenkins | drone | gitea | generic
   - commit_sha: git commit hash
   - branch: git branch name
   - build_url: link to the CI/CD build page
@@ -91,6 +91,10 @@ STATUS_MAP_DRONE = {
     "blocked": "todo",
 }
 
+# Gitea Actions models its run/job webhooks on GitHub Actions (same field names), so
+# the same conclusion vocabulary applies once the payload shape is unwrapped.
+STATUS_MAP_GITEA = STATUS_MAP_GITHUB
+
 VALID_STATUSES = {"todo", "in_progress", "done", "failed"}
 
 # What ``status`` is when the payload carried no outcome this system recognises. The
@@ -118,6 +122,11 @@ def _base_result() -> dict[str, Any]:
 def detect_provider(headers: dict[str, str], body: dict) -> str:
     """Detect CI/CD provider from request headers and body shape."""
     h = {k.lower(): v for k, v in headers.items()}
+
+    # Gitea / Gitea Actions (checked before GitHub: Actions run/job payloads mirror
+    # GitHub's field names, so the header is the only reliable signal between them)
+    if "x-gitea-event" in h or "x-gitea-delivery" in h:
+        return "gitea"
 
     # GitHub Actions / GitHub webhooks
     if "x-github-event" in h or "x-github-delivery" in h:
@@ -453,6 +462,85 @@ def parse_drone(headers: dict[str, str], body: dict) -> dict[str, Any]:
     return result
 
 
+def parse_gitea(headers: dict[str, str], body: dict) -> dict[str, Any]:
+    """Parse Gitea webhook payloads: push events and Gitea Actions run/job events.
+
+    A plain push carries no build outcome, so ``status`` stays unmapped on purpose —
+    the caller logs it rather than treating a push as a status to apply (ADR-0051).
+    Actions events mirror GitHub Actions' field names, so they reuse that mapping.
+    """
+    result = _base_result()
+    result["provider"] = "gitea"
+    result["raw_payload"] = body
+
+    event_type = headers.get("x-gitea-event", headers.get("X-Gitea-Event", ""))
+    result["event_type"] = event_type
+
+    if "workflow_run" in body:
+        run = body["workflow_run"]
+        conclusion = run.get("conclusion")
+        run_status = run.get("status", "")
+
+        if conclusion:
+            result["status"] = STATUS_MAP_GITEA.get("completed", {}).get(conclusion)
+        elif run_status in STATUS_MAP_GITEA:
+            mapped = STATUS_MAP_GITEA[run_status]
+            result["status"] = mapped if isinstance(mapped, str) else "todo"
+        else:
+            result["status"] = "in_progress"
+
+        result["message"] = f"Workflow '{run.get('name', 'unknown')}' {conclusion or run_status}"
+        result["build_url"] = run.get("html_url")
+        result["build_number"] = str(run.get("run_number", ""))
+        result["commit_sha"] = run.get("head_sha")
+        result["branch"] = run.get("head_branch")
+        return result
+
+    if "workflow_job" in body:
+        job = body["workflow_job"]
+        conclusion = job.get("conclusion")
+        job_status = job.get("status", "")
+
+        if conclusion:
+            result["status"] = STATUS_MAP_GITEA.get("completed", {}).get(conclusion)
+        elif job_status == "in_progress":
+            result["status"] = "in_progress"
+        else:
+            result["status"] = "todo"
+
+        result["message"] = f"Job '{job.get('name', 'unknown')}' {conclusion or job_status}"
+        result["build_url"] = job.get("html_url")
+        result["commit_sha"] = job.get("head_sha")
+        return result
+
+    if event_type == "push" or ("commits" in body and "ref" in body):
+        commits = body.get("commits") or []
+        ref = body.get("ref", "")
+        branch = ref.removeprefix("refs/heads/") if ref else None
+        repo = body.get("repository") if isinstance(body.get("repository"), dict) else {}
+        pusher = body.get("pusher") if isinstance(body.get("pusher"), dict) else {}
+
+        result["branch"] = branch
+        result["commit_sha"] = body.get("after")
+        result["triggered_by"] = pusher.get("login") or pusher.get("full_name")
+        result["build_url"] = body.get("compare_url") or repo.get("html_url")
+
+        count = len(commits)
+        who = f" by {result['triggered_by']}" if result["triggered_by"] else ""
+        if count:
+            headline = (commits[-1].get("message") or "").splitlines()[0]
+            noun = "commit" if count == 1 else "commits"
+            result["message"] = f"{count} {noun} pushed to {branch or '?'}{who}: {headline}"
+        else:
+            result["message"] = f"Push to {branch or '?'}{who}"
+        return result
+
+    # Fallback: try to extract status from body
+    result["status"] = _extract_simple_status(body)
+    result["message"] = body.get("message") or f"Gitea event: {event_type}"
+    return result
+
+
 def parse_generic(headers: dict[str, str], body: dict) -> dict[str, Any]:
     """Parse generic/simple webhook payloads (the existing format)."""
     result = _base_result()
@@ -542,6 +630,7 @@ PROVIDER_PARSERS = {
     "bitbucket": parse_bitbucket,
     "jenkins": parse_jenkins,
     "drone": parse_drone,
+    "gitea": parse_gitea,
     "generic": parse_generic,
 }
 
