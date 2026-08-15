@@ -12,7 +12,7 @@ from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.schemas import AgentContextOut, AgentProjectInfo, AgentProjectTaskInfo
 from app.services import graph
-from app.services.graph_registry import relation_vocabulary
+from app.services.graph_registry import relation_vocabulary, type_vocabulary
 
 sub_router = APIRouter()
 
@@ -105,6 +105,10 @@ def api_agent_context(
                 "POST /api/v1/nodes/{source_id}/edges {target_id, rel_type} — see relations below. "
                 "A node may have any number of parents; container_id on create is only the first one."
             ),
+            # Both vocabularies are generated from the registries the write path
+            # enforces (ADR-0078, ADR-0079). `type` is required on every node write and
+            # nothing here used to say which values were legal.
+            "node_types": type_vocabulary(db),
             # Generated from the edge-type registry the write path enforces (ADR-0078),
             # never restated here: the one endpoint an agent is told to call first said
             # only "Relationships are edges", so choosing between contains and owns was

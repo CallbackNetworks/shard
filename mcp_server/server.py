@@ -312,6 +312,19 @@ async def _bulk_update_tasks(project_id: str, updates: list[dict]) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _list_node_types() -> str:
+    result = await _get("/node-types")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _create_node_type(key: str, label: str, roles: list[str] | None = None) -> str:
+    body: dict = {"key": key, "label": label}
+    if roles:
+        body["roles"] = roles
+    result = await _post("/node-types", body)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 async def _list_edge_types() -> str:
     result = await _get("/edge-types")
     return json.dumps(result) if not isinstance(result, str) else result
@@ -598,6 +611,30 @@ async def get_container_subtree(node_id: str) -> str:
 async def bulk_update_tasks(project_id: str, updates: list[dict]) -> str:
     """Each update is an object with 'id' plus fields to change: status, priority, title, ..."""
     return await _bulk_update_tasks(project_id=project_id, updates=updates)
+
+
+@mcp.tool(
+    description=(
+        "List the node types (layers) that exist, with the roles that decide where a "
+        "node of each type may sit. The 'type' field of a node write must be a key from "
+        "here — call this before inventing one."
+    )
+)
+async def list_node_types() -> str:
+    """No arguments; returns every registered node type."""
+    return await _list_node_types()
+
+
+@mcp.tool(
+    description=(
+        "Register a new node type (a new layer, e.g. an 'organization' above projects). "
+        "Pass roles=['container'] for a layer that holds other nodes. Requires an admin "
+        "API key. Creating a type is rare — check list_node_types first."
+    )
+)
+async def create_node_type(key: str, label: str, roles: list[str] | None = None) -> str:
+    """key is the lowercase identifier written into each node's `type`."""
+    return await _create_node_type(key=key, label=label, roles=roles)
 
 
 @mcp.tool(

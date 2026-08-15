@@ -1373,6 +1373,22 @@ Task-role nodes tear down their subtree. Container-role nodes cascade their excl
 tasks and their labels/cycles (ADR-0043); a task also linked into another container is only
 unlinked.
 
+#### `GET /api/v1/node-types` — requires `read`
+Every layer with `roles`, field declarations and usage count. The `type` of a node write
+must be a key from here.
+
+#### `POST /api/v1/node-types` — requires `admin`
+```json
+{ "key": "organization", "label": "Organization", "roles": ["container"] }
+```
+`PATCH /api/v1/node-types/{key}` and `DELETE /api/v1/node-types/{key}` also require
+`admin`. A built-in type refuses role changes and deletion; a type still used by nodes
+refuses deletion (ADR-0079).
+
+#### `GET /api/v1/edge-types` — requires `read`
+The relation vocabulary with what may sit at each end (ADR-0078). Read-only: creating a
+relation would mean declaring its endpoint rules, which is not an external contract yet.
+
 #### `POST /api/v1/nodes/{id}/edges` — requires `write`
 ```json
 { "target_id": "uuid", "rel_type": "contains | owns | depends_on | labeled | in_cycle",

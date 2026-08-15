@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Edge, EdgeType, Node, NodeType
+from app.models import Edge, EdgeType, NodeType
 from app.schemas import (
     EdgeTypeCreate,
     EdgeTypeOut,
@@ -21,12 +21,22 @@ from app.schemas import (
     NodeTypeUpdate,
 )
 from app.services import graph, node_data
+from app.services import graph_registry as type_registry
 
 router = APIRouter(prefix="/graph-types", tags=["graph-types"])
 
-# Roles whose membership is frozen on built-in types: flipping project's ``container``
-# or task's ``task`` role would collapse the compat/enrichment pipeline (ADR-0034/0035).
-_IMMUTABLE_BUILTIN_ROLES = {graph.ROLE_CONTAINER, graph.ROLE_TASK}
+
+def _registry(call):
+    """Run a registry operation, reporting its refusal as HTTP.
+
+    The rules live in ``graph_registry`` because the same registry is also reachable
+    through ``/api/v1/node-types`` (ADR-0079), and a guard enforced at only one door
+    is not a guard.
+    """
+    try:
+        return call()
+    except type_registry.TypeRegistryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 # --- Node types --------------------------------------------------------------
@@ -34,11 +44,7 @@ _IMMUTABLE_BUILTIN_ROLES = {graph.ROLE_CONTAINER, graph.ROLE_TASK}
 
 @router.get("/nodes", response_model=list[NodeTypeOut])
 def list_node_types(db: Session = Depends(get_db)):
-    types = db.query(NodeType).order_by(NodeType.is_builtin.desc(), NodeType.key).all()
-    counts = dict(db.query(Node.type, func.count(Node.id)).group_by(Node.type).all())
-    for nt in types:
-        nt.usage_count = counts.get(nt.key, 0)
-    return types
+    return type_registry.node_types_with_usage(db)
 
 
 @router.get("/data-keys/managed")
@@ -58,63 +64,17 @@ def list_managed_data_keys():
 
 @router.post("/nodes", response_model=NodeTypeOut, status_code=status.HTTP_201_CREATED)
 def create_node_type(body: NodeTypeCreate, db: Session = Depends(get_db)):
-    if db.get(NodeType, body.key) is not None:
-        raise HTTPException(status_code=409, detail=f"node type '{body.key}' already exists")
-    nt = NodeType(
-        is_builtin=False,
-        key=body.key,
-        label=body.label,
-        icon=body.icon,
-        color=body.color,
-        data=body.data,
-        roles=sorted(set(body.roles)) if body.roles else None,
-        # A type may declare which keys of its nodes' ``data`` are the user's (ADR-0074).
-        fields=[f.model_dump(exclude_none=True) for f in body.fields] if body.fields else None,
-    )
-    db.add(nt)
-    db.commit()
-    db.refresh(nt)
-    return nt
+    return _registry(lambda: type_registry.create_node_type(db, body))
 
 
 @router.patch("/nodes/{key}", response_model=NodeTypeOut)
 def update_node_type(key: str, body: NodeTypeUpdate, db: Session = Depends(get_db)):
-    nt = db.get(NodeType, key)
-    if nt is None:
-        raise HTTPException(status_code=404, detail="node type not found")
-    # Named ``patch``, not ``fields``: ``fields`` is now a column of its own (ADR-0074).
-    patch = body.model_dump(exclude_unset=True, exclude_none=False)
-    if "roles" in patch:
-        new_roles = set(patch.pop("roles") or [])
-        # Built-in container/task membership is immutable (ADR-0034/0035): reject a
-        # change to those roles.
-        if nt.is_builtin and (
-            {r for r in new_roles if r in _IMMUTABLE_BUILTIN_ROLES}
-            != {r for r in (nt.roles or []) if r in _IMMUTABLE_BUILTIN_ROLES}
-        ):
-            raise HTTPException(status_code=400, detail="cannot change roles of a built-in node type")
-        nt.roles = sorted(new_roles) or None
-    if "fields" in patch:
-        declared = patch.pop("fields")
-        nt.fields = [{k: v for k, v in f.items() if v is not None} for f in declared] if declared else None
-    for field, value in patch.items():
-        setattr(nt, field, value)
-    db.commit()
-    db.refresh(nt)
-    return nt
+    return _registry(lambda: type_registry.update_node_type(db, key, body))
 
 
 @router.delete("/nodes/{key}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_node_type(key: str, db: Session = Depends(get_db)):
-    nt = db.get(NodeType, key)
-    if nt is None:
-        raise HTTPException(status_code=404, detail="node type not found")
-    if nt.is_builtin:
-        raise HTTPException(status_code=400, detail="cannot delete a built-in node type")
-    if db.query(Node.id).filter(Node.type == key).first() is not None:
-        raise HTTPException(status_code=409, detail="node type is still in use by existing nodes")
-    db.delete(nt)
-    db.commit()
+    _registry(lambda: type_registry.delete_node_type(db, key))
 
 
 # --- Edge types --------------------------------------------------------------

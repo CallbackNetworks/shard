@@ -80,3 +80,4 @@
 | [0076](0076-remote-mcp-through-the-existing-door.md) | 遠端 MCP 走既有那扇門，而且那扇門一定上鎖 | Accepted | 2026-08-14 |
 | [0077](0077-the-tool-list-is-the-code.md) | 工具清單就是程式碼本身 | Accepted | 2026-08-14 |
 | [0078](0078-a-relation-declares-what-may-sit-at-each-end.md) | 關係自己宣告兩端可以接什麼 | Accepted | 2026-08-14 |
+| [0079](0079-a-layer-can-be-created-through-the-api.md) | 新增一個層級，不能只有 UI 做得到 | Accepted | 2026-08-15 |

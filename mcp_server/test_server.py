@@ -559,6 +559,25 @@ async def test_get_container_subtree_error():
     assert "Error 404" in text
 
 
+# ── Tools: node types (ADR-0079) ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_list_node_types():
+    with _patch_client("get", _mock_response(json_data=[{"key": "project", "roles": ["container"]}])):
+        text = await _call("list_node_types", {})
+    assert json.loads(text)[0]["key"] == "project"
+
+
+@pytest.mark.asyncio
+async def test_create_node_type():
+    with _patch_client("post", _mock_response(json_data={"key": "organization", "roles": ["container"]})):
+        text = await _call("create_node_type", {
+            "key": "organization", "label": "Organization", "roles": ["container"]
+        })
+    assert json.loads(text)["key"] == "organization"
+
+
 # ── Tools: list_edge_types / manage_edges (ADR-0078) ────────────────
 
 
@@ -608,7 +627,7 @@ async def test_manage_edges_remove():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 23
+    assert len(tools) == 25
 
 
 @pytest.mark.asyncio
@@ -625,6 +644,9 @@ async def test_list_tools_names():
         # ADR-0078: edges had no tool at all, so an agent could only ever set the one
         # container_id a node was created with.
         "list_edge_types", "manage_edges",
+        # ADR-0079: `type` is required on every node write and nothing listed the
+        # legal values; creating a layer was a UI-only capability.
+        "list_node_types", "create_node_type",
     }
     assert names == expected
 

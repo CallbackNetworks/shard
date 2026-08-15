@@ -250,6 +250,30 @@ Content-Type: application/json
 
 Use `DELETE /api/v1/nodes/{node_id}/edges?target_id=...&rel_type=...` to unlink.
 
+### Layers (node types)
+
+The `type` of every node write must be a key from the node-type registry. Read it rather
+than guessing — a custom layer is not discoverable any other way:
+
+```
+GET /api/v1/node-types      # key, label, roles, field declarations, usage count
+```
+
+`roles` is what decides where a node of that type may sit: `container` may parent other
+nodes through `contains`, `task` may be a subtask. To add a layer of your own — say an
+`organization` above projects — register the type (needs an `admin` key, ADR-0079):
+
+```
+POST /api/v1/node-types
+Content-Type: application/json
+
+{"key": "organization", "label": "Organization", "roles": ["container"]}
+```
+
+Then it is an ordinary node: `POST /api/v1/nodes {"type": "organization", "title": "..."}`,
+and `contains` edges file projects under it. Both vocabularies also arrive together in
+`GET /api/v1/agent-context` under `conventions.node_types` and `conventions.relations`.
+
 ### Explore the graph
 
 ```

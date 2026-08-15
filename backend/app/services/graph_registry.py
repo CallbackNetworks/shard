@@ -236,6 +236,120 @@ BUILTIN_EDGE_TYPES: list[dict] = [
 ]
 
 
+# ── Node-type registry operations (ADR-0079) ─────────────────────────────────
+# Held here rather than in a router because there are now two doors onto the
+# registry — the SPA's ``/api/graph-types/nodes`` and the external
+# ``/api/v1/node-types`` — and a guard that exists on one is worth nothing if the
+# other can be used to step around it. Routers translate ``TypeRegistryError``
+# into HTTP; the rules live once.
+
+# Roles whose membership is frozen on built-in types: flipping project's ``container``
+# or task's ``task`` role would collapse the compat/enrichment pipeline (ADR-0034/0035).
+IMMUTABLE_BUILTIN_ROLES = {graph.ROLE_CONTAINER, graph.ROLE_TASK}
+
+
+class TypeRegistryError(Exception):
+    """A refusal that both registry doors must report identically."""
+
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+def node_types_with_usage(db: Session) -> list[NodeType]:
+    """Every node type, built-ins first, each carrying how many nodes use it."""
+    from sqlalchemy import func
+
+    from app.models import Node
+
+    types = db.query(NodeType).order_by(NodeType.is_builtin.desc(), NodeType.key).all()
+    counts = dict(db.query(Node.type, func.count(Node.id)).group_by(Node.type).all())
+    for nt in types:
+        nt.usage_count = counts.get(nt.key, 0)
+    return types
+
+
+def create_node_type(db: Session, body) -> NodeType:
+    """Register a new layer. ``body`` is a ``NodeTypeCreate`` (its own validators
+    already reject a managed data key, an unknown ``kind`` and an unknown ``store``)."""
+    if db.get(NodeType, body.key) is not None:
+        raise TypeRegistryError(409, f"node type '{body.key}' already exists")
+    nt = NodeType(
+        is_builtin=False,
+        key=body.key,
+        label=body.label,
+        icon=body.icon,
+        color=body.color,
+        data=body.data,
+        roles=sorted(set(body.roles)) if body.roles else None,
+        # A type may declare which keys of its nodes' ``data`` are the user's (ADR-0074).
+        fields=[f.model_dump(exclude_none=True) for f in body.fields] if body.fields else None,
+    )
+    db.add(nt)
+    db.commit()
+    db.refresh(nt)
+    return nt
+
+
+def update_node_type(db: Session, key: str, body) -> NodeType:
+    nt = db.get(NodeType, key)
+    if nt is None:
+        raise TypeRegistryError(404, "node type not found")
+    # Named ``patch``, not ``fields``: ``fields`` is now a column of its own (ADR-0074).
+    patch = body.model_dump(exclude_unset=True, exclude_none=False)
+    if "roles" in patch:
+        new_roles = set(patch.pop("roles") or [])
+        if nt.is_builtin and (
+            {r for r in new_roles if r in IMMUTABLE_BUILTIN_ROLES}
+            != {r for r in (nt.roles or []) if r in IMMUTABLE_BUILTIN_ROLES}
+        ):
+            raise TypeRegistryError(400, "cannot change roles of a built-in node type")
+        nt.roles = sorted(new_roles) or None
+    if "fields" in patch:
+        declared = patch.pop("fields")
+        nt.fields = [{k: v for k, v in f.items() if v is not None} for f in declared] if declared else None
+    for field, value in patch.items():
+        setattr(nt, field, value)
+    db.commit()
+    db.refresh(nt)
+    return nt
+
+
+def delete_node_type(db: Session, key: str) -> None:
+    from app.models import Node
+
+    nt = db.get(NodeType, key)
+    if nt is None:
+        raise TypeRegistryError(404, "node type not found")
+    if nt.is_builtin:
+        raise TypeRegistryError(400, "cannot delete a built-in node type")
+    if db.query(Node.id).filter(Node.type == key).first() is not None:
+        raise TypeRegistryError(409, "node type is still in use by existing nodes")
+    db.delete(nt)
+    db.commit()
+
+
+def type_vocabulary(db: Session) -> list[dict]:
+    """The node-type vocabulary as an agent needs it (ADR-0079).
+
+    ``type`` is a required field of every node write, and until this existed nothing
+    under ``/api/v1`` said which values were legal — the caller had to already know.
+    Roles travel with it because they are what decides where a node of that type may
+    sit (ADR-0078): a ``container`` may parent, a ``task`` may be a subtask.
+    """
+    return [
+        {
+            "key": nt.key,
+            "label": nt.label,
+            "roles": nt.roles or [],
+            "is_builtin": nt.is_builtin,
+            "fields": nt.fields or [],
+        }
+        for nt in db.query(NodeType).order_by(NodeType.is_builtin.desc(), NodeType.key).all()
+    ]
+
+
 def relation_vocabulary(db: Session) -> list[dict]:
     """The relation vocabulary as an agent needs to read it (ADR-0078).
 
