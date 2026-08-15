@@ -8,11 +8,9 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-import pytest_asyncio
 from mcp.server.mcpserver.exceptions import ResourceNotFoundError, ToolError
 
-import server as mcp_server
-
+from app.mcp_server import server as mcp_server
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
@@ -32,7 +30,7 @@ def _patch_client(method, response):
     getattr(client, method).return_value = response
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=False)
-    return patch("server.httpx.AsyncClient", return_value=client)
+    return patch("app.mcp_server.server.httpx.AsyncClient", return_value=client)
 
 
 async def _call(tool_name, arguments=None):
@@ -83,7 +81,7 @@ async def test_list_tasks():
 async def test_list_tasks_with_filters():
     tasks = [{"id": "t1", "title": "Done task", "status": "done"}]
     with _patch_client("get", _mock_response(json_data=tasks)) as mock_cls:
-        text = await _call("list_tasks", {"project_id": "p1", "status": "done", "priority": "high"})
+        await _call("list_tasks", {"project_id": "p1", "status": "done", "priority": "high"})
         client = mock_cls.return_value
         call_args = client.get.call_args
         assert call_args[1]["params"]["status_filter"] == "done"
@@ -97,10 +95,17 @@ async def test_list_tasks_with_filters():
 async def test_create_task():
     created = {"id": "t3", "title": "New task", "priority": "high"}
     with _patch_client("post", _mock_response(json_data=created)) as mock_cls:
-        text = await _call("create_task", {
-            "project_id": "p1", "title": "New task", "priority": "high",
-            "description": "Some desc", "assignee": "alice", "due_date": "2026-07-01"
-        })
+        text = await _call(
+            "create_task",
+            {
+                "project_id": "p1",
+                "title": "New task",
+                "priority": "high",
+                "description": "Some desc",
+                "assignee": "alice",
+                "due_date": "2026-07-01",
+            },
+        )
         client = mock_cls.return_value
         body = client.post.call_args[1]["json"]
         assert body["title"] == "New task"
@@ -147,9 +152,7 @@ async def test_update_task_no_fields():
 async def test_create_subtask():
     sub = {"id": "t5", "title": "Sub", "parent_id": "t1"}
     with _patch_client("post", _mock_response(json_data=sub)) as mock_cls:
-        text = await _call("create_subtask", {
-            "project_id": "p1", "parent_task_id": "t1", "title": "Sub"
-        })
+        text = await _call("create_subtask", {"project_id": "p1", "parent_task_id": "t1", "title": "Sub"})
         body = mock_cls.return_value.post.call_args[1]["json"]
         assert body["parent_id"] == "t1"
     parsed = json.loads(text)
@@ -184,9 +187,7 @@ async def test_manage_labels_list_no_project():
 @pytest.mark.asyncio
 async def test_manage_labels_add():
     with _patch_client("post", _mock_response(json_data={"status": "ok"})):
-        text = await _call("manage_labels", {
-            "action": "add", "project_id": "p1", "task_id": "t1", "label_id": "l1"
-        })
+        text = await _call("manage_labels", {"action": "add", "project_id": "p1", "task_id": "t1", "label_id": "l1"})
     parsed = json.loads(text)
     assert parsed["status"] == "ok"
 
@@ -200,9 +201,7 @@ async def test_manage_labels_add_missing_params():
 @pytest.mark.asyncio
 async def test_manage_labels_remove():
     with _patch_client("delete", _mock_response(status_code=204)):
-        text = await _call("manage_labels", {
-            "action": "remove", "project_id": "p1", "task_id": "t1", "label_id": "l1"
-        })
+        text = await _call("manage_labels", {"action": "remove", "project_id": "p1", "task_id": "t1", "label_id": "l1"})
     parsed = json.loads(text)
     assert parsed["status"] == "deleted"
 
@@ -221,7 +220,7 @@ async def test_manage_labels_unknown_action():
 async def test_analyze_workload_with_project():
     stats = {"total": 10, "done": 5}
     with _patch_client("get", _mock_response(json_data=stats)) as mock_cls:
-        text = await _call("analyze_workload", {"project_id": "p1"})
+        await _call("analyze_workload", {"project_id": "p1"})
         url = mock_cls.return_value.get.call_args[0][0]
         assert "/projects/p1/stats" in url
 
@@ -230,7 +229,7 @@ async def test_analyze_workload_with_project():
 async def test_analyze_workload_overview():
     overview = {"total_tasks": 50}
     with _patch_client("get", _mock_response(json_data=overview)) as mock_cls:
-        text = await _call("analyze_workload", {})
+        await _call("analyze_workload", {})
         url = mock_cls.return_value.get.call_args[0][0]
         assert "/analytics/overview" in url
 
@@ -242,7 +241,7 @@ async def test_analyze_workload_overview():
 async def test_search():
     results = {"tasks": [{"id": "t1"}], "projects": []}
     with _patch_client("get", _mock_response(json_data=results)) as mock_cls:
-        text = await _call("search", {"query": "deploy"})
+        await _call("search", {"query": "deploy"})
         params = mock_cls.return_value.get.call_args[1]["params"]
         assert params["q"] == "deploy"
 
@@ -254,7 +253,7 @@ async def test_search():
 async def test_get_activity():
     activities = [{"id": "a1", "action": "task.created"}]
     with _patch_client("get", _mock_response(json_data=activities)) as mock_cls:
-        text = await _call("get_activity", {"limit": 5})
+        await _call("get_activity", {"limit": 5})
         params = mock_cls.return_value.get.call_args[1]["params"]
         assert params["limit"] == 5
 
@@ -266,9 +265,7 @@ async def test_get_activity():
 async def test_add_comment():
     comment = {"id": "c1", "body": "Nice work"}
     with _patch_client("post", _mock_response(json_data=comment)) as mock_cls:
-        text = await _call("add_comment", {
-            "project_id": "p1", "task_id": "t1", "body": "Nice work", "author": "bob"
-        })
+        await _call("add_comment", {"project_id": "p1", "task_id": "t1", "body": "Nice work", "author": "bob"})
         body = mock_cls.return_value.post.call_args[1]["json"]
         assert body["body"] == "Nice work"
         assert body["author"] == "bob"
@@ -302,9 +299,7 @@ async def test_list_comments():
 async def test_manage_dependencies_list():
     deps = {"blocked_by": ["t2"], "blocking": []}
     with _patch_client("get", _mock_response(json_data=deps)):
-        text = await _call("manage_dependencies", {
-            "action": "list", "project_id": "p1", "task_id": "t1"
-        })
+        text = await _call("manage_dependencies", {"action": "list", "project_id": "p1", "task_id": "t1"})
     parsed = json.loads(text)
     assert "blocked_by" in parsed
 
@@ -312,27 +307,25 @@ async def test_manage_dependencies_list():
 @pytest.mark.asyncio
 async def test_manage_dependencies_add():
     with _patch_client("post", _mock_response(json_data={"status": "ok"})):
-        text = await _call("manage_dependencies", {
-            "action": "add", "project_id": "p1", "task_id": "t1", "depends_on_id": "t2"
-        })
+        text = await _call(
+            "manage_dependencies", {"action": "add", "project_id": "p1", "task_id": "t1", "depends_on_id": "t2"}
+        )
     parsed = json.loads(text)
     assert parsed["status"] == "ok"
 
 
 @pytest.mark.asyncio
 async def test_manage_dependencies_add_missing_id():
-    text = await _call("manage_dependencies", {
-        "action": "add", "project_id": "p1", "task_id": "t1"
-    })
+    text = await _call("manage_dependencies", {"action": "add", "project_id": "p1", "task_id": "t1"})
     assert "depends_on_id required" in text
 
 
 @pytest.mark.asyncio
 async def test_manage_dependencies_remove():
     with _patch_client("delete", _mock_response(status_code=204)):
-        text = await _call("manage_dependencies", {
-            "action": "remove", "project_id": "p1", "task_id": "t1", "depends_on_id": "t2"
-        })
+        text = await _call(
+            "manage_dependencies", {"action": "remove", "project_id": "p1", "task_id": "t1", "depends_on_id": "t2"}
+        )
     parsed = json.loads(text)
     assert parsed["status"] == "deleted"
 
@@ -340,9 +333,7 @@ async def test_manage_dependencies_remove():
 @pytest.mark.asyncio
 async def test_manage_dependencies_unknown_action():
     with pytest.raises(ToolError):
-        await _call("manage_dependencies", {
-            "action": "reorder", "project_id": "p1", "task_id": "t1"
-        })
+        await _call("manage_dependencies", {"action": "reorder", "project_id": "p1", "task_id": "t1"})
 
 
 # ── Tool: get_notifications ─────────────────────────────────────────
@@ -352,7 +343,7 @@ async def test_manage_dependencies_unknown_action():
 async def test_get_notifications():
     notifs = [{"id": "n1", "type": "task.done"}]
     with _patch_client("get", _mock_response(json_data=notifs)) as mock_cls:
-        text = await _call("get_notifications", {"unread_only": False, "limit": 10})
+        await _call("get_notifications", {"unread_only": False, "limit": 10})
         params = mock_cls.return_value.get.call_args[1]["params"]
         assert params["unread_only"] == "false"
         assert params["limit"] == 10
@@ -377,10 +368,16 @@ async def test_get_agent_context():
 async def test_report_progress():
     result = {"status": "ok"}
     with _patch_client("post", _mock_response(json_data=result)) as mock_cls:
-        text = await _call("report_progress", {
-            "project_id": "p1", "task_id": "t1",
-            "progress_pct": 75, "agent_notes": "Almost done", "comment": "Update"
-        })
+        await _call(
+            "report_progress",
+            {
+                "project_id": "p1",
+                "task_id": "t1",
+                "progress_pct": 75,
+                "agent_notes": "Almost done",
+                "comment": "Update",
+            },
+        )
         body = mock_cls.return_value.post.call_args[1]["json"]
         assert body["progress_pct"] == 75
         assert body["agent_notes"] == "Almost done"
@@ -413,7 +410,7 @@ async def test_list_projects():
 async def test_list_projects_with_status():
     projects = [{"id": "p1", "name": "Alpha", "status": "active"}]
     with _patch_client("get", _mock_response(json_data=projects)) as mock_cls:
-        text = await _call("list_projects", {"status": "active"})
+        await _call("list_projects", {"status": "active"})
         params = mock_cls.return_value.get.call_args[1]["params"]
         assert params["status"] == "active"
 
@@ -439,7 +436,7 @@ async def test_create_project():
 async def test_create_project_minimal():
     project = {"id": "p4", "name": "Delta"}
     with _patch_client("post", _mock_response(json_data=project)) as mock_cls:
-        text = await _call("create_project", {"name": "Delta"})
+        await _call("create_project", {"name": "Delta"})
         body = mock_cls.return_value.post.call_args[1]["json"]
         assert body["title"] == "Delta"
         assert "data" not in body
@@ -487,7 +484,7 @@ async def test_tool_exception_handling():
     reading the prose. It now surfaces as an error (ADR-0077), the same
     distinction ADR-0051 drew for unrecognised webhook statuses.
     """
-    with patch("server._get_summary", side_effect=Exception("connection refused")):
+    with patch("app.mcp_server.server._get_summary", side_effect=Exception("connection refused")):
         with pytest.raises(ToolError, match="connection refused"):
             await _call("get_summary")
 
@@ -572,9 +569,7 @@ async def test_list_node_types():
 @pytest.mark.asyncio
 async def test_create_node_type():
     with _patch_client("post", _mock_response(json_data={"key": "organization", "roles": ["container"]})):
-        text = await _call("create_node_type", {
-            "key": "organization", "label": "Organization", "roles": ["container"]
-        })
+        text = await _call("create_node_type", {"key": "organization", "label": "Organization", "roles": ["container"]})
     assert json.loads(text)["key"] == "organization"
 
 
@@ -599,9 +594,7 @@ async def test_manage_edges_list():
 @pytest.mark.asyncio
 async def test_manage_edges_add():
     with _patch_client("post", _mock_response(json_data={"rel_type": "owns"})):
-        text = await _call("manage_edges", {
-            "action": "add", "node_id": "i1", "target_id": "p1", "rel_type": "owns"
-        })
+        text = await _call("manage_edges", {"action": "add", "node_id": "i1", "target_id": "p1", "rel_type": "owns"})
     assert json.loads(text)["rel_type"] == "owns"
 
 
@@ -615,9 +608,7 @@ async def test_manage_edges_add_without_a_relation_says_so():
 @pytest.mark.asyncio
 async def test_manage_edges_remove():
     with _patch_client("delete", _mock_response(status_code=204)):
-        text = await _call("manage_edges", {
-            "action": "remove", "node_id": "i1", "target_id": "p1", "rel_type": "owns"
-        })
+        text = await _call("manage_edges", {"action": "remove", "node_id": "i1", "target_id": "p1", "rel_type": "owns"})
     assert json.loads(text)["status"] == "deleted"
 
 
@@ -635,18 +626,35 @@ async def test_list_tools_names():
     tools = await mcp_server.mcp.list_tools()
     names = {t.name for t in tools}
     expected = {
-        "get_summary", "list_tasks", "create_task", "update_task", "create_subtask",
-        "manage_labels", "analyze_workload", "search", "get_activity",
-        "add_comment", "list_comments", "manage_dependencies", "get_notifications",
-        "get_agent_context", "report_progress",
-        "list_projects", "create_project", "delete_task",
-        "get_project_detail", "bulk_update_tasks", "get_container_subtree",
+        "get_summary",
+        "list_tasks",
+        "create_task",
+        "update_task",
+        "create_subtask",
+        "manage_labels",
+        "analyze_workload",
+        "search",
+        "get_activity",
+        "add_comment",
+        "list_comments",
+        "manage_dependencies",
+        "get_notifications",
+        "get_agent_context",
+        "report_progress",
+        "list_projects",
+        "create_project",
+        "delete_task",
+        "get_project_detail",
+        "bulk_update_tasks",
+        "get_container_subtree",
         # ADR-0078: edges had no tool at all, so an agent could only ever set the one
         # container_id a node was created with.
-        "list_edge_types", "manage_edges",
+        "list_edge_types",
+        "manage_edges",
         # ADR-0079: `type` is required on every node write and nothing listed the
         # legal values; creating a layer was a UI-only capability.
-        "list_node_types", "create_node_type",
+        "list_node_types",
+        "create_node_type",
     }
     assert names == expected
 

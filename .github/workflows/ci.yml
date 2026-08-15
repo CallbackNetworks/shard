@@ -26,11 +26,9 @@ jobs:
       - name: Security audit
         run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps backend sh -c "pip install pip-audit && pip-audit --strict"
 
-      - name: Build MCP image
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks build mcp
-
-      - name: MCP server tests
-        run: docker compose -f docker-compose.ci.yml -p ci-backend-checks run --rm --no-deps mcp pytest test_server.py -q
+      # No separate MCP image or suite: the server is a module inside the backend
+      # package now (ADR-0080), so `tests/test_mcp_server.py` runs in the backend
+      # test jobs below — against both databases rather than once here.
 
       - name: Cleanup
         if: always()
@@ -216,16 +214,9 @@ jobs:
           docker push $IMAGE_PREFIX/frontend:${{ github.sha }}
           docker push $IMAGE_PREFIX/frontend:latest
 
-      # Built here rather than reused from the integration stack: the MCP server has no
-      # part in that stack (its tests mock every HTTP call), but the image has to exist
-      # in the registry for a deployment that enables remote MCP (ADR-0076).
-      - name: Build, tag and push MCP server
-        run: |
-          docker compose -f docker-compose.ci.yml -p ci-publish build mcp
-          docker tag ci-publish-mcp:latest $IMAGE_PREFIX/mcp:${{ github.sha }}
-          docker tag ci-publish-mcp:latest $IMAGE_PREFIX/mcp:latest
-          docker push $IMAGE_PREFIX/mcp:${{ github.sha }}
-          docker push $IMAGE_PREFIX/mcp:latest
+      # No MCP image to build: the server is a module inside the backend package
+      # (ADR-0080), so a deployment that enables remote MCP runs the backend image
+      # with a different command. One build context, one image.
 
   deploy:
     name: Deploy to production
@@ -365,7 +356,10 @@ jobs:
           if [ "$MCP_ENABLED" = "1" ]; then
             cat >> "$DEPLOY_DIR/docker-compose.yml" <<EOF
             mcp:
-              image: $IMAGE_PREFIX/mcp:$IMAGE_TAG
+              # The backend image with a different command (ADR-0080): the MCP server
+              # is a module in that package, not its own build.
+              image: $IMAGE_PREFIX/backend:$IMAGE_TAG
+              command: python -m app.mcp_server.server
               container_name: ${REPO_NAME}-mcp
               expose:
                 - "8001"

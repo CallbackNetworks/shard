@@ -23,3 +23,9 @@ services:
     profiles:
       - mcp
     # Only start mcp if explicitly requested: docker compose --profile mcp up
+    # Same overrides as backend — it is the same image (ADR-0080), so without
+    # these it would build the dev Dockerfile and mount host source in prod.
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    volumes: []

@@ -83,10 +83,10 @@ async def _delete(path: str) -> dict | str:
     return resp.json()
 
 
-
 def _as_text(data) -> str:
     """Resource bodies are JSON text; a tool-style error string passes through."""
     return data if isinstance(data, str) else json.dumps(data, indent=2)
+
 
 # ── Tool implementations ────────────────────────────────────────────
 
@@ -96,9 +96,7 @@ async def _get_summary() -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _list_tasks(
-    project_id: str, status: str | None = None, priority: str | None = None
-) -> str:
+async def _list_tasks(project_id: str, status: str | None = None, priority: str | None = None) -> str:
     params = {}
     if status:
         params["status_filter"] = status
@@ -136,10 +134,14 @@ async def _update_task(project_id: str, task_id: str, **kwargs) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _create_subtask(
-    project_id: str, parent_task_id: str, title: str, priority: str = "medium"
-) -> str:
-    body = {"type": "task", "container_id": project_id, "parent_id": parent_task_id, "title": title, "priority": priority}
+async def _create_subtask(project_id: str, parent_task_id: str, title: str, priority: str = "medium") -> str:
+    body = {
+        "type": "task",
+        "container_id": project_id,
+        "parent_id": parent_task_id,
+        "title": title,
+        "priority": priority,
+    }
     result = await _post("/nodes", body)
     return json.dumps(result) if not isinstance(result, str) else result
 
@@ -159,17 +161,13 @@ async def _manage_labels(
     if action == "add":
         if not project_id or not task_id or not label_id:
             return "project_id, task_id, and label_id required for add action"
-        result = await _post(
-            f"/projects/{project_id}/tasks/{task_id}/labels/{label_id}"
-        )
+        result = await _post(f"/projects/{project_id}/tasks/{task_id}/labels/{label_id}")
         return json.dumps(result) if not isinstance(result, str) else result
 
     if action == "remove":
         if not project_id or not task_id or not label_id:
             return "project_id, task_id, and label_id required for remove action"
-        result = await _delete(
-            f"/projects/{project_id}/tasks/{task_id}/labels/{label_id}"
-        )
+        result = await _delete(f"/projects/{project_id}/tasks/{task_id}/labels/{label_id}")
         return json.dumps(result) if not isinstance(result, str) else result
 
     return f"Unknown label action: {action}"
@@ -193,15 +191,11 @@ async def _get_activity(limit: int = 20) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _add_comment(
-    project_id: str, task_id: str, body: str, author: str | None = None
-) -> str:
+async def _add_comment(project_id: str, task_id: str, body: str, author: str | None = None) -> str:
     payload: dict = {"body": body}
     if author:
         payload["author"] = author
-    result = await _post(
-        f"/projects/{project_id}/tasks/{task_id}/comments", payload
-    )
+    result = await _post(f"/projects/{project_id}/tasks/{task_id}/comments", payload)
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -217,25 +211,19 @@ async def _manage_dependencies(
     depends_on_id: str | None = None,
 ) -> str:
     if action == "list":
-        result = await _get(
-            f"/projects/{project_id}/tasks/{task_id}/dependencies"
-        )
+        result = await _get(f"/projects/{project_id}/tasks/{task_id}/dependencies")
         return json.dumps(result) if not isinstance(result, str) else result
 
     if action == "add":
         if not depends_on_id:
             return "depends_on_id required for add action"
-        result = await _post(
-            f"/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}"
-        )
+        result = await _post(f"/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}")
         return json.dumps(result) if not isinstance(result, str) else result
 
     if action == "remove":
         if not depends_on_id:
             return "depends_on_id required for remove action"
-        result = await _delete(
-            f"/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}"
-        )
+        result = await _delete(f"/projects/{project_id}/tasks/{task_id}/dependencies/{depends_on_id}")
         return json.dumps(result) if not isinstance(result, str) else result
 
     return f"Unknown dependency action: {action}"
@@ -266,9 +254,7 @@ async def _report_progress(
         body["agent_notes"] = agent_notes
     if comment is not None:
         body["comment"] = comment
-    result = await _post(
-        f"/projects/{project_id}/tasks/{task_id}/progress", body
-    )
+    result = await _post(f"/projects/{project_id}/tasks/{task_id}/progress", body)
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -405,8 +391,7 @@ async def create_task(
 
 @mcp.tool(
     description=(
-        "Update task fields: status, priority, title, description, assignee, "
-        "due_date, time_estimate, time_spent."
+        "Update task fields: status, priority, title, description, assignee, " "due_date, time_estimate, time_spent."
     )
 )
 async def update_task(

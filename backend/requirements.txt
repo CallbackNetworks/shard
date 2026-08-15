@@ -11,3 +11,10 @@ pytest-cov==6.0.0
 psycopg[binary]==3.2.4
 pymysql==1.1.1
 ruff==0.8.6
+# MCP server (ADR-0080: it lives in this process now). Pinned exactly, like
+# everything else here. The pin is what stopped a fresh image from silently
+# picking up 2.0, whose low-level `Server` dropped the `list_tools`/`call_tool`
+# decorators the server was built on — it would have died at import while the
+# long-running dev container kept working. We are now *on* 2.0, deliberately,
+# via `MCPServer` (ADR-0077); the pin still matters for the same reason.
+mcp==2.0.0
