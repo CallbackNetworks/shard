@@ -81,4 +81,4 @@
 | [0077](0077-the-tool-list-is-the-code.md) | 工具清單就是程式碼本身 | Accepted | 2026-08-14 |
 | [0078](0078-a-relation-declares-what-may-sit-at-each-end.md) | 關係自己宣告兩端可以接什麼 | Accepted | 2026-08-14 |
 | [0079](0079-a-layer-can-be-created-through-the-api.md) | 新增一個層級，不能只有 UI 做得到 | Accepted | 2026-08-15 |
-| [0080](0080-a-protocol-adapter-lives-in-the-process-it-wraps.md) | 協定外皮住在它包裝的那個行程裡 | Proposed | 2026-08-15 |
+| [0080](0080-a-protocol-adapter-lives-in-the-process-it-wraps.md) | 協定外皮住在它包裝的那個行程裡 | Accepted | 2026-08-15 |

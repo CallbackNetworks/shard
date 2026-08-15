@@ -1,7 +1,7 @@
 # ADR-0080: 協定外皮住在它包裝的那個行程裡
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-08-15
@@ -60,3 +60,17 @@ ADR-0076 把遠端 HTTP transport 接起來之後，那個「必須」就消失�
 - stdio 的啟動命令改變，本機已經設好的 MCP client 設定要重寫一次。
 - 67 個測試搬家；HTTP transport 那幾個要改成打 backend 的 test client。
 - backend 這個行程的職責又多了一項。它已經同時是 SPA 的 API、外部 API、webhook 接收端、WebSocket 廣播端與排程器；這是第六項。真正需要把 MCP 拆出去的那一天，是它需要獨立擴縮或獨立部署的那一天——到時候這個決定應該被一個新的 ADR 取代，而不是被偷偷改回去。
+
+## 落地與提案的差異
+
+實作分三次 commit（`38d3e41` 搬家、`71891d8` 掛上、`7a3f8fe` 拆外掛），過程中有四件事和提案不同，記在這裡而不是默默改掉：
+
+**1. SDK 的 session manager 每個 instance 只能 `run()` 一次。** 提案假設 transport app 可以在 import 時建一次、重複進入 lifespan。不行。第一次進入之後，後續每一次 startup 都會炸——而在測試套件裡，「每一次 startup」就是每一個用 `client` fixture 的測試。症狀是把 token 設進開發容器後跑全套，上百個測試同時 error，且離原因很遠。改成 **每次進入 lifespan 建一個新的 transport app**。prod 每個 worker 各自 import，本來踩不到；這是一個等著咬人的形狀，不是一個已經在痛的 bug。
+
+**2. route 的 endpoint 必須是 class，不能是 function。** 提案只寫了「用 `Route` 不用 `Mount`」，這不夠。`starlette.routing.Route` 用 `inspect.isfunction` 決定 endpoint 是什麼：是 function 就當成 `func(request) -> response`，只有非 function 才當 ASGI app。session manager 自己寫回應，所以交給它一個 function，Starlette 會等一個永遠不會來的 `Response`——client 端看到的是掛住。守門的 `BearerGuard` 因此是一個 class，並有一個測試斷言 `Route(...).app is transport`（Starlette 沒有包它）。
+
+**3. 「兩個 secret 才算啟用」收斂成一個。** 原本 deploy 用 `MCP_API_KEY` + `MCP_HTTP_TOKEN` 決定要不要生成 service。現在 route 由 app 自己依 `MCP_HTTP_TOKEN` 註冊，所以那個閘只剩一個條件；只設 token 沒設 key 會得到一個「開得起來但每個工具都 401」的端點，deploy 因此改成**明確警告**而不是安靜地放行。順帶讓負向驗證變強：停用時斷言 **404**（route 從未註冊），而過去停用只可能是 502（容器不存在），根本無從斷言。
+
+**4. 兩個原本沒被 lint 過的檔案。** 舊的 CI job 只跑 pytest，沒跑 ruff。併進 backend 後跳出 12 個錯誤（十個測試裡沒用到的綁定、import 排序），一併修掉。至於 Context 裡擔心的 coverage 分母：**是往上不是往下**——模組本身 93%，整體 83%（gate 78%），`pip-audit --strict` 也乾淨。
+
+驗證方式一律是實機而不只是測試綠：未驗證的 `POST /mcp` 得到 401、帶 token 完成 initialize、`tools/list` 25 個工具、`list_projects` 真的繞回本行程自己的 `/api/v1` 取到資料（單 worker 下 8 個並發也正常），以及透過 production nginx image 走完整條路徑。
