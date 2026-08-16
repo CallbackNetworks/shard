@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bot } from 'lucide-react'
 import { formatMinutes } from '../utils/formatTime'
@@ -23,6 +23,14 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const cycle = cycleByTask[task.id]
   const taskLabels = task.labels || []
+
+  const [assigneeDraft, setAssigneeDraft] = useState(task.assignee || '')
+  useEffect(() => { setAssigneeDraft(task.assignee || '') }, [task.assignee])
+  const commitAssignee = () => {
+    const next = assigneeDraft.trim() || null
+    if (next === (task.assignee || null)) return
+    onUpdate(task.id, { assignee: next })
+  }
 
   const style = {
     background: isDragging ? 'rgba(250,204,21,0.08)' : 'transparent',
@@ -77,9 +85,15 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
         </span>
       </td>
       <td style={tdStyle}>
+        {/* Held locally and committed on blur/Enter: submitting on every
+            keystroke fired one PATCH plus a full project refetch per character. */}
         <input
-          value={task.assignee || ''}
-          onChange={e => onUpdate(task.id, { assignee: e.target.value || null })}
+          value={assigneeDraft}
+          onChange={e => setAssigneeDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') e.target.blur()
+            if (e.key === 'Escape') { setAssigneeDraft(task.assignee || ''); e.target.blur() }
+          }}
           placeholder="—"
           style={{
             width: 80, fontSize: 11, border: '1px solid transparent', borderRadius: 4,
@@ -87,7 +101,11 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
             color: task.assignee ? DARK.text : 'rgba(var(--kt-ink-rgb), 0.15)',
           }}
           onFocus={e => { e.target.style.borderColor = 'rgba(var(--kt-ink-rgb), 0.15)'; e.target.style.background = 'rgba(var(--kt-ink-rgb), 0.05)' }}
-          onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent' }}
+          onBlur={e => {
+            e.target.style.borderColor = 'transparent'
+            e.target.style.background = 'transparent'
+            commitAssignee()
+          }}
         />
       </td>
       <td style={tdStyle}>

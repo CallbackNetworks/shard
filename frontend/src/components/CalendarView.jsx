@@ -148,16 +148,12 @@ export default function CalendarView({ tasks, onUpdateTask, projectId: _projectI
   const handleDrop = useCallback(
     (e, targetDate) => {
       e.preventDefault()
-      const taskId = parseInt(e.dataTransfer.getData('text/plain'), 10)
-      if (!taskId || isNaN(taskId)) return
+      // Task ids are UUID strings (models.py: String(36)). Parsing them as
+      // integers made every drop either a silent no-op (NaN) or a PATCH against
+      // a truncated id, so drag-to-reschedule never worked.
+      const taskId = e.dataTransfer.getData('text/plain')
+      if (!taskId) return
       onUpdateTask(taskId, { due_date: formatDateISO(targetDate) })
-    },
-    [onUpdateTask],
-  )
-
-  const handleTaskClick = useCallback(
-    (taskId) => {
-      onUpdateTask(taskId, {})
     },
     [onUpdateTask],
   )
@@ -300,7 +296,6 @@ export default function CalendarView({ tasks, onUpdateTask, projectId: _projectI
                     key={task.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, task.id)}
-                    onClick={() => handleTaskClick(task.id)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',

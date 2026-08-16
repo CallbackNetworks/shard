@@ -16,10 +16,76 @@ import WebhookPanel from './WebhookPanel'
 import MarkdownPreview from './MarkdownPreview'
 import TimeTracker from './TimeTracker'
 
+// Row badges are buttons, not styled spans: each one toggles a panel, and a row
+// carries up to four of them — as <span onClick> none were reachable by Tab,
+// multiplied across every task in the list.
+const BADGE_BUTTON = {
+  display: 'inline-flex', alignItems: 'center', gap: 3,
+  background: 'none', border: 'none', padding: 0, font: 'inherit',
+  fontSize: 10, cursor: 'pointer', flexShrink: 0,
+}
+
+/**
+ * The due date, editable where it is shown. It used to be read-only text, so
+ * setting one meant hovering the row, opening the 12-control edit form, saving
+ * and closing — four steps for one field the row already had a column for.
+ */
+function DueDateCell({ task, hovered, onUpdate }) {
+  const { t } = useTranslation()
+  const [editing, setEditing] = useState(false)
+  const iso = task.due_date ? task.due_date.split('T')[0] : ''
+
+  const commit = (next) => {
+    setEditing(false)
+    if (next === iso) return
+    onUpdate(task.id, { due_date: next ? new Date(next).toISOString() : null })
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="date"
+        defaultValue={iso}
+        autoFocus
+        onClick={e => e.stopPropagation()}
+        onChange={e => commit(e.target.value)}
+        onBlur={e => commit(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setEditing(false) } }}
+        style={{
+          fontSize: 11, background: DARK.elevated, color: DARK.text,
+          border: `1px solid ${DARK.border}`, borderRadius: 4, padding: '1px 4px',
+          flexShrink: 0, colorScheme: 'dark',
+        }}
+      />
+    )
+  }
+
+  // Nothing set and nothing to reveal: keep the row quiet until it is hovered.
+  if (!iso && !hovered) return null
+
+  const overdue = iso && task.status !== 'done' && new Date(iso) < new Date(new Date().toDateString())
+
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+      title={t('taskEdit.setDueDate')}
+      style={{
+        fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer',
+        background: 'none', border: 'none', padding: '2px 4px', borderRadius: 4,
+        color: overdue ? DARK.danger : `rgba(var(--kt-ink-rgb), ${iso ? 0.3 : 0.18})`,
+      }}
+    >
+      {iso
+        ? new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })
+        : '+ date'}
+    </button>
+  )
+}
+
 export default memo(function IssueRow({
   task, projectId, projectCode, onUpdate, onDelete,
   showProject, projectName, onCreateSubtask,
-  allTasks = [], depth = 0,
+  allTasks = [], projectLabels = [], depth = 0,
 }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -66,6 +132,8 @@ export default memo(function IssueRow({
       <TaskEditForm
         task={task}
         depth={depth}
+        projectId={projectId}
+        projectLabels={projectLabels}
         onSave={onUpdate}
         onCancel={() => setEditing(false)}
       />
@@ -117,12 +185,13 @@ export default memo(function IssueRow({
         }}>
           {task.title}
           {task.description && !hovered && labels.length === 0 && (
-            <span
+            <button
               onClick={(e) => { e.stopPropagation(); setShowDescription(v => !v) }}
-              style={{ color: DARK.textMid, marginLeft: 6, fontSize: 11, fontWeight: 400, cursor: 'pointer' }}
+              title={t('taskEdit.toggleDescription')}
+              style={{ ...BADGE_BUTTON, color: DARK.textMid, marginLeft: 6, fontSize: 11, fontWeight: 400, textAlign: 'left' }}
             >
               {task.description.length > 60 ? task.description.slice(0, 60) + '\u2026' : task.description}
-            </span>
+            </button>
           )}
         </span>
 
@@ -155,32 +224,31 @@ export default memo(function IssueRow({
 
         {/* Multi-project membership badge (ADR-0032) */}
         {(task.project_ids || []).length > 1 && (
-          <span
+          <button
             onClick={(e) => { e.stopPropagation(); setShowMembership(v => !v) }}
             title={t('membership.badge', { count: task.project_ids.length })}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 10, color: showMembership ? '#818cf8' : 'rgba(129,140,248,0.75)',
-              cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+              ...BADGE_BUTTON,
+              color: showMembership ? '#818cf8' : 'rgba(129,140,248,0.75)',
+              whiteSpace: 'nowrap',
             }}
           >
             <Boxes size={11} />{task.project_ids.length}
-          </span>
+          </button>
         )}
 
         {/* Recurrence badge */}
         {task.recurrence && (
-          <span
+          <button
             onClick={(e) => { e.stopPropagation(); setShowRecurrence(v => !v) }}
             title={t('recurrence.repeats', { frequency: task.recurrence.frequency })}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 10, color: showRecurrence ? DARK.success : 'rgba(var(--kt-ink-rgb), 0.3)',
-              cursor: 'pointer', flexShrink: 0,
+              ...BADGE_BUTTON,
+              color: showRecurrence ? DARK.success : 'rgba(var(--kt-ink-rgb), 0.3)',
             }}
           >
             <Repeat2 size={11} />
-          </span>
+          </button>
         )}
 
         {/* Blocked badge */}
@@ -196,16 +264,16 @@ export default memo(function IssueRow({
 
         {/* Comment count badge */}
         {(task.comment_count || 0) > 0 && (
-          <span
+          <button
             onClick={(e) => { e.stopPropagation(); setShowComments(v => !v) }}
+            title={t('issue.comments')}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.35)', cursor: 'pointer',
-              flexShrink: 0, whiteSpace: 'nowrap',
+              ...BADGE_BUTTON,
+              color: 'rgba(var(--kt-ink-rgb), 0.35)', whiteSpace: 'nowrap',
             }}
           >
             <MessageSquare size={10} />{task.comment_count}
-          </span>
+          </button>
         )}
 
         {/* Agent badge */}
@@ -253,11 +321,7 @@ export default memo(function IssueRow({
         {/* Time tracking */}
         <TimeTracker task={task} onUpdate={onUpdate} />
 
-        {task.due_date && (
-          <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {new Date(task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
+        <DueDateCell task={task} hovered={hovered} onUpdate={onUpdate} />
 
         <span style={{
           fontSize: 11, color: p.color, background: p.bg,
@@ -456,6 +520,7 @@ export default memo(function IssueRow({
           onDelete={onDelete}
           onCreateSubtask={onCreateSubtask}
           allTasks={allTasks}
+          projectLabels={projectLabels}
           depth={depth + 1}
         />
       ))}

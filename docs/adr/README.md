@@ -84,3 +84,4 @@
 | [0080](0080-a-protocol-adapter-lives-in-the-process-it-wraps.md) | 協定外皮住在它包裝的那個行程裡 | Accepted | 2026-08-15 |
 | [0081](0081-focus-follows-ownership-and-containment.md) | 聚焦沿著擁有和包含關係走，不是寫死在身分上 | Accepted | 2026-08-15 |
 | [0082](0082-a-container-can-log-inbound-cicd-events-too.md) | 容器也能收 CI/CD 回呼，但只記錄不套用 | Accepted | 2026-08-15 |
+| [0083](0083-a-filter-narrows-the-work-not-the-view.md) | 篩選縮小的是工作，不是某一個檢視 | Accepted | 2026-08-15 |

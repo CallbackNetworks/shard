@@ -30,6 +30,7 @@ const focus = vi.hoisted(() => ({ filterProjects: (p) => p }))
 vi.mock('../../context/IdentityFocusContext', () => ({ useIdentityFocus: () => focus }))
 
 import CommandPalette from '../CommandPalette'
+import { NAV_GROUPS } from '../../constants/nav'
 import { touchProject, forgetProject, getRecentProjectIds } from '../../utils/recentProjects'
 
 const PROJECTS = [
@@ -47,8 +48,9 @@ function setup({ mode = 'projects' } = {}) {
 
 // Section headings are siblings of the rows, so read the rows in order and
 // take each one's label span — not its whole text, which also carries the meta.
+// Rows are matched on role, not on a style string: they are real buttons.
 function rowLabels(container) {
-  return Array.from(container.querySelectorAll('div[style*="cursor: pointer"]'))
+  return Array.from(container.querySelectorAll('[role="option"]'))
     .map(el => el.children[1]?.textContent.trim())
     .filter(Boolean)
 }
@@ -152,5 +154,54 @@ describe('CommandPalette project switcher', () => {
   it('still shows nav commands in the general mode', () => {
     const { container } = setup({ mode: 'all' })
     expect(rowLabels(container)).toContain('nav.apiKeys')
+  })
+
+  // The palette used to carry a hand-written list of four destinations, so
+  // goals, decisions, analytics, activity, settings and the whole Graph group
+  // were in the rail and unreachable from search. The rail's module list is now
+  // the single source, and this fails if the palette grows its own copy again.
+  it('offers every destination the rail does', () => {
+    const { container } = setup({ mode: 'all' })
+    const offered = rowLabels(container)
+    const railKeys = NAV_GROUPS.flatMap(g => g.items.map(i => i.labelKey))
+
+    expect(railKeys.length).toBeGreaterThan(4)
+    expect(railKeys.filter(key => !offered.includes(key))).toEqual([])
+  })
+
+  it('navigates to a rail destination chosen from the palette', () => {
+    const { container } = setup({ mode: 'all' })
+    const goals = [...container.querySelectorAll('[role="option"]')]
+      .find(el => el.children[1]?.textContent.trim() === 'nav.goals')
+
+    fireEvent.click(goals)
+
+    expect(navigate).toHaveBeenCalledWith('/goals')
+  })
+
+  // A keyboard-first surface whose rows are unreachable by Tab is only
+  // keyboard-first for the person who wrote the arrow-key loop.
+  it('renders result rows as focusable controls', () => {
+    const { container } = setup({ mode: 'all' })
+    const rows = [...container.querySelectorAll('[role="option"]')]
+
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every(el => el.tagName === 'BUTTON')).toBe(true)
+  })
+
+  // `c` pressed away from a project asks "in which project?"; the answer has to
+  // arrive still carrying the intent, or the keystroke just navigates.
+  it('carries a new-task intent onto the project it lands on', () => {
+    render(<CommandPalette open onClose={vi.fn()} mode="projects" intent="new-task" />)
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/projects\/\w+\?new=task$/))
+  })
+
+  it('does not add the intent when there is none', () => {
+    render(<CommandPalette open onClose={vi.fn()} mode="projects" />)
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(navigate).toHaveBeenCalledWith(expect.not.stringContaining('new=task'))
   })
 })

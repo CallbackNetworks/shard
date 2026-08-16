@@ -84,22 +84,27 @@ export default function useKeyboardShortcuts(config = {}) {
       }
 
       // ── Single-key shortcuts ──
+      // Only swallow the key when something is actually listening: an
+      // unwired shortcut that still calls preventDefault is worse than no
+      // shortcut, because the key silently does nothing.
+      const fire = (fn) => {
+        if (!fn) return
+        e.preventDefault()
+        fn()
+      }
+
       switch (key) {
         case 'c':
-          e.preventDefault()
-          onCreateTask?.()
+          fire(onCreateTask)
           break
         case 'n':
-          e.preventDefault()
-          onCreateProject?.()
+          fire(onCreateProject)
           break
         case '/':
-          e.preventDefault()
-          onSearch?.()
+          fire(onSearch)
           break
         case '?':
-          e.preventDefault()
-          onShowHelp?.()
+          fire(onShowHelp)
           break
         default:
           break

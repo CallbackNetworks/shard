@@ -229,14 +229,23 @@
 }
 
 /* ── TaskRow ─────────────────────────────────────────────────────── */
+/* Rendered as a <button>, so the reset lives here rather than inline: the
+   overdue and hover states are class-driven, and an inline background or
+   border-left would always win over them. */
 .taskRow {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 7px 10px;
   border-radius: 0;
   cursor: pointer;
   transition: background 0.12s;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  border: none;
   border-left: 2px solid transparent;
 }
 

@@ -10,10 +10,15 @@ export default function TaskRow({ t: task, i, total, onClick }) {
   const pc = PRIORITY[task.priority]?.color || DARK.textMid
   const overdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
   return (
-    <div
+    // The dashboard's primary click target, so it is a real button: as a
+    // <div onClick> it could not be reached or activated from the keyboard.
+    <button
+      type="button"
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onFocus={() => setHov(true)}
+      onBlur={() => setHov(false)}
       className={`${s.taskRow} ${overdue ? s.taskRowOverdue : ''} ${!overdue && hov ? s.taskRowHover : ''}`}
       style={{
         borderBottom: i < total - 1 ? `1px solid ${DARK.border}` : 'none',
@@ -40,6 +45,6 @@ export default function TaskRow({ t: task, i, total, onClick }) {
           {new Date(task.due_date).toLocaleDateString()}
         </span>
       )}
-    </div>
+    </button>
   )
 }

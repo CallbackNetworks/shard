@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, FolderOpen, Archive, User, Activity, BarChart2, TrendingUp, Shield, ListChecks, GitCompare, Settings, Eye, EyeOff } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats, getGoals, getDecisions, getPreference, setPreference } from '../api/client'
@@ -75,6 +75,16 @@ export default function Dashboard() {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [showForm, setShowForm] = useState(false)
+  // `?new=project` is how the global `n` shortcut asks for the create form.
+  // Consumed once, then stripped so a reload or Back does not reopen it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('new') !== 'project') return
+    setShowForm(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
   const [filter, setFilter] = useState('active')
   const [tab, setTab] = useState('projects')
   const [pinned, setPinned] = useState(() => getPinnedIds())
@@ -228,7 +238,7 @@ export default function Dashboard() {
           { key: 'projects', label: t('nav.projects'), icon: <FolderOpen size={13} /> },
           { key: 'progress', label: t('dashboard.progress'), icon: <TrendingUp size={13} /> },
           { key: 'health',   label: t('dashboard.health'),   icon: <Shield size={13} /> },
-          { key: 'tasks',    label: t('dashboard.myWork'),   icon: <ListChecks size={13} /> },
+          { key: 'tasks',    label: t('dashboard.allTasks'), icon: <ListChecks size={13} /> },
           { key: 'compare',  label: t('dashboard.compare'),  icon: <GitCompare size={13} /> },
           { key: 'mywork',   label: t('dashboard.myWork'),   icon: <User size={13} /> },
           { key: 'charts',   label: t('dashboard.charts'),   icon: <BarChart2 size={13} /> },

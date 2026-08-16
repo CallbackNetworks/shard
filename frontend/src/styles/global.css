@@ -2602,20 +2602,12 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-command-header {
   animation: commandGlitch 0.42s steps(2, end) both;
 }
+/* The ink and the 4px accent stripe are set inline per toast type, because the
+   stripe carries the meaning (success/error/warning/info). Forcing the colour
+   here to var(--kt-bg) made light mode white-on-#34d399. */
 .kt-toast {
   position: relative;
   overflow: hidden;
-  color: var(--kt-bg) !important;
-}
-.kt-toast::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--kt-bg);
-  opacity: 0.65;
 }
 .kt-progress-track,
 [class*="progressBarTrack"],

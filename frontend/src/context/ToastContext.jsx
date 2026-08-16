@@ -8,11 +8,20 @@ export function globalAddToast(msg, type = 'error') { _addToast?.(msg, type) }
 
 let _nextId = 0
 
+// One colour per meaning. These are the semantic values from constants/theme.js
+// (DARK.success/danger/warning/info); a toast that cannot be told apart from the
+// opposite outcome at a glance is not feedback.
 const TOAST_COLORS = {
-  error:   { bg: '#facc15', border: '#eab308' },
-  success: { bg: '#facc15', border: '#eab308' },
+  success: { bg: '#34d399', border: '#10b981' },
+  error:   { bg: '#fb7185', border: '#f43f5e' },
   warning: { bg: '#f59e0b', border: '#d97706' },
+  info:    { bg: '#60a5fa', border: '#3b82f6' },
 }
+
+// Every toast background above is a bright, saturated colour, so the readable
+// foreground is a fixed dark ink in BOTH themes. It must not follow --kt-bg:
+// that resolves to white in light mode and leaves white-on-#34d399 (~1.9:1).
+const TOAST_INK = '#0f1115'
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
@@ -51,12 +60,12 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ addToast }}>
       {children}
       {toasts.length > 0 && (
-        <div className="kt-toast-stack" style={{
+        <div className="kt-toast-stack" role="status" aria-live="polite" style={{
           display: 'flex', flexDirection: 'column', gap: 8,
           pointerEvents: 'none',
         }}>
           {toasts.map(toast => {
-            const colors = TOAST_COLORS[toast.type] || TOAST_COLORS.error
+            const colors = TOAST_COLORS[toast.type] || TOAST_COLORS.info
             return (
               <div
                 key={toast.id}
@@ -64,7 +73,8 @@ export function ToastProvider({ children }) {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '10px 16px', borderRadius: 8,
-                  background: colors.bg, color: '#fff',
+                  background: colors.bg, color: TOAST_INK,
+                  borderLeft: `4px solid ${colors.border}`,
                   fontSize: 13, fontWeight: 500,
                   boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
                   pointerEvents: 'auto', maxWidth: 360,
@@ -74,8 +84,9 @@ export function ToastProvider({ children }) {
                 <span style={{ flex: 1 }}>{toast.message}</span>
                 <button
                   onClick={() => removeToast(toast.id)}
+                  aria-label="Dismiss"
                   style={{
-                    background: 'none', border: 'none', color: '#fff',
+                    background: 'none', border: 'none', color: TOAST_INK,
                     cursor: 'pointer', padding: 0, fontSize: 16, lineHeight: 1,
                     opacity: 0.7,
                   }}

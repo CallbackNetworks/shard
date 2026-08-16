@@ -4,11 +4,13 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { Sparkles } from 'lucide-react'
 import { DARK, FORM_INPUT } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
-import { getApiKeys, getEstimateSuggestion } from '../api/client'
+import { LabelChip } from './project/LabelManager'
+import { useInvalidatingMutation } from '../hooks/useCrudMutations'
+import { getApiKeys, getEstimateSuggestion, addLabelToTask, removeLabelFromTask } from '../api/client'
 
 const darkInput = FORM_INPUT
 
-export default function TaskEditForm({ task, depth, onSave, onCancel }) {
+export default function TaskEditForm({ task, depth, projectId, projectLabels = [], onSave, onCancel }) {
   const { t } = useTranslation()
   const { data: apiKeys = [] } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys })
   const activeKeys = apiKeys.filter(k => k.active)
@@ -29,6 +31,22 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
     mutationFn: () => getEstimateSuggestion(parseInt(editData.time_estimate), task.project_id),
   })
   const suggestion = suggestMut.data
+
+  // Labels are edges, not columns on the task, so they are applied immediately
+  // rather than collected into the Save payload. Before this the UI could only
+  // attach a label while creating a task and had no way at all to take one off.
+  const taskLabels = task.labels || []
+  const taskLabelIds = new Set(taskLabels.map(lb => lb.id))
+  const unusedLabels = projectLabels.filter(lb => !taskLabelIds.has(lb.id))
+  const invalidateProject = [['project', projectId]]
+  const addLabelMut = useInvalidatingMutation({
+    mutationFn: (labelId) => addLabelToTask(projectId, task.id, labelId),
+    invalidateKeys: invalidateProject,
+  })
+  const removeLabelMut = useInvalidatingMutation({
+    mutationFn: (labelId) => removeLabelFromTask(projectId, task.id, labelId),
+    invalidateKeys: invalidateProject,
+  })
 
   const handleSave = () => {
     const data = { ...editData }
@@ -118,6 +136,25 @@ export default function TaskEditForm({ task, depth, onSave, onCancel }) {
             </select>
           )}
         </div>
+        {projectId && (projectLabels.length > 0 || taskLabels.length > 0) && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+            <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.3)', fontSize: 11 }}>{t('taskEdit.labels')}</span>
+            {taskLabels.map(lb => (
+              <LabelChip key={lb.id} label={lb} onRemove={() => removeLabelMut.mutate(lb.id)} />
+            ))}
+            {unusedLabels.length > 0 && (
+              <select
+                value=""
+                onChange={e => { if (e.target.value) addLabelMut.mutate(e.target.value) }}
+                aria-label={t('taskEdit.addLabel')}
+                style={{ ...darkInput, fontSize: 11 }}
+              >
+                <option value="">{t('taskEdit.addLabel')}</option>
+                {unusedLabels.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
+              </select>
+            )}
+          </div>
+        )}
         <div style={{ marginTop: 8 }}>
           <MarkdownEditor
             value={editData.description}

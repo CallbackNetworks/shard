@@ -147,6 +147,11 @@ export const updateLabel = (projectId, labelId, { name, ...rest }) =>
 export const deleteLabel = (projectId, labelId) => deleteNode(labelId)
 export const addLabelToTask = (projectId, taskId, labelId) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/labels/${labelId}`).then(r => r.data)
+// The DELETE half has always existed on the backend (routers/labels.py) and is
+// reachable through MCP; the UI simply never called it, so a label applied at
+// creation time could never be taken off again.
+export const removeLabelFromTask = (projectId, taskId, labelId) =>
+  api.delete(`/projects/${projectId}/tasks/${taskId}/labels/${labelId}`).then(r => r.data)
 
 // Cycles — reads/linking/duplicate stay on /projects; cycle entity writes go through
 // the node surface (ADR-0043): a cycle is a container-scoped node; end_date -> due_date.

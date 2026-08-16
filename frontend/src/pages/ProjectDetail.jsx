@@ -1,5 +1,5 @@
-import { useState, useEffect, useDeferredValue } from 'react'
-import { useParams, useNavigate } from 'react-router'
+import { useState, useEffect, useCallback, useDeferredValue } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Zap, Bot, Share2, Webhook } from 'lucide-react'
 import {
@@ -41,14 +41,41 @@ export default function ProjectDetail() {
   const qc = useQueryClient()
 
   const uiPrefs = getUiPrefs()
-  const [tab, setTab] = useState(uiPrefs.defaultView)
-  const [filter, setFilter] = useState('all')
-  const [searchQ, setSearchQ] = useState('')
-  const [filterPriority, setFilterPriority] = useState('all')
-  const [filterLabel, setFilterLabel] = useState('all')
-  const [filterAssignee, setFilterAssignee] = useState('all')
-  const [filterDue, setFilterDue] = useState('all')
-  const [filterAgent, setFilterAgent] = useState('all')
+
+  // Which view you are on and what you have filtered to is where you are, not
+  // private component state: it belongs in the URL so it survives a reload,
+  // comes back with Back, and can be handed to someone else. uiPrefs.defaultView
+  // is the fallback when the URL says nothing — a default, not the truth.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const param = (key, fallback = 'all') => searchParams.get(key) || fallback
+
+  const tab = param('tab', uiPrefs.defaultView)
+  const filter = param('status')
+  const filterPriority = param('priority')
+  const filterLabel = param('label')
+  const filterAssignee = param('assignee')
+  const filterDue = param('due')
+  const filterAgent = param('agent')
+  const searchQ = param('q', '')
+
+  // `all` and `''` are the absence of a filter, so they are dropped rather than
+  // written — the URL stays readable and only carries what is actually set.
+  const patchParams = useCallback((patch, { replace = true } = {}) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      for (const [key, value] of Object.entries(patch)) {
+        if (value == null || value === '' || value === 'all') next.delete(key)
+        else next.set(key, value)
+      }
+      return next
+    }, { replace })
+  }, [setSearchParams])
+
+  // Switching view is a navigation, so it pushes; adjusting a filter replaces,
+  // otherwise Back would walk one keystroke at a time.
+  const setTab = useCallback((next) => patchParams({ tab: next }, { replace: false }), [patchParams])
+  const setSearchQ = useCallback((next) => patchParams({ q: next }), [patchParams])
+
   const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [newTask, setNewTask] = useState({
@@ -65,6 +92,7 @@ export default function ProjectDetail() {
   const [selectedTasks, setSelectedTasks] = useState(new Set())
   const [showImport, setShowImport] = useState(false)
   const [importJson, setImportJson] = useState('')
+  const [importError, setImportError] = useState('')
   const [shareSettingsOpen, setShareSettingsOpen] = useState(false)
   const [cicdOpen, setCicdOpen] = useState(false)
 
@@ -216,29 +244,26 @@ export default function ProjectDetail() {
 
   const activeFilterCount = [filterPriority, filterLabel, filterAssignee, filterDue, filterAgent].filter(f => f !== 'all').length
 
-  const applyFilterPatch = (patch) => {
-    if ('status' in patch) setFilter(patch.status)
-    if ('priority' in patch) setFilterPriority(patch.priority)
-    if ('label' in patch) setFilterLabel(patch.label)
-    if ('assignee' in patch) setFilterAssignee(patch.assignee)
-    if ('due' in patch) setFilterDue(patch.due)
-    if ('agent' in patch) setFilterAgent(patch.agent)
-  }
+  const applyFilterPatch = (patch) => patchParams(patch)
 
   const applySavedFilter = (filterId) => {
     const sf = savedFilters.find(f => f.id === filterId)
     if (!sf) return
     const fl = sf.filters || {}
-    setFilter(fl.status || 'all')
-    setFilterPriority(fl.priority || 'all')
-    setFilterLabel(fl.label_id || 'all')
-    setFilterAssignee(fl.assignee || 'all')
-    setFilterDue(fl.due || 'all')
+    // Every axis is written, including the ones the saved view leaves empty, so
+    // applying a view replaces the current filter rather than merging into it.
+    patchParams({
+      status: fl.status || 'all',
+      priority: fl.priority || 'all',
+      label: fl.label_id || 'all',
+      assignee: fl.assignee || 'all',
+      due: fl.due || 'all',
+      agent: fl.agent || 'all',
+    })
     setShowFilters(true)
   }
 
-  const saveCurrentFilter = () => {
-    const name = prompt('Name for this saved view:')
+  const saveCurrentFilter = (name) => {
     if (!name) return
     saveFilterMut.mutate({
       name,
@@ -249,6 +274,9 @@ export default function ProjectDetail() {
         label_id: filterLabel !== 'all' ? filterLabel : undefined,
         assignee: filterAssignee !== 'all' ? filterAssignee : undefined,
         due: filterDue !== 'all' ? filterDue : undefined,
+        // `agent` was offered as a filter but neither saved nor restored, so a
+        // saved view silently dropped it.
+        agent: filterAgent !== 'all' ? filterAgent : undefined,
       },
     })
   }
@@ -272,10 +300,23 @@ export default function ProjectDetail() {
     ? applyFilters(searchFiltered)
     : applyFilters(topTasks)
 
-  const openQuickAdd = () => {
+  // The same filter applied to the full task list, for the views that draw
+  // subtasks too. Board/Timeline/Calendar/Table used to receive the *unfiltered*
+  // list, so switching view silently changed what you were looking at.
+  const filteredTasks = applyFilters(searchFiltered || tasks)
+
+  const openQuickAdd = useCallback(() => {
     setShowForm(true)
     setTab('issues')
-  }
+  }, [setTab])
+
+  // `?new=task` is how the global `c` shortcut (and the palette carrying that
+  // intent) asks for the create form. Consumed once, then stripped.
+  useEffect(() => {
+    if (searchParams.get('new') !== 'task') return
+    openQuickAdd()
+    patchParams({ new: null })
+  }, [searchParams, openQuickAdd, patchParams])
 
   if (isLoading) return (
     <div className={s.loadingWrapper}>
@@ -490,31 +531,39 @@ export default function ProjectDetail() {
       {/* Tab content */}
       <div className={s.tabContent}>
 
+        {/* The filter strip belongs to the project's tasks, not to one view of
+            them: it is rendered above every task tab so switching view can
+            never silently drop the filter you set. Cycles are not tasks. */}
+        {tab !== 'cycles' && (
+          <TaskFiltersPanel
+            filters={{ status: filter, priority: filterPriority, label: filterLabel, assignee: filterAssignee, due: filterDue, agent: filterAgent }}
+            setFilters={applyFilterPatch}
+            searchQ={searchQ}
+            setSearchQ={setSearchQ}
+            showFilters={showFilters}
+            setShowFilters={setShowFilters}
+            activeFilterCount={activeFilterCount}
+            topTasks={topTasks}
+            labels={labels}
+            assignees={assignees}
+            agentNames={agentNames}
+            savedFilters={savedFilters}
+            onApplySavedFilter={applySavedFilter}
+            onSaveFilter={saveCurrentFilter}
+            bulkMode={bulkMode}
+            onToggleBulk={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
+            // Bulk selection needs the checkbox column, which only the Issues
+            // list draws — offering the toggle elsewhere would do nothing.
+            showBulk={tab === 'issues'}
+            onExport={exportTasksToFile}
+            showImport={showImport}
+            onToggleImport={() => setShowImport(v => !v)}
+          />
+        )}
+
         {/* Issues */}
         {tab === 'issues' && (
           <div>
-            <TaskFiltersPanel
-              filters={{ status: filter, priority: filterPriority, label: filterLabel, assignee: filterAssignee, due: filterDue, agent: filterAgent }}
-              setFilters={applyFilterPatch}
-              searchQ={searchQ}
-              setSearchQ={setSearchQ}
-              showFilters={showFilters}
-              setShowFilters={setShowFilters}
-              activeFilterCount={activeFilterCount}
-              topTasks={topTasks}
-              labels={labels}
-              assignees={assignees}
-              agentNames={agentNames}
-              savedFilters={savedFilters}
-              onApplySavedFilter={applySavedFilter}
-              onSaveFilter={saveCurrentFilter}
-              bulkMode={bulkMode}
-              onToggleBulk={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
-              onExport={exportTasksToFile}
-              showImport={showImport}
-              onToggleImport={() => setShowImport(v => !v)}
-            />
-
             {/* Bulk action bar */}
             {bulkMode && selectedTasks.size > 0 && (
               <BulkToolbar
@@ -532,17 +581,25 @@ export default function ProjectDetail() {
                 <div style={{ fontSize: 12, color: DARK.text, fontWeight: 600, marginBottom: 8 }}>Import Tasks (JSON)</div>
                 <textarea
                   value={importJson}
-                  onChange={e => setImportJson(e.target.value)}
+                  onChange={e => { setImportJson(e.target.value); if (importError) setImportError('') }}
                   placeholder={'[\n  { "title": "Task 1", "priority": "high" },\n  { "title": "Task 2", "subtasks": [{ "title": "Sub 1" }] }\n]'}
-                  style={{ width: '100%', minHeight: 100, background: DARK.elevated, color: DARK.text, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 6, padding: 10, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
+                  style={{ width: '100%', minHeight: 100, background: DARK.elevated, color: DARK.text, border: `1px solid ${importError ? DARK.danger : 'rgba(var(--kt-ink-rgb), 0.1)'}`, borderRadius: 6, padding: 10, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
                 />
+                {importError && (
+                  <div role="alert" style={{ marginTop: 6, fontSize: 11, color: DARK.danger }}>{importError}</div>
+                )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
                     onClick={() => {
                       try {
                         const parsed = JSON.parse(importJson)
+                        setImportError('')
                         importMut.mutate({ tasks: Array.isArray(parsed) ? parsed : [parsed] })
-                      } catch { alert('Invalid JSON') }
+                      } catch (err) {
+                        // Inline and specific: a blocking alert() saying only
+                        // "Invalid JSON" does not say where the problem is.
+                        setImportError(err.message)
+                      }
                     }}
                     disabled={!importJson.trim() || importMut.isPending}
                     style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: DARK.info, color: '#fff', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: importJson.trim() ? 1 : 0.5 }}
@@ -597,6 +654,7 @@ export default function ProjectDetail() {
                       onDelete={handleDelete}
                       onCreateSubtask={handleCreateSubtask}
                       allTasks={tasks}
+                      projectLabels={labels}
                     />
                   </div>
                 </div>
@@ -607,27 +665,28 @@ export default function ProjectDetail() {
 
         {/* Board */}
         {tab === 'board' && (
-          <BoardView tasks={tasks} projectCode={projectCode} onUpdate={handleUpdate} onDelete={handleDelete} onReorder={handleReorder} wipLimits={project?.wip_limits || {}} />
+          <BoardView tasks={filteredTasks} projectCode={projectCode} onUpdate={handleUpdate} onDelete={handleDelete} onReorder={handleReorder} wipLimits={project?.wip_limits || {}} />
         )}
 
         {/* Calendar */}
         {tab === 'calendar' && (
-          <CalendarView tasks={tasks} onUpdateTask={(taskId, data) => handleUpdate(taskId, data)} projectId={id} />
+          <CalendarView tasks={filteredTasks} onUpdateTask={(taskId, data) => handleUpdate(taskId, data)} projectId={id} />
         )}
 
         {/* Timeline */}
         {tab === 'timeline' && (
           <div>
             <div className={s.timelineHint}>
-              Set <strong className={s.timelineHintStrong}>start date</strong> and <strong className={s.timelineHintStrong}>due date</strong> on issues (click ✎ in Issues tab) to see them on the timeline.
+              Drag a bar to move it, or set <strong className={s.timelineHintStrong}>start date</strong> and{' '}
+              <strong className={s.timelineHintStrong}>due date</strong> on any issue row.
             </div>
-            <GanttChart tasks={tasks} onUpdateTask={(taskId, data) => handleUpdate(taskId, data)} />
+            <GanttChart tasks={filteredTasks} onUpdateTask={(taskId, data) => handleUpdate(taskId, data)} />
           </div>
         )}
 
         {/* Table */}
         {tab === 'table' && (
-          <TableView tasks={tasks} projectId={id} labels={labels} cycles={cycles} onUpdate={handleUpdate} onReorder={handleReorder} />
+          <TableView tasks={filteredTasks} projectId={id} labels={labels} cycles={cycles} onUpdate={handleUpdate} onReorder={handleReorder} />
         )}
 
         {/* Cycles */}

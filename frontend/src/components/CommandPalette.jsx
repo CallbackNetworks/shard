@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Zap, Key, Users, FolderOpen, Search, ArrowRight, Hash, Boxes } from 'lucide-react'
+import { FolderOpen, Search, ArrowRight, Hash, Boxes } from 'lucide-react'
 import { getProjects, search, getNodes, getNodeTypes } from '../api/client'
+import { NAV_GROUPS } from '../constants/nav'
 import { BRAND, DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
@@ -15,12 +16,19 @@ const BORDER   = DARK.border
 const ACCENT   = BRAND
 const ITEM_HOVER = DARK.active
 
-const STATIC_COMMANDS = [
-  { id: 'nav-dashboard',    labelKey: 'nav.myIssues',      section: 'Navigation', icon: <LayoutGrid size={14}/>, path: '/' },
-  { id: 'nav-identities',  labelKey: 'nav.identities',    section: 'Navigation', icon: <Users size={14}/>,      path: '/identities' },
-  { id: 'nav-integrations',labelKey: 'nav.integrations',  section: 'Navigation', icon: <Zap size={14}/>,        path: '/integrations' },
-  { id: 'nav-apikeys',     labelKey: 'nav.apiKeys',       section: 'Navigation', icon: <Key size={14}/>,        path: '/api-keys' },
-]
+// Navigation commands are derived from the rail's own module list rather than
+// re-typed here. A hand-written subset went stale the moment a page was added:
+// goals, decisions, analytics, activity, settings and the whole Graph group
+// existed in the rail and were unreachable from the palette.
+const STATIC_COMMANDS = NAV_GROUPS.flatMap(group =>
+  group.items.map(({ to, icon: Icon, labelKey }) => ({
+    id: `nav-${to}`,
+    labelKey,
+    section: 'Navigation',
+    icon: <Icon size={14} />,
+    path: to,
+  })),
+)
 
 function useDebounce(value, delay) {
   const [debounced, setDebounced] = useState(value)
@@ -47,16 +55,24 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
     if (isActive) ref.current?.scrollIntoView({ block: 'nearest' })
   }, [isActive])
 
+  // A real <button>: the palette is a keyboard-first surface, so its rows must
+  // be reachable by Tab and activatable by Enter/Space without the arrow-key
+  // loop being the only way in.
   return (
-    <div
+    <button
       ref={ref}
+      type="button"
+      role="option"
+      aria-selected={isActive}
       onMouseEnter={onHover}
+      onFocus={onHover}
       onClick={onSelect}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10,
+        display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 12px)',
         padding: '8px 14px', cursor: 'pointer', borderRadius: 0, margin: '1px 6px',
         background: isActive ? ITEM_HOVER : 'transparent',
-        borderLeft: isActive ? `3px solid ${ACCENT}` : '3px solid transparent',
+        border: 'none', borderLeft: isActive ? `3px solid ${ACCENT}` : '3px solid transparent',
+        font: 'inherit', textAlign: 'left',
         transition: 'background 0.1s',
       }}
     >
@@ -80,14 +96,14 @@ function CommandItem({ item, isActive, onSelect, onHover }) {
           <ArrowRight size={12} />
         </span>
       )}
-    </div>
+    </button>
   )
 }
 
 // `mode` picks what the palette is for: 'all' is the general command bar,
 // 'projects' is the dedicated switcher (ADR-0067) — projects only, so the
 // recency order is not diluted by nav commands, tasks and nodes.
-export default function CommandPalette({ open, onClose, mode = 'all' }) {
+export default function CommandPalette({ open, onClose, mode = 'all', intent = null }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [query, setQuery]     = useState('')
@@ -243,11 +259,17 @@ export default function CommandPalette({ open, onClose, mode = 'all' }) {
 
   const clampedActive = Math.min(activeIdx, items.length - 1)
 
+  // `intent` lets a caller open the switcher to answer a question it already
+  // has — `c` off a project page asks "in which project?" and wants the create
+  // form open on arrival, not just the project page.
   const execute = useCallback((item) => {
     if (!item) return
-    if (item.path) navigate(item.path)
+    if (item.path) {
+      const carries = intent === 'new-task' && item.path.startsWith('/projects/')
+      navigate(carries ? `${item.path}?new=task` : item.path)
+    }
     onClose()
-  }, [navigate, onClose])
+  }, [navigate, onClose, intent])
 
   // Reset on open
   useEffect(() => {
@@ -291,6 +313,9 @@ export default function CommandPalette({ open, onClose, mode = 'all' }) {
     >
       <div
         className="kt-command-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('palette.title')}
         onClick={e => e.stopPropagation()}
         style={{
           width: 560, maxWidth: '90vw',

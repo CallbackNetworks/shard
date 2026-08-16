@@ -9,10 +9,8 @@ import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp'
 import Sidebar from './components/Sidebar'
 import GlobalActivityTicker from './components/GlobalActivityTicker'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { ToastProvider } from './context/ToastContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { IdentityFocusProvider } from './context/IdentityFocusContext'
-import ErrorBoundary from './components/ErrorBoundary'
 import { BRAND, DARK, FONT } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
@@ -61,20 +59,37 @@ function Layout() {
   const { theme } = useTheme()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [paletteMode, setPaletteMode] = useState('all')
+  const [paletteIntent, setPaletteIntent] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
   useRealtimeSync()
 
   const nav = useNavigate()
-  const openPalette = useCallback(() => { setPaletteMode('all'); setPaletteOpen(true) }, [])
+  const openPalette = useCallback(() => { setPaletteMode('all'); setPaletteIntent(null); setPaletteOpen(true) }, [])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
   // Project switching lives here rather than in the rail (ADR-0067).
-  const openProjectSwitcher = useCallback(() => { setPaletteMode('projects'); setPaletteOpen(true) }, [])
+  const openProjectSwitcher = useCallback(() => { setPaletteMode('projects'); setPaletteIntent(null); setPaletteOpen(true) }, [])
+
+  // `c` creates a task. On a project page that means "here"; anywhere else the
+  // question "in which project?" has no default, so it opens the switcher
+  // carrying the intent (ADR-0067: which project you want is a choice).
+  const createTaskHere = useCallback(() => {
+    if (/^\/projects\/[^/]+/.test(window.location.pathname)) {
+      nav(`${window.location.pathname}?new=task`)
+      return
+    }
+    setPaletteMode('projects')
+    setPaletteIntent('new-task')
+    setPaletteOpen(true)
+  }, [nav])
+  const createProject = useCallback(() => nav('/?new=project'), [nav])
 
   useKeyboardShortcuts({
     onSearch: openPalette,
     onShowHelp: () => setShortcutsHelpOpen(v => !v),
     onSwitchProject: openProjectSwitcher,
+    onCreateTask: createTaskHere,
+    onCreateProject: createProject,
     navigate: nav,
   })
 
@@ -185,7 +200,7 @@ function Layout() {
           </Suspense>
         </div>
       </main>
-      <CommandPalette open={paletteOpen} onClose={closePalette} mode={paletteMode} />
+      <CommandPalette open={paletteOpen} onClose={closePalette} mode={paletteMode} intent={paletteIntent} />
       <NotificationCenter />
       <AssistantPanel />
       <PWAInstallPrompt />
@@ -195,24 +210,24 @@ function Layout() {
   )
 }
 
+// ErrorBoundary and ToastProvider are mounted once, in main.jsx — they wrap the
+// QueryClientProvider whose MutationCache.onError pushes through globalAddToast.
+// Mounting a second ToastProvider here gave the app two toast stacks and let the
+// inner one silently take over the global bridge.
 export default function App() {
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
-        <ThemeProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <Suspense fallback={<LoadingSpinner />}>
-                <Routes>
-                  <Route path="/share/n/:token" element={<ShareView />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/*" element={<IdentityFocusProvider><Layout /></IdentityFocusProvider>} />
-                </Routes>
-              </Suspense>
-            </ToastProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </BrowserRouter>
-    </ErrorBoundary>
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              <Route path="/share/n/:token" element={<ShareView />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/*" element={<IdentityFocusProvider><Layout /></IdentityFocusProvider>} />
+            </Routes>
+          </Suspense>
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   )
 }

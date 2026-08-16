@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Bookmark, CheckSquare, Download, SlidersHorizontal, Upload } from 'lucide-react'
 import { DARK } from '../../constants/theme'
 import s from './TaskFiltersPanel.module.css'
@@ -24,11 +25,22 @@ export default function TaskFiltersPanel({
   onSaveFilter,
   bulkMode,
   onToggleBulk,
+  showBulk = true,
   onExport,
   showImport,
   onToggleImport,
 }) {
   const { status, priority, label, assignee, due, agent } = filters
+  const [naming, setNaming] = useState(false)
+  const [viewName, setViewName] = useState('')
+
+  const commitSavedView = () => {
+    const name = viewName.trim()
+    if (!name) return
+    onSaveFilter(name)
+    setViewName('')
+    setNaming(false)
+  }
 
   return (
     <>
@@ -53,27 +65,55 @@ export default function TaskFiltersPanel({
               ))}
             </select>
           )}
-          {/* Save current filter */}
+          {/* Save current filter. Naming a view is a real form field, so it is
+              one here rather than a native window.prompt: unthemed, unvalidated
+              and hardcoded English regardless of locale. */}
           {activeFilterCount > 0 && (
-            <button
-              onClick={onSaveFilter}
-              title="Save current filter"
-              style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}
-            >
-              <Bookmark size={11} /> Save
-            </button>
+            naming ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <input
+                  value={viewName}
+                  autoFocus
+                  onChange={e => setViewName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitSavedView()
+                    if (e.key === 'Escape') { setNaming(false); setViewName('') }
+                  }}
+                  placeholder="View name…"
+                  aria-label="View name"
+                  className={s.searchInput}
+                />
+                <button
+                  onClick={commitSavedView}
+                  disabled={!viewName.trim()}
+                  style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, fontSize: 11, opacity: viewName.trim() ? 1 : 0.4 }}
+                >
+                  Save
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setNaming(true)}
+                title="Save current filter"
+                style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}
+              >
+                <Bookmark size={11} /> Save
+              </button>
+            )
           )}
           {/* Bulk mode toggle */}
-          <button
-            onClick={onToggleBulk}
-            style={{
-              background: bulkMode ? 'rgba(250,204,21,0.12)' : 'none',
-              border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
-              color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
-            }}
-          >
-            <CheckSquare size={11} /> Bulk
-          </button>
+          {showBulk && (
+            <button
+              onClick={onToggleBulk}
+              style={{
+                background: bulkMode ? 'rgba(250,204,21,0.12)' : 'none',
+                border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
+                color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
+              }}
+            >
+              <CheckSquare size={11} /> Bulk
+            </button>
+          )}
           {/* Export */}
           <button
             onClick={onExport}

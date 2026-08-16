@@ -461,3 +461,46 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.55; transform: scale(0.92); }
 }
+
+/* ── Narrow screens ──
+   This is the densest page in the app and had no breakpoint at all: fixed
+   column widths plus a non-wrapping tab row overflowed the viewport sideways.
+   The rule here is to drop what is secondary rather than shrink everything —
+   the ID and Priority columns go, the tab row scrolls instead of wrapping. */
+@media (max-width: 640px) {
+  .headerDesktop {
+    padding: 12px 12px 0;
+  }
+
+  /* Tabs scroll on their own axis so the page body never does. */
+  .tabRow {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabRow::-webkit-scrollbar {
+    display: none;
+  }
+  .tab {
+    padding: 10px 12px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  /* The list keeps title + due date; the rest is noise at this width. */
+  .colHeaderId,
+  .colHeaderPriority,
+  .colSpacer88 {
+    display: none;
+  }
+  .tableHeader {
+    padding: 0 12px;
+    gap: 6px;
+  }
+  .colHeaderDue {
+    min-width: 56px;
+  }
+
+  .emptyState {
+    padding: 32px 16px;
+  }
+}
