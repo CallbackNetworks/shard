@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { alpha } from '../../utils/color'
 
 export default function WaffleChart({ segments = [], total, cols = 10, cellSize = 14, gap = 2 }) {
   const [hover, setHover] = useState(null)
@@ -34,7 +35,7 @@ export default function WaffleChart({ segments = [], total, cols = 10, cellSize 
               x={col * (cellSize + gap)}
               y={row * (cellSize + gap)}
               width={cellSize} height={cellSize} rx={2}
-              fill={isHov ? cell.color : cell.color + (cell.segIdx >= 0 ? 'cc' : '')}
+              fill={isHov || cell.segIdx < 0 ? cell.color : alpha(cell.color, 80)}
               stroke={isHov ? 'var(--kt-ink)' : 'none'} strokeWidth={isHov ? 0.5 : 0}
               onMouseEnter={() => setHover(cell.segIdx)}
               onMouseLeave={() => setHover(null)}

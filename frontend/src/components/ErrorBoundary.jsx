@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import i18n from '../i18n'
 import { DARK } from '../constants/theme'
 
 export default class ErrorBoundary extends Component {
@@ -25,14 +26,14 @@ export default class ErrorBoundary extends Component {
           justifyContent: 'center',
           height: '100vh',
           background: DARK.bg,
-          color: '#e2e8f0',
+          color: DARK.text,
           gap: 16,
           padding: 24,
           textAlign: 'center',
         }}>
           <div style={{ fontSize: 32 }}>⚠️</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Something went wrong</div>
-          <div style={{ fontSize: 13, color: '#64748b', maxWidth: 480 }}>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>{i18n.t('errorBoundary.title')}</div>
+          <div style={{ fontSize: 13, color: DARK.textMid, maxWidth: 480 }}>
             {this.state.error.message}
           </div>
           <button
@@ -48,7 +49,7 @@ export default class ErrorBoundary extends Component {
               fontSize: 14,
             }}
           >
-            Reload page
+            {i18n.t('errorBoundary.reload')}
           </button>
         </div>
       )

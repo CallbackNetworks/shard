@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Square, Clock } from 'lucide-react'
 import { DARK } from '../constants/theme'
 import { formatMinutes } from '../utils/formatTime'
+import { useTranslation } from 'react-i18next'
 
 export default function TimeTracker({ task, onUpdate }) {
+  const { t } = useTranslation()
   const [running, setRunning] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const intervalRef = useRef(null)
@@ -57,7 +59,7 @@ export default function TimeTracker({ task, onUpdate }) {
         <>
           <button
             onClick={(e) => { e.stopPropagation(); stop() }}
-            title="Stop timer"
+            title={t('timeTracker.stop')}
             style={{
               background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)',
               borderRadius: 4, padding: '1px 3px', cursor: 'pointer', display: 'inline-flex',
@@ -74,7 +76,7 @@ export default function TimeTracker({ task, onUpdate }) {
         <>
           <button
             onClick={(e) => { e.stopPropagation(); start() }}
-            title="Start timer"
+            title={t('timeTracker.start')}
             style={{
               background: 'transparent', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)',
               borderRadius: 4, padding: '1px 3px', cursor: 'pointer', display: 'inline-flex',

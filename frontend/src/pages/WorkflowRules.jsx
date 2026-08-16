@@ -404,7 +404,7 @@ export default function WorkflowRules() {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
-                    <span className="kt-chip" style={{ color: DARK.success, background: 'rgba(250,204,21,0.1)' }}>
+                    <span className="kt-chip" style={{ color: DARK.success, background: DARK.successBg }}>
                       when: {triggerLabel(rule.trigger, t)}
                     </span>
                     {/* The rule read back, not its JSON transcribed. `title` keeps the
@@ -416,7 +416,7 @@ export default function WorkflowRules() {
                       </span>
                     ))}
                     {(rule.actions || []).map((a, i) => (
-                      <span key={i} className="kt-chip" title={`${a.type} ${a.value}`} style={{ color: DARK.success, background: 'rgba(250,204,21,0.1)' }}>
+                      <span key={i} className="kt-chip" title={`${a.type} ${a.value}`} style={{ color: DARK.success, background: DARK.successBg }}>
                         → {actionLabel(a.type, t)}: {valueLabel(a.value, actionValues[a.type])}
                       </span>
                     ))}

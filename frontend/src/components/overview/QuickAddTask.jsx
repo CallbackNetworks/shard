@@ -2,9 +2,11 @@ import { useState, useCallback } from 'react'
 import { createTask } from '../../api/client'
 import { useInvalidatingMutation } from '../../hooks/useCrudMutations'
 import s from './QuickAddTask.module.css'
+import { useTranslation } from 'react-i18next'
 
 /** Inline task creator shown on overview project cards. */
 export default function QuickAddTask({ projectId }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const addMut = useInvalidatingMutation({
@@ -31,7 +33,7 @@ export default function QuickAddTask({ projectId }) {
         value={title}
         onChange={e => setTitle(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setOpen(false) }}
-        placeholder="Task title..."
+        placeholder={t('overview.taskTitlePlaceholder')}
         autoFocus
         className={s.input}
       />

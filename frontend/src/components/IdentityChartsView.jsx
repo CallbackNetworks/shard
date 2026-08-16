@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import DonutChart from './charts/DonutChart'
 import EmptyState from './shared/EmptyState'
 import TabBar from './shared/TabBar'
-import { STATUS_COLOR } from '../constants/theme'
+import { STATUS_COLOR, PRIORITY } from '../constants/theme'
 import StatCard from './charts/StatCard'
 
 const HeatmapChart = lazy(() => import('./charts/HeatmapChart'))
@@ -219,12 +219,12 @@ function buildTreesByStatus(data) {
   })).filter(s => s.children.length > 0)
 }
 
-function buildTreesByPriority(data) {
-  const priorities = [
-    { key: 'high', label: 'HIGH', color: '#facc15' },
-    { key: 'medium', label: 'MEDIUM', color: '#f59e0b' },
-    { key: 'low', label: 'LOW', color: '#9ca3af' },
-  ]
+function buildTreesByPriority(data, t) {
+  const priorities = ['high', 'medium', 'low'].map(key => ({
+    key,
+    label: t(PRIORITY[key].labelKey).toUpperCase(),
+    color: PRIORITY[key].color,
+  }))
   return priorities.map(pri => ({
     id: `pri-${pri.key}`,
     label: pri.label,
@@ -285,9 +285,9 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
   const trees = useMemo(() => {
     if (!data) return []
     if (perspective === 'status') return buildTreesByStatus(data)
-    if (perspective === 'priority') return buildTreesByPriority(data)
+    if (perspective === 'priority') return buildTreesByPriority(data, t)
     return buildTreesByIdentity(data)
-  }, [data, perspective])
+  }, [data, perspective, t])
 
   const radarAxes = [
     { key: 'completion', label: t('hub.completionRate') },

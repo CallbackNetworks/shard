@@ -1,6 +1,8 @@
 import { memo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { PRIORITY, STATUS_COLOR } from '../constants/theme'
+import { alpha } from '../utils/color'
 import { getNodeTypes } from '../api/client'
 
 // Badge for a user-defined task-like type (ADR-0035). Built-in "task" nodes show
@@ -25,11 +27,45 @@ export const TypeBadge = memo(function TypeBadge({ type }) {
 })
 
 export const PriorityIcon = memo(function PriorityIcon({ priority }) {
-  const icons = { high: '\u25B2', medium: '\u25A0', low: '\u25BC' }
+  // The glyph lives in PRIORITY beside the colour so the shape and the hue
+  // cannot drift apart; the shape is what carries the order without colour.
+  const { t } = useTranslation()
   const c = PRIORITY[priority] || PRIORITY.medium
   return (
-    <span style={{ color: c.color, fontSize: 9, width: 14, textAlign: 'center', flexShrink: 0 }}>
-      {icons[priority] || '\u25A0'}
+    <span
+      title={t(c.labelKey)}
+      style={{ color: c.color, fontSize: 9, width: 14, textAlign: 'center', flexShrink: 0 }}
+    >
+      {c.icon}
+    </span>
+  )
+})
+
+/**
+ * The one priority chip. `weight` (solid / outline / ghost) plus the ▲■▼ glyph
+ * carry the ordinal, so "high" reads as louder than "medium" even where the two
+ * colours cannot be told apart — printed, dimmed, or by a colour-blind reader.
+ * Before this the two were adjacent ambers at identical weight (ADR-0088).
+ */
+export const PriorityChip = memo(function PriorityChip({ priority, compact = false, className }) {
+  const { t } = useTranslation()
+  const p = PRIORITY[priority] || PRIORITY.medium
+  const solid = p.weight === 'solid'
+  const ghost = p.weight === 'ghost'
+  return (
+    <span className={className} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+      fontSize: compact ? 10 : 11,
+      padding: compact ? '1px 5px' : '2px 7px',
+      borderRadius: 4,
+      color: p.color,
+      background: ghost ? 'transparent' : p.bg,
+      border: ghost ? '1px solid transparent' : `1px solid ${alpha(p.color, solid ? 45 : 22)}`,
+      fontWeight: solid ? 700 : 500,
+      letterSpacing: solid ? 0.2 : 0,
+    }}>
+      <span aria-hidden="true" style={{ fontSize: compact ? 7 : 8 }}>{p.icon}</span>
+      {t(p.labelKey)}
     </span>
   )
 })
@@ -39,7 +75,9 @@ export const StatusIcon = memo(function StatusIcon({ status }) {
   if (status === 'done') return (
     <svg width={size} height={size} viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
       <circle cx="7" cy="7" r="6.5" fill={STATUS_COLOR.done} />
-      <polyline points="4,7 6.5,9.5 10,5" fill="none" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Knocked out of the page background, not black: in light mode the
+          filled circle is a dark green and a black tick vanishes into it. */}
+      <polyline points="4,7 6.5,9.5 10,5" fill="none" stroke="var(--kt-bg, #171717)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
   if (status === 'in_progress') return (

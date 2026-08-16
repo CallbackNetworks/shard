@@ -63,6 +63,7 @@ export const DEFAULT_UI_PREFS = {
   accent: 'amber',
   displayFont: 'anton',
   uiScale: 1.0,
+  railExpanded: true, // rail shows labels and reserves its own gutter
   sidebarHidden: [], // list of nav `to` paths to hide
   sidebarOrder: [], // list of nav `to` paths giving explicit order
   timeFormat: '24h',
@@ -130,6 +131,9 @@ export function applyUiPrefs(prefs = current) {
   try {
     const root = document.documentElement
     root.setAttribute('data-motion', prefs.reduceMotion ? 'reduced' : 'full')
+    // Drives --rail-w, which sizes the rail *and* the gutter the layout keeps
+    // for it, so an expanded rail can never sit on top of the page (ADR-0088).
+    root.setAttribute('data-rail', prefs.railExpanded ? 'expanded' : 'collapsed')
     const accent = resolveAccent(prefs)
     root.style.setProperty('--accent-dark', accent.main)
     root.style.setProperty('--accent-2-dark', accent.deep)

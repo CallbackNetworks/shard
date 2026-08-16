@@ -5,18 +5,27 @@
 export const BRAND = 'var(--kt-hit, #facc15)'
 export const BRAND_2 = 'var(--accent-2, #eab308)'
 
+// Status, priority and the brand accent are three separate colour families and
+// none of them shares a hue with another (ADR-0088). in_progress used to be the
+// brand amber #facc15 — the same value as PRIORITY.high and every CTA — so one
+// yellow in a task row carried three unrelated meanings.
+//
+// Like DARK below, these resolve through the theme-aware --kt-* variables (both
+// themes are declared in global.css) so a value stays legible on white. The
+// literal fallbacks are the dark-mode shades. `var()` resolves in SVG
+// presentation attributes too, which is how the charts consume them.
 export const STATUS_COLOR = {
-  todo: '#737373',
-  in_progress: '#facc15',
-  done: '#34d399',
-  failed: '#fb7185',
+  todo: 'var(--kt-status-todo, #9ca3af)',
+  in_progress: 'var(--kt-status-progress, #60a5fa)',
+  done: 'var(--kt-status-done, #34d399)',
+  failed: 'var(--kt-status-failed, #fb7185)',
 }
 
 export const STATUS_BG = {
-  todo: 'rgba(115,115,115,0.14)',
-  in_progress: 'rgba(250,204,21,0.12)',
-  done: 'rgba(52,211,153,0.12)',
-  failed: 'rgba(251,113,133,0.12)',
+  todo: 'var(--kt-status-todo-bg, rgba(156,163,175,0.14))',
+  in_progress: 'var(--kt-status-progress-bg, rgba(96,165,250,0.14))',
+  done: 'var(--kt-status-done-bg, rgba(52,211,153,0.14))',
+  failed: 'var(--kt-status-failed-bg, rgba(251,113,133,0.14))',
 }
 
 export const SHADOW_SM = '0 1px 2px rgba(0,0,0,0.3)'
@@ -44,12 +53,12 @@ export const DARK = {
   active:    'rgba(var(--kt-ink-rgb, 255, 255, 255), 0.08)',
   danger:    STATUS_COLOR.failed,
   dangerBg:  STATUS_BG.failed,
-  warning:   '#f59e0b',
-  warningBg: 'rgba(245,158,11,0.12)',
+  warning:   'var(--kt-warning, #f59e0b)',
+  warningBg: 'var(--kt-warning-bg, rgba(245,158,11,0.12))',
   success:   STATUS_COLOR.done,
   successBg: STATUS_BG.done,
-  info:      '#3b82f6',
-  infoBg:    'rgba(59,130,246,0.12)',
+  info:      'var(--kt-info, #60a5fa)',
+  infoBg:    'var(--kt-info-bg, rgba(96,165,250,0.12))',
 }
 
 export const SPACE = {
@@ -95,18 +104,24 @@ export const RADIUS = {
 }
 
 export const STATUS_COLS = [
-  { key: 'todo',        label: 'Todo',        color: STATUS_COLOR.todo, bg: STATUS_BG.todo },
-  { key: 'in_progress', label: 'In Progress', color: STATUS_COLOR.in_progress, bg: STATUS_BG.in_progress },
-  { key: 'done',        label: 'Done',        color: STATUS_COLOR.done, bg: STATUS_BG.done },
-  { key: 'failed',      label: 'Failed',      color: STATUS_COLOR.failed, bg: STATUS_BG.failed },
+  { key: 'todo',        label: 'Todo',        labelKey: 'todo',       color: STATUS_COLOR.todo, bg: STATUS_BG.todo },
+  { key: 'in_progress', label: 'In Progress', labelKey: 'inProgress', color: STATUS_COLOR.in_progress, bg: STATUS_BG.in_progress },
+  { key: 'done',        label: 'Done',        labelKey: 'done',       color: STATUS_COLOR.done, bg: STATUS_BG.done },
+  { key: 'failed',      label: 'Failed',      labelKey: 'failed',     color: STATUS_COLOR.failed, bg: STATUS_BG.failed },
 ]
 
 export const STATUS_MAP = Object.fromEntries(STATUS_COLS.map(s => [s.key, s]))
 
+// Priority is ordinal, so it is drawn as a ramp rather than three equal hues:
+// `weight` picks the chip treatment (solid / outline / ghost) and the ▲■▼ icon
+// carries the order without colour at all. high #facc15 and medium #f59e0b were
+// adjacent ambers — the two were not tellable apart in a row.
+// `labelKey` is the translation key; `label` stays as the fallback for the few
+// callers that build a chart series outside a component and have no `t`.
 export const PRIORITY = {
-  high:   { label: 'High',   color: '#facc15', bg: 'rgba(250,204,21,0.12)', icon: '▲' },
-  medium: { label: 'Medium', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', icon: '■' },
-  low:    { label: 'Low',    color: '#6b7280', bg: 'rgba(107,114,128,0.12)', icon: '▼' },
+  high:   { label: 'High',   labelKey: 'high',   color: 'var(--kt-prio-high, #fb923c)',   bg: 'var(--kt-prio-high-bg, rgba(251,146,60,0.16))',    icon: '▲', weight: 'solid' },
+  medium: { label: 'Medium', labelKey: 'medium', color: 'var(--kt-prio-medium, #9ca3af)', bg: 'var(--kt-prio-medium-bg, rgba(156,163,175,0.10))', icon: '■', weight: 'outline' },
+  low:    { label: 'Low',    labelKey: 'low',    color: 'var(--kt-prio-low, #6b7280)',    bg: 'var(--kt-prio-low-bg, rgba(107,114,128,0.08))',    icon: '▼', weight: 'ghost' },
 }
 
 export const LIGHT = {
@@ -126,12 +141,12 @@ export const LIGHT = {
   active:    'rgba(0,0,0,0.06)',
   danger:    STATUS_COLOR.failed,
   dangerBg:  STATUS_BG.failed,
-  warning:   '#d97706',
-  warningBg: 'rgba(217,119,6,0.08)',
+  warning:   'var(--kt-warning, #b45309)',
+  warningBg: 'var(--kt-warning-bg, rgba(180,83,9,0.10))',
   success:   STATUS_COLOR.done,
   successBg: STATUS_BG.done,
-  info:      '#2563eb',
-  infoBg:    'rgba(37,99,235,0.08)',
+  info:      'var(--kt-info, #1d4ed8)',
+  infoBg:    'var(--kt-info-bg, rgba(29,78,216,0.10))',
 }
 
 export const FORM_INPUT = {
@@ -156,17 +171,17 @@ export const LABEL_PALETTE = [
 
 // Goal status chips (Goals page).
 export const GOAL_STATUS_COLORS = {
-  active:    { bg: 'rgba(250,204,21,0.14)', color: BRAND },
-  completed: { bg: 'rgba(250,204,21,0.12)', color: BRAND },
-  cancelled: { bg: 'rgba(250,204,21,0.12)', color: DARK.danger },
+  active:    { bg: STATUS_BG.in_progress, color: STATUS_COLOR.in_progress },
+  completed: { bg: STATUS_BG.done,        color: STATUS_COLOR.done },
+  cancelled: { bg: STATUS_BG.todo,        color: STATUS_COLOR.todo },
 }
 
 // ADR decision status chips (Decisions page).
 export const DECISION_STATUS_COLORS = {
-  proposed: { bg: 'rgba(250,204,21,0.15)', color: BRAND, border: `1px dashed ${BRAND}` },
-  accepted: { bg: 'rgba(250,204,21,0.12)', color: BRAND, border: `1px solid ${BRAND}` },
-  deprecated: { bg: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: '1px solid #94a3b8' },
-  superseded: { bg: 'rgba(250,204,21,0.12)', color: BRAND, border: `1px solid ${BRAND}` },
+  proposed:   { bg: STATUS_BG.in_progress, color: STATUS_COLOR.in_progress, border: `1px dashed ${STATUS_COLOR.in_progress}` },
+  accepted:   { bg: STATUS_BG.done,        color: STATUS_COLOR.done,        border: `1px solid ${STATUS_COLOR.done}` },
+  deprecated: { bg: STATUS_BG.todo,        color: STATUS_COLOR.todo,        border: `1px solid ${STATUS_COLOR.todo}` },
+  superseded: { bg: STATUS_BG.todo,        color: STATUS_COLOR.todo,        border: `1px dashed ${STATUS_COLOR.todo}` },
 }
 
 // Webhook delivery status chips/dots (Integrations page).

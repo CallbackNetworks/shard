@@ -3,8 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, ExternalLink, GitPullRequestArrow, Boxes } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { regenerateToken, createExternalIssue } from '../api/client'
-import { PRIORITY, DARK } from '../constants/theme'
-import { PriorityIcon, StatusIcon, LabelChip, PrBadge, TypeBadge } from './TaskIcons'
+import { DARK } from '../constants/theme'
+import { PriorityIcon, PriorityChip, StatusIcon, LabelChip, PrBadge, TypeBadge } from './TaskIcons'
 import TaskEditForm from './TaskEditForm'
 import CommentsPanel from './CommentsPanel'
 import DependenciesPanel from './DependenciesPanel'
@@ -114,7 +114,6 @@ export default memo(function IssueRow({
   })
 
   const issueId = `${(projectCode || 'TSK')}-${task.id.slice(-4).toUpperCase()}`
-  const p = PRIORITY[task.priority] || PRIORITY.medium
   const labels = task.labels || []
   const subtaskCount = task.subtask_count || 0
   const subtasks = allTasks.filter(t => t.parent_id === task.id)
@@ -168,7 +167,7 @@ export default memo(function IssueRow({
         <PriorityIcon priority={task.priority} />
         <StatusIcon status={task.status} />
 
-        <span style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.22)', fontFamily: 'monospace', minWidth: 64, flexShrink: 0 }}>
+        <span className="kt-issue-id" style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.22)', fontFamily: 'monospace', minWidth: 64, flexShrink: 0 }}>
           {issueId}
         </span>
 
@@ -177,8 +176,8 @@ export default memo(function IssueRow({
           <Pin size={11} style={{ color: DARK.warning, flexShrink: 0, transform: 'rotate(45deg)' }} />
         )}
 
-        <span style={{
-          flex: 1, fontSize: 13,
+        <span title={task.title} style={{
+          flex: 1, minWidth: 0, fontSize: 13,
           color: task.status === 'done' ? 'rgba(var(--kt-ink-rgb), 0.25)' : DARK.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           textDecoration: task.status === 'done' ? 'line-through' : 'none',
@@ -319,30 +318,26 @@ export default memo(function IssueRow({
         )}
 
         {/* Time tracking */}
-        <TimeTracker task={task} onUpdate={onUpdate} />
+        <span className="kt-issue-time" style={{ display: 'inline-flex', flexShrink: 0 }}>
+          <TimeTracker task={task} onUpdate={onUpdate} />
+        </span>
 
         <DueDateCell task={task} hovered={hovered} onUpdate={onUpdate} />
 
-        <span style={{
-          fontSize: 11, color: p.color, background: p.bg,
-          padding: '2px 7px', borderRadius: 4, fontWeight: 500, flexShrink: 0,
-          border: `1px solid ${p.color}33`,
-        }}>
-          {p.label}
-        </span>
+        <PriorityChip priority={task.priority} className="kt-issue-prio" />
 
         {hovered ? (
           <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
             {task.description && (
-              <button onClick={(e) => { e.stopPropagation(); setShowDescription(v => !v) }} title="Toggle description" style={{ background: showDescription ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDescription ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              <button onClick={(e) => { e.stopPropagation(); setShowDescription(v => !v) }} title={t('issue.toggleDescription')} style={{ background: showDescription ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDescription ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
                 <FileText size={12} />
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setShowComments(v => !v) }} title="Comments"
+            <button onClick={(e) => { e.stopPropagation(); setShowComments(v => !v) }} title={t('issue.comments')}
               style={{ background: showComments ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showComments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <MessageSquare size={12} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); setShowDeps(v => !v) }} title="Dependencies"
+            <button onClick={(e) => { e.stopPropagation(); setShowDeps(v => !v) }} title={t('issue.dependencies')}
               style={{ background: showDeps ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDeps ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <GitBranch size={12} />
             </button>
@@ -350,19 +345,19 @@ export default memo(function IssueRow({
               style={{ background: showMembership ? 'rgba(129,140,248,0.14)' : 'none', border: 'none', cursor: 'pointer', color: showMembership ? '#818cf8' : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Boxes size={12} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); setShowRecurrence(v => !v) }} title="Recurrence"
+            <button onClick={(e) => { e.stopPropagation(); setShowRecurrence(v => !v) }} title={t('issue.recurrence')}
               style={{ background: showRecurrence ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showRecurrence ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Repeat2 size={12} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); setShowAttachments(v => !v) }} title="Attachments"
+            <button onClick={(e) => { e.stopPropagation(); setShowAttachments(v => !v) }} title={t('issue.attachments')}
               style={{ background: showAttachments ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showAttachments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Paperclip size={12} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); setShowBuildHistory(v => !v) }} title="Build History"
+            <button onClick={(e) => { e.stopPropagation(); setShowBuildHistory(v => !v) }} title={t('issue.buildHistory')}
               style={{ background: showBuildHistory ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showBuildHistory ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Activity size={12} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); setShowWebhook(v => !v) }} title="Webhook setup"
+            <button onClick={(e) => { e.stopPropagation(); setShowWebhook(v => !v) }} title={t('issue.webhookSetup')}
               style={{ background: showWebhook ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showWebhook ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Link2 size={12} />
             </button>
@@ -381,15 +376,15 @@ export default memo(function IssueRow({
               <button
                 onClick={(e) => { e.stopPropagation(); createIssueMut.mutate() }}
                 disabled={createIssueMut.isPending}
-                title="Create a linked issue in the project's repository"
+                title={t('issue.createExternal')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}
               >
                 <GitPullRequestArrow size={12} />
               </button>
             )}
             <button
-              onClick={(e) => { e.stopPropagation(); if (confirm('Regenerate webhook token? Old URLs will stop working.')) regenMut.mutate() }}
-              title="Regenerate webhook token"
+              onClick={(e) => { e.stopPropagation(); if (confirm(t('issue.regenerateToken') + '\n' + t('issue.regenerateConfirm'))) regenMut.mutate() }}
+              title={t('issue.regenerateToken')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}
             >
               <RefreshCw size={12} />
@@ -407,7 +402,7 @@ export default memo(function IssueRow({
             {onCreateSubtask && (
               <button
                 onClick={() => { setShowSubtaskForm(v => !v); setExpanded(true) }}
-                title="Add subtask"
+                title={t('issue.addSubtask')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', borderRadius: 4 }}
               >
                 <Plus size={12} />
@@ -418,8 +413,20 @@ export default memo(function IssueRow({
             </button>
           </div>
         ) : (
-          <div style={{ width: onCreateSubtask ? 130 : 108, flexShrink: 0 }} />
+          <div className="kt-issue-actions-spacer" style={{ width: onCreateSubtask ? 130 : 108, flexShrink: 0 }} />
         )}
+
+        {/* The toolbar above is hover-only, so on a touch device none of it —
+            including edit — was ever reachable. This one button is shown in
+            its place at the width where the spacer is dropped (ADR-0088). */}
+        <button
+          className="kt-issue-edit-touch"
+          onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+          aria-label={t('edit')}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: '2px 5px', flexShrink: 0 }}
+        >
+          <Pencil size={14} />
+        </button>
       </div>
 
       {/* Expanded description preview */}

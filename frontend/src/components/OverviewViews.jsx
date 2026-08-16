@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { DARK, STATUS_COLOR } from '../constants/theme'
+import { useTranslation } from 'react-i18next'
+import { DARK, STATUS_COLOR, PRIORITY } from '../constants/theme'
 import { formatMinutes } from '../utils/formatTime'
 import { formatTimestamp } from '../utils/datetime'
 import QuickAddTask from './overview/QuickAddTask'
@@ -26,9 +27,11 @@ const relativeTime = formatTimestamp
 // Pin storage moved to components/overview/pinnedProjects (re-exported for Dashboard).
 export { getPinnedIds, togglePin } from './overview/pinnedProjects'
 
-function formatDate(dateStr) {
+// The active i18n locale, not a hardcoded 'en': the whole page translates and
+// then printed "Jul 22" beside it (ADR-0088).
+function formatDate(dateStr, locale) {
   if (!dateStr) return null
-  return new Date(dateStr).toLocaleDateString('en', { month: 'short', day: 'numeric' })
+  return new Date(dateStr).toLocaleDateString(locale || undefined, { month: 'short', day: 'numeric' })
 }
 
 export function urgencyScore(project) {
@@ -218,10 +221,16 @@ export function ViewProgress({ projects, pinned, onTogglePin }) {
 
 /* ── ViewHealth ────────────────────────────────────────────────────── */
 export function ViewHealth({ projects, pinned, onTogglePin }) {
+  const { t } = useTranslation()
+  const legend = [
+    [STATUS_COLOR.done, t('overview.colDone')],
+    [STATUS_COLOR.in_progress, t('overview.colActive')],
+    [STATUS_COLOR.failed, t('overview.colFailed')],
+  ]
   return (
     <div style={{ paddingTop: 8 }}>
       <div style={{ display: 'flex', gap: 20, paddingBottom: 14, marginBottom: 4 }}>
-        {[[STATUS_COLOR.done, 'DONE'], [STATUS_COLOR.in_progress, 'ACTIVE'], [STATUS_COLOR.failed, 'FAILED']].map(([c, l]) => (
+        {legend.map(([c, l]) => (
           <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: DIM, fontWeight: 700, letterSpacing: '0.1em' }}>
             <span style={{ width: 12, height: 4, background: c, clipPath: PARA(4) }} />{l}
           </span>
@@ -235,7 +244,7 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
         const total   = p.total_tasks || 0
         const u       = urgencyScore(p)
         const color   = urgencyColor(u)
-        const uLabel  = u > 0.55 ? 'URGENT' : u > 0.28 ? 'WARNING' : u > 0.08 ? 'CAUTION' : 'HEALTHY'
+        const uLabel  = t(u > 0.55 ? 'overview.urgent' : u > 0.28 ? 'overview.warning' : u > 0.08 ? 'overview.caution' : 'overview.healthy')
         return (
           <GlassRow key={p.id} accentColor={color}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
@@ -276,10 +285,12 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
 
 /* ── ViewTasks ─────────────────────────────────────────────────────── */
 const STATUS_COLOR_MAP = STATUS_COLOR
-const STATUS_LABEL = { done: 'DONE', in_progress: 'ACTIVE', failed: 'FAILED', todo: 'TODO' }
-const PRI_COLOR    = { high: '#facc15', medium: '#f0b429', low: '#facc15' }
+const STATUS_LABEL_KEY = { done: 'done', in_progress: 'inProgress', failed: 'failed', todo: 'todo' }
 
 export function ViewTasks({ projects }) {
+  // `t` is the map callback's task in this file, so the translator is `tr`.
+  const { t: tr, i18n } = useTranslation()
+  const locale = i18n.language
   const [open, setOpen] = useState({})
   const [expandedTask, setExpandedTask] = useState(null)
   return (
@@ -363,15 +374,15 @@ export function ViewTasks({ projects }) {
                       {t.title}
                     </span>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-                      {isOverdue && <Label color={STATUS_COLOR.failed}>OVERDUE</Label>}
-                      <span style={{ fontSize: 10, fontWeight: 700, color: PRI_COLOR[t.priority] || DIM, letterSpacing: '0.06em' }}>
-                        {(t.priority || '').toUpperCase()}
+                      {isOverdue && <Label color={STATUS_COLOR.failed}>{tr('overview.overdueTag')}</Label>}
+                      <span style={{ fontSize: 10, fontWeight: 700, color: (PRIORITY[t.priority] || {}).color || DIM, letterSpacing: '0.06em' }}>
+                        {PRIORITY[t.priority] ? tr(PRIORITY[t.priority].labelKey) : t.priority}
                       </span>
                       <span style={{
                         fontSize: 10, fontWeight: 700, color: sc, letterSpacing: '0.06em',
                         minWidth: 48, textAlign: 'right',
                       }}>
-                        {STATUS_LABEL[t.status] || t.status}
+                        {STATUS_LABEL_KEY[t.status] ? tr(STATUS_LABEL_KEY[t.status]) : t.status}
                       </span>
                     </div>
                   </div>
@@ -395,10 +406,10 @@ export function ViewTasks({ projects }) {
                       {/* Metadata row */}
                       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: 11 }}>
                         {t.start_date && (
-                          <span style={{ color: DIM }}>Start: <span style={{ color: MID }}>{formatDate(t.start_date)}</span></span>
+                          <span style={{ color: DIM }}>{tr('overview.startLabel')} <span style={{ color: MID }}>{formatDate(t.start_date, locale)}</span></span>
                         )}
                         {t.due_date && (
-                          <span style={{ color: DIM }}>Due: <span style={{ color: isOverdue ? STATUS_COLOR.failed : MID }}>{formatDate(t.due_date)}</span></span>
+                          <span style={{ color: DIM }}>{tr('overview.dueLabel')} <span style={{ color: isOverdue ? STATUS_COLOR.failed : MID }}>{formatDate(t.due_date, locale)}</span></span>
                         )}
                         {t.progress_pct != null && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -447,7 +458,7 @@ export function ViewTasks({ projects }) {
                                   fontSize: 9, fontWeight: 700, color: sColor,
                                   letterSpacing: '0.06em', flexShrink: 0,
                                 }}>
-                                  {STATUS_LABEL[s.status] || s.status}
+                                  {STATUS_LABEL_KEY[s.status] ? tr(STATUS_LABEL_KEY[s.status]) : s.status}
                                 </span>
                               </div>
                             )
@@ -490,7 +501,8 @@ export function ViewTasks({ projects }) {
 
 /* ── ViewCompare ───────────────────────────────────────────────────── */
 export function ViewCompare({ projects }) {
-  const cols = ['TOTAL', 'DONE', 'ACT', 'FAIL', 'OVD', 'PCT']
+  const { t } = useTranslation()
+  const cols = ['overview.colTotal', 'overview.colDone', 'overview.colActive', 'overview.colFailed', 'overview.colOverdue', 'overview.colPct'].map(k => t(k))
   return (
     <div style={{ paddingTop: 8 }}>
       {/* Header */}
@@ -501,7 +513,7 @@ export function ViewCompare({ projects }) {
         clipPath: PARA_R(14),
         marginBottom: 4,
       }}>
-        <span style={{ fontSize: 9, color: DIM, letterSpacing: '0.14em', fontWeight: 800 }}>PROJECT</span>
+        <span style={{ fontSize: 9, color: DIM, letterSpacing: '0.14em', fontWeight: 800 }}>{t('overview.colProject')}</span>
         {cols.map(c => (
           <span key={c} style={{ fontSize: 9, color: DIM, letterSpacing: '0.12em', fontWeight: 800, textAlign: 'right' }}>{c}</span>
         ))}

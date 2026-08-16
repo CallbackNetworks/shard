@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { alpha } from '../../utils/color'
 
 export default function DonutChart({ segments = [], size = 120, strokeWidth = 10, centerText, centerSub }) {
   const [hover, setHover] = useState(null)
@@ -30,7 +31,7 @@ export default function DonutChart({ segments = [], size = 120, strokeWidth = 10
           key={i}
           cx={cx} cy={cy} r={radius}
           fill="none"
-          stroke={hover === i ? arc.color : arc.color + 'cc'}
+          stroke={hover === i ? arc.color : alpha(arc.color, 80)}
           strokeWidth={hover === i ? strokeWidth + 2 : strokeWidth}
           strokeDasharray={`${arc.arcLen} ${circumference - arc.arcLen}`}
           strokeDashoffset={arc.offset}

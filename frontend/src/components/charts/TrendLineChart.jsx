@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { alpha } from '../../utils/color'
 
 export default function TrendLineChart({ series = [], height = 200, showArea = false, showLegend = true }) {
   const [hoverX, setHoverX] = useState(null)
@@ -60,7 +61,7 @@ export default function TrendLineChart({ series = [], height = 200, showArea = f
               {showArea && (
                 <polygon
                   points={`${x(sorted[0].date)},${y(0)} ${points} ${x(sorted[sorted.length - 1].date)},${y(0)}`}
-                  fill={s.color + '18'}
+                  fill={alpha(s.color, 9)}
                 />
               )}
               <polyline points={points} fill="none" stroke={s.color} strokeWidth={1.5}

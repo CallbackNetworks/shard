@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { RefreshCw, ChevronDown, ChevronUp, ScrollText, Trash2 } from 'lucide-react'
 import { getAllDeliveries, getIntegrations, retryDelivery, purgeDeliveries } from '../api/client'
 import { DARK, DELIVERY_STATUS_TEXT as STATUS_COLORS } from '../constants/theme'
+import { alpha } from '../utils/color'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import EmptyState from '../components/shared/EmptyState'
@@ -29,7 +30,7 @@ function DeliveryRow({ delivery, integrationMap, isMobile }) {
         <td style={tdStyle}>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999,
-            background: `${STATUS_COLORS[delivery.status] || '#6b7280'}22`,
+            background: alpha(STATUS_COLORS[delivery.status] || '#6b7280', 13),
             color: STATUS_COLORS[delivery.status] || '#6b7280',
           }}>
             {delivery.status}

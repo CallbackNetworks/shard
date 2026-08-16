@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { alpha } from '../../utils/color'
 
 export default function StackedBarChart({ bars = [], segments = [], height = 220, horizontal = false }) {
   const [hover, setHover] = useState(null)
@@ -43,7 +44,7 @@ export default function StackedBarChart({ bars = [], segments = [], height = 220
                 const rect = (
                   <rect key={seg.key}
                     x={xOffset} y={y} width={w} height={barH} rx={i === 0 ? 3 : 0}
-                    fill={isHov ? seg.color : seg.color + 'bb'}
+                    fill={isHov ? seg.color : alpha(seg.color, 73)}
                   />
                 )
                 xOffset += w
@@ -118,7 +119,7 @@ export default function StackedBarChart({ bars = [], segments = [], height = 220
               return (
                 <rect key={seg.key}
                   x={x} y={yOffset} width={barW} height={h} rx={2}
-                  fill={isHov ? seg.color : seg.color + 'bb'}
+                  fill={isHov ? seg.color : alpha(seg.color, 73)}
                 />
               )
             })}

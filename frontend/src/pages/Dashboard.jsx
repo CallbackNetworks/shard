@@ -298,10 +298,7 @@ export default function Dashboard() {
         ) : (
           <div className={`${s.commandLayout} ${isMobile ? s.commandLayoutMobile : s.commandLayoutDesktop}`}>
             <div className={s.commandMainColumn}>
-              {w('command-hero') && <CommandHero
-                command={command}
-                onNewProject={() => setShowForm(true)}
-              />}
+              {w('command-hero') && <CommandHero command={command} />}
 
               {w('priority-wall') && <PriorityWall command={command} />}
 

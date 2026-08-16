@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { STATUS_COLS, PRIORITY, SHADOW_SM, SHADOW_LG, DARK } from '../constants/theme'
 import { TypeBadge } from './TaskIcons'
+import { alpha } from '../utils/color'
 
 function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOverlay }) {
   const { t } = useTranslation()
@@ -53,8 +54,8 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(250,204,21,0.12)', color: DARK.info,
-            border: '1px solid rgba(250,204,21,0.25)',
+            background: DARK.infoBg, color: DARK.info,
+            border: `1px solid ${alpha(DARK.info, 30)}`,
           }}>
             <Bot size={9} />
             {task.assigned_agent_name}
@@ -71,7 +72,7 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
       )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
         <span style={{ fontSize: 10, color: p.color, display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{ fontSize: 8 }}>{p.icon}</span> {p.label}
+          <span style={{ fontSize: 8 }}>{p.icon}</span> {t(p.labelKey)}
         </span>
         {hovered && !isDragOverlay ? (
           <div style={{ display: 'flex', gap: 2 }}>
@@ -158,12 +159,12 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
   return (
     <div key={colKey} style={{ width: 258, minWidth: 258, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', marginBottom: 2 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: overWip ? '#facc15' : colColor }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: overWip ? '#facc15' : DARK.text }}>{translatedLabel}</span>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: overWip ? DARK.warning : colColor }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: overWip ? DARK.warning : DARK.text }}>{translatedLabel}</span>
         <span style={{
           marginLeft: 'auto', fontSize: 11, padding: '1px 6px', borderRadius: 10,
-          background: overWip ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)',
-          color: overWip ? '#facc15' : 'rgba(var(--kt-ink-rgb), 0.35)',
+          background: overWip ? DARK.warningBg : 'rgba(var(--kt-ink-rgb), 0.06)',
+          color: overWip ? DARK.warning : 'rgba(var(--kt-ink-rgb), 0.35)',
           fontWeight: overWip ? 700 : 400,
         }}>
           {tasks.length}{wipLimit ? ` / ${wipLimit}` : ''}

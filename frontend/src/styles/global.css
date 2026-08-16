@@ -19,6 +19,38 @@
      rewrites --kt-display (see utils/uiPrefs.js). This is the default. */
   --kt-display: 'Anton', 'Bebas Neue', 'Impact', 'Arial Narrow', sans-serif;
   --kt-body: 'Inter', 'Arial Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* One width for the rail and for the gutter the layout reserves for it
+     (ADR-0088). They must be the same number: while the rail expanded on hover
+     it was `position: fixed` at 224px over a 72px gutter, so crossing the left
+     edge covered the first 150px of the page — page title, first tab, and the
+     start of every task row. `railExpanded` in uiPrefs sets data-rail. */
+  --rail-w: 224px;
+
+  /* Three colour families that never share a hue (ADR-0088):
+     the accent above is the brand, --kt-status-* is the state machine, and
+     --kt-prio-* is urgency. Amber used to be all three at once, so a row could
+     not say whether yellow meant "in progress", "high priority" or "button". */
+  --kt-status-todo: #9ca3af;
+  --kt-status-todo-bg: rgba(156, 163, 175, 0.14);
+  --kt-status-progress: #60a5fa;
+  --kt-status-progress-bg: rgba(96, 165, 250, 0.14);
+  --kt-status-done: #34d399;
+  --kt-status-done-bg: rgba(52, 211, 153, 0.14);
+  --kt-status-failed: #fb7185;
+  --kt-status-failed-bg: rgba(251, 113, 133, 0.14);
+  /* Priority is ordinal, so colour marks only the top of the ramp; medium and
+     low are carried by the ▲■▼ icon and the chip weight instead. */
+  --kt-prio-high: #fb923c;
+  --kt-prio-high-bg: rgba(251, 146, 60, 0.16);
+  --kt-prio-medium: #9ca3af;
+  --kt-prio-medium-bg: rgba(156, 163, 175, 0.10);
+  --kt-prio-low: #6b7280;
+  --kt-prio-low-bg: rgba(107, 114, 128, 0.08);
+  --kt-warning: #f59e0b;
+  --kt-warning-bg: rgba(245, 158, 11, 0.12);
+  --kt-info: #60a5fa;
+  --kt-info-bg: rgba(96, 165, 250, 0.12);
 }
 /* Light mode palette: must come after :root so equal-specificity override wins.
    --kt-hit falls back to a dark amber because #facc15 is illegible on white. */
@@ -36,6 +68,26 @@
   --kt-line: #e5e7eb;
   --kt-hover: rgba(0, 0, 0, 0.05);
   --kt-hit: var(--accent, #a16207);
+  /* The dark-tuned status hues score 1.5–2.7:1 on white — below even the 3:1
+     non-text floor. These are the same semantics at AA on #ffffff. */
+  --kt-status-todo: #4b5563;
+  --kt-status-todo-bg: rgba(75, 85, 99, 0.10);
+  --kt-status-progress: #1d4ed8;
+  --kt-status-progress-bg: rgba(29, 78, 216, 0.10);
+  --kt-status-done: #047857;
+  --kt-status-done-bg: rgba(4, 120, 87, 0.10);
+  --kt-status-failed: #be123c;
+  --kt-status-failed-bg: rgba(190, 18, 60, 0.10);
+  --kt-prio-high: #c2410c;
+  --kt-prio-high-bg: rgba(194, 65, 12, 0.12);
+  --kt-prio-medium: #4b5563;
+  --kt-prio-medium-bg: rgba(75, 85, 99, 0.08);
+  --kt-prio-low: #6b7280;
+  --kt-prio-low-bg: rgba(107, 114, 128, 0.07);
+  --kt-warning: #b45309;
+  --kt-warning-bg: rgba(180, 83, 9, 0.10);
+  --kt-info: #1d4ed8;
+  --kt-info-bg: rgba(29, 78, 216, 0.10);
 }
 html { background: var(--kt-bg); }
 body {
@@ -1185,11 +1237,14 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   position: relative;
   isolation: isolate;
 }
+:root[data-rail="collapsed"] {
+  --rail-w: 72px;
+}
 .kt-mini-rail {
   --rail-open: 224px;
   position: relative;
-  width: 72px;
-  min-width: 72px;
+  width: var(--rail-w);
+  min-width: var(--rail-w);
   height: 100vh;
   display: grid;
   /* brand / search / focus / modules / actions — only the module list scrolls,
@@ -1398,35 +1453,39 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
     z-index: 90;
     transition: width 0.2s cubic-bezier(.2,.8,.2,1), box-shadow 0.2s ease;
   }
-  /* A popover anchored to the rail outlives the pointer that opened it, so an
-     open menu holds the rail expanded rather than collapsing behind it. */
-  .kt-mini-rail:hover,
+  /* Expansion is an explicit, persisted choice, not a hover. A popover anchored
+     to the rail outlives the pointer that opened it, so an open menu also holds
+     it expanded — but it overlays only for as long as the menu is open. */
   .kt-mini-rail.is-menu-open {
     width: var(--rail-open);
     box-shadow: 14px 0 36px rgba(0,0,0,0.5);
   }
-  .kt-mini-rail:hover .kt-rail-label,
-  .kt-mini-rail:hover .kt-rail-kbd,
+  :root:not([data-rail="collapsed"]) .kt-rail-label,
+  :root:not([data-rail="collapsed"]) .kt-rail-kbd,
   .kt-mini-rail.is-menu-open .kt-rail-label,
   .kt-mini-rail.is-menu-open .kt-rail-kbd {
     opacity: 1;
     transform: none;
   }
-  .kt-mini-rail:hover .kt-rail-grouplabel,
+  :root:not([data-rail="collapsed"]) .kt-rail-grouplabel,
   .kt-mini-rail.is-menu-open .kt-rail-grouplabel {
     color: var(--kt-faint);
   }
-  .kt-mini-rail:hover .kt-rail-grouplabel::before,
+  :root:not([data-rail="collapsed"]) .kt-rail-grouplabel::before,
   .kt-mini-rail.is-menu-open .kt-rail-grouplabel::before {
     opacity: 0;
   }
 }
+/* Collapsed, the wordmark has no room; the logo alone keeps the brand row. */
+:root[data-rail="collapsed"] .kt-rail-word {
+  display: none;
+}
 .kt-mini-drawer {
   position: fixed;
-  left: 72px;
+  left: var(--rail-w);
   top: 0;
   bottom: 0;
-  width: min(320px, calc(100vw - 72px));
+  width: min(320px, calc(100vw - var(--rail-w)));
   z-index: 80;
   display: none;
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
@@ -1772,8 +1831,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   position: relative;
 }
 .layout-sidebar {
-  width: 72px;
-  min-width: 72px;
+  width: var(--rail-w);
+  min-width: var(--rail-w);
   flex-shrink: 0;
 }
 .kt-route-shell {
@@ -2380,29 +2439,30 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   overflow: hidden;
   border-bottom: 1px solid var(--kt-line);
   background: rgba(var(--kt-bg-rgb), 0.96);
-  color: #e0a13a;
+  color: var(--kt-warning);
   font-family: var(--kt-display);
   font-size: 12px;
   line-height: 24px;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
-.kt-alert-strip-track {
-  display: inline-flex;
+/* Static, not a marquee: at most three counters, and they fit. */
+.kt-alert-strip-list {
+  display: flex;
   align-items: center;
   gap: 26px;
-  min-width: 200%;
   height: 100%;
+  padding: 0 14px;
+  overflow: hidden;
   white-space: nowrap;
-  animation: kineticTicker 58s linear infinite;
 }
-.kt-alert-strip-track span {
+.kt-alert-strip-list span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   opacity: 0.85;
 }
-.kt-alert-strip-track span::after {
+.kt-alert-strip-list span::after {
   content: '';
   width: 3px;
   height: 3px;
@@ -2478,7 +2538,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-signal-timeline {
   position: fixed;
-  left: 72px;
+  left: var(--rail-w);
   right: 0;
   bottom: 0;
   z-index: 57;
@@ -2529,7 +2589,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   white-space: nowrap;
 }
 .kt-signal-timeline-head strong {
-  color: #ffffff;
+  color: var(--kt-ink);
   font-family: var(--kt-display);
   font-size: 22px;
   line-height: 0.85;
@@ -2537,7 +2597,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-signal-timeline-head em {
   flex-basis: 100%;
-  color: #737373;
+  color: var(--kt-faint);
   font-size: 8px;
   font-style: normal;
   letter-spacing: 0;
@@ -2562,7 +2622,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  color: #737373;
+  color: var(--kt-faint);
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -3700,9 +3760,6 @@ select[style*="border-radius"],
   :root:not([data-motion="full"]) .kt-ticker-track {
     animation: none !important;
   }
-  :root:not([data-motion="full"]) .kt-alert-strip-track {
-    animation: none !important;
-  }
   :root:not([data-motion="full"]) .kt-route-shell {
     animation: none !important;
   }
@@ -3718,7 +3775,6 @@ select[style*="border-radius"],
   transition-duration: 0.001ms !important;
 }
 :root[data-motion="reduced"] .kt-ticker-track,
-:root[data-motion="reduced"] .kt-alert-strip-track,
 :root[data-motion="reduced"] .kt-route-shell {
   animation: none !important;
 }
@@ -3794,9 +3850,19 @@ select[style*="border-radius"],
   .kt-heatscale {
     display: none;
   }
+  /* On a phone the rail is an off-canvas drawer, not a rack of icons: it is
+     always expanded, because a drawer you had to hover to read is unusable. */
+  :root,
+  :root[data-rail="collapsed"] {
+    --rail-w: 224px;
+  }
+  /* The drawer is off-canvas, so the fixed footer starts at the page edge. */
+  .kt-signal-timeline {
+    left: 0;
+  }
   .layout-sidebar {
     position: fixed !important;
-    left: -72px;
+    left: calc(-1 * var(--rail-w));
     top: 0;
     bottom: 0;
     z-index: 200;
@@ -3807,9 +3873,28 @@ select[style*="border-radius"],
     left: 0 !important;
     box-shadow: 4px 0 24px rgba(0,0,0,0.6);
   }
+  .kt-rail-label,
+  .kt-rail-kbd {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .kt-rail-grouplabel {
+    color: var(--kt-faint);
+  }
+  .kt-rail-grouplabel::before {
+    opacity: 0;
+  }
   .kt-mini-drawer {
-    left: 72px;
-    width: min(300px, calc(100vw - 72px));
+    left: var(--rail-w);
+    width: min(300px, calc(100vw - var(--rail-w)));
+  }
+  /* Three counters do not always fit 390px; scroll them rather than clip. */
+  .kt-alert-strip-list {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .kt-alert-strip-list::-webkit-scrollbar {
+    display: none;
   }
   .layout-main {
     margin-left: 0 !important;
@@ -3916,5 +4001,28 @@ select[style*="border-radius"],
   .kt-offline-indicator {
     bottom: 72px;
     max-width: calc(100vw - 32px);
+  }
+}
+
+/* ── Task row on a narrow screen (ADR-0088) ──
+   The row is a single non-wrapping flex line, so at 390px it laid out at its
+   ~862px min-content and got clipped with no scrollbar: the end of every title
+   was unreachable. The wrapper now shrinks (minWidth:0 in ProjectDetail) and
+   the two columns that repeat information already on the row drop out — the
+   monospace id, and the priority chip whose ▲■▼ icon stays at the row start. */
+/* The hover toolbar's placeholder alone reserved 130px of a 390px row for
+   buttons a touch device can never reveal. */
+.kt-issue-edit-touch {
+  display: none;
+}
+@media (max-width: 640px) {
+  .kt-issue-id,
+  .kt-issue-prio,
+  .kt-issue-time,
+  .kt-issue-actions-spacer {
+    display: none !important;
+  }
+  .kt-issue-edit-touch {
+    display: inline-flex;
   }
 }

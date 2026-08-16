@@ -6,9 +6,12 @@ import {
 // Single source of truth for the sidebar rail modules. Consumed by the
 // Sidebar for rendering and by the Settings page for show/hide + reorder.
 // Each item's `to` path is its stable identity used in user preferences.
+//
+// Group headings are keys, not literals: they were the only text in the rail
+// that never translated, so a zh-TW rail read OPERATE / THINK / BUILD.
 export const NAV_GROUPS = [
   {
-    label: 'Operate',
+    labelKey: 'nav.groupOperate',
     items: [
       { to: '/', icon: LayoutGrid, labelKey: 'nav.commandCenter', locked: true },
       { to: '/structure', icon: Network, labelKey: 'nav.structureMap' },
@@ -17,7 +20,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Think',
+    labelKey: 'nav.groupThink',
     items: [
       { to: '/goals', icon: Target, labelKey: 'nav.goals' },
       { to: '/decisions', icon: GitFork, labelKey: 'nav.decisions' },
@@ -26,7 +29,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Build',
+    labelKey: 'nav.groupBuild',
     items: [
       { to: '/integrations', icon: Zap, labelKey: 'nav.integrations' },
       { to: '/workflow-rules', icon: GitMerge, labelKey: 'nav.workflowRules' },
@@ -35,7 +38,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Graph',
+    labelKey: 'nav.groupData',
     items: [
       { to: '/unfiled', icon: Inbox, labelKey: 'nav.unfiled' },
       { to: '/containers', icon: Layers, labelKey: 'nav.containers' },
@@ -44,7 +47,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'System',
+    labelKey: 'nav.groupSystem',
     items: [
       { to: '/identities', icon: Users, labelKey: 'nav.identities' },
       { to: '/settings', icon: Settings2, labelKey: 'nav.settings', locked: true },

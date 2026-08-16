@@ -263,9 +263,9 @@ export default function Settings() {
         {NAV_GROUPS.map(group => {
           const ordered = orderGroupItems(group.items, uiPrefs.sidebarOrder)
           return (
-            <div key={group.label} style={{ marginBottom: 14 }}>
+            <div key={group.labelKey} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: DARK.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
-                {group.label}
+                {t(group.labelKey)}
               </div>
               {ordered.map((item, i) => {
                 const isHidden = uiPrefs.sidebarHidden.includes(item.to)

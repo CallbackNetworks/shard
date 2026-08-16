@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { alpha } from '../../utils/color'
 
 export default function AreaChart({ layers = [], height = 200 }) {
   const [hoverX, setHoverX] = useState(null)
@@ -70,7 +71,7 @@ export default function AreaChart({ layers = [], height = 200 }) {
           return (
             <polygon key={li}
               points={`${topPoints} ${bottomPoints}`}
-              fill={layer.color + '44'}
+              fill={alpha(layer.color, 27)}
               stroke={layer.color}
               strokeWidth={1}
               strokeLinejoin="round"
@@ -118,7 +119,7 @@ export default function AreaChart({ layers = [], height = 200 }) {
       <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
         {layers.map((l, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
-            <span style={{ width: 12, height: 8, borderRadius: 2, background: l.color + '88' }} />
+            <span style={{ width: 12, height: 8, borderRadius: 2, background: alpha(l.color, 53) }} />
             <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.5)' }}>{l.name}</span>
           </div>
         ))}

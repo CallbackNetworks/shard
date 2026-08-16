@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Bot, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { getAgentSummary } from '../api/client'
-import { DARK, STATUS_MAP, PRIORITY } from '../constants/theme'
+import { DARK, STATUS_MAP } from '../constants/theme'
+import { PriorityChip } from './TaskIcons'
 
 function StatusBar({ counts }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
@@ -106,24 +107,17 @@ function AgentCard({ agent, index }) {
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.06)' }}>
           {agent.tasks.map(task => {
             const sm = STATUS_MAP[task.status] || {}
-            const p = PRIORITY[task.priority] || PRIORITY.medium
             return (
               <div key={task.id} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '4px 0',
                 borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.04)',
               }}>
-                <span style={{ fontSize: 10, color: sm.color, flexShrink: 0 }}>{sm.label || task.status}</span>
+                <span style={{ fontSize: 10, color: sm.color, flexShrink: 0 }}>{sm.labelKey ? t(sm.labelKey) : task.status}</span>
                 <span style={{ flex: 1, fontSize: 12, color: '#d1d5db', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {task.title}
                 </span>
-                <span style={{
-                  fontSize: 10, color: p.color, background: p.bg,
-                  padding: '1px 5px', borderRadius: 4, flexShrink: 0,
-                  border: `1px solid ${p.color}33`,
-                }}>
-                  {p.label}
-                </span>
+                <PriorityChip priority={task.priority} compact />
               </div>
             )
           })}

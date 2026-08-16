@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useDeferredValue } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation, Trans } from 'react-i18next'
 import { ArrowLeft, Plus, Zap, Bot, Share2, Webhook } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
@@ -34,6 +35,7 @@ import s from './ProjectDetail.module.css'
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ProjectDetail() {
+  const { t } = useTranslation()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const { id } = useParams()
@@ -325,7 +327,7 @@ export default function ProjectDetail() {
     </div>
   )
 
-  if (!project) return <div className={s.notFound}>Project not found</div>
+  if (!project) return <div className={s.notFound}>{t('project.notFound')}</div>
 
   // The project's own colour first (ADR-0074). Falling back to a linked identity's
   // keeps every existing project looking the same, but 'first identity' is edge-creation
@@ -340,7 +342,7 @@ export default function ProjectDetail() {
           onClick={() => navigate('/')}
           className={s.backBtn}
         >
-          <ArrowLeft size={12} /> My Issues
+          <ArrowLeft size={12} /> {t('project.myIssues')}
         </button>
 
         <div className={s.headerRow}>
@@ -355,7 +357,7 @@ export default function ProjectDetail() {
             <div className={s.projectNameRow}>
               <h1 className={s.projectName}>{project.name}</h1>
               <span className={`${s.statusBadge} ${project.status === 'archived' ? s.statusArchived : s.statusActive}`}>
-                {project.status === 'archived' ? 'Archived' : 'Active'}
+                {project.status === 'archived' ? t('archived') : t('active')}
               </span>
             </div>
             {project.description && (
@@ -370,12 +372,12 @@ export default function ProjectDetail() {
 
           <div className={s.headerActions}>
             <div className={s.progressInfo}>
-              <div className={s.progressText}>{project.done_tasks}/{project.total_tasks} done</div>
+              <div className={s.progressText}>{project.done_tasks}/{project.total_tasks} {t('project.done')}</div>
               {/* Counts roll up the whole subtree (ADR-0065), so say when part of the
                   work is not on the list below — the sub-container panel names where. */}
               {project.total_tasks > project.direct_task_count && (
                 <div className={s.progressNote}>
-                  {project.total_tasks - project.direct_task_count} in sub-containers
+                  {t('project.inSubContainers', { count: project.total_tasks - project.direct_task_count })}
                 </div>
               )}
               <div className={s.progressBarTrack}>
@@ -388,20 +390,20 @@ export default function ProjectDetail() {
               onClick={() => setShareSettingsOpen(v => !v)}
               className={`${s.archiveBtn}${project.share_expires_at || project.share_pin_set ? ` ${s.archiveBtnActive}` : ''}`}
               title={[
-                project.share_pin_set ? 'PIN protected' : null,
-                project.share_expires_at ? `expires ${new Date(project.share_expires_at).toLocaleString()}` : null,
-              ].filter(Boolean).join(' · ') || 'Public share link, calendar feed, PIN, expiry and guest notes'}
+                project.share_pin_set ? t('project.sharePinProtected') : null,
+                project.share_expires_at ? t('project.shareExpires', { when: new Date(project.share_expires_at).toLocaleString() }) : null,
+              ].filter(Boolean).join(' · ') || t('project.shareHint')}
             >
               <Share2 size={12} />
-              Share
+              {t('project.share')}
             </button>
             <button
               onClick={() => setCicdOpen(v => !v)}
               className={`${s.archiveBtn}${cicdOpen ? ` ${s.archiveBtnActive}` : ''}`}
-              title="Push and build events from this project's repo (ADR-0082)"
+              title={t('project.cicdHint')}
             >
               <Webhook size={12} />
-              CI/CD
+              {t('project.cicd')}
             </button>
             <LabelManager
               labels={labels}
@@ -412,19 +414,19 @@ export default function ProjectDetail() {
               onClick={() => { setShowAgentInstr(v => !v); if (!agentInstrDirty) { setAgentInstr(project.agent_instructions || ''); setRepoUrl(project.repo_url || '') } }}
               className={`${s.agentBtn} ${showAgentInstr ? s.agentBtnActive : s.agentBtnInactive}`}
             >
-              <Bot size={12} /> Agent
+              <Bot size={12} /> {t('project.agent')}
             </button>
             <button
               onClick={() => archiveMut.mutate()}
               className={s.archiveBtn}
             >
-              {project.status === 'archived' ? 'Unarchive' : 'Archive'}
+              {project.status === 'archived' ? t('project.unarchive') : t('project.archive')}
             </button>
             <button
               onClick={() => setShowForm(v => !v)}
               className={s.newIssueBtn}
             >
-              <Plus size={13} /> New Issue
+              <Plus size={13} /> {t('project.newIssue')}
             </button>
           </div>
         </div>
@@ -435,12 +437,8 @@ export default function ProjectDetail() {
 
         {cicdOpen && (
           <div className={s.agentInstrPanel}>
-            <div className={s.agentInstrTitle}>CI/CD</div>
-            <div className={s.agentInstrDesc}>
-              Point your repo's webhooks at this project's own callback URL to see pushes and
-              build results here — a project has no build outcome to apply, so every event is
-              only recorded, never changes the project itself (ADR-0082).
-            </div>
+            <div className={s.agentInstrTitle}>{t('project.cicd')}</div>
+            <div className={s.agentInstrDesc}>{t('project.cicdHint')}</div>
             <WebhookPanel taskId={project.id} />
             <div style={{ marginTop: 12 }}>
               <BuildHistoryPanel taskId={project.id} />
@@ -450,24 +448,20 @@ export default function ProjectDetail() {
 
         {showAgentInstr && (
           <div className={s.agentInstrPanel}>
-            <div className={s.agentInstrTitle}>
-              Agent Instructions
-            </div>
-            <div className={s.agentInstrDesc}>
-              Instructions for AI agents working on this project. Agents can read these via the API.
-            </div>
+            <div className={s.agentInstrTitle}>{t('project.agentInstructions')}</div>
+            <div className={s.agentInstrDesc}>{t('project.agentInstructionsHint')}</div>
             <input
               type="text"
               value={repoUrl}
               onChange={e => { setRepoUrl(e.target.value); setAgentInstrDirty(true) }}
-              placeholder="Repository URL (optional), e.g. https://github.com/user/repo"
+              placeholder={t('project.repoUrlPlaceholder')}
               className={s.agentInstrTextarea}
               style={{ marginBottom: 8, height: 'auto', minHeight: 'unset', padding: '8px 10px' }}
             />
             <textarea
               value={agentInstr}
               onChange={e => { setAgentInstr(e.target.value); setAgentInstrDirty(true) }}
-              placeholder="e.g. Use conventional commit style for task titles. Always create subtasks for multi-step work."
+              placeholder={t('project.agentInstrPlaceholder')}
               rows={4}
               className={s.agentInstrTextarea}
             />
@@ -478,13 +472,13 @@ export default function ProjectDetail() {
                   disabled={saveAgentInstrMut.isPending}
                   className={s.agentInstrSaveBtn}
                 >
-                  {saveAgentInstrMut.isPending ? 'Saving...' : 'Save'}
+                  {saveAgentInstrMut.isPending ? t('saving') : t('save')}
                 </button>
                 <button
                   onClick={() => { setAgentInstr(project.agent_instructions || ''); setRepoUrl(project.repo_url || ''); setAgentInstrDirty(false) }}
                   className={s.agentInstrCancelBtn}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
               </div>
             )}
@@ -493,14 +487,14 @@ export default function ProjectDetail() {
 
         {/* Tabs */}
         <div className={s.tabRow}>
-          <button className={`${s.tab} ${tab === 'issues' ? s.tabActive : ''}`} onClick={() => setTab('issues')}>Issues</button>
-          <button className={`${s.tab} ${tab === 'board' ? s.tabActive : ''}`} onClick={() => setTab('board')}>Board</button>
-          <button className={`${s.tab} ${tab === 'timeline' ? s.tabActive : ''}`} onClick={() => setTab('timeline')}>Timeline</button>
-          <button className={`${s.tab} ${tab === 'calendar' ? s.tabActive : ''}`} onClick={() => setTab('calendar')}>Calendar</button>
-          <button className={`${s.tab} ${tab === 'table' ? s.tabActive : ''}`} onClick={() => setTab('table')}>Table</button>
+          <button className={`${s.tab} ${tab === 'issues' ? s.tabActive : ''}`} onClick={() => setTab('issues')}>{t('project.issues')}</button>
+          <button className={`${s.tab} ${tab === 'board' ? s.tabActive : ''}`} onClick={() => setTab('board')}>{t('project.board')}</button>
+          <button className={`${s.tab} ${tab === 'timeline' ? s.tabActive : ''}`} onClick={() => setTab('timeline')}>{t('project.timeline')}</button>
+          <button className={`${s.tab} ${tab === 'calendar' ? s.tabActive : ''}`} onClick={() => setTab('calendar')}>{t('project.calendar')}</button>
+          <button className={`${s.tab} ${tab === 'table' ? s.tabActive : ''}`} onClick={() => setTab('table')}>{t('project.table')}</button>
           <button className={`${s.tab} ${tab === 'cycles' ? s.tabActive : ''}`} onClick={() => setTab('cycles')}>
             <span className={s.cycleTabContent}>
-              <Zap size={12} /> Cycles
+              <Zap size={12} /> {t('project.cycles')}
               {cycles.filter(c => c.status === 'active').length > 0 && (
                 <span className={s.cycleActiveBadge}>
                   {cycles.filter(c => c.status === 'active').length}
@@ -578,7 +572,7 @@ export default function ProjectDetail() {
             {/* Import modal */}
             {showImport && (
               <div style={{ padding: 16, background: 'rgba(var(--kt-ink-rgb), 0.02)', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)' }}>
-                <div style={{ fontSize: 12, color: DARK.text, fontWeight: 600, marginBottom: 8 }}>Import Tasks (JSON)</div>
+                <div style={{ fontSize: 12, color: DARK.text, fontWeight: 600, marginBottom: 8 }}>{t('project.importTasks')}</div>
                 <textarea
                   value={importJson}
                   onChange={e => { setImportJson(e.target.value); if (importError) setImportError('') }}
@@ -604,9 +598,9 @@ export default function ProjectDetail() {
                     disabled={!importJson.trim() || importMut.isPending}
                     style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: DARK.info, color: '#fff', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: importJson.trim() ? 1 : 0.5 }}
                   >
-                    {importMut.isPending ? 'Importing...' : 'Import'}
+                    {importMut.isPending ? t('project.importing') : t('project.importAction')}
                   </button>
-                  <button onClick={() => setShowImport(false)} style={{ padding: '5px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.text }}>Cancel</button>
+                  <button onClick={() => setShowImport(false)} style={{ padding: '5px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.text }}>{t('cancel')}</button>
                 </div>
               </div>
             )}
@@ -614,10 +608,10 @@ export default function ProjectDetail() {
             {filteredTopTasks.length > 0 && (
               <div className={s.tableHeader}>
                 <span className={s.colSpacer12} /><span className={s.colSpacer22} /><span className={s.colSpacer14} />
-                <span className={`${s.colHeader} ${s.colHeaderId}`}>ID</span>
-                <span className={`${s.colHeader} ${s.colHeaderTitle}`}>Title</span>
-                <span className={`${s.colHeader} ${s.colHeaderDue}`}>Due date</span>
-                <span className={`${s.colHeader} ${s.colHeaderPriority}`}>Priority</span>
+                <span className={`${s.colHeader} ${s.colHeaderId}`}>{t('project.colId')}</span>
+                <span className={`${s.colHeader} ${s.colHeaderTitle}`}>{t('project.colTitle')}</span>
+                <span className={`${s.colHeader} ${s.colHeaderDue}`}>{t('project.colDue')}</span>
+                <span className={`${s.colHeader} ${s.colHeaderPriority}`}>{t('project.colPriority')}</span>
                 <span className={s.colSpacer88} />
               </div>
             )}
@@ -625,8 +619,8 @@ export default function ProjectDetail() {
             {filteredTopTasks.length === 0 ? (
               <div className={s.emptyState}>
                 {filter === 'all'
-                  ? 'No issues yet. Click "+ New Issue" to create one.'
-                  : `No issues with status "${filter === 'in_progress' ? 'In Progress' : filter}".`}
+                  ? t('project.noIssuesCreated')
+                  : t('project.noIssuesWithStatus', { status: filter === 'in_progress' ? t('inProgress') : t(filter) })}
               </div>
             ) : (
               filteredTopTasks.map(task => (
@@ -645,7 +639,12 @@ export default function ProjectDetail() {
                       />
                     </label>
                   )}
-                  <div style={{ flex: 1 }}>
+                  {/* minWidth:0 — a flex item defaults to min-width:auto, so
+                      this one refused to shrink below the row's min-content
+                      (862px). On a phone every row was laid out at 862 and
+                      clipped by an ancestor with no scrollbar, so the end of
+                      every task title was simply unreachable (ADR-0088). */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <IssueRow
                       task={task}
                       projectId={id}
@@ -677,8 +676,10 @@ export default function ProjectDetail() {
         {tab === 'timeline' && (
           <div>
             <div className={s.timelineHint}>
-              Drag a bar to move it, or set <strong className={s.timelineHintStrong}>start date</strong> and{' '}
-              <strong className={s.timelineHintStrong}>due date</strong> on any issue row.
+              <Trans
+                i18nKey="project.timelineHint"
+                components={[<span key="0" />, <strong key="1" className={s.timelineHintStrong} />, <span key="2" />, <strong key="3" className={s.timelineHintStrong} />]}
+              />
             </div>
             <GanttChart tasks={filteredTasks} onUpdateTask={(taskId, data) => handleUpdate(taskId, data)} />
           </div>
@@ -712,7 +713,7 @@ export default function ProjectDetail() {
       {/* Floating Quick-Add button */}
       <button
         onClick={openQuickAdd}
-        title="New Issue"
+        title={t('project.newIssue')}
         className={s.fab}
       >
         <Plus size={22} />

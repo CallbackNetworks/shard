@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
-import { Plus, Clock, Activity, AlertTriangle, CheckCircle2, Radio } from 'lucide-react'
+import { Clock, Activity, AlertTriangle, CheckCircle2, Radio } from 'lucide-react'
 import { densityCount } from '../../utils/uiPrefs'
 import ActivityFeed from './ActivityFeed'
 import s from '../../pages/Dashboard.module.css'
 
-export function CommandHero({ command, onNewProject }) {
+export function CommandHero({ command }) {
   const { t } = useTranslation()
   const { metrics } = command
   return (
@@ -24,21 +24,10 @@ export function CommandHero({ command, onNewProject }) {
         </div>
       </div>
       <div className={s.commandMetrics}>
-        <div className={s.commandMetric}>
-          <span>{metrics.completion}%</span>
-          <small>{t('dashboard.completionRate')}</small>
-        </div>
-        <div className={s.commandMetric}>
-          <span>{metrics.projects}</span>
-          <small>{t('nav.projects')}</small>
-        </div>
         <div className={s.commandMetricWide}>
           <small>{t('dashboard.latestSignal')}</small>
           <strong>{metrics.latestSignal}</strong>
         </div>
-        <button onClick={onNewProject} className={s.commandAction}>
-          <Plus size={14} /> {t('dashboard.newProject')}
-        </button>
       </div>
     </div>
   )
@@ -125,21 +114,13 @@ function BriefingList({ items, renderItem, empty }) {
 
 export function OpsSidebar({ command }) {
   const { t } = useTranslation()
-  const { metrics, briefing } = command
+  const { briefing } = command
 
   return (
     <aside className={s.opsSidebar}>
       <div className={s.opsPanel}>
         <div className={s.opsPanelTitle}>{t('dashboard.liveSignals')}</div>
         <ActivityFeed activities={briefing.recentActivity} />
-      </div>
-      <div className={s.opsPanel}>
-        <div className={s.opsPanelTitle}>{t('dashboard.queuePressure')}</div>
-        <div className={s.pressureRows}>
-          <div><span>{command.lanes.critical.length}</span><em>{t('dashboard.critical')}</em></div>
-          <div><span>{metrics.failed}</span><em>{t('failed')}</em></div>
-          <div><span>{metrics.projects}</span><em>{t('active')} {t('nav.projects')}</em></div>
-        </div>
       </div>
       <div className={s.opsPanel}>
         <div className={s.opsPanelTitle}>{t('dashboard.briefing')}</div>

@@ -1,8 +1,10 @@
 import { WifiOff, RefreshCw } from 'lucide-react'
 import { DARK } from '../constants/theme'
 import useOfflineSync from '../hooks/useOfflineSync'
+import { useTranslation } from 'react-i18next'
 
 export default function OfflineIndicator() {
+  const { t } = useTranslation()
   const { isOnline, pendingCount, syncing, syncPending } = useOfflineSync()
 
   if (isOnline && pendingCount === 0) return null
@@ -21,12 +23,12 @@ export default function OfflineIndicator() {
       {!isOnline && (
         <>
           <WifiOff size={14} />
-          <span>Offline</span>
+          <span>{t('offline.offline')}</span>
         </>
       )}
       {pendingCount > 0 && (
         <span style={{ color: DARK.warning }}>
-          {pendingCount} pending {pendingCount === 1 ? 'change' : 'changes'}
+          {t('offline.pending', { count: pendingCount })}
         </span>
       )}
       {isOnline && pendingCount > 0 && (

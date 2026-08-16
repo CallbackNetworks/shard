@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink, Search, Sun, Moon } from 'lucide-react'
+import { ExternalLink, Search, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
-import { useUiPrefs } from '../utils/uiPrefs'
+import { useUiPrefs, setUiPref } from '../utils/uiPrefs'
 import FocusSwitcher from './FocusSwitcher'
 
 export default function Sidebar({ onOpenPalette }) {
@@ -54,8 +54,8 @@ export default function Sidebar({ onOpenPalette }) {
 
       <nav className="kt-mini-nav" aria-label="Rail module groups">
         {groups.map(group => (
-          <div key={group.label} className="kt-mini-group">
-            <div className="kt-rail-grouplabel" aria-hidden="true">{group.label}</div>
+          <div key={group.labelKey} className="kt-mini-group">
+            <div className="kt-rail-grouplabel" aria-hidden="true">{t(group.labelKey)}</div>
             {group.items.map(({ to, icon: Icon, labelKey }) => (
               <Link
                 key={to}
@@ -100,6 +100,21 @@ export default function Sidebar({ onOpenPalette }) {
         >
           <span className="kt-rail-ico">{i18n.language === 'en' ? 'EN' : '中'}</span>
           <span className="kt-rail-label">{t('nav.language')}</span>
+        </button>
+        {/* Collapsing is a deliberate, remembered choice. It used to happen on
+            hover, which both hid every label by default and put the expanded
+            rail on top of the page it was navigating (ADR-0088). */}
+        <button
+          onClick={() => setUiPref('railExpanded', !prefs.railExpanded)}
+          aria-label={prefs.railExpanded ? t('nav.collapseRail') : t('nav.expandRail')}
+          title={prefs.railExpanded ? t('nav.collapseRail') : t('nav.expandRail')}
+          aria-expanded={!!prefs.railExpanded}
+          className="kt-mini-action"
+        >
+          <span className="kt-rail-ico">
+            {prefs.railExpanded ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </span>
+          <span className="kt-rail-label">{t('nav.collapseRail')}</span>
         </button>
       </div>
     </aside>

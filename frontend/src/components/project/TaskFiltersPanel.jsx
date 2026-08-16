@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Bookmark, CheckSquare, Download, SlidersHorizontal, Upload } from 'lucide-react'
 import { DARK } from '../../constants/theme'
 import s from './TaskFiltersPanel.module.css'
@@ -30,6 +31,7 @@ export default function TaskFiltersPanel({
   showImport,
   onToggleImport,
 }) {
+  const { t } = useTranslation()
   const { status, priority, label, assignee, due, agent } = filters
   const [naming, setNaming] = useState(false)
   const [viewName, setViewName] = useState('')
@@ -47,7 +49,7 @@ export default function TaskFiltersPanel({
       <div className={s.filterBar}>
         {!searchQ && ['all', 'todo', 'in_progress', 'done', 'failed'].map(f => (
           <button key={f} onClick={() => setFilters({ status: f })} className={`${s.filterBtn} ${status === f ? s.filterBtnActive : s.filterBtnInactive}`}>
-            {f === 'all' ? 'All' : f === 'in_progress' ? 'In Progress' : f.charAt(0).toUpperCase() + f.slice(1)}
+            {f === 'in_progress' ? t('inProgress') : t(f)}
             {' '}<span className={s.filterCount}>{f === 'all' ? topTasks.length : topTasks.filter(t => t.status === f).length}</span>
           </button>
         ))}
@@ -59,7 +61,7 @@ export default function TaskFiltersPanel({
               style={{ fontSize: 11, background: DARK.elevated, color: DARK.textMid, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
               value=""
             >
-              <option value="">Saved views</option>
+              <option value="">{t('project.savedViews')}</option>
               {savedFilters.map(sf => (
                 <option key={sf.id} value={sf.id}>{sf.name}</option>
               ))}
@@ -79,8 +81,8 @@ export default function TaskFiltersPanel({
                     if (e.key === 'Enter') commitSavedView()
                     if (e.key === 'Escape') { setNaming(false); setViewName('') }
                   }}
-                  placeholder="View name…"
-                  aria-label="View name"
+                  placeholder={t('project.viewNamePlaceholder')}
+                  aria-label={t('project.viewName')}
                   className={s.searchInput}
                 />
                 <button
@@ -88,16 +90,16 @@ export default function TaskFiltersPanel({
                   disabled={!viewName.trim()}
                   style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, fontSize: 11, opacity: viewName.trim() ? 1 : 0.4 }}
                 >
-                  Save
+                  {t('save')}
                 </button>
               </span>
             ) : (
               <button
                 onClick={() => setNaming(true)}
-                title="Save current filter"
+                title={t('project.saveView')}
                 style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}
               >
-                <Bookmark size={11} /> Save
+                <Bookmark size={11} /> {t('save')}
               </button>
             )
           )}
@@ -111,13 +113,13 @@ export default function TaskFiltersPanel({
                 color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
               }}
             >
-              <CheckSquare size={11} /> Bulk
+              <CheckSquare size={11} /> {t('project.bulk')}
             </button>
           )}
           {/* Export */}
           <button
             onClick={onExport}
-            title="Export tasks"
+            title={t('project.exportTasks')}
             style={{ background: 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: DARK.textMid, display: 'flex', alignItems: 'center' }}
           >
             <Download size={11} />
@@ -125,7 +127,7 @@ export default function TaskFiltersPanel({
           {/* Import */}
           <button
             onClick={onToggleImport}
-            title="Import tasks"
+            title={t('project.importTasksTitle')}
             style={{ background: showImport ? 'rgba(250,204,21,0.12)' : 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
           >
             <Upload size={11} />
@@ -135,7 +137,7 @@ export default function TaskFiltersPanel({
             className={`${s.advancedFilterBtn} ${activeFilterCount > 0 ? s.advancedFilterActive : s.advancedFilterInactive}`}
           >
             <SlidersHorizontal size={12} />
-            Filter
+            {t('project.filter')}
             {activeFilterCount > 0 && (
               <span className={s.activeFilterBadge}>
                 {activeFilterCount}
@@ -145,7 +147,7 @@ export default function TaskFiltersPanel({
           <input
             value={searchQ}
             onChange={e => setSearchQ(e.target.value)}
-            placeholder="Search issues…"
+            placeholder={t('project.searchIssues')}
             className={s.searchInput}
           />
           {searchQ && (
@@ -159,35 +161,35 @@ export default function TaskFiltersPanel({
       {/* Advanced filter bar */}
       {showFilters && (
         <div className={s.advancedFilterBar}>
-          <span className={s.advancedFilterLabel}>Filters:</span>
+          <span className={s.advancedFilterLabel}>{t('project.filters')}</span>
           <select value={priority} onChange={e => setFilters({ priority: e.target.value })}
             className={`${s.filterSelect} ${priority !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-            <option value="all">Priority: All</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
+            <option value="all">{t('project.priorityAll')}</option>
+            <option value="high">{t('high')}</option>
+            <option value="medium">{t('medium')}</option>
+            <option value="low">{t('low')}</option>
           </select>
           <select value={label} onChange={e => setFilters({ label: e.target.value })}
             className={`${s.filterSelect} ${label !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-            <option value="all">Label: All</option>
+            <option value="all">{t('project.labelAll')}</option>
             {labels.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
           </select>
           <select value={assignee} onChange={e => setFilters({ assignee: e.target.value })}
             className={`${s.filterSelect} ${assignee !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-            <option value="all">Assignee: All</option>
+            <option value="all">{t('project.assigneeAll')}</option>
             {assignees.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
           <select value={due} onChange={e => setFilters({ due: e.target.value })}
             className={`${s.filterSelect} ${due !== 'all' ? s.filterSelectActive : s.filterSelectDefault}`}>
-            <option value="all">Due: All</option>
-            <option value="overdue">Overdue</option>
-            <option value="this_week">This week</option>
-            <option value="no_date">No date</option>
+            <option value="all">{t('project.dueAll')}</option>
+            <option value="overdue">{t('project.overdue')}</option>
+            <option value="this_week">{t('project.thisWeek')}</option>
+            <option value="no_date">{t('project.noDate')}</option>
           </select>
           {agentNames.length > 0 && (
             <select value={agent} onChange={e => setFilters({ agent: e.target.value })}
               className={`${s.filterSelect} ${agent !== 'all' ? s.filterSelectAgent : s.filterSelectAgentDefault}`}>
-              <option value="all">Agent: All</option>
+              <option value="all">{t('project.agentAll')}</option>
               {agentNames.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           )}
@@ -196,7 +198,7 @@ export default function TaskFiltersPanel({
               onClick={() => setFilters({ priority: 'all', label: 'all', assignee: 'all', due: 'all', agent: 'all' })}
               className={s.clearAllFiltersBtn}
             >
-              Clear all
+              {t('project.clearAll')}
             </button>
           )}
         </div>

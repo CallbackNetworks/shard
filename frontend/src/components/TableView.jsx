@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { DARK, BRAND, PRIORITY, STATUS_MAP } from '../constants/theme'
+import { alpha } from '../utils/color'
 
 function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
   const { t } = useTranslation()
@@ -123,8 +124,8 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(250,204,21,0.12)', color: DARK.info,
-            border: '1px solid rgba(250,204,21,0.25)', whiteSpace: 'nowrap',
+            background: DARK.infoBg, color: DARK.info,
+            border: `1px solid ${alpha(DARK.info, 30)}`, whiteSpace: 'nowrap',
           }}>
             <Bot size={9} />
             {task.assigned_agent_name}

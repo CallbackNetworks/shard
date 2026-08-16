@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import { getActivity, getProjects } from '../api/client'
 import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
@@ -115,6 +116,7 @@ function buildActivityHeat(activities) {
 }
 
 export default function GlobalActivityTicker() {
+  const { t } = useTranslation()
   const prefs = useUiPrefs()
   const { data: activities = [] } = useQuery({
     queryKey: ['global-activity-ticker'],
@@ -142,11 +144,11 @@ export default function GlobalActivityTicker() {
     ).length
 
     return [
-      overdue > 0 ? `${overdue} OVERDUE TASK${overdue === 1 ? '' : 'S'}` : null,
-      failed > 0 ? `${failed} FAILED TASK${failed === 1 ? '' : 'S'}` : null,
-      highActive > 0 ? `${highActive} HIGH PRIORITY ACTIVE` : null,
+      overdue > 0 ? t('ticker.overdueTasks', { count: overdue }) : null,
+      failed > 0 ? t('ticker.failedTasks', { count: failed }) : null,
+      highActive > 0 ? t('ticker.highPriorityActive', { count: highActive }) : null,
     ].filter(Boolean)
-  }, [projects])
+  }, [projects, t])
 
   const activityItems = activities.map(eventLabel).filter(Boolean)
   const tickerItems = activityItems.length > 0 ? activityItems : FALLBACK_ITEMS
@@ -159,9 +161,9 @@ export default function GlobalActivityTicker() {
       <div className="kt-notice-stack">
         {alerts.length > 0 && (
           <div className="kt-alert-strip" role="status" aria-live="polite">
-            <div className="kt-alert-strip-track">
-              {[...alerts, ...alerts, ...alerts].map((alert, index) => (
-                <span key={`${alert}-${index}`}>
+            <div className="kt-alert-strip-list">
+              {alerts.map(alert => (
+                <span key={alert}>
                   <AlertTriangle size={13} />
                   {alert}
                 </span>
