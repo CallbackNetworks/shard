@@ -1,5 +1,3 @@
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -10,8 +8,7 @@ from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.deps import get_task_or_404
 from app.routers.issue_sync import create_external_issue_from_task
 from app.schemas import ReorderRequest, TaskOut, TaskWithSubtasksOut
-from app.services import graph
-from app.services.activity import log_activity
+from app.services import graph, webhook_credentials
 from app.services.enrichment import enrich_task
 from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.ws_manager import ws_manager
@@ -187,18 +184,13 @@ async def reorder_tasks(project_id: str, body: ReorderRequest, db: Session = Dep
     description="Generates a new unique callback_token for a task. Old webhook URLs will stop working.",
 )
 def regenerate_token(project_id: str, task_id: str, db: Session = Depends(get_db)):
+    # Delegates to the same act as `/api/nodes/{id}/webhook/rotate-token` and its v1 twin
+    # (ADR-0085). This route predates the node surface and rotated the token with its own
+    # copy of the write and its own activity row, so a task's address could be rotated in
+    # two ways that logged two different things. Kept for the URL, not for the behaviour.
     _get_project_or_404(project_id, db)
-    task = get_task_or_404(task_id, db, project_id=project_id)
-    task = graph.update_task(db, task_id, callback_token=str(uuid.uuid4()))
-    log_activity(
-        db,
-        "task.token_regenerated",
-        project_id=project_id,
-        task_id=task_id,
-        actor="system",
-        detail=f'Webhook token regenerated for "{task.title}"',
-        meta={"title": task.title},
-    )
+    get_task_or_404(task_id, db, project_id=project_id)
+    webhook_credentials.rotate_token(db, webhook_credentials.load(db, task_id), actor="user")
     db.commit()
     return enrich_task(graph.get_task(db, task_id), db)
 

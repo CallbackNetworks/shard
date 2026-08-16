@@ -288,9 +288,11 @@ export const getIntegrationTemplates = () =>
 export const getIntegrationTemplate = (templateId) =>
   api.get(`/integrations/templates/${templateId}`).then(r => r.data)
 
-// Webhook events (build history)
-export const getWebhookEvents = (taskId, params = {}) =>
-  api.get(`/webhook/events/${taskId}`, { params }).then(r => r.data)
+// Webhook events (build history). Under `/api/nodes`, not `/webhook` (ADR-0085): the old
+// path sat on the auth-bypassed prefix a CI runner posts to, and this client's baseURL is
+// `/api`, so the call it produced (`/api/webhook/events/...`) had never matched any route.
+export const getWebhookEvents = (nodeId, params = {}) =>
+  api.get(`/nodes/${nodeId}/webhook-events`, { params }).then(r => r.data)
 
 // CI/CD pipeline triggers
 

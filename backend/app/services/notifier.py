@@ -231,9 +231,19 @@ def _build_headers(integration: Integration, body_bytes: bytes | None = None) ->
     return headers
 
 
-def _safe_headers_for_log(headers: dict) -> dict:
-    """Strip sensitive auth values before logging."""
-    return {k: ("***" if k.lower() in ("authorization",) else v) for k, v in headers.items()}
+def _safe_headers_for_log(headers: dict, integration: Integration | None = None) -> dict:
+    """Strip this integration's credentials before logging the request.
+
+    ``authorization`` used to be the entire list, which was right when bearer was the only
+    auth type. An ``api_key`` integration puts its key in whatever header the user named,
+    and ``custom_headers`` is free-form — both were written to the delivery log in plaintext
+    and served back out of it, defeating ADR-0063's withholding by a second path. The set of
+    secret names is derived from the integration itself (``delivery_admin``), and the same
+    derivation is applied again on read so rows written before this are covered too.
+    """
+    from app.services.delivery_admin import public_headers
+
+    return public_headers(headers, integration)
 
 
 async def _dispatch_webhook(
@@ -258,7 +268,7 @@ async def _dispatch_webhook(
             event=event,
             payload=payload,
             request_url=integration.url,
-            request_headers=_safe_headers_for_log(headers),
+            request_headers=_safe_headers_for_log(headers, integration),
             attempt=1,
             status="pending",
         )

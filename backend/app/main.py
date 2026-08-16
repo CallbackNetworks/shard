@@ -56,6 +56,7 @@ from app.routers import ws as ws_router
 from app.routers.auth import router as auth_router
 from app.routers.labels import task_label_router
 from app.services import node_data
+from app.services.errors import ServiceError
 from app.services.scheduler import due_date_reminder_loop, get_scheduler_health
 from app.services.search_backend import get_search_backend
 from app.services.usage_tracker import UsageTrackingMiddleware
@@ -320,6 +321,13 @@ if _mcp_transport is not None:
     from app.mcp_server.server import mcp_route
 
     app.router.routes.append(mcp_route(_mcp_transport))
+
+
+@app.exception_handler(ServiceError)
+async def service_error_handler(request: Request, exc: ServiceError):
+    """One rendering of a service-layer refusal, so the internal and v1 doors onto the same
+    act cannot answer it differently (ADR-0085). Neither router writes this response."""
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.exception_handler(Exception)

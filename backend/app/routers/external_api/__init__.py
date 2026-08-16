@@ -10,10 +10,12 @@ from fastapi import APIRouter, Depends
 from app.routers.external_api.activity import sub_router as activity_router
 from app.routers.external_api.agent_context import sub_router as agent_context_router
 from app.routers.external_api.analytics import sub_router as analytics_router
+from app.routers.external_api.cicd import sub_router as cicd_router
 from app.routers.external_api.comments import sub_router as comments_router
 from app.routers.external_api.dependencies import sub_router as dependencies_router
 from app.routers.external_api.edge_types import sub_router as edge_types_router
 from app.routers.external_api.email import sub_router as email_router
+from app.routers.external_api.integrations import sub_router as integrations_router
 from app.routers.external_api.labels import sub_router as labels_router
 from app.routers.external_api.node_types import sub_router as node_types_router
 from app.routers.external_api.nodes import sub_router as nodes_router
@@ -26,6 +28,7 @@ from app.routers.external_api.subscriptions import sub_router as subscriptions_r
 from app.routers.external_api.summary import sub_router as summary_router
 from app.routers.external_api.tasks import sub_router as tasks_router
 from app.routers.external_api.tools_schema import sub_router as tools_schema_router
+from app.routers.external_api.workflow_rules import sub_router as workflow_rules_router
 from app.services.rate_limiter import api_rate_limit
 
 router = APIRouter(prefix="/api/v1", tags=["External API v1"], dependencies=[Depends(api_rate_limit)])
@@ -50,3 +53,9 @@ router.include_router(agent_context_router)
 router.include_router(progress_router)
 router.include_router(tools_schema_router)
 router.include_router(subscriptions_router)
+# ADR-0085: the capabilities that had a door only on the internal `/api`, which production
+# puts behind the password gate — CI/CD triggers, outbound integrations and their delivery
+# log, and the whole automation layer.
+router.include_router(cicd_router)
+router.include_router(integrations_router)
+router.include_router(workflow_rules_router)

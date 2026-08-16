@@ -11,11 +11,12 @@ def _make_task(db, project_id):
     return t
 
 
-# Patch targets: the router imports functions directly, so we patch in the router module.
-_GH = "app.routers.cicd.trigger_github_workflow"
-_GL = "app.routers.cicd.trigger_gitlab_pipeline"
-_JK = "app.routers.cicd.trigger_jenkins_build"
-_GN = "app.routers.cicd.trigger_generic_webhook"
+# Patch targets: the adapters are imported by the dispatch service, which both the internal
+# router and `/api/v1/cicd` call (ADR-0085), so the seam is there rather than in a router.
+_GH = "app.services.cicd_dispatch.trigger_github_workflow"
+_GL = "app.services.cicd_dispatch.trigger_gitlab_pipeline"
+_JK = "app.services.cicd_dispatch.trigger_jenkins_build"
+_GN = "app.services.cicd_dispatch.trigger_generic_webhook"
 
 
 # --- 1. Trigger GitHub workflow ---

@@ -32,7 +32,7 @@ TaskStatus = Literal["todo", "in_progress", "done", "failed"]
 Priority = Literal["low", "medium", "high"]
 ProjectStatus = Literal["active", "archived"]
 ManageAction = Literal["list", "add", "remove"]
-WebhookAction = Literal["reveal", "rotate"]
+WebhookAction = Literal["reveal", "rotate_secret", "rotate_token", "history"]
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://backend:8000")
 API_KEY = os.environ.get("API_KEY", "")
@@ -61,9 +61,9 @@ async def _get(path: str, params: dict | None = None) -> dict | list | str:
     return resp.json()
 
 
-async def _post(path: str, body: dict | list | None = None) -> dict | list | str:
+async def _post(path: str, body: dict | list | None = None, params: dict | None = None) -> dict | list | str:
     client = _get_client()
-    resp = await client.post(path, json=body)
+    resp = await client.post(path, json=body, params=params)
     if resp.status_code >= 400:
         return f"Error {resp.status_code}: {resp.text}"
     if resp.status_code == 204:
@@ -346,8 +346,101 @@ async def _manage_edges(
 async def _manage_webhook(action: str, node_id: str) -> str:
     if action == "reveal":
         result = await _get(f"/nodes/{node_id}/webhook")
-    elif action == "rotate":
+    elif action == "rotate_secret":
         result = await _post(f"/nodes/{node_id}/webhook/rotate-secret")
+    elif action == "rotate_token":
+        result = await _post(f"/nodes/{node_id}/webhook/rotate-token")
+    elif action == "history":
+        result = await _get(f"/nodes/{node_id}/webhook-events")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _trigger_pipeline(provider: str, config: dict, task_id: str | None = None) -> str:
+    params = {"task_id": task_id} if task_id else None
+    result = await _post(f"/cicd/trigger/{provider}", config, params=params)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _list_integrations() -> str:
+    result = await _get("/integrations")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_integration(action: str, integration_id: str | None = None, config: dict | None = None) -> str:
+    if action == "create":
+        if not config:
+            return "Error: config is required to create an integration"
+        result = await _post("/integrations", config)
+    elif action == "update":
+        if not integration_id or not config:
+            return "Error: integration_id and config are required to update an integration"
+        result = await _patch(f"/integrations/{integration_id}", config)
+    elif action == "delete":
+        if not integration_id:
+            return "Error: integration_id is required to delete an integration"
+        result = await _delete(f"/integrations/{integration_id}")
+    elif action == "test":
+        if not integration_id:
+            return "Error: integration_id is required to test an integration"
+        result = await _post(f"/integrations/{integration_id}/test")
+    elif action == "events":
+        result = await _get("/integrations/events")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _list_deliveries(integration_id: str | None = None, status: str | None = None, limit: int = 20) -> str:
+    params = {"limit": limit}
+    if integration_id:
+        params["integration_id"] = integration_id
+    if status:
+        params["status"] = status
+    result = await _get("/deliveries", params=params)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _retry_delivery(delivery_id: str) -> str:
+    result = await _post(f"/deliveries/{delivery_id}/retry")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _get_rule_vocabulary(project_id: str | None = None) -> str:
+    result = await _get("/workflow-rules/vocabulary", params={"project_id": project_id} if project_id else None)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_workflow_rules(
+    action: str,
+    rule_id: str | None = None,
+    config: dict | None = None,
+    project_id: str | None = None,
+    node_id: str | None = None,
+) -> str:
+    if action == "list":
+        result = await _get("/workflow-rules", params={"project_id": project_id} if project_id else None)
+    elif action == "get":
+        if not rule_id:
+            return "Error: rule_id is required"
+        result = await _get(f"/workflow-rules/{rule_id}")
+    elif action == "create":
+        if not config:
+            return "Error: config is required to create a rule"
+        result = await _post("/workflow-rules", config)
+    elif action == "update":
+        if not rule_id or not config:
+            return "Error: rule_id and config are required to update a rule"
+        result = await _patch(f"/workflow-rules/{rule_id}", config)
+    elif action == "delete":
+        if not rule_id:
+            return "Error: rule_id is required"
+        result = await _delete(f"/workflow-rules/{rule_id}")
+    elif action == "test":
+        if not rule_id or not node_id:
+            return "Error: rule_id and node_id are required to test a rule"
+        result = await _post(f"/workflow-rules/{rule_id}/test", None, params={"node_id": node_id})
     else:
         return f"Error: unknown action '{action}'"
     return json.dumps(result) if not isinstance(result, str) else result
@@ -670,17 +763,117 @@ async def manage_edges(
 
 @mcp.tool(
     description=(
-        "Configure inbound CI/CD callbacks for a task or project (ADR-0084). 'reveal' "
-        "returns the callback_token, the HMAC-SHA256 signing secret, and the path to "
-        "POST build results to; minting them if the node has none. 'rotate' issues a new "
-        "signing secret and invalidates the old one. Give the returned path and secret to "
-        "the CI provider — unsigned callbacks are rejected. Needs an admin-scope API key: "
-        "these credentials are an unauthenticated write path into the platform."
+        "Configure inbound CI/CD callbacks for a task or project (ADR-0084, ADR-0085). "
+        "'reveal' returns the callback_token, the HMAC-SHA256 signing secret and the path "
+        "to POST build results to, minting them if the node has none. 'rotate_secret' "
+        "issues a new signing key; 'rotate_token' issues a new callback *address*, for when "
+        "the URL itself has leaked. 'history' lists the build results received so far. "
+        "Give the returned path and secret to the CI provider — unsigned callbacks are "
+        "rejected. Everything but 'history' needs an admin-scope API key: these credentials "
+        "are an unauthenticated write path into the platform."
     )
 )
 async def manage_webhook(action: WebhookAction, node_id: str) -> str:
     """node_id is the task or project that should receive the build results."""
     return await _manage_webhook(action=action, node_id=node_id)
+
+
+@mcp.tool(
+    description=(
+        "Start a CI/CD pipeline (ADR-0085). `config` carries what the provider needs and "
+        "its credential, which is never stored: github needs {repo, workflow_id, token, "
+        "ref?, inputs?, api_base?}; gitlab {project_id, token, ref?, variables?, "
+        "gitlab_url?}; jenkins {url, token?, username?, parameters?}; generic {url, method?, "
+        "headers?, body?}. Pass task_id to record the trigger against that task's activity, "
+        "which is how a build gets tied to the work that caused it."
+    )
+)
+async def trigger_pipeline(
+    provider: Literal["github", "gitlab", "jenkins", "generic"],
+    config: dict,
+    task_id: str | None = None,
+) -> str:
+    return await _trigger_pipeline(provider=provider, config=config, task_id=task_id)
+
+
+@mcp.tool(
+    description=(
+        "List outbound integrations: where this platform sends notifications, by webhook or "
+        "email. Credentials never come back — a set secret reads as secret_set: true."
+    )
+)
+async def list_integrations() -> str:
+    return await _list_integrations()
+
+
+@mcp.tool(
+    description=(
+        "Create, update, delete or test an outbound integration (ADR-0085). `config` for "
+        "'create' takes {name, type, url|email_to, events[], secret?, auth_type?, "
+        "auth_config?, custom_headers?, project_id?}. Use action='events' first to see which "
+        "event names are deliverable — an unknown one is refused. 'test' fires a synthetic "
+        "delivery and returns what the target answered. On update, a null credential value "
+        "means unchanged, not deleted (ADR-0063)."
+    )
+)
+async def manage_integration(
+    action: Literal["create", "update", "delete", "test", "events"],
+    integration_id: str | None = None,
+    config: dict | None = None,
+) -> str:
+    return await _manage_integration(action=action, integration_id=integration_id, config=config)
+
+
+@mcp.tool(
+    description=(
+        "List outbound webhook delivery attempts, newest first, with the response the target "
+        "gave and the next scheduled retry. The failure mode of a webhook is silence, so "
+        "this is how you find out yours is not arriving. Filter by integration_id or status "
+        "(pending/success/failed/dead)."
+    )
+)
+async def list_deliveries(integration_id: str | None = None, status: str | None = None, limit: int = 20) -> str:
+    return await _list_deliveries(integration_id=integration_id, status=status, limit=limit)
+
+
+@mcp.tool(description="Retry one failed or dead webhook delivery. The retry backoff starts over.")
+async def retry_delivery(delivery_id: str) -> str:
+    return await _retry_delivery(delivery_id=delivery_id)
+
+
+@mcp.tool(
+    description=(
+        "Everything needed to compose a workflow rule the engine will actually run: the "
+        "legal triggers, which condition fields each trigger carries, condition operators, "
+        "action types, and the legal values for each. Generated from the registries the "
+        "write path enforces (ADR-0055, ADR-0056). Call this BEFORE create_workflow_rule — "
+        "a guessed field name produces a rule that saves cleanly and never fires."
+    )
+)
+async def get_rule_vocabulary(project_id: str | None = None) -> str:
+    return await _get_rule_vocabulary(project_id=project_id)
+
+
+@mcp.tool(
+    description=(
+        "List, read, create, update, delete or dry-run workflow rules — the platform's "
+        "automation layer (ADR-0085). `config` for 'create' takes {name, trigger, actions[], "
+        "conditions?, project_id?, active?}; see get_rule_vocabulary for the legal values. "
+        "'test' needs node_id and reports whether the rule would fire and what each action "
+        "would do, without writing anything. Rules never chain: writes a rule makes do not "
+        "re-enter the engine."
+    )
+)
+async def manage_workflow_rules(
+    action: Literal["list", "get", "create", "update", "delete", "test"],
+    rule_id: str | None = None,
+    config: dict | None = None,
+    project_id: str | None = None,
+    node_id: str | None = None,
+) -> str:
+    return await _manage_workflow_rules(
+        action=action, rule_id=rule_id, config=config, project_id=project_id, node_id=node_id
+    )
 
 
 # ── MCP resources ────────────────────────────────────────────────────

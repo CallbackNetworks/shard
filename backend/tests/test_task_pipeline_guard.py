@@ -52,7 +52,9 @@ ALLOWED = {
     # Writes only bookkeeping fields that no rule or notification keys off:
     # reminder_sent_at, callback_token, external_* linkage, progress fields.
     "services/scheduler.py": "reminder_sent_at bookkeeping (recurrence uses the pipeline)",
-    "routers/tasks.py": "callback_token regeneration only",
+    # `routers/tasks.py` was here for "callback_token regeneration only". It no longer
+    # writes a task at all: the rotation moved to `services/webhook_credentials`, which the
+    # internal node route and `/api/v1` share (ADR-0085), and this guard is what noticed.
     "routers/issue_sync.py": "external_* linkage (inbound events use the pipeline)",
     "routers/external_api/progress.py": "progress_pct/agent_notes only",
 }

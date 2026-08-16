@@ -626,10 +626,103 @@ async def test_manage_webhook_reveal():
 
 
 @pytest.mark.asyncio
-async def test_manage_webhook_rotate():
+async def test_manage_webhook_rotate_secret():
     with _patch_client("post", _mock_response(json_data={"secret": "new-one"})):
-        text = await _call("manage_webhook", {"action": "rotate", "node_id": "t1"})
+        text = await _call("manage_webhook", {"action": "rotate_secret", "node_id": "t1"})
     assert json.loads(text)["secret"] == "new-one"
+
+
+@pytest.mark.asyncio
+async def test_manage_webhook_rotate_token():
+    """A leaked *address* and a leaked *key* are different incidents (ADR-0085)."""
+    with _patch_client("post", _mock_response(json_data={"callback_token": "cb-2"})):
+        text = await _call("manage_webhook", {"action": "rotate_token", "node_id": "t1"})
+    assert json.loads(text)["callback_token"] == "cb-2"
+
+
+@pytest.mark.asyncio
+async def test_manage_webhook_history():
+    with _patch_client("get", _mock_response(json_data=[{"status": "success", "provider": "github"}])):
+        text = await _call("manage_webhook", {"action": "history", "node_id": "t1"})
+    assert json.loads(text)[0]["provider"] == "github"
+
+
+# ── Tools: CI/CD triggers, integrations, deliveries, rules (ADR-0085) ──
+
+
+@pytest.mark.asyncio
+async def test_trigger_pipeline():
+    with _patch_client("post", _mock_response(json_data={"success": True})):
+        text = await _call(
+            "trigger_pipeline",
+            {"provider": "github", "config": {"repo": "o/r", "workflow_id": "ci.yml", "token": "t"}},
+        )
+    assert json.loads(text)["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_trigger_pipeline_rejects_an_unknown_provider():
+    with pytest.raises(ToolError):
+        await _call("trigger_pipeline", {"provider": "teamcity", "config": {}})
+
+
+@pytest.mark.asyncio
+async def test_list_integrations_tool():
+    with _patch_client("get", _mock_response(json_data=[{"name": "ci", "secret_set": True}])):
+        text = await _call("list_integrations", {})
+    # Credentials never come back, only the fact that one is set (ADR-0063).
+    assert json.loads(text)[0]["secret_set"] is True
+
+
+@pytest.mark.asyncio
+async def test_manage_integration_create():
+    with _patch_client("post", _mock_response(json_data={"id": "i1"})):
+        text = await _call("manage_integration", {"action": "create", "config": {"name": "ci", "type": "webhook"}})
+    assert json.loads(text)["id"] == "i1"
+
+
+@pytest.mark.asyncio
+async def test_manage_integration_create_without_config_says_so():
+    text = await _call("manage_integration", {"action": "create"})
+    assert "config" in text
+
+
+@pytest.mark.asyncio
+async def test_list_deliveries_tool():
+    with _patch_client("get", _mock_response(json_data=[{"status": "failed"}])):
+        text = await _call("list_deliveries", {"status": "failed"})
+    assert json.loads(text)[0]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_retry_delivery_tool():
+    with _patch_client("post", _mock_response(json_data={"status": "success"})):
+        text = await _call("retry_delivery", {"delivery_id": "d1"})
+    assert json.loads(text)["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_get_rule_vocabulary_tool():
+    vocab = {"triggers": ["node.created"], "action_types": ["set_status"]}
+    with _patch_client("get", _mock_response(json_data=vocab)):
+        text = await _call("get_rule_vocabulary", {})
+    assert "node.created" in json.loads(text)["triggers"]
+
+
+@pytest.mark.asyncio
+async def test_manage_workflow_rules_create():
+    with _patch_client("post", _mock_response(json_data={"id": "r1"})):
+        text = await _call(
+            "manage_workflow_rules",
+            {"action": "create", "config": {"name": "r", "trigger": "node.created", "actions": []}},
+        )
+    assert json.loads(text)["id"] == "r1"
+
+
+@pytest.mark.asyncio
+async def test_manage_workflow_rules_test_needs_a_subject():
+    text = await _call("manage_workflow_rules", {"action": "test", "rule_id": "r1"})
+    assert "node_id" in text
 
 
 @pytest.mark.asyncio
@@ -646,7 +739,7 @@ async def test_manage_webhook_rejects_an_action_that_is_not_one():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 26
+    assert len(tools) == 33
 
 
 @pytest.mark.asyncio
@@ -686,6 +779,18 @@ async def test_list_tools_names():
         # ADR-0084: inbound CI/CD credentials were readable only from the internal API,
         # which in production sits behind the password gate — so no agent could reach it.
         "manage_webhook",
+        # ADR-0085: the rest of what was browser-only. Triggering a build, the general form
+        # of outbound integrations (not just the `/subscriptions` sugar over it), the
+        # delivery log that tells you a webhook is silently failing, and the whole
+        # automation layer — an agent could perform every write forever and never automate
+        # one.
+        "trigger_pipeline",
+        "list_integrations",
+        "manage_integration",
+        "list_deliveries",
+        "retry_delivery",
+        "get_rule_vocabulary",
+        "manage_workflow_rules",
     }
     assert names == expected
 

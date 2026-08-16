@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Node, WebhookEvent
+from app.models import WebhookEvent
 from app.schemas import TaskOut, WebhookEventOut
 from app.services import graph
 from app.services.activity import log_activity
@@ -224,22 +224,15 @@ async def webhook_callback(
     return enrich_task(task, db)
 
 
-@router.get("/events/{task_id}", response_model=list[WebhookEventOut])
-def get_webhook_events(
-    task_id: str,
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
-):
-    """Get build history (webhook events) for a task or a container/project."""
-    node = db.get(Node, task_id)
-    if node is None or node.type not in graph.webhookable_type_keys(db):
-        raise HTTPException(status_code=404, detail="Node not found")
-    return (
-        db.query(WebhookEvent)
-        .filter(WebhookEvent.task_id == task_id)
-        .order_by(WebhookEvent.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+# Build history used to be served from `GET /webhook/events/{task_id}`, right here. It is
+# now `GET /api/nodes/{id}/webhook-events` and `GET /api/v1/nodes/{id}/webhook-events`
+# (ADR-0085).
+#
+# This prefix is in `main.py`'s `_AUTH_BYPASS` for one reason: a CI runner cannot carry the
+# owner's session, so `POST /callback/{token}` has to be reachable without one — and it
+# authenticates itself, with a token that is the address plus a signature over the body
+# (ADR-0060). That read authenticated itself with nothing. It was exempt purely because it
+# shared a prefix with something that had earned the exemption, which is the same shape as
+# ADR-0059: a rule attached to a path rather than to what the endpoint does.
+#
+# What remains under `/webhook/` is only what a runner posts to.

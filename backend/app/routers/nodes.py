@@ -27,6 +27,7 @@ from app.schemas import (
     NodeOut,
     NodeUpdate,
     TaskOut,
+    WebhookEventOut,
 )
 from app.services import graph, node_data, webhook_credentials
 from app.services.activity import share_view_count
@@ -390,25 +391,14 @@ def get_node_share_views(node_id: str, db: Session = Depends(get_db)):
 #
 # The act itself lives in services/webhook_credentials.py, because /api/v1 performs the
 # same one (ADR-0084). What stays here is what is this door's own: no scope to check,
-# because reaching /api at all means the session passed the password gate.
-
-
-def _load_webhook_node(node_id: str, db: Session) -> Node:
-    node = db.get(Node, node_id)
-    if node is None:
-        raise HTTPException(status_code=404, detail="node not found")
-    try:
-        webhook_credentials.ensure_webhookable(db, node)
-    except webhook_credentials.WebhookCredentialError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return node
+# because reaching /api at all means the session passed the password gate. The 404/400
+# refusals are the service's and are rendered by one handler (ADR-0085).
 
 
 @router.get("/{node_id}/webhook", response_model=WebhookConfigOut)
 def get_node_webhook_config(node_id: str, db: Session = Depends(get_db)):
     """Reveal the callback credentials for one node, as a deliberate act."""
-    node = _load_webhook_node(node_id, db)
-    config = webhook_credentials.reveal(db, node, actor="user")
+    config = webhook_credentials.reveal(db, webhook_credentials.load(db, node_id), actor="user")
     db.commit()
     return config
 
@@ -416,7 +406,26 @@ def get_node_webhook_config(node_id: str, db: Session = Depends(get_db)):
 @router.post("/{node_id}/webhook/rotate-secret", response_model=WebhookConfigOut)
 def rotate_node_webhook_secret(node_id: str, db: Session = Depends(get_db)):
     """Issue a new signing key. Callbacks signed with the old one stop being accepted."""
-    node = _load_webhook_node(node_id, db)
-    config = webhook_credentials.rotate(db, node, actor="user")
+    config = webhook_credentials.rotate(db, webhook_credentials.load(db, node_id), actor="user")
     db.commit()
     return config
+
+
+@router.post("/{node_id}/webhook/rotate-token", response_model=WebhookConfigOut)
+def rotate_node_callback_token(node_id: str, db: Session = Depends(get_db)):
+    """Issue a new callback address. The old URL stops resolving (ADR-0085)."""
+    config = webhook_credentials.rotate_token(db, webhook_credentials.load(db, node_id), actor="user")
+    db.commit()
+    return config
+
+
+@router.get("/{node_id}/webhook-events", response_model=list[WebhookEventOut])
+def get_node_webhook_events(
+    node_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Build history for a node. Moved here from ``GET /webhook/events/{id}``, which sat
+    under the auth-bypassed ``/webhook/`` prefix and was readable by anybody (ADR-0085)."""
+    return webhook_credentials.build_history(db, webhook_credentials.load(db, node_id), limit=limit, offset=offset)

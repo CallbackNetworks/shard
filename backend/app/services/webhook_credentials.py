@@ -24,13 +24,10 @@ import uuid
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.models import Node
+from app.models import Node, WebhookEvent
 from app.services import graph
 from app.services.activity import log_activity
-
-
-class WebhookCredentialError(Exception):
-    """A node whose type does not receive callbacks was asked for credentials."""
+from app.services.errors import Invalid, NotFound
 
 
 class WebhookConfigOut(BaseModel):
@@ -44,7 +41,16 @@ class WebhookConfigOut(BaseModel):
 def ensure_webhookable(db: Session, node: Node) -> None:
     """Raise unless this node's type is one that receives callbacks (ADR-0082)."""
     if node.type not in graph.webhookable_type_keys(db):
-        raise WebhookCredentialError("node type does not receive webhook callbacks")
+        raise Invalid("node type does not receive webhook callbacks")
+
+
+def load(db: Session, node_id: str) -> Node:
+    """The node, or the refusal — 404 for absent, 400 for a type that receives nothing."""
+    node = db.get(Node, node_id)
+    if node is None:
+        raise NotFound("node not found")
+    ensure_webhookable(db, node)
+    return node
 
 
 def _config(db: Session, node: Node) -> WebhookConfigOut:
@@ -63,17 +69,17 @@ def _config(db: Session, node: Node) -> WebhookConfigOut:
     return WebhookConfigOut(callback_token=token, secret=secret, path=f"/webhook/callback/{token}")
 
 
-def _log(db: Session, node: Node, verb: str, actor: str) -> None:
-    """Log a reveal/rotate against the right scope: a task's own row, or the
+def _log(db: Session, node: Node, event: str, detail: str, actor: str) -> None:
+    """Log a credential act against the right scope: a task's own row, or the
     container it is (there is no task to point at)."""
     is_task = node.type in graph.task_type_keys(db)
     log_activity(
         db,
-        f"task.webhook_secret_{verb}" if is_task else f"project.webhook_secret_{verb}",
+        f"task.{event}" if is_task else f"project.{event}",
         project_id=graph.project_id_of_task(db, node.id) if is_task else node.id,
         task_id=node.id if is_task else None,
         actor=actor,
-        detail=f'Webhook credentials {verb} for "{node.title}"',
+        detail=f'{detail} for "{node.title}"',
         meta={"title": node.title},
     )
 
@@ -87,7 +93,7 @@ def reveal(db: Session, node: Node, *, actor: str) -> WebhookConfigOut:
     """
     ensure_webhookable(db, node)
     config = _config(db, node)
-    _log(db, node, "revealed", actor)
+    _log(db, node, "webhook_secret_revealed", "Webhook credentials revealed", actor)
     return config
 
 
@@ -95,7 +101,46 @@ def rotate(db: Session, node: Node, *, actor: str) -> WebhookConfigOut:
     """Issue a new signing key. Callbacks signed with the old one stop being accepted."""
     ensure_webhookable(db, node)
     graph.update_node(db, node.id, webhook_secret=graph.new_webhook_secret())
-    _log(db, node, "rotated", actor)
+    _log(db, node, "webhook_secret_rotated", "Webhook signing secret rotated", actor)
     db.flush()
     db.refresh(node)
     return _config(db, node)
+
+
+def rotate_token(db: Session, node: Node, *, actor: str) -> WebhookConfigOut:
+    """Issue a new callback token — a new *address* (ADR-0085).
+
+    The counterpart to ``rotate``, and the one that was missing. Rotating the signing key
+    answers "the secret leaked"; only this answers "the URL leaked", and a callback URL is
+    the thing that ends up in pipeline config, proxy logs and screenshots. It existed as a
+    task-only internal route (``POST .../regenerate-token``) while the secret's rotation had
+    already been generalised to any webhookable node and given a v1 door.
+
+    The old address stops resolving immediately: every CI provider pointed at it must be
+    updated, which is why the whole config comes back rather than just the token.
+    """
+    ensure_webhookable(db, node)
+    graph.update_node(db, node.id, callback_token=str(uuid.uuid4()))
+    _log(db, node, "callback_token_rotated", "Webhook callback address rotated", actor)
+    db.flush()
+    db.refresh(node)
+    return _config(db, node)
+
+
+def build_history(db: Session, node: Node, *, limit: int = 20, offset: int = 0) -> list[WebhookEvent]:
+    """Inbound callbacks recorded against this node, newest first.
+
+    Lives here rather than on ``/webhook/`` where it used to (ADR-0085). That prefix is in
+    ``main.py``'s auth bypass because a CI runner cannot carry the owner's session — the
+    *callback* authenticates itself with a token and a signature. This read authenticated
+    itself with nothing at all and merely inherited the exemption by sharing a prefix, so
+    anyone holding a node id could read its build history off production.
+    """
+    return (
+        db.query(WebhookEvent)
+        .filter(WebhookEvent.task_id == node.id)
+        .order_by(WebhookEvent.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )

@@ -286,6 +286,7 @@ class TestContainerCallbacksNeverMutateTheProject:
             content=body,
             headers={"X-Hub-Signature-256": f"sha256={_hmac(project_webhook['secret'], body)}"},
         )
-        resp = client.get(f"/webhook/events/{sample_project.id}")
+        # Behind the password gate now, not on the auth-bypassed callback prefix (ADR-0085).
+        resp = client.get(f"/api/nodes/{sample_project.id}/webhook-events")
         assert resp.status_code == 200
         assert len(resp.json()) == 1

@@ -34,6 +34,7 @@ from app.schemas import (
     NodeOut,
     NodeUpdate,
     TaskOut,
+    WebhookEventOut,
 )
 from app.services import graph, node_data, webhook_credentials
 from app.services.activity import share_view_count
@@ -524,10 +525,9 @@ def api_get_share_views(node_id: str, db: Session = Depends(get_db), api_key: Ap
 def _load_webhookable(node_id: str, db: Session, api_key: ApiKey) -> Node:
     node = _load_node_or_404(node_id, db)
     _check_node_access(api_key, db, node)
-    try:
-        webhook_credentials.ensure_webhookable(db, node)
-    except webhook_credentials.WebhookCredentialError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # The type rule is the service's, and so is its refusal — one handler renders it for
+    # both doors, so they cannot answer it differently (ADR-0085).
+    webhook_credentials.ensure_webhookable(db, node)
     return node
 
 
@@ -572,3 +572,49 @@ def api_rotate_node_webhook_secret(
     config = webhook_credentials.rotate(db, node, actor=_build_actor(api_key))
     db.commit()
     return config
+
+
+@sub_router.post(
+    "/nodes/{node_id}/webhook/rotate-token",
+    response_model=WebhookConfigOut,
+    summary="Rotate a node's inbound CI/CD callback address",
+    description=(
+        "Issues a new `callback_token`, which is the callback *address*. The old URL stops "
+        "resolving immediately. Use this when the URL itself has leaked — it ends up in "
+        "pipeline config, proxy logs and screenshots — and `rotate-secret` when only the "
+        "signing key has. Returns the full config. Requires `admin` scope."
+    ),
+    responses=_auth_errors,
+)
+def api_rotate_node_callback_token(
+    node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
+):
+    _require_scope(api_key, "admin")
+    node = _load_webhookable(node_id, db, api_key)
+    config = webhook_credentials.rotate_token(db, node, actor=_build_actor(api_key))
+    db.commit()
+    return config
+
+
+@sub_router.get(
+    "/nodes/{node_id}/webhook-events",
+    response_model=list[WebhookEventOut],
+    summary="Build history for a node",
+    description=(
+        "Inbound CI/CD callbacks recorded against this node, newest first — provider, "
+        "status, commit, branch, build URL and the raw payload. A row is written for every "
+        "callback that arrives, including ones whose status this system could not map "
+        '(`status: "unmapped"`, ADR-0051). Requires `read` scope.'
+    ),
+    responses=_auth_errors,
+)
+def api_get_node_webhook_events(
+    node_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    node = _load_webhookable(node_id, db, api_key)
+    return webhook_credentials.build_history(db, node, limit=limit, offset=offset)
