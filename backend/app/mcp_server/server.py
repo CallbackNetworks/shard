@@ -446,6 +446,32 @@ async def _manage_workflow_rules(
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _manage_attachments(
+    action: str,
+    project_id: str,
+    task_id: str,
+    filename: str | None = None,
+    content_base64: str | None = None,
+    content_type: str | None = None,
+    attachment_id: str | None = None,
+) -> str:
+    base = f"/projects/{project_id}/tasks/{task_id}/attachments"
+    if action == "list":
+        result = await _get(base)
+    elif action == "upload":
+        if not filename or not content_base64:
+            return "Error: filename and content_base64 are required to upload"
+        body = {"filename": filename, "content_base64": content_base64, "content_type": content_type}
+        result = await _post(base, body)
+    elif action == "delete":
+        if not attachment_id:
+            return "Error: attachment_id is required to delete"
+        result = await _delete(f"{base}/{attachment_id}")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 # ── MCP tools ────────────────────────────────────────────────────────
 #
 # One decorated function per tool (ADR-0077). The schema is derived from the
@@ -873,6 +899,34 @@ async def manage_workflow_rules(
 ) -> str:
     return await _manage_workflow_rules(
         action=action, rule_id=rule_id, config=config, project_id=project_id, node_id=node_id
+    )
+
+
+@mcp.tool(
+    description=(
+        "List, upload or delete a task's file attachments (ADR-0086). This is where output "
+        "you produced belongs — a build log, a report, a diff — rather than pasted into a "
+        "comment where it cannot be downloaded. Upload takes the bytes base64-encoded in "
+        "content_base64, max 20MB decoded."
+    )
+)
+async def manage_attachments(
+    action: Literal["list", "upload", "delete"],
+    project_id: str,
+    task_id: str,
+    filename: str | None = None,
+    content_base64: str | None = None,
+    content_type: str | None = None,
+    attachment_id: str | None = None,
+) -> str:
+    return await _manage_attachments(
+        action=action,
+        project_id=project_id,
+        task_id=task_id,
+        filename=filename,
+        content_base64=content_base64,
+        content_type=content_type,
+        attachment_id=attachment_id,
     )
 
 

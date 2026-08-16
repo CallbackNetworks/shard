@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+"""Task recurrence for the SPA.
+
+Thin over ``services/recurrence_admin``, which ``/api/v1`` calls too (ADR-0086).
+"""
+
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import RecurrenceRule
 from app.schemas import RecurrenceRuleCreate, RecurrenceRuleOut, RecurrenceRuleUpdate
-from app.services import graph
+from app.services import recurrence_admin
 
 router = APIRouter(
     prefix="/projects/{project_id}/tasks/{task_id}/recurrence",
@@ -12,62 +16,21 @@ router = APIRouter(
 )
 
 
-def _get_task_or_404(project_id: str, task_id: str, db: Session) -> graph.TaskView:
-    task = graph.get_task(db, task_id)
-    if not task or task_id not in graph.contained_task_ids(db, project_id):
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
-
-
 @router.get("", response_model=RecurrenceRuleOut)
 def get_recurrence(project_id: str, task_id: str, db: Session = Depends(get_db)):
-    _get_task_or_404(project_id, task_id, db)
-    rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="No recurrence rule for this task")
-    return rule
+    return recurrence_admin.get(db, project_id, task_id)
 
 
 @router.post("", response_model=RecurrenceRuleOut, status_code=status.HTTP_201_CREATED)
 def set_recurrence(project_id: str, task_id: str, body: RecurrenceRuleCreate, db: Session = Depends(get_db)):
-    _get_task_or_404(project_id, task_id, db)
-    existing = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task_id).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="Recurrence rule already exists — use PATCH to update")
-    rule = RecurrenceRule(
-        template_task_id=task_id,
-        frequency=body.frequency,
-        interval_value=body.interval_value,
-        day_of_week=body.day_of_week,
-        day_of_month=body.day_of_month,
-        next_run_at=body.next_run_at,
-        end_date=body.end_date,
-        active=body.active,
-    )
-    db.add(rule)
-    db.commit()
-    db.refresh(rule)
-    return rule
+    return recurrence_admin.create(db, project_id, task_id, body)
 
 
 @router.patch("", response_model=RecurrenceRuleOut)
 def update_recurrence(project_id: str, task_id: str, body: RecurrenceRuleUpdate, db: Session = Depends(get_db)):
-    _get_task_or_404(project_id, task_id, db)
-    rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="No recurrence rule for this task")
-    for field, val in body.model_dump(exclude_unset=True).items():
-        setattr(rule, field, val)
-    db.commit()
-    db.refresh(rule)
-    return rule
+    return recurrence_admin.update(db, project_id, task_id, body)
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 def delete_recurrence(project_id: str, task_id: str, db: Session = Depends(get_db)):
-    _get_task_or_404(project_id, task_id, db)
-    rule = db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="No recurrence rule for this task")
-    db.delete(rule)
-    db.commit()
+    recurrence_admin.delete(db, project_id, task_id)

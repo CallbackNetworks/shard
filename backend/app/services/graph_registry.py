@@ -383,3 +383,93 @@ def seed_builtin_types(db: Session) -> None:
         if spec["key"] not in existing_edges:
             db.add(EdgeType(is_builtin=True, **spec))
     db.commit()
+
+
+# --- Edge types (ADR-0086) ---------------------------------------------------
+#
+# ADR-0079 gave node types a v1 door and deliberately left edge types read-only there,
+# reasoning that a relation created without endpoint declarations is what ADR-0078 closed.
+# That reason no longer holds up: the internal `/api/graph-types/edges` has always been
+# able to create one with `allowed_source`/`allowed_target` left NULL, so the restriction
+# never prevented an unconstrained relation — it only prevented an agent from reaching a
+# state the UI could reach in two clicks. What ADR-0078 actually buys is that a *declared*
+# endpoint rule is enforced, and that holds wherever the type came from.
+#
+# So the guards move here, next to the node-type ones, for the same reason those did: a
+# guard enforced at one door is not a guard.
+
+
+def edge_types_with_usage(db: Session) -> list[EdgeType]:
+    """Every edge type, built-ins first, each carrying how many edges use it."""
+    from sqlalchemy import func
+
+    from app.models import Edge
+
+    types = db.query(EdgeType).order_by(EdgeType.is_builtin.desc(), EdgeType.key).all()
+    counts = dict(db.query(Edge.rel_type, func.count(Edge.id)).group_by(Edge.rel_type).all())
+    for et in types:
+        et.usage_count = counts.get(et.key, 0)
+    return types
+
+
+def check_endpoint_rules(db: Session, body) -> None:
+    """Reject an endpoint declaration naming a role or node type that does not exist.
+
+    A rule carrying a typo constrains nothing and says nothing about why — the same
+    silent-empty-set trap ADR-0056 closed for condition values, applied to ADR-0078's
+    endpoint declarations.
+    """
+    known_types = {key for (key,) in db.query(NodeType.key).all()}
+    for side in ("allowed_source", "allowed_target"):
+        rule = getattr(body, side, None)
+        if rule is None:
+            continue
+        unknown_roles = [r for r in rule.roles if r not in graph.ROLES]
+        if unknown_roles:
+            raise TypeRegistryError(422, f"{side}: unknown role(s) {', '.join(unknown_roles)}")
+        unknown_types = [t for t in rule.types if t not in known_types]
+        if unknown_types:
+            raise TypeRegistryError(422, f"{side}: unknown node type(s) {', '.join(unknown_types)}")
+
+
+def create_edge_type(db: Session, body) -> EdgeType:
+    if db.get(EdgeType, body.key) is not None:
+        raise TypeRegistryError(409, f"edge type '{body.key}' already exists")
+    check_endpoint_rules(db, body)
+    et = EdgeType(is_builtin=False, **body.model_dump())
+    db.add(et)
+    db.commit()
+    db.refresh(et)
+    return et
+
+
+def update_edge_type(db: Session, key: str, body) -> EdgeType:
+    et = db.get(EdgeType, key)
+    if et is None:
+        raise TypeRegistryError(404, "edge type not found")
+    check_endpoint_rules(db, body)
+    fields = body.model_dump(exclude_unset=True)
+    # Built-in structural flags are immutable — mirroring the node-type role guard:
+    # flipping contains' is_containment would collapse the containment pipeline
+    # (project/task membership, structure map, unfiled detection).
+    if et.is_builtin and ("is_containment" in fields or "is_symmetric" in fields):
+        raise TypeRegistryError(400, "cannot change structural flags of a built-in edge type")
+    for field, value in fields.items():
+        setattr(et, field, value)
+    db.commit()
+    db.refresh(et)
+    return et
+
+
+def delete_edge_type(db: Session, key: str) -> None:
+    from app.models import Edge
+
+    et = db.get(EdgeType, key)
+    if et is None:
+        raise TypeRegistryError(404, "edge type not found")
+    if et.is_builtin:
+        raise TypeRegistryError(400, "cannot delete a built-in edge type")
+    if db.query(Edge.id).filter(Edge.rel_type == key).first() is not None:
+        raise TypeRegistryError(409, "edge type is still in use by existing edges")
+    db.delete(et)
+    db.commit()

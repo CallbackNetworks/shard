@@ -7,7 +7,7 @@ from app.database import get_db
 from app.routers.deps import get_cycle_or_404, get_task_or_404
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.schemas import CycleOut
-from app.services import graph
+from app.services import cycle_admin, graph
 from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.task_mutations import finalize_task_create
 from app.services.ws_manager import ws_manager
@@ -16,28 +16,18 @@ router = APIRouter(prefix="/projects/{project_id}/cycles", tags=["cycles"])
 
 
 def _enrich_cycle(cycle: graph.CycleView, db: Session) -> CycleOut:
-    tasks = graph.tasks_in_cycle(db, cycle.id)
-    task_ids = [t.id for t in tasks]
-    total = len(tasks)
-    done = sum(1 for t in tasks if t.status == "done")
-    out = CycleOut.model_validate(cycle)
-    out.task_ids = task_ids
-    out.total_tasks = total
-    out.done_tasks = done
-    return out
+    # One enrichment, shared with `/api/v1` (ADR-0086).
+    return cycle_admin.enrich(db, cycle)
 
 
 @router.get("", response_model=list[CycleOut])
 def list_cycles(project_id: str, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    return [_enrich_cycle(c, db) for c in graph.cycles_in_project(db, project_id)]
+    return cycle_admin.list_cycles(db, project_id)
 
 
 @router.get("/{cycle_id}", response_model=CycleOut)
 def get_cycle(project_id: str, cycle_id: str, db: Session = Depends(get_db)):
-    _get_project_or_404(project_id, db)
-    cycle = get_cycle_or_404(cycle_id, db, project_id=project_id)
-    return _enrich_cycle(cycle, db)
+    return cycle_admin.get_cycle(db, project_id, cycle_id)
 
 
 # Cycle create/update/delete retired (ADR-0043): a cycle is a container-scoped node —
@@ -126,42 +116,4 @@ def compare_cycles(
     db: Session = Depends(get_db),
 ):
     """Compare two cycles side-by-side: task counts, completion rates, velocity."""
-    _get_project_or_404(project_id, db)
-
-    def _stats(cid):
-        cycle = graph.get_cycle(db, cid, project_id=project_id)
-        if not cycle:
-            return None
-        tasks = graph.tasks_in_cycle(db, cycle.id)
-        total = len(tasks)
-        done = sum(1 for t in tasks if t.status == "done")
-        failed = sum(1 for t in tasks if t.status == "failed")
-        in_prog = sum(1 for t in tasks if t.status == "in_progress")
-        est = sum(t.time_estimate or 0 for t in tasks)
-        spent = sum(t.time_spent or 0 for t in tasks)
-        duration_days = None
-        if cycle.start_date and cycle.end_date:
-            duration_days = (cycle.end_date - cycle.start_date).days
-        return {
-            "cycle_id": cycle.id,
-            "name": cycle.name,
-            "status": cycle.status,
-            "total_tasks": total,
-            "done": done,
-            "in_progress": in_prog,
-            "failed": failed,
-            "completion_rate": round(done / total * 100, 1) if total else 0,
-            "duration_days": duration_days,
-            "total_estimate_min": est,
-            "total_spent_min": spent,
-            "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
-            "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
-        }
-
-    a = _stats(cycle_id)
-    b = _stats(compare_with)
-    if not a:
-        raise HTTPException(status_code=404, detail="Cycle not found")
-    if not b:
-        raise HTTPException(status_code=404, detail="Comparison cycle not found")
-    return {"cycle_a": a, "cycle_b": b}
+    return cycle_admin.compare(db, project_id, cycle_id, compare_with)

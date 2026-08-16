@@ -1,34 +1,22 @@
-import os
-import uuid
-from pathlib import Path
+"""Task attachments for the SPA.
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+Thin over ``services/attachment_admin``, which ``/api/v1`` calls too (ADR-0086).
+"""
+
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Attachment
 from app.schemas import AttachmentOut
-from app.services import graph
-
-UPLOAD_DIR = Path("/app/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+from app.services import attachment_admin
 
 router = APIRouter(prefix="/projects/{project_id}/tasks/{task_id}/attachments", tags=["attachments"])
 
 
 @router.get("", response_model=list[AttachmentOut])
 def list_attachments(project_id: str, task_id: str, db: Session = Depends(get_db)):
-    return (
-        db.query(Attachment)
-        .filter(
-            Attachment.task_id == task_id,
-            Attachment.project_id == project_id,
-        )
-        .order_by(Attachment.created_at.desc())
-        .all()
-    )
+    return attachment_admin.list_for_task(db, project_id, task_id)
 
 
 @router.post("", response_model=AttachmentOut, status_code=status.HTTP_201_CREATED)
@@ -38,78 +26,26 @@ async def upload_attachment(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    if not graph.get_task(db, task_id) or task_id not in graph.contained_task_ids(db, project_id):
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    file_id = str(uuid.uuid4())
-    ext = Path(file.filename or "file").suffix
-    storage_name = f"{file_id}{ext}"
-    storage_path = UPLOAD_DIR / storage_name
-
-    chunk_size = 64 * 1024  # 64KB
-    total_size = 0
-    try:
-        with open(storage_path, "wb") as f:
-            while True:
-                chunk = await file.read(chunk_size)
-                if not chunk:
-                    break
-                total_size += len(chunk)
-                if total_size > MAX_FILE_SIZE:
-                    f.close()
-                    storage_path.unlink(missing_ok=True)
-                    raise HTTPException(status_code=400, detail="File too large (max 20MB)")
-                f.write(chunk)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        storage_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=500, detail="Failed to save file") from exc
-
-    attachment = Attachment(
-        task_id=task_id,
-        project_id=project_id,
+    # One bounded read rather than a chunk loop: the limit lives in the service so both
+    # upload paths obey the same one, and reading one byte past it is what proves it was
+    # exceeded. Memory stays bounded by MAX_FILE_SIZE.
+    content = await file.read(attachment_admin.MAX_FILE_SIZE + 1)
+    return attachment_admin.store(
+        db,
+        project_id,
+        task_id,
         filename=file.filename or "file",
-        content_type=file.content_type or "application/octet-stream",
-        size=total_size,
-        storage_path=str(storage_path),
+        content=content,
+        content_type=file.content_type,
     )
-    db.add(attachment)
-    db.commit()
-    db.refresh(attachment)
-    return attachment
 
 
 @router.get("/{attachment_id}/download")
 def download_attachment(project_id: str, task_id: str, attachment_id: str, db: Session = Depends(get_db)):
-    att = (
-        db.query(Attachment)
-        .filter(
-            Attachment.id == attachment_id,
-            Attachment.task_id == task_id,
-        )
-        .first()
-    )
-    if not att:
-        raise HTTPException(status_code=404, detail="Attachment not found")
-    if not os.path.exists(att.storage_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
+    att = attachment_admin.readable_path(db, task_id, attachment_id)
     return FileResponse(att.storage_path, filename=att.filename, media_type=att.content_type)
 
 
 @router.delete("/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_attachment(project_id: str, task_id: str, attachment_id: str, db: Session = Depends(get_db)):
-    att = (
-        db.query(Attachment)
-        .filter(
-            Attachment.id == attachment_id,
-            Attachment.task_id == task_id,
-        )
-        .first()
-    )
-    if not att:
-        raise HTTPException(status_code=404, detail="Attachment not found")
-    if os.path.exists(att.storage_path):
-        os.remove(att.storage_path)
-    db.delete(att)
-    db.commit()
+    attachment_admin.delete(db, task_id, attachment_id)

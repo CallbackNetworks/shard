@@ -26,8 +26,10 @@ from app.routers.external_api.search import sub_router as search_router
 from app.routers.external_api.stats import sub_router as stats_router
 from app.routers.external_api.subscriptions import sub_router as subscriptions_router
 from app.routers.external_api.summary import sub_router as summary_router
+from app.routers.external_api.task_resources import sub_router as task_resources_router
 from app.routers.external_api.tasks import sub_router as tasks_router
 from app.routers.external_api.tools_schema import sub_router as tools_schema_router
+from app.routers.external_api.transfer import sub_router as transfer_router
 from app.routers.external_api.workflow_rules import sub_router as workflow_rules_router
 from app.services.rate_limiter import api_rate_limit
 
@@ -38,6 +40,10 @@ router.include_router(nodes_router)
 router.include_router(edge_types_router)
 router.include_router(node_types_router)
 router.include_router(projects_router)
+# Before `tasks_router`: `/projects/{id}/tasks/export` would otherwise be swallowed by
+# `/projects/{id}/tasks/{task_id}` with task_id="export". Routing is first-match, and the
+# literal segment has to be offered first (ADR-0086).
+router.include_router(transfer_router)
 router.include_router(tasks_router)
 router.include_router(stats_router)
 router.include_router(email_router)
@@ -59,3 +65,6 @@ router.include_router(subscriptions_router)
 router.include_router(cicd_router)
 router.include_router(integrations_router)
 router.include_router(workflow_rules_router)
+# ADR-0086: the read/write asymmetries — recurrence, attachments, cycle reads. (The
+# transfer router is included further up, where its literal path segment must win.)
+router.include_router(task_resources_router)

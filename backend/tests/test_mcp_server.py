@@ -733,13 +733,35 @@ async def test_manage_webhook_rejects_an_action_that_is_not_one():
         await _call("manage_webhook", {"action": "delete", "node_id": "t1"})
 
 
+@pytest.mark.asyncio
+async def test_manage_attachments_upload():
+    with _patch_client("post", _mock_response(json_data={"id": "a1", "filename": "build.log"})):
+        text = await _call(
+            "manage_attachments",
+            {
+                "action": "upload",
+                "project_id": "p1",
+                "task_id": "t1",
+                "filename": "build.log",
+                "content_base64": "aGk=",
+            },
+        )
+    assert json.loads(text)["filename"] == "build.log"
+
+
+@pytest.mark.asyncio
+async def test_manage_attachments_upload_without_bytes_says_so():
+    text = await _call("manage_attachments", {"action": "upload", "project_id": "p1", "task_id": "t1"})
+    assert "content_base64" in text
+
+
 # ── MCP registry: list_tools ────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 33
+    assert len(tools) == 34
 
 
 @pytest.mark.asyncio
@@ -791,6 +813,8 @@ async def test_list_tools_names():
         "retry_delivery",
         "get_rule_vocabulary",
         "manage_workflow_rules",
+        # ADR-0086: an agent's output is mostly files and it had nowhere to put one.
+        "manage_attachments",
     }
     assert names == expected
 

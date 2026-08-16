@@ -7,11 +7,9 @@ cannot be deleted while nodes/edges of that type still exist.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Edge, EdgeType, NodeType
 from app.schemas import (
     EdgeTypeCreate,
     EdgeTypeOut,
@@ -20,8 +18,8 @@ from app.schemas import (
     NodeTypeOut,
     NodeTypeUpdate,
 )
-from app.services import graph, node_data
 from app.services import graph_registry as type_registry
+from app.services import node_data
 
 router = APIRouter(prefix="/graph-types", tags=["graph-types"])
 
@@ -82,72 +80,19 @@ def delete_node_type(key: str, db: Session = Depends(get_db)):
 
 @router.get("/edges", response_model=list[EdgeTypeOut])
 def list_edge_types(db: Session = Depends(get_db)):
-    types = db.query(EdgeType).order_by(EdgeType.is_builtin.desc(), EdgeType.key).all()
-    counts = dict(db.query(Edge.rel_type, func.count(Edge.id)).group_by(Edge.rel_type).all())
-    for et in types:
-        et.usage_count = counts.get(et.key, 0)
-    return types
-
-
-def _check_endpoint_rules(db: Session, body) -> None:
-    """Reject an endpoint declaration naming a role or node type that does not exist.
-
-    A rule carrying a typo constrains nothing and says nothing about why — the same
-    silent-empty-set trap ADR-0056 closed for condition values, applied to ADR-0078's
-    endpoint declarations.
-    """
-    known_types = {key for (key,) in db.query(NodeType.key).all()}
-    for side in ("allowed_source", "allowed_target"):
-        rule = getattr(body, side, None)
-        if rule is None:
-            continue
-        unknown_roles = [r for r in rule.roles if r not in graph.ROLES]
-        if unknown_roles:
-            raise HTTPException(status_code=422, detail=f"{side}: unknown role(s) {', '.join(unknown_roles)}")
-        unknown_types = [t for t in rule.types if t not in known_types]
-        if unknown_types:
-            raise HTTPException(status_code=422, detail=f"{side}: unknown node type(s) {', '.join(unknown_types)}")
+    return type_registry.edge_types_with_usage(db)
 
 
 @router.post("/edges", response_model=EdgeTypeOut, status_code=status.HTTP_201_CREATED)
 def create_edge_type(body: EdgeTypeCreate, db: Session = Depends(get_db)):
-    if db.get(EdgeType, body.key) is not None:
-        raise HTTPException(status_code=409, detail=f"edge type '{body.key}' already exists")
-    _check_endpoint_rules(db, body)
-    et = EdgeType(is_builtin=False, **body.model_dump())
-    db.add(et)
-    db.commit()
-    db.refresh(et)
-    return et
+    return _registry(lambda: type_registry.create_edge_type(db, body))
 
 
 @router.patch("/edges/{key}", response_model=EdgeTypeOut)
 def update_edge_type(key: str, body: EdgeTypeUpdate, db: Session = Depends(get_db)):
-    et = db.get(EdgeType, key)
-    if et is None:
-        raise HTTPException(status_code=404, detail="edge type not found")
-    _check_endpoint_rules(db, body)
-    fields = body.model_dump(exclude_unset=True)
-    # Built-in structural flags are immutable — mirroring the node-type role
-    # guard: flipping contains' is_containment would collapse the containment
-    # pipeline (project/task membership, structure map, unfiled detection).
-    if et.is_builtin and ("is_containment" in fields or "is_symmetric" in fields):
-        raise HTTPException(status_code=400, detail="cannot change structural flags of a built-in edge type")
-    for field, value in fields.items():
-        setattr(et, field, value)
-    db.commit()
-    db.refresh(et)
-    return et
+    return _registry(lambda: type_registry.update_edge_type(db, key, body))
 
 
 @router.delete("/edges/{key}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_edge_type(key: str, db: Session = Depends(get_db)):
-    et = db.get(EdgeType, key)
-    if et is None:
-        raise HTTPException(status_code=404, detail="edge type not found")
-    if et.is_builtin:
-        raise HTTPException(status_code=400, detail="cannot delete a built-in edge type")
-    if db.query(Edge.id).filter(Edge.rel_type == key).first() is not None:
-        raise HTTPException(status_code=409, detail="edge type is still in use by existing edges")
-    db.delete(et)
-    db.commit()
+    _registry(lambda: type_registry.delete_edge_type(db, key))

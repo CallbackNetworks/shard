@@ -31,7 +31,7 @@ def test_list_attachments_empty(client, db, sample_project):
 def test_upload_attachment(client, db, sample_project, tmp_path):
     task = _make_task(db, sample_project.id)
 
-    with patch("app.routers.attachments.UPLOAD_DIR", tmp_path):
+    with patch("app.services.attachment_admin.UPLOAD_DIR", tmp_path):
         r = client.post(
             _url(sample_project.id, task.id),
             files={"file": ("test.txt", b"hello world", "text/plain")},
@@ -50,7 +50,7 @@ def test_upload_attachment(client, db, sample_project, tmp_path):
 def test_list_after_upload(client, db, sample_project, tmp_path):
     task = _make_task(db, sample_project.id)
 
-    with patch("app.routers.attachments.UPLOAD_DIR", tmp_path):
+    with patch("app.services.attachment_admin.UPLOAD_DIR", tmp_path):
         client.post(
             _url(sample_project.id, task.id),
             files={"file": ("readme.md", b"# Hello", "text/markdown")},
@@ -70,7 +70,7 @@ def test_upload_attachment_fields(client, db, sample_project, tmp_path):
     task = _make_task(db, sample_project.id)
     content = b"some binary data here"
 
-    with patch("app.routers.attachments.UPLOAD_DIR", tmp_path):
+    with patch("app.services.attachment_admin.UPLOAD_DIR", tmp_path):
         r = client.post(
             _url(sample_project.id, task.id),
             files={"file": ("data.bin", content, "application/octet-stream")},
@@ -90,7 +90,7 @@ def test_download_attachment(client, db, sample_project, tmp_path):
     task = _make_task(db, sample_project.id)
     file_content = b"download me please"
 
-    with patch("app.routers.attachments.UPLOAD_DIR", tmp_path):
+    with patch("app.services.attachment_admin.UPLOAD_DIR", tmp_path):
         upload_r = client.post(
             _url(sample_project.id, task.id),
             files={"file": ("dl.txt", file_content, "text/plain")},
@@ -108,7 +108,7 @@ def test_download_attachment(client, db, sample_project, tmp_path):
 def test_delete_attachment(client, db, sample_project, tmp_path):
     task = _make_task(db, sample_project.id)
 
-    with patch("app.routers.attachments.UPLOAD_DIR", tmp_path):
+    with patch("app.services.attachment_admin.UPLOAD_DIR", tmp_path):
         upload_r = client.post(
             _url(sample_project.id, task.id),
             files={"file": ("remove.txt", b"bye", "text/plain")},
@@ -127,7 +127,7 @@ def test_delete_attachment(client, db, sample_project, tmp_path):
 
 
 def test_upload_to_nonexistent_task(client, db, sample_project, tmp_path):
-    with patch("app.routers.attachments.UPLOAD_DIR", tmp_path):
+    with patch("app.services.attachment_admin.UPLOAD_DIR", tmp_path):
         r = client.post(
             _url(sample_project.id, "nonexistent-task-id"),
             files={"file": ("test.txt", b"data", "text/plain")},

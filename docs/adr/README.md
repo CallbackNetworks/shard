@@ -87,3 +87,4 @@
 | [0083](0083-a-filter-narrows-the-work-not-the-view.md) | 篩選縮小的是工作，不是某一個檢視 | Accepted | 2026-08-15 |
 | [0084](0084-configuring-ci-is-not-a-browser-only-act.md) | 設定 CI/CD 不能只有瀏覽器做得到 | Accepted | 2026-08-16 |
 | [0085](0085-a-capability-is-not-browser-only.md) | 一個能力不能只有瀏覽器做得到 | Accepted | 2026-08-16 |
+| [0086](0086-a-field-you-can-read-is-a-field-you-can-write.md) | 讀得到的東西就要寫得了 | Accepted | 2026-08-16 |
