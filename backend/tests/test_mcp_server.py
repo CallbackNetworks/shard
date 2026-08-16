@@ -612,13 +612,41 @@ async def test_manage_edges_remove():
     assert json.loads(text)["status"] == "deleted"
 
 
+# ── Tools: manage_webhook (ADR-0084) ────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_manage_webhook_reveal():
+    config = {"callback_token": "cb-1", "secret": "s3cret", "path": "/webhook/callback/cb-1"}
+    with _patch_client("get", _mock_response(json_data=config)):
+        text = await _call("manage_webhook", {"action": "reveal", "node_id": "t1"})
+    # The whole point of the tool: the agent gets everything CI needs, in one call.
+    assert json.loads(text)["path"] == "/webhook/callback/cb-1"
+    assert json.loads(text)["secret"] == "s3cret"
+
+
+@pytest.mark.asyncio
+async def test_manage_webhook_rotate():
+    with _patch_client("post", _mock_response(json_data={"secret": "new-one"})):
+        text = await _call("manage_webhook", {"action": "rotate", "node_id": "t1"})
+    assert json.loads(text)["secret"] == "new-one"
+
+
+@pytest.mark.asyncio
+async def test_manage_webhook_rejects_an_action_that_is_not_one():
+    """An out-of-enum value is a protocol error, not a result whose text says 'error'
+    (ADR-0077) — the enum comes from the signature, so there is nothing to keep in step."""
+    with pytest.raises(ToolError):
+        await _call("manage_webhook", {"action": "delete", "node_id": "t1"})
+
+
 # ── MCP registry: list_tools ────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 25
+    assert len(tools) == 26
 
 
 @pytest.mark.asyncio
@@ -655,6 +683,9 @@ async def test_list_tools_names():
         # legal values; creating a layer was a UI-only capability.
         "list_node_types",
         "create_node_type",
+        # ADR-0084: inbound CI/CD credentials were readable only from the internal API,
+        # which in production sits behind the password gate — so no agent could reach it.
+        "manage_webhook",
     }
     assert names == expected
 

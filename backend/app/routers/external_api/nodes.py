@@ -35,7 +35,7 @@ from app.schemas import (
     NodeUpdate,
     TaskOut,
 )
-from app.services import graph, node_data
+from app.services import graph, node_data, webhook_credentials
 from app.services.activity import share_view_count
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
@@ -46,6 +46,7 @@ from app.services.graph_dispatch import (
     dispatch_node_updated,
 )
 from app.services.task_mutations import AgentKeyError
+from app.services.webhook_credentials import WebhookConfigOut
 
 sub_router = APIRouter()
 
@@ -502,3 +503,72 @@ def api_get_share_views(node_id: str, db: Session = Depends(get_db), api_key: Ap
     _require_scope(api_key, "read")
     _load_shareable(node_id, db, api_key)
     return {"view_count": share_view_count(db, node_id)}
+
+
+# ── Inbound CI/CD callback credentials (ADR-0084) ─────────────────
+#
+# The same act as GET /api/nodes/{id}/webhook, through the door an agent can reach. It
+# was internal-only, which in production means behind AUTH_PASSWORD, which means CI could
+# only be configured by a person in a browser — while /api/v1/subscriptions had already
+# accepted that an agent registers its own outbound callbacks.
+#
+# ``admin``, not ``write``, and that is not caution: the redaction middleware strips
+# ``callback_token`` from every v1 response for a lesser key (ADR-0059), so a ``write``
+# key would receive a config with the address missing and no way to tell. The rule is
+# response-shaped on purpose — a new endpoint must not be able to be written without it —
+# so the right move is to meet it rather than carve an exception into it. Handing out a
+# token plus its signing key mints an unauthenticated write path into the system; that is
+# an administrative act, not an ordinary one.
+
+
+def _load_webhookable(node_id: str, db: Session, api_key: ApiKey) -> Node:
+    node = _load_node_or_404(node_id, db)
+    _check_node_access(api_key, db, node)
+    try:
+        webhook_credentials.ensure_webhookable(db, node)
+    except webhook_credentials.WebhookCredentialError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return node
+
+
+@sub_router.get(
+    "/nodes/{node_id}/webhook",
+    response_model=WebhookConfigOut,
+    summary="Reveal a node's inbound CI/CD callback credentials",
+    description=(
+        "Returns the `callback_token` and signing `secret` a CI provider needs to post "
+        "build results to `POST /webhook/callback/{callback_token}`, plus the `path` to "
+        "post to. Credentials are minted on first request for nodes that lack them. "
+        "Callbacks are signed with HMAC-SHA256 over the raw body and rejected without a "
+        "valid `X-Hub-Signature-256` (ADR-0060). Requires `admin` scope; the reveal is "
+        "recorded in the activity log."
+    ),
+    responses=_auth_errors,
+)
+def api_get_node_webhook_config(node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
+    _require_scope(api_key, "admin")
+    node = _load_webhookable(node_id, db, api_key)
+    config = webhook_credentials.reveal(db, node, actor=_build_actor(api_key))
+    db.commit()
+    return config
+
+
+@sub_router.post(
+    "/nodes/{node_id}/webhook/rotate-secret",
+    response_model=WebhookConfigOut,
+    summary="Rotate a node's inbound CI/CD signing secret",
+    description=(
+        "Issues a new signing secret and returns the full config. Callbacks signed with "
+        "the old secret stop being accepted immediately, so update the CI provider in the "
+        "same change. The `callback_token` is unaffected. Requires `admin` scope."
+    ),
+    responses=_auth_errors,
+)
+def api_rotate_node_webhook_secret(
+    node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
+):
+    _require_scope(api_key, "admin")
+    node = _load_webhookable(node_id, db, api_key)
+    config = webhook_credentials.rotate(db, node, actor=_build_actor(api_key))
+    db.commit()
+    return config

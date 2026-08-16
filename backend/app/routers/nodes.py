@@ -28,8 +28,8 @@ from app.schemas import (
     NodeUpdate,
     TaskOut,
 )
-from app.services import graph, node_data
-from app.services.activity import log_activity, share_view_count
+from app.services import graph, node_data, webhook_credentials
+from app.services.activity import share_view_count
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -39,6 +39,7 @@ from app.services.graph_dispatch import (
     dispatch_node_updated,
 )
 from app.services.task_mutations import AgentKeyError
+from app.services.webhook_credentials import WebhookConfigOut
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -386,67 +387,28 @@ def get_node_share_views(node_id: str, db: Session = Depends(get_db)):
 # outcome to apply, but push/CI events are worth logging against it (ADR-0082). Unlike
 # a task, a container is never minted with these at creation — every write path that
 # creates one would need touching — so they are provisioned lazily on first reveal.
-
-
-class WebhookConfigOut(BaseModel):
-    """Everything needed to configure a CI provider, and nothing that reads back later."""
-
-    callback_token: str
-    secret: str
-    path: str
+#
+# The act itself lives in services/webhook_credentials.py, because /api/v1 performs the
+# same one (ADR-0084). What stays here is what is this door's own: no scope to check,
+# because reaching /api at all means the session passed the password gate.
 
 
 def _load_webhook_node(node_id: str, db: Session) -> Node:
     node = db.get(Node, node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="node not found")
-    if node.type not in graph.webhookable_type_keys(db):
-        raise HTTPException(status_code=400, detail="node type does not receive webhook callbacks")
+    try:
+        webhook_credentials.ensure_webhookable(db, node)
+    except webhook_credentials.WebhookCredentialError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return node
-
-
-def _webhook_config(node: Node, db: Session) -> WebhookConfigOut:
-    data = node.data or {}
-    token = data.get("callback_token")
-    secret = data.get("webhook_secret")
-    if not token or not secret:
-        # Tasks always get both at creation (_apply_task_data_defaults); a container
-        # never has, so this is where it first gets them.
-        token = token or str(uuid.uuid4())
-        secret = secret or graph.new_webhook_secret()
-        node = graph.update_node(db, node.id, callback_token=token, webhook_secret=secret)
-        db.flush()
-    # A path, not a URL: behind a reverse proxy the server's own idea of its origin is
-    # whatever the last hop told it, while the client asking already knows the real one.
-    return WebhookConfigOut(callback_token=token, secret=secret, path=f"/webhook/callback/{token}")
-
-
-def _log_webhook_credential_event(db: Session, node: Node, verb: str) -> None:
-    """Log a reveal/rotate against the right scope: a task's own row, or the
-    container it is (there is no task to point at)."""
-    is_task = node.type in graph.task_type_keys(db)
-    log_activity(
-        db,
-        f"task.webhook_secret_{verb}" if is_task else f"project.webhook_secret_{verb}",
-        project_id=graph.project_id_of_task(db, node.id) if is_task else node.id,
-        task_id=node.id if is_task else None,
-        actor="user",
-        detail=f'Webhook credentials {verb} for "{node.title}"',
-        meta={"title": node.title},
-    )
 
 
 @router.get("/{node_id}/webhook", response_model=WebhookConfigOut)
 def get_node_webhook_config(node_id: str, db: Session = Depends(get_db)):
-    """Reveal the callback credentials for one node, as a deliberate act.
-
-    A separate request rather than a field on the node, so that reading the secret is
-    something a person did at a moment that can be pointed at, instead of something that
-    rode along in every list response.
-    """
+    """Reveal the callback credentials for one node, as a deliberate act."""
     node = _load_webhook_node(node_id, db)
-    config = _webhook_config(node, db)
-    _log_webhook_credential_event(db, node, "revealed")
+    config = webhook_credentials.reveal(db, node, actor="user")
     db.commit()
     return config
 
@@ -455,8 +417,6 @@ def get_node_webhook_config(node_id: str, db: Session = Depends(get_db)):
 def rotate_node_webhook_secret(node_id: str, db: Session = Depends(get_db)):
     """Issue a new signing key. Callbacks signed with the old one stop being accepted."""
     node = _load_webhook_node(node_id, db)
-    graph.update_node(db, node_id, webhook_secret=graph.new_webhook_secret())
-    _log_webhook_credential_event(db, node, "rotated")
+    config = webhook_credentials.rotate(db, node, actor="user")
     db.commit()
-    db.refresh(node)
-    return _webhook_config(node, db)
+    return config

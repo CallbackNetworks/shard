@@ -114,6 +114,15 @@ def api_agent_context(
             # only "Relationships are edges", so choosing between contains and owns was
             # a guess whose only feedback was a silently useless edge.
             "relations": relation_vocabulary(db),
+            # Both directions of the CI/CD story, because for a long time only the
+            # outbound one had a door an agent could reach (ADR-0084).
+            "cicd": (
+                "Outbound: POST /api/v1/subscriptions {callback_url, events} to be notified "
+                "of platform events. Inbound: GET /api/v1/nodes/{id}/webhook (admin scope) "
+                "returns the callback path and HMAC-SHA256 signing secret a CI provider "
+                "posts build results to; POST /api/v1/nodes/{id}/webhook/rotate-secret "
+                "replaces the secret. Unsigned callbacks are rejected."
+            ),
         },
         projects=project_infos,
         quick_start=(

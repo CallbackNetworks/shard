@@ -32,6 +32,7 @@ TaskStatus = Literal["todo", "in_progress", "done", "failed"]
 Priority = Literal["low", "medium", "high"]
 ProjectStatus = Literal["active", "archived"]
 ManageAction = Literal["list", "add", "remove"]
+WebhookAction = Literal["reveal", "rotate"]
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://backend:8000")
 API_KEY = os.environ.get("API_KEY", "")
@@ -337,6 +338,16 @@ async def _manage_edges(
         if not target_id or not rel_type:
             return "Error: target_id and rel_type are required to remove an edge"
         result = await _delete(f"/nodes/{node_id}/edges?target_id={target_id}&rel_type={rel_type}")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_webhook(action: str, node_id: str) -> str:
+    if action == "reveal":
+        result = await _get(f"/nodes/{node_id}/webhook")
+    elif action == "rotate":
+        result = await _post(f"/nodes/{node_id}/webhook/rotate-secret")
     else:
         return f"Error: unknown action '{action}'"
     return json.dumps(result) if not isinstance(result, str) else result
@@ -655,6 +666,21 @@ async def manage_edges(
 ) -> str:
     """node_id is the edge's source; target_id + rel_type are required for add/remove."""
     return await _manage_edges(action=action, node_id=node_id, target_id=target_id, rel_type=rel_type)
+
+
+@mcp.tool(
+    description=(
+        "Configure inbound CI/CD callbacks for a task or project (ADR-0084). 'reveal' "
+        "returns the callback_token, the HMAC-SHA256 signing secret, and the path to "
+        "POST build results to; minting them if the node has none. 'rotate' issues a new "
+        "signing secret and invalidates the old one. Give the returned path and secret to "
+        "the CI provider — unsigned callbacks are rejected. Needs an admin-scope API key: "
+        "these credentials are an unauthenticated write path into the platform."
+    )
+)
+async def manage_webhook(action: WebhookAction, node_id: str) -> str:
+    """node_id is the task or project that should receive the build results."""
+    return await _manage_webhook(action=action, node_id=node_id)
 
 
 # ── MCP resources ────────────────────────────────────────────────────
