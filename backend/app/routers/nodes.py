@@ -9,7 +9,6 @@ Free-form containment is the point: a custom node may contain a project/task via
 a ``contains`` edge; only ``detect_cycle`` guards the structure.
 """
 
-import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -29,8 +28,7 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import graph, node_data, webhook_credentials
-from app.services.activity import share_view_count
+from app.services import graph, node_data, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -303,15 +301,6 @@ async def detach_edge(
 # has one implementation instead of one per entity type (ADR-0070).
 
 
-def _load_shareable_node(node_id: str, db: Session) -> Node:
-    node = db.get(Node, node_id)
-    if node is None:
-        raise HTTPException(status_code=404, detail="node not found")
-    if not graph.node_is_shareable(db, node):
-        raise HTTPException(status_code=400, detail="node type is not shareable")
-    return node
-
-
 class SetPinBody(BaseModel):
     pin: str
 
@@ -326,55 +315,33 @@ class SetGuestNotesBody(BaseModel):
 
 @router.post("/{node_id}/share/rotate-token")
 def rotate_node_share_token(node_id: str, db: Session = Depends(get_db)):
-    _load_shareable_node(node_id, db)
-    token = str(uuid.uuid4())
-    graph.update_node(db, node_id, share_token=token)
-    db.commit()
-    return {"share_token": token}
+    return share_admin.rotate_token(db, share_admin.load(db, node_id).id)
 
 
 @router.post("/{node_id}/share/set-pin")
 def set_node_share_pin(node_id: str, body: SetPinBody, db: Session = Depends(get_db)):
-    from app.services.pin_utils import hash_pin
-
-    _load_shareable_node(node_id, db)
-    if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
-    graph.update_node(db, node_id, share_pin_hash=hash_pin(body.pin))
-    db.commit()
-    return {"ok": True}
+    return share_admin.set_pin(db, share_admin.load(db, node_id).id, body.pin)
 
 
 @router.delete("/{node_id}/share/pin")
 def clear_node_share_pin(node_id: str, db: Session = Depends(get_db)):
-    _load_shareable_node(node_id, db)
-    graph.update_node(db, node_id, share_pin_hash=None)
-    db.commit()
-    return {"ok": True}
+    return share_admin.clear_pin(db, share_admin.load(db, node_id).id)
 
 
 @router.post("/{node_id}/share/set-expiry")
 def set_node_share_expiry(node_id: str, body: SetExpiryBody, db: Session = Depends(get_db)):
-    _load_shareable_node(node_id, db)
-    # Stored as an ISO string in node.data (update_node does not encode datetimes).
-    graph.update_node(db, node_id, share_expires_at=body.expires_at.isoformat() if body.expires_at else None)
-    db.commit()
-    return {"ok": True}
+    return share_admin.set_expiry(db, share_admin.load(db, node_id).id, body.expires_at)
 
 
 @router.post("/{node_id}/share/set-guest-notes")
 def set_node_guest_notes(node_id: str, body: SetGuestNotesBody, db: Session = Depends(get_db)):
     """Let (or stop letting) visitors leave notes on this node's share page (ADR-0016)."""
-    _load_shareable_node(node_id, db)
-    graph.update_node(db, node_id, allow_guest_notes=body.allowed)
-    db.commit()
-    return {"ok": True}
+    return share_admin.set_guest_notes(db, share_admin.load(db, node_id).id, body.allowed)
 
 
 @router.get("/{node_id}/share-views")
 def get_node_share_views(node_id: str, db: Session = Depends(get_db)):
-    _load_shareable_node(node_id, db)
-    return {"view_count": share_view_count(db, node_id)}
+    return share_admin.view_count(db, share_admin.load(db, node_id).id)
 
 
 # --- Inbound webhook credentials (ADR-0060, generalized to containers by ADR-0082) --

@@ -7,7 +7,6 @@ the SPA use, so behaviour is identical; API-key ``scope`` and project-access che
 are layered on top (see ``auth._check_node_access`` / ``_check_create_access``).
 """
 
-import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -36,8 +35,7 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import graph, node_data, webhook_credentials
-from app.services.activity import share_view_count
+from app.services import graph, node_data, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -413,6 +411,12 @@ def api_node_events(
 
 
 # ── Share facade (shareable-role nodes) ───────────────────────────
+#
+# Every rule here is `services/share_admin`'s, shared with `/api/nodes` (ADR-0087). This
+# door was written fresh alongside the internal one and minted its own token from its own
+# uuid4(); nothing had broken, which is the state ADR-0070 warns about — a duplicate that
+# still works has no failure symptom, and ADR-0072 was the bill for the last one. What
+# stays here is this door's own: the scope, and which nodes this key may touch.
 
 
 class SetPinBody(BaseModel):
@@ -428,45 +432,46 @@ class SetGuestNotesBody(BaseModel):
 
 
 def _load_shareable(node_id: str, db: Session, api_key: ApiKey) -> Node:
-    node = _load_node_or_404(node_id, db)
+    node = share_admin.load(db, node_id)
     _check_node_access(api_key, db, node)
-    if not graph.node_is_shareable(db, node):
-        raise HTTPException(status_code=400, detail="node type is not shareable")
     return node
 
 
-@sub_router.post("/nodes/{node_id}/share/rotate-token", summary="Rotate a node's share token", responses=_auth_errors)
+@sub_router.post(
+    "/nodes/{node_id}/share/rotate-token",
+    summary="Rotate a node's share token",
+    description=(
+        "Issues a new share token and returns it. The old link — and the calendar feed that "
+        "reuses the same token — stop resolving immediately. Requires `admin` scope: the "
+        "token *is* the public URL, so the response carries a capability, and the redaction "
+        "middleware withholds it from a lesser key (ADR-0059)."
+    ),
+    responses=_auth_errors,
+)
 def api_rotate_share_token(node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
-    _require_scope(api_key, "write")
+    # `write` until ADR-0087, which is how this was found: the middleware stripped
+    # `share_token` from the response for any lesser key, so a `write` key rotated the
+    # token — breaking the live link — and got back `200 {}`, with no way to learn the new
+    # one. Same shape ADR-0084 refused to carve an exception for; meet the rule instead.
+    _require_scope(api_key, "admin")
     _load_shareable(node_id, db, api_key)
-    token = str(uuid.uuid4())
-    graph.update_node(db, node_id, share_token=token)
-    db.commit()
-    return {"share_token": token}
+    return share_admin.rotate_token(db, node_id)
 
 
 @sub_router.post("/nodes/{node_id}/share/set-pin", summary="Set a node's share PIN", responses=_auth_errors)
 def api_set_share_pin(
     node_id: str, body: SetPinBody, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
 ):
-    from app.services.pin_utils import hash_pin
-
     _require_scope(api_key, "write")
     _load_shareable(node_id, db, api_key)
-    if not body.pin or len(body.pin) < 4 or len(body.pin) > 6 or not body.pin.isdigit():
-        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
-    graph.update_node(db, node_id, share_pin_hash=hash_pin(body.pin))
-    db.commit()
-    return {"ok": True}
+    return share_admin.set_pin(db, node_id, body.pin)
 
 
 @sub_router.delete("/nodes/{node_id}/share/pin", summary="Clear a node's share PIN", responses=_auth_errors)
 def api_clear_share_pin(node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "write")
     _load_shareable(node_id, db, api_key)
-    graph.update_node(db, node_id, share_pin_hash=None)
-    db.commit()
-    return {"ok": True}
+    return share_admin.clear_pin(db, node_id)
 
 
 @sub_router.post("/nodes/{node_id}/share/set-expiry", summary="Set a node's share expiry", responses=_auth_errors)
@@ -475,9 +480,7 @@ def api_set_share_expiry(
 ):
     _require_scope(api_key, "write")
     _load_shareable(node_id, db, api_key)
-    graph.update_node(db, node_id, share_expires_at=body.expires_at.isoformat() if body.expires_at else None)
-    db.commit()
-    return {"ok": True}
+    return share_admin.set_expiry(db, node_id, body.expires_at)
 
 
 @sub_router.post(
@@ -490,9 +493,7 @@ def api_set_share_guest_notes(
 ):
     _require_scope(api_key, "write")
     _load_shareable(node_id, db, api_key)
-    graph.update_node(db, node_id, allow_guest_notes=body.allowed)
-    db.commit()
-    return {"ok": True}
+    return share_admin.set_guest_notes(db, node_id, body.allowed)
 
 
 @sub_router.get(
@@ -503,7 +504,7 @@ def api_set_share_guest_notes(
 def api_get_share_views(node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "read")
     _load_shareable(node_id, db, api_key)
-    return {"view_count": share_view_count(db, node_id)}
+    return share_admin.view_count(db, node_id)
 
 
 # ── Inbound CI/CD callback credentials (ADR-0084) ─────────────────
