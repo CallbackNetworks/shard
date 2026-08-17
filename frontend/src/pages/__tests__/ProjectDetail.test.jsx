@@ -53,6 +53,10 @@ vi.mock('../../api/client', () => ({
   addTaskToCycle: vi.fn(), removeTaskFromCycle: vi.fn(), reorderTasks: vi.fn(),
   bulkUpdateTasks: vi.fn(), exportTasks: vi.fn(), importTasks: vi.fn(),
   getSavedFilters: vi.fn(), createSavedFilter: vi.fn(),
+  // The header's ancestry strip (ADR-0094) asks for these; the mocked useQuery
+  // above answers every non-project key with an empty list, so the strip renders
+  // nothing and these only have to exist.
+  getAncestry: vi.fn(), getNodeTypes: vi.fn(),
 }))
 
 // Each view reports the ids it received, so the assertions can be about the

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, FolderOpen, Archive, User, Activity, BarChart2, TrendingUp, Shield, ListChecks, GitCompare, Settings, Eye, EyeOff } from 'lucide-react'
-import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats, getGoals, getDecisions, getPreference, setPreference } from '../api/client'
+import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats, getGoals, getDecisions, getPreference, setPreference, getAncestry } from '../api/client'
 import AgentTasksPanel from '../components/AgentTasksPanel'
 import IdentityChartsView from '../components/IdentityChartsView'
 import { ViewProgress, ViewHealth, ViewTasks, ViewCompare, getPinnedIds, togglePin } from '../components/OverviewViews'
@@ -17,6 +17,7 @@ import GettingStarted from '../components/dashboard/GettingStarted'
 import { BRAND, DARK } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { deriveCommandCenter } from '../utils/commandCenter'
+import { groupProjectsByOwner } from '../utils/projectGroups'
 import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Dashboard.module.css'
@@ -105,6 +106,18 @@ export default function Dashboard() {
   const active = projects.filter(p => p.status === 'active')
   const archived = projects.filter(p => p.status === 'archived')
   const displayed = filter === 'all' ? projects : filter === 'archived' ? archived : active
+  // One request for every card on screen (ADR-0094) — asked per project this would be a
+  // request per card, which is how a page ends up not asking at all.
+  const { data: ancestry = {} } = useQuery({
+    queryKey: ['ancestry', 'projects', allProjects.map(p => p.id).join(',')],
+    queryFn: () => getAncestry(allProjects.map(p => p.id)),
+    enabled: allProjects.length > 0,
+    staleTime: 60000,
+  })
+  const projectGroups = groupProjectsByOwner(displayed, ancestry)
+  // A heading that would say the same thing for every card is noise: with one group
+  // (or none identified) the grid stays flat, which is also every small instance.
+  const showGroups = projectGroups.length > 1
   const command = deriveCommandCenter(projects, activities, goals, decisions)
 
   // Time-of-day greeting
@@ -328,11 +341,34 @@ export default function Dashboard() {
                   <p className={s.emptySubtitle}>{focusTarget ? t('focus.focusedOn', { name: focusTarget.name }) : t('dashboard.createFirstProject')}</p>
                 </div>
               ) : (
-                <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
-                  {displayed.map((p, i) => (
-                    <ProjectCard key={p.id} project={p} index={i} onDelete={id => deleteMut.mutate(id)} />
-                  ))}
-                </div>
+                projectGroups.map(group => (
+                  <div key={group.key} className={s.projectGroup}>
+                    {showGroups && (
+                      <div className={s.groupHeading}>
+                        {group.owner?.color && (
+                          <span className={s.groupDot} style={{ background: group.owner.color }} />
+                        )}
+                        {group.above.length > 0 && (
+                          <span className={s.groupAbove}>{group.above.map(a => a.title).join(' › ')} ›</span>
+                        )}
+                        <span className={s.groupName}>{group.owner?.title || t('dashboard.unowned')}</span>
+                        <span className={s.groupCount}>{group.projects.length}</span>
+                        <span className={s.groupLine} />
+                      </div>
+                    )}
+                    <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
+                      {group.projects.map((p, i) => (
+                        <ProjectCard
+                          key={p.id}
+                          project={p}
+                          owners={ancestry[p.id]?.owners || []}
+                          index={i}
+                          onDelete={id => deleteMut.mutate(id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
             {w('ops-sidebar') && <OpsSidebar command={command} />}

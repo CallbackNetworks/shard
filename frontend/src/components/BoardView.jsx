@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Trash2, Bot } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -20,8 +20,9 @@ import { CSS } from '@dnd-kit/utilities'
 import { STATUS_COLS, PRIORITY, SHADOW_SM, SHADOW_LG, DARK } from '../constants/theme'
 import { TypeBadge } from './TaskIcons'
 import { alpha } from '../utils/color'
+import { parentIndex } from '../utils/taskTree'
 
-function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOverlay }) {
+function CardContent({ task, parent, projectCode, hovered, onUpdate, onDelete, isDragOverlay }) {
   const { t } = useTranslation()
   const p = PRIORITY[task.priority] || PRIORITY.medium
   const issueId = `${projectCode}-${task.id.slice(-4).toUpperCase()}`
@@ -33,6 +34,19 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
         <span style={{ fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.25)', fontFamily: 'monospace' }}>{issueId}</span>
         <TypeBadge type={task.type} />
       </div>
+      {/* A subtask is on the board now (ADR-0094), so the card has to say what it is
+          part of — an unattributed card is how ten pieces of one job read as ten jobs. */}
+      {parent && (
+        <div
+          title={t('board.partOf', { title: parent.title })}
+          style={{
+            fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 3,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          ↳ {parent.title}
+        </div>
+      )}
       <div style={{ fontSize: 13, color: DARK.text, lineHeight: 1.4, marginBottom: 6, fontWeight: 400 }}>{task.title}</div>
       {task.description && (
         <div style={{ fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)', lineHeight: 1.4, marginBottom: 6 }}>
@@ -110,7 +124,7 @@ function CardContent({ task, projectCode, hovered, onUpdate, onDelete, isDragOve
   )
 }
 
-function SortableBoardCard({ task, projectCode, onUpdate, onDelete }) {
+function SortableBoardCard({ task, parent, projectCode, onUpdate, onDelete }) {
   const [hovered, setHovered] = useState(false)
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -139,6 +153,7 @@ function SortableBoardCard({ task, projectCode, onUpdate, onDelete }) {
     >
       <CardContent
         task={task}
+        parent={parent}
         projectCode={projectCode}
         hovered={hovered}
         onUpdate={onUpdate}
@@ -148,7 +163,7 @@ function SortableBoardCard({ task, projectCode, onUpdate, onDelete }) {
   )
 }
 
-function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpdate, onDelete, isOver, wipLimit }) {
+function DroppableColumn({ colKey, colLabel, colColor, tasks, parents, projectCode, onUpdate, onDelete, isOver, wipLimit }) {
   const { t } = useTranslation()
   const { setNodeRef } = useDroppable({ id: colKey })
 
@@ -187,6 +202,7 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
             <SortableBoardCard
               key={task.id}
               task={task}
+              parent={parents?.get(task.id)}
               projectCode={projectCode}
               onUpdate={onUpdate}
               onDelete={onDelete}
@@ -209,6 +225,10 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, projectCode, onUpd
 export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onReorder, wipLimits = {} }) {
   const [activeTask, setActiveTask] = useState(null)
   const [overColumn, setOverColumn] = useState(null)
+  // Subtasks are cards like any other (ADR-0094); this is only how each one names the
+  // work it belongs to. Resolved within the visible set, so a filtered-out parent leaves
+  // its children on the board unattributed rather than removing them.
+  const parents = useMemo(() => parentIndex(tasks), [tasks])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -253,7 +273,7 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onRe
     } else if (!isOverAColumn && active.id !== over.id && onReorder) {
       // Same-column drag: reorder
       const colTasks = tasks
-        .filter(t => t.status === task.status && t.parent_id == null)
+        .filter(t => t.status === task.status)
         .slice()
         .sort((a, b) => a.position - b.position)
       const oldIdx = colTasks.findIndex(t => t.id === active.id)
@@ -276,13 +296,14 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onRe
       <div style={{ display: 'flex', gap: 12, padding: 16, overflowX: 'auto', alignItems: 'flex-start', minHeight: '100%' }}>
         {STATUS_COLS.map(col => {
           const colTasks = tasks
-            .filter(t => t.status === col.key && t.parent_id == null)
+            .filter(t => t.status === col.key)
             .slice()
             .sort((a, b) => a.position - b.position)
           return (
             <DroppableColumn
               key={col.key}
               colKey={col.key}
+              parents={parents}
               colLabel={col.label}
               colColor={col.color}
               tasks={colTasks}
@@ -305,6 +326,7 @@ export default function BoardView({ tasks, projectCode, onUpdate, onDelete, onRe
           }}>
             <CardContent
               task={activeTask}
+              parent={parents.get(activeTask.id)}
               projectCode={projectCode}
               hovered={false}
               isDragOverlay

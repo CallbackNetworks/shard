@@ -1113,7 +1113,7 @@ async def test_manage_attachments_upload_without_bytes_says_so():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 50
+    assert len(tools) == 51
 
 
 @pytest.mark.asyncio
@@ -1185,6 +1185,7 @@ async def test_list_tools_names():
         "manage_notifications",
         "transfer_tasks",
         "get_graph_map",
+        "get_ancestry",
         "manage_email",
     }
     assert names == expected

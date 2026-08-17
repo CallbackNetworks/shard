@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
 from app.schemas import (
+    AncestryOut,
     ContainerSubtree,
     EdgeCreate,
     EdgeOut,
@@ -28,7 +29,7 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import graph, node_data, share_admin, webhook_credentials
+from app.services import ancestry, graph, node_data, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -99,6 +100,21 @@ def graph_map(
             {"id": e.id, "source_id": e.source_id, "target_id": e.target_id, "rel_type": e.rel_type} for e in edges
         ],
     }
+
+
+@graph_router.get("/ancestry", response_model=dict[str, AncestryOut])
+def graph_ancestry(
+    ids: str = Query(description="comma-separated node ids"),
+    db: Session = Depends(get_db),
+):
+    """Where each of these nodes lives, and whose it is (ADR-0094).
+
+    Batched because the callers are lists: the dashboard asks about every project it
+    is about to draw. Ids that resolve to nothing are absent from the map rather than
+    a 404 — one deleted member must not cost the whole answer.
+    """
+    node_ids = [i.strip() for i in ids.split(",") if i.strip()][: ancestry.MAX_IDS]
+    return ancestry.ancestry_for(db, node_ids)
 
 
 @router.get("", response_model=list[NodeOut])

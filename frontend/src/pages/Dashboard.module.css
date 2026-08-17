@@ -1303,6 +1303,72 @@
   gap: 14px;
 }
 
+/* Owner groups (ADR-0094): the heading is the only place the identity or
+   organization above a project is named, so it is quiet but not decorative. */
+.projectGroup + .projectGroup {
+  margin-top: 22px;
+}
+
+.groupHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: rgba(var(--kt-ink-rgb), 0.45);
+  flex-wrap: wrap;
+}
+
+.groupDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.groupName {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(var(--kt-ink-rgb), 0.6);
+}
+
+.groupAbove,
+.groupCount {
+  color: rgba(var(--kt-ink-rgb), 0.3);
+}
+
+.groupLine {
+  flex: 1;
+  height: 1px;
+  min-width: 20px;
+  background: rgba(var(--kt-ink-rgb), 0.08);
+}
+
+/* The owner chips on a card: the same fact at card scale, for when a card is seen
+   outside its group (search, pinned, a single-group dashboard). */
+.cardOwners {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+
+.cardOwner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: rgba(var(--kt-ink-rgb), 0.4);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  border-radius: 9999px;
+  padding: 0 6px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .projectGridDesktop {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }

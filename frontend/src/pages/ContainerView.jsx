@@ -11,6 +11,7 @@ import { hasNodeRole } from '../constants/nodeRoles'
 import BoardView from '../components/BoardView'
 import TableView from '../components/TableView'
 import EmptyState from '../components/shared/EmptyState'
+import AncestryTrail from '../components/shared/AncestryTrail'
 
 // Container view for user-defined container types (ADR-0037): the same
 // board/table machinery as ProjectDetail, fed from the generic
@@ -87,6 +88,9 @@ export default function ContainerView() {
     <div className="kt-page">
       <div className="kt-page-header">
         <div className="kt-page-heading">
+          {/* Where this container sits (ADR-0094) — a container one level down used to
+              open with no sign that anything was above it. */}
+          <AncestryTrail nodeId={id} className="kt-ancestry" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3,

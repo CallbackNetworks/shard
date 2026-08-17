@@ -2751,6 +2751,12 @@ h1 {
 .kt-page-heading {
   min-width: 0;
 }
+/* The ancestry strip sits above a page title wherever one is shown (ADR-0094).
+   The spacing lives here, with the header rhythm, rather than in the component:
+   the component owns the trail, the page owns where it sits. */
+.kt-ancestry {
+  margin-bottom: 6px;
+}
 .kt-page-title {
   margin: 0;
   color: var(--kt-ink);

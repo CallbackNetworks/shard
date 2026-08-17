@@ -31,7 +31,7 @@ function GlowBar({ done, inProgress, failed, total }) {
 }
 
 /* ── Project card ─────────────────────────────────────────────────── */
-export default function ProjectCard({ project, onDelete, index }) {
+export default function ProjectCard({ project, owners = [], onDelete, index }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [hovered, setHovered] = useState(false)
@@ -39,8 +39,11 @@ export default function ProjectCard({ project, onDelete, index }) {
   const inProgress = tasks.filter(t => t.status === 'in_progress').length
   const failed = tasks.filter(t => t.status === 'failed').length
   const pct = Math.round(project.progress || 0)
-  // Own colour first, then a linked identity's (ADR-0074) — see ProjectDetail.
-  const identColor = project.color || project.identities?.[0]?.color || BRAND
+  // Own colour first, then whoever owns it (ADR-0074, ADR-0094). ``identities`` only
+  // ever held ``owns`` links, so for a project filed under an identity by containment it
+  // was empty and the card fell back to the brand colour — the ancestry the dashboard
+  // now passes in covers both relations.
+  const identColor = project.color || owners[0]?.color || project.identities?.[0]?.color || BRAND
 
   return (
     <div
@@ -70,6 +73,18 @@ export default function ProjectCard({ project, onDelete, index }) {
           {project.description && (
             <div className={s.cardDescription}>
               {project.description}
+            </div>
+          )}
+          {/* Whose project this is (ADR-0094). Named, not merely tinted — a colour is
+              not a label, which is how a wall of 38 cards said nothing about ownership. */}
+          {owners.length > 0 && (
+            <div className={s.cardOwners}>
+              {owners.map(o => (
+                <span key={o.id} className={s.cardOwner} title={`${o.type_label}: ${o.title}`}>
+                  {o.color && <span className={s.groupDot} style={{ background: o.color, width: 6, height: 6 }} />}
+                  {o.title}
+                </span>
+              ))}
             </div>
           )}
         </div>

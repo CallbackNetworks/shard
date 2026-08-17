@@ -1066,5 +1066,12 @@
   "assistant.promptDecisionsText": "分析我的專案，找出已經做過或應該被記錄的關鍵決策。為每個決策建立一筆決策記錄，包含背景、決策內容與後果，並把相關任務打上該決策的標籤。",
   "markdown.placeholder": "輸入 Markdown…",
   "goals.noTasksLinked": "尚未連結任何任務",
-  "goals.progressOf": "{{total}} 項中完成 {{done}} 項"
+  "goals.progressOf": "{{total}} 項中完成 {{done}} 項",
+  "ancestry.livesIn": "位於",
+  "ancestry.ownedBy": "屬於",
+  "ancestry.alsoIn": "另有 {{count}} 處",
+  "board.partOf": "隸屬於：{{title}}",
+  "table.partOf": "隸屬於：{{title}}",
+  "issue.partOf": "隸屬於：{{title}}",
+  "dashboard.unowned": "未歸屬"
 }

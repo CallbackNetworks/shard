@@ -17,6 +17,7 @@ export default function TaskFiltersPanel({
   showFilters,
   setShowFilters,
   activeFilterCount,
+  // The task set this strip describes: the rows the current view draws.
   topTasks,
   labels,
   assignees,

@@ -117,6 +117,13 @@ export default memo(function IssueRow({
   const labels = task.labels || []
   const subtaskCount = task.subtask_count || 0
   const subtasks = allTasks.filter(t => t.parent_id === task.id)
+  // A subtask normally arrives nested under its parent, so it needs no attribution.
+  // Filtered and searched lists hand it over at the top level instead, and there the row
+  // has to say what it is part of (ADR-0094) — that is the case where a project's ten
+  // pieces of one job read as ten unrelated jobs.
+  const detachedParent = depth === 0 && task.parent_id
+    ? allTasks.find(x => x.id === task.parent_id)
+    : null
 
   const handleCreateSubtask = () => {
     if (!subtaskTitle.trim()) return
@@ -174,6 +181,18 @@ export default memo(function IssueRow({
         {/* Pin indicator */}
         {task.is_pinned && (
           <Pin size={11} style={{ color: DARK.warning, flexShrink: 0, transform: 'rotate(45deg)' }} />
+        )}
+
+        {detachedParent && (
+          <span
+            title={t('issue.partOf', { title: detachedParent.title })}
+            style={{
+              fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.35)', flexShrink: 0,
+              maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
+            ↳ {detachedParent.title}
+          </span>
         )}
 
         <span title={task.title} style={{

@@ -1320,6 +1320,32 @@ class ContainerSubtree(ContainerSummary):
     children: list[ContainerSummary] = []
 
 
+class AncestryRef(BaseModel):
+    """One step of a node's ancestry: an ancestor named the way a user names it."""
+
+    id: str
+    type: str
+    type_label: str
+    title: str | None = None
+    color: str | None = None
+
+
+class AncestryOut(BaseModel):
+    """Where a node lives and whose it is (ADR-0094).
+
+    ``trails`` are ``contains`` paths, root-first, each ending at a *direct* parent —
+    several of them when the node has several parents, which the graph has always
+    allowed. ``owners`` are the ``owns`` sources; the two axes stay apart on purpose
+    (ADR-0078). ``truncated`` says the walk hit its cap, so a client never presents a
+    partial trail as a whole one.
+    """
+
+    id: str
+    trails: list[list[AncestryRef]] = []
+    owners: list[AncestryRef] = []
+    truncated: bool = False
+
+
 class NodeRef(BaseModel):
     """Lightweight summary of an edge endpoint, embedded to spare clients an N+1."""
 

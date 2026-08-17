@@ -12,6 +12,7 @@ import {
   getSavedFilters, createSavedFilter,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
+import AncestryTrail from '../components/shared/AncestryTrail'
 import LabelManager, { LabelChip } from '../components/project/LabelManager'
 import TaskFiltersPanel from '../components/project/TaskFiltersPanel'
 import BulkToolbar from '../components/project/BulkToolbar'
@@ -354,6 +355,9 @@ export default function ProjectDetail() {
           </div>
 
           <div className={s.projectInfo}>
+            {/* Whose project this is, and where it sits (ADR-0094). The identity used to
+                reach this page as a colour and nothing else. */}
+            <AncestryTrail nodeId={id} className="kt-ancestry" />
             <div className={s.projectNameRow}>
               <h1 className={s.projectName}>{project.name}</h1>
               <span className={`${s.statusBadge} ${project.status === 'archived' ? s.statusArchived : s.statusActive}`}>
@@ -537,7 +541,11 @@ export default function ProjectDetail() {
             showFilters={showFilters}
             setShowFilters={setShowFilters}
             activeFilterCount={activeFilterCount}
-            topTasks={topTasks}
+            // The strip counts what the view below it draws. The Issues list nests
+            // subtasks under their parent and the other views give each one a row of
+            // its own (ADR-0094), so a single set here would have the strip saying 6
+            // beside a board holding 10 cards.
+            topTasks={tab === 'issues' ? topTasks : tasks}
             labels={labels}
             assignees={assignees}
             agentNames={agentNames}

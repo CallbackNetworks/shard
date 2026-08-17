@@ -18,8 +18,9 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { DARK, BRAND, PRIORITY, STATUS_MAP } from '../constants/theme'
 import { alpha } from '../utils/color'
+import { parentIndex } from '../utils/taskTree'
 
-function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
+function SortableRow({ task, parent, cycleByTask, onUpdate, tdStyle }) {
   const { t } = useTranslation()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const cycle = cycleByTask[task.id]
@@ -77,6 +78,20 @@ function SortableRow({ task, cycleByTask, onUpdate, tdStyle }) {
         </select>
       </td>
       <td style={{ ...tdStyle, maxWidth: 320 }}>
+        {/* The table lists subtasks and top-level tasks together, and any column can be
+            sorted, so the parent is named on the row rather than implied by its position
+            (ADR-0094). */}
+        {parent && (
+          <span
+            title={t('table.partOf', { title: parent.title })}
+            style={{
+              display: 'block', fontSize: 10, color: 'rgba(var(--kt-ink-rgb), 0.35)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
+            ↳ {parent.title}
+          </span>
+        )}
         <span style={{
           textDecoration: task.status === 'done' ? 'line-through' : 'none',
           color: task.status === 'done' ? 'rgba(var(--kt-ink-rgb), 0.25)' : DARK.text,
@@ -169,6 +184,8 @@ export default function TableView({ tasks, projectId: _projectId, labels: _label
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
+  const parents = useMemo(() => parentIndex(tasks), [tasks])
+
   const cycleByTask = useMemo(() => {
     const map = {}
     cycles.forEach(c => c.task_ids.forEach(tid => { map[tid] = c }))
@@ -260,6 +277,7 @@ export default function TableView({ tasks, projectId: _projectId, labels: _label
                 <SortableRow
                   key={task.id}
                   task={task}
+                  parent={parents.get(task.id)}
                   cycleByTask={cycleByTask}
                   onUpdate={onUpdate}
                   tdStyle={tdStyle}

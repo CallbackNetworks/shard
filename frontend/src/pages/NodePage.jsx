@@ -12,18 +12,12 @@ import NodeCombobox from '../components/shared/NodeCombobox'
 import NodeShareFacet from '../components/NodeShareFacet'
 import NodeFieldsPanel from '../components/NodeFieldsPanel'
 import EmptyState from '../components/shared/EmptyState'
+import AncestryTrail from '../components/shared/AncestryTrail'
 import { hasNodeRole } from '../constants/nodeRoles'
+import { nodeHref } from '../utils/nodeHref'
 
 // Universal node page (ADR-0037): one URL per node, edges grouped by rel_type
 // and direction, neighbors navigable, provenance at the bottom.
-
-function nodeHref(ref, typeByKey) {
-  // Entity types with a richer dedicated page keep it; custom containers get
-  // the container view; everything else lands on the node page.
-  if (ref.type === 'project') return `/projects/${ref.id}`
-  if (hasNodeRole(typeByKey?.get(ref.type), 'container')) return `/c/${ref.id}`
-  return `/n/${ref.id}`
-}
 
 function fmtDateTime(iso) {
   if (!iso) return ''
@@ -176,6 +170,9 @@ export default function NodePage() {
 
       {/* Header */}
       <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        {/* Where it lives, before what it is (ADR-0094). The relations panel below lists
+            every edge; this says which of them is the node's place in the hierarchy. */}
+        <AncestryTrail nodeId={id} className="kt-ancestry" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <TypeChip typeMeta={typeMeta} typeKey={node.type} />
           {editingTitle ? (

@@ -25,6 +25,7 @@ from app.routers.external_api.auth import (
     _require_scope,
 )
 from app.schemas import (
+    AncestryOut,
     ContainerSubtree,
     EdgeCreate,
     EdgeOut,
@@ -35,7 +36,7 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import graph, node_data, share_admin, webhook_credentials
+from app.services import ancestry, graph, node_data, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -115,6 +116,28 @@ def api_graph_map(
             {"id": e.id, "source_id": e.source_id, "target_id": e.target_id, "rel_type": e.rel_type} for e in edges
         ],
     }
+
+
+@sub_router.get(
+    "/graph/ancestry",
+    summary="Where nodes live, and whose they are",
+    description=(
+        "For each requested node id: its `contains` trails (root-first, one per parent — a node "
+        "may have several) and its `owns` owners. Batched: pass `ids` comma-separated. Ids that "
+        "resolve to nothing, and ancestors a project-scoped key may not read, are omitted rather "
+        "than refused. Requires `read` scope."
+    ),
+    response_model=dict[str, AncestryOut],
+    responses=_auth_errors,
+)
+def api_graph_ancestry(
+    ids: str = Query(description="comma-separated node ids"),
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    node_ids = [i.strip() for i in ids.split(",") if i.strip()][: ancestry.MAX_IDS]
+    return ancestry.ancestry_for(db, node_ids, visible=lambda n: _node_accessible(api_key, db, n))
 
 
 @sub_router.get(

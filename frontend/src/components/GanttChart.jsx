@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DARK, STATUS_MAP } from '../constants/theme'
+import { orderTasksByParent } from '../utils/taskTree'
 const STATUS_COLOR = Object.fromEntries(Object.entries(STATUS_MAP).map(([k, v]) => [k, v.color]))
 
 const TASK_NAME_W = 220
@@ -67,9 +68,14 @@ export default function GanttChart({ tasks, onUpdateTask }) {
 
   const todayLeft = getLeft(today)
 
-  // Build task index for dependency arrows
+  // Build task index for dependency arrows.
+  // Rows are the whole tree, parent immediately followed by its children (ADR-0094):
+  // dropping subtasks here hid the dated work of any project that plans under a parent
+  // task, and the timeline is the view where a missing bar is least noticeable.
+  const rows = orderTasksByParent(tasks)
+  const visibleTasks = rows.map(r => r.task)
+  const depthById = new Map(rows.map(r => [r.task.id, r.depth]))
   const taskIndex = {}
-  const visibleTasks = tasks.filter(t => t.parent_id == null)
   visibleTasks.forEach((t, i) => { taskIndex[t.id] = i })
 
   // Dependency lines (SVG arrows)
@@ -200,8 +206,12 @@ export default function GanttChart({ tasks, onUpdateTask }) {
                   padding: '0 16px', display: 'flex', alignItems: 'center',
                   borderRight: '1px solid rgba(var(--kt-ink-rgb), 0.05)',
                 }}>
-                  <span style={{ fontSize: 13, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {task.title}
+                  <span style={{
+                    fontSize: 13, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    paddingLeft: (depthById.get(task.id) || 0) * 14,
+                    opacity: depthById.get(task.id) ? 0.75 : 1,
+                  }}>
+                    {depthById.get(task.id) ? '↳ ' : ''}{task.title}
                   </span>
                 </div>
 

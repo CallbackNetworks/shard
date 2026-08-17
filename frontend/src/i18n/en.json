@@ -1066,5 +1066,12 @@
   "assistant.promptDecisionsText": "Analyze my projects and identify key decisions that have been made or should be recorded. For each decision, create a decision record with context, the decision itself, and consequences. Tag relevant tasks with the decision labels.",
   "markdown.placeholder": "Write markdown…",
   "goals.noTasksLinked": "No tasks linked yet",
-  "goals.progressOf": "{{done}} of {{total}} done"
+  "goals.progressOf": "{{done}} of {{total}} done",
+  "ancestry.livesIn": "Lives in",
+  "ancestry.ownedBy": "Owned by",
+  "ancestry.alsoIn": "+{{count}} more",
+  "board.partOf": "Part of: {{title}}",
+  "table.partOf": "Part of: {{title}}",
+  "issue.partOf": "Part of: {{title}}",
+  "dashboard.unowned": "No owner"
 }

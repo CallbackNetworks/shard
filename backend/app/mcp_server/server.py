@@ -790,6 +790,11 @@ async def _get_graph_map(types: str | None = None, include: str | None = None, l
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _get_ancestry(node_ids: list[str]) -> str:
+    result = await _get("/graph/ancestry", params={"ids": ",".join(node_ids)})
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 async def _manage_email(action: str, to: list[str] | None = None, subject: str = "", body: str = "") -> str:
     if action == "status":
         result = await _get("/email/status")
@@ -1445,6 +1450,18 @@ async def transfer_tasks(action: TransferAction, project_id: str, tasks: list[di
 )
 async def get_graph_map(types: str | None = None, include: str | None = None, limit: int | None = None) -> str:
     return await _get_graph_map(types=types, include=include, limit=limit)
+
+
+@mcp.tool(
+    description=(
+        "Where these nodes live and whose they are (ADR-0094). For each id: 'trails' are the "
+        "'contains' paths above it, root-first — several when a node has several parents — and "
+        "'owners' are the identities that own it. Ask this before reporting on a project: the "
+        "project list says nothing about the identity or organization it sits under."
+    )
+)
+async def get_ancestry(node_ids: list[str]) -> str:
+    return await _get_ancestry(node_ids=node_ids)
 
 
 @mcp.tool(

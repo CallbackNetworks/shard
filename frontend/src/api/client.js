@@ -466,6 +466,14 @@ export const getGraphMap = ({ types, includeData } = {}) => {
   if (includeData) params.include = 'data'
   return api.get('/graph/map', { params }).then(r => r.data)
 }
+// Where nodes live and whose they are (ADR-0094). Batched by id: the caller is always a
+// list (a header asking about one node, a dashboard asking about every card it draws), and
+// one-per-node would have made the dashboard's question cost a request per project.
+export const getAncestry = (ids) => {
+  const list = (ids || []).filter(Boolean)
+  if (list.length === 0) return Promise.resolve({})
+  return api.get('/graph/ancestry', { params: { ids: list.join(',') } }).then(r => r.data)
+}
 export const createNode = (data) => api.post('/nodes', data).then(r => r.data)
 export const updateNode = (id, data) => api.patch(`/nodes/${id}`, data).then(r => r.data)
 export const deleteNode = (id) => api.delete(`/nodes/${id}`)
