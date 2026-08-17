@@ -15,6 +15,7 @@ from app.routers.external_api.comments import sub_router as comments_router
 from app.routers.external_api.dependencies import sub_router as dependencies_router
 from app.routers.external_api.edge_types import sub_router as edge_types_router
 from app.routers.external_api.email import sub_router as email_router
+from app.routers.external_api.intake import sub_router as intake_router
 from app.routers.external_api.integrations import sub_router as integrations_router
 from app.routers.external_api.labels import sub_router as labels_router
 from app.routers.external_api.node_types import sub_router as node_types_router
@@ -71,3 +72,6 @@ router.include_router(workflow_rules_router)
 router.include_router(task_resources_router)
 # ADR-0091: the operational surface — system settings, backups, the calendar feed token.
 router.include_router(ops_router)
+# ADR-0092: how work gets in (importers), out (external issues) and filed (the unfiled
+# bucket), plus decision records and cycle rollover.
+router.include_router(intake_router)

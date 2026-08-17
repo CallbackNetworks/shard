@@ -719,6 +719,85 @@ async def test_manage_backup_restore_passes_the_confirmation_through():
     assert patched.return_value.post.await_args.kwargs["params"] == {"confirm": "replace"}
 
 
+# ── Tools: import, publish, file, decisions, cycles (ADR-0092) ──────
+
+
+@pytest.mark.asyncio
+async def test_import_tasks_sends_the_sources_own_shape():
+    payload = {"issues": [{"number": 7, "title": "Fix it", "state": "open"}]}
+    with _patch_client("post", _mock_response(json_data={"imported": 1, "skipped": 0, "errors": []})) as patched:
+        text = await _call("import_tasks", {"project_id": "p1", "source": "github", "payload": payload})
+    assert json.loads(text)["imported"] == 1
+    # The payload is passed through untouched — normalising it here would be a second mapping.
+    assert patched.return_value.post.await_args.kwargs["json"] == payload
+
+
+@pytest.mark.asyncio
+async def test_import_tasks_reports_partial_success():
+    """One bad row must not abandon the batch."""
+    result = {"imported": 20, "skipped": 1, "errors": ["Issue '': title is required"]}
+    with _patch_client("post", _mock_response(json_data=result)):
+        text = await _call("import_tasks", {"project_id": "p1", "source": "linear", "payload": {"issues": []}})
+    parsed = json.loads(text)
+    assert parsed["imported"] == 20 and parsed["errors"]
+
+
+@pytest.mark.asyncio
+async def test_import_tasks_rejects_an_unknown_source():
+    with pytest.raises(ToolError):
+        await _call("import_tasks", {"project_id": "p1", "source": "jira", "payload": {}})
+
+
+@pytest.mark.asyncio
+async def test_create_external_issue():
+    with _patch_client("post", _mock_response(json_data={"id": "t1", "external_url": "https://gh/1"})):
+        text = await _call("create_external_issue", {"project_id": "p1", "task_id": "t1"})
+    assert json.loads(text)["external_url"] == "https://gh/1"
+
+
+@pytest.mark.asyncio
+async def test_manage_unfiled_list():
+    with _patch_client("get", _mock_response(json_data=[{"id": "t9", "title": "Homeless"}])):
+        text = await _call("manage_unfiled", {"action": "list"})
+    assert json.loads(text)[0]["id"] == "t9"
+
+
+@pytest.mark.asyncio
+async def test_manage_unfiled_file_needs_both_ends():
+    text = await _call("manage_unfiled", {"action": "file", "task_id": "t9"})
+    assert "project_id" in text
+
+
+@pytest.mark.asyncio
+async def test_manage_unfiled_file():
+    with _patch_client("post", _mock_response(json_data={"id": "t9", "project_id": "p1"})):
+        text = await _call("manage_unfiled", {"action": "file", "task_id": "t9", "project_id": "p1"})
+    assert json.loads(text)["project_id"] == "p1"
+
+
+@pytest.mark.asyncio
+async def test_list_decisions():
+    with _patch_client("get", _mock_response(json_data=[{"id": "d1", "name": "Use Postgres"}])):
+        text = await _call("list_decisions", {"status": "accepted"})
+    assert json.loads(text)[0]["name"] == "Use Postgres"
+
+
+@pytest.mark.asyncio
+async def test_export_decision_returns_markdown_not_json():
+    """The body is a document; parsing it as JSON is how this one breaks."""
+    resp = _mock_response(text="# Use Postgres\n\n## Status\nAccepted\n")
+    with _patch_client("get", resp):
+        text = await _call("export_decision", {"decision_id": "d1"})
+    assert text.startswith("# Use Postgres")
+
+
+@pytest.mark.asyncio
+async def test_duplicate_cycle():
+    with _patch_client("post", _mock_response(json_data={"id": "c2", "name": "Sprint 4 (copy)"})):
+        text = await _call("duplicate_cycle", {"project_id": "p1", "cycle_id": "c1"})
+    assert json.loads(text)["name"].endswith("(copy)")
+
+
 # ── Tools: CI/CD triggers, integrations, deliveries, rules (ADR-0085) ──
 
 
@@ -833,7 +912,7 @@ async def test_manage_attachments_upload_without_bytes_says_so():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 36
+    assert len(tools) == 42
 
 
 @pytest.mark.asyncio
@@ -890,6 +969,13 @@ async def test_list_tools_names():
         # ADR-0091: the operational surface — how this instance behaves, and its backups.
         "manage_settings",
         "manage_backup",
+        # ADR-0092: how work gets in, out and filed.
+        "import_tasks",
+        "create_external_issue",
+        "manage_unfiled",
+        "list_decisions",
+        "export_decision",
+        "duplicate_cycle",
     }
     assert names == expected
 

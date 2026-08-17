@@ -42,7 +42,11 @@ EDGE_ALLOWED = {
     "routers/issue_sync.py": "applies inbound provider state; must not echo it back",
     # Labels are attached before the task exists as far as listeners are
     # concerned; finalize_task_create then announces the finished task.
-    "routers/imports.py": "importer attaches labels before finalize_task_create",
+    # (Moved out of routers/imports.py by ADR-0092, which gave the importers a v1 door.)
+    "services/task_import.py": "importer attaches labels before finalize_task_create",
+    # Same shape: the clone is linked into its new cycle before finalize_task_create, so
+    # cycle-scoped rules see it where it belongs (moved from routers/cycles.py, ADR-0092).
+    "services/cycle_admin.py": "cycle clone joins the new cycle before finalize_task_create",
 }
 
 # Files exempt from needing a pipeline call, with the reason they are exempt.

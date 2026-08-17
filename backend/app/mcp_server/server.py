@@ -35,6 +35,8 @@ ManageAction = Literal["list", "add", "remove"]
 WebhookAction = Literal["reveal", "rotate_secret", "rotate_token", "history"]
 SettingsAction = Literal["get", "bounds", "update", "ical_token", "rotate_ical_token"]
 BackupAction = Literal["status", "run", "restore"]
+ImportSource = Literal["github", "linear", "trello"]
+UnfiledAction = Literal["list", "file"]
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://backend:8000")
 API_KEY = os.environ.get("API_KEY", "")
@@ -79,6 +81,15 @@ async def _patch(path: str, body: dict | None = None) -> dict | list | str:
     if resp.status_code >= 400:
         return f"Error {resp.status_code}: {resp.text}"
     return resp.json()
+
+
+async def _get_text(path: str) -> str:
+    """For the endpoints whose body is a document, not JSON (the decision export)."""
+    client = _get_client()
+    resp = await client.get(path)
+    if resp.status_code >= 400:
+        return f"Error {resp.status_code}: {resp.text}"
+    return resp.text
 
 
 async def _put(path: str, body: dict | None = None) -> dict | list | str:
@@ -514,6 +525,46 @@ async def _manage_backup(action: str, filename: str | None = None, confirm: str 
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _import_tasks(project_id: str, source: str, payload: dict) -> str:
+    if source not in ("github", "linear", "trello"):
+        return f"Error: unknown source '{source}'"
+    result = await _post(f"/projects/{project_id}/import/{source}", payload)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _create_external_issue(project_id: str, task_id: str, provider: str | None = None) -> str:
+    body = {"provider": provider} if provider else {}
+    result = await _post(f"/projects/{project_id}/tasks/{task_id}/create-external-issue", body)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_unfiled(action: str, task_id: str | None = None, project_id: str | None = None) -> str:
+    if action == "list":
+        result = await _get("/tasks/unfiled")
+    elif action == "file":
+        if not task_id or not project_id:
+            return "Error: task_id and project_id are required to file a task"
+        result = await _post(f"/tasks/{task_id}/memberships/{project_id}")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _list_decisions(project_id: str | None = None, status: str | None = None) -> str:
+    params = {k: v for k, v in {"project_id": project_id, "status": status}.items() if v}
+    result = await _get("/decisions", params=params or None)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _export_decision(decision_id: str) -> str:
+    return await _get_text(f"/decisions/{decision_id}/export")
+
+
+async def _duplicate_cycle(project_id: str, cycle_id: str) -> str:
+    result = await _post(f"/projects/{project_id}/cycles/{cycle_id}/duplicate")
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 # ── MCP tools ────────────────────────────────────────────────────────
 #
 # One decorated function per tool (ADR-0077). The schema is derived from the
@@ -942,6 +993,80 @@ async def manage_settings(action: SettingsAction, settings: dict | None = None) 
 async def manage_backup(action: BackupAction, filename: str | None = None, confirm: str = "") -> str:
     """filename and confirm='replace' are both required for 'restore'."""
     return await _manage_backup(action=action, filename=filename, confirm=confirm)
+
+
+@mcp.tool(
+    description=(
+        "Import a batch of issues or cards as tasks (ADR-0092). `payload` is the source's "
+        "own shape: github {issues:[{number,title,body,state,html_url,labels:[{name}],"
+        "assignee:{login}}]}, linear {issues:[{title,description,state,priority,assignee,"
+        "labels:[]}]}, trello {cards:[{name,desc,closed,due,labels:[{name}]}]}. Labels are "
+        "matched by name in the project and created if missing; a closed issue or card "
+        "becomes a done task. Partial success is the contract: the result is "
+        "{imported, skipped, errors[]}, so one malformed row does not abandon the batch."
+    )
+)
+async def import_tasks(project_id: str, source: ImportSource, payload: dict) -> str:
+    """payload is the raw export from the source tool, not a normalised shape."""
+    return await _import_tasks(project_id=project_id, source=source, payload=payload)
+
+
+@mcp.tool(
+    description=(
+        "Publish a task as a new GitHub or GitLab issue and link the two (ADR-0092). The "
+        "task stays the source of truth and the usual two-way sync takes over afterwards. "
+        "Needs an active issue_sync integration with a token and a repo URL on the project. "
+        "provider is detected from the repo URL; pass it only when that is ambiguous. A task "
+        "already linked to an issue is refused."
+    )
+)
+async def create_external_issue(project_id: str, task_id: str, provider: str | None = None) -> str:
+    return await _create_external_issue(project_id=project_id, task_id=task_id, provider=provider)
+
+
+@mcp.tool(
+    description=(
+        "List or file the unfiled bucket (ADR-0092): tasks that belong to no project at all. "
+        "Listing tasks by project cannot show these by definition, so this is the inbox the "
+        "triage-inbox prompt is about. 'file' gives a task its first project — it needs both "
+        "task_id and project_id, is idempotent, and a task may belong to several projects."
+    )
+)
+async def manage_unfiled(action: UnfiledAction, task_id: str | None = None, project_id: str | None = None) -> str:
+    return await _manage_unfiled(action=action, task_id=task_id, project_id=project_id)
+
+
+@mcp.tool(
+    description=(
+        "List decision records — what was decided about the work, and its status "
+        "(proposed/accepted/superseded/deprecated). Read this before proposing a decision "
+        "somebody already made. Writing one is create_node with type='decision'."
+    )
+)
+async def list_decisions(project_id: str | None = None, status: str | None = None) -> str:
+    return await _list_decisions(project_id=project_id, status=status)
+
+
+@mcp.tool(
+    description=(
+        "One decision record as a Markdown document under Status / Date / body headings, "
+        "ready to commit to a docs directory."
+    )
+)
+async def export_decision(decision_id: str) -> str:
+    return await _export_decision(decision_id=decision_id)
+
+
+@mcp.tool(
+    description=(
+        "Roll a cycle over: create a draft cycle holding fresh todo copies of every task in "
+        "an existing one (ADR-0092). Title, description, priority, assignee and estimate "
+        "follow; status and time spent do not — what is copied is the intent to do the work, "
+        "not the record of having done it."
+    )
+)
+async def duplicate_cycle(project_id: str, cycle_id: str) -> str:
+    return await _duplicate_cycle(project_id=project_id, cycle_id=cycle_id)
 
 
 @mcp.tool(

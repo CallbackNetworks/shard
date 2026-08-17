@@ -5,16 +5,24 @@ edge, so ``/api/v1`` could always *put a task into* a cycle and never read what 
 contains. Writable and unreadable is the same asymmetry as readable-and-unwritable, from
 the other side.
 
-Only the reads live here. ``duplicate`` and the add/remove-task routes stay on the internal
-router: they broadcast over the websocket and run the task-create pipeline, and v1 reaches
-the same membership through the edge surface it already has.
+The add/remove-task routes stay on the internal router: v1 reaches the same membership
+through the edge surface it already has (``in_cycle`` declares its endpoints, ADR-0078).
+
+``duplicate`` moved here in ADR-0092. It was left out originally because it broadcasts over
+the websocket and runs the task-create pipeline — but that describes where the code lived,
+not who may call it, and rolling a sprint over is planning work, which is what an agent is
+for. A service can broadcast; ``task_import`` already does.
 """
+
+import uuid
 
 from sqlalchemy.orm import Session
 
 from app.schemas import CycleOut
 from app.services import graph
 from app.services.errors import NotFound
+from app.services.task_mutations import finalize_task_create
+from app.services.ws_manager import ws_manager
 
 
 def enrich(db: Session, cycle: graph.CycleView) -> CycleOut:
@@ -46,6 +54,62 @@ def list_cycles(db: Session, project_id: str) -> list[CycleOut]:
 def get_cycle(db: Session, project_id: str, cycle_id: str) -> CycleOut:
     _project_or_404(db, project_id)
     return enrich(db, _cycle_or_404(db, project_id, cycle_id))
+
+
+async def duplicate(db: Session, project_id: str, cycle_id: str) -> CycleOut:
+    """A new draft cycle holding fresh todo copies of another cycle's tasks.
+
+    The clone carries the plan — title, description, priority, assignee, estimate — and
+    none of the history: status resets to ``todo``, and time spent does not follow. What
+    is being copied is the intent to do the work, not the record of having done it.
+    """
+    _project_or_404(db, project_id)
+    source = _cycle_or_404(db, project_id, cycle_id)
+
+    new_cycle = graph.create_cycle(
+        db,
+        project_id,
+        id=str(uuid.uuid4()),
+        name=f"{source.name} (copy)",
+        description=source.description,
+        status="draft",
+    )
+
+    created_ids: list[str] = []
+    for src_task in graph.tasks_in_cycle(db, source.id):
+        new_task = graph.create_task(
+            db,
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            title=src_task.title,
+            description=src_task.description,
+            priority=src_task.priority,
+            assignee=src_task.assignee,
+            status="todo",
+            callback_token=str(uuid.uuid4()),
+            time_estimate=src_task.time_estimate,
+        )
+        graph.add_to_cycle(db, new_cycle.id, new_task.id)
+        # Cycle membership is linked first so cycle-scoped workflow rules see
+        # the clone where it actually belongs.
+        await finalize_task_create(
+            db,
+            new_task.id,
+            actor="system",
+            source="duplicate",
+            project_id=project_id,
+            activity_meta={"cycle_id": new_cycle.id, "source_task_id": src_task.id},
+            commit=False,
+            broadcast=False,
+        )
+        created_ids.append(new_task.id)
+
+    db.commit()
+    await ws_manager.broadcast(
+        "task.imported",
+        {"project_id": project_id, "task_ids": created_ids, "cycle_id": new_cycle.id},
+    )
+    return enrich(db, new_cycle)
 
 
 def _stats(db: Session, project_id: str, cycle_id: str) -> dict | None:

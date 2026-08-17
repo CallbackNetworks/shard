@@ -6,9 +6,8 @@ from app.database import get_db
 from app.models import Node
 from app.routers.deps import get_project_or_404 as _get_project_or_404
 from app.routers.deps import get_task_or_404
-from app.routers.issue_sync import create_external_issue_from_task
 from app.schemas import ReorderRequest, TaskOut, TaskWithSubtasksOut
-from app.services import graph, webhook_credentials
+from app.services import graph, issue_sync_admin, task_filing, webhook_credentials
 from app.services.enrichment import enrich_task
 from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.ws_manager import ws_manager
@@ -93,12 +92,7 @@ async def create_external_issue(
     two-way sync applies. Requires an active issue_sync integration and the
     project's repo URL.
     """
-    project = _get_project_or_404(project_id, db)
-    task = get_task_or_404(task_id, db, project_id=project_id)
-    provider = body.provider if body else None
-    if provider and provider not in ("github", "gitlab"):
-        raise HTTPException(status_code=400, detail="provider must be 'github' or 'gitlab'")
-    return await create_external_issue_from_task(task, project, db, provider)
+    return await issue_sync_admin.create_from_task(db, project_id, task_id, body.provider if body else None)
 
 
 @router.post("/{task_id}/dependencies/{depends_on_id}", status_code=status.HTTP_201_CREATED)
@@ -204,10 +198,7 @@ task_ops_router = APIRouter(prefix="/tasks", tags=["tasks"])
 @task_ops_router.get("/unfiled", response_model=list[TaskOut])
 def list_unfiled_tasks(db: Session = Depends(get_db)):
     """List unfiled tasks — tasks that belong to no project (ADR-0032/0033)."""
-    ids = graph.unfiled_task_ids(db)
-    if not ids:
-        return []
-    return [enrich_task(t, db) for t in graph.task_views_for_ids(db, ids)]
+    return task_filing.list_unfiled(db)
 
 
 @task_ops_router.post(
@@ -220,12 +211,4 @@ async def file_task_into_project(task_id: str, project_id: str, db: Session = De
     to already live under some source project, so it is how an *unfiled* task
     gets its first project. Idempotent: adding an existing membership is a no-op.
     """
-    task = graph.get_task(db, task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    _get_project_or_404(project_id, db)
-    graph.ensure_node(db, project_id, graph.NODE_PROJECT)
-    graph.ensure_node(db, task_id, graph.NODE_TASK, title=task.title)
-    graph.add_edge(db, project_id, task_id, graph.REL_CONTAINS)
-    await dispatch_edge_added(db, project_id, task_id, graph.REL_CONTAINS, actor="api")
-    return enrich_task(graph.get_task(db, task_id), db)
+    return await task_filing.file_into_project(db, task_id, project_id)

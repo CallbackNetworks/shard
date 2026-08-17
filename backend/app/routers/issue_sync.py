@@ -22,6 +22,7 @@ from app.models import (
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.enrichment import enrich_task
+from app.services.errors import Invalid, ServiceError
 from app.services.issue_sync import (
     GITHUB_API_BASE,
     close_github_issue,
@@ -806,24 +807,19 @@ async def create_external_issue_from_task(
     of truth here). Requires an active issue_sync integration with a token and a
     project repo URL. On success, sets the task's external_* fields so all later
     two-way sync (state, fields, comments, labels) flows through the usual paths.
-    Raises HTTPException with an actionable message on any precondition failure.
+    Raises ``ServiceError`` with an actionable message on any precondition failure, so
+    the internal and v1 doors onto this act render the refusal identically (ADR-0085).
     """
     if task.external_id:
-        raise HTTPException(status_code=409, detail="Task is already linked to an external issue")
+        raise ServiceError(409, "Task is already linked to an external issue")
 
     integration = _get_sync_integration(graph.project_id_of_task(db, task.id), db)
     if not integration or not integration.secret:
-        raise HTTPException(
-            status_code=400,
-            detail="No active issue_sync integration with a token is configured for this project",
-        )
+        raise Invalid("No active issue_sync integration with a token is configured for this project")
 
     parsed = parse_repo_url(project.repo_url or "", provider)
     if not parsed:
-        raise HTTPException(
-            status_code=400,
-            detail="Project has no valid repo URL; set the project's repo URL first",
-        )
+        raise Invalid("Project has no valid repo URL; set the project's repo URL first")
 
     token = integration.secret
     labels = [lb.name for lb in graph.labels_for_task(db, task.id) if lb.type == "label"]
@@ -838,7 +834,7 @@ async def create_external_issue_from_task(
         )
 
     if not result:
-        raise HTTPException(status_code=502, detail="External issue creation failed; check the token and repo URL")
+        raise ServiceError(502, "External issue creation failed; check the token and repo URL")
 
     task = graph.update_task(
         db,
