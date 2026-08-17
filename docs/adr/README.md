@@ -96,3 +96,5 @@
 | [0092](0092-work-gets-in-and-out-through-both-doors.md) | 工作進得來、出得去、歸得了檔，兩道門都要能做 | Accepted | 2026-08-16 |
 | [0093](0093-the-mcp-registry-catches-up-with-the-api.md) | MCP 註冊表要跟得上 API | Accepted | 2026-08-16 |
 | [0094](0094-a-node-says-where-it-lives.md) | 每個節點都說得出自己住在哪 | Accepted | 2026-08-17 |
+| [0095](0095-the-assistants-provider-is-a-runtime-setting.md) | 助理要打哪個 provider 是一個執行期設定，不是一個部署決策 | Accepted | 2026-08-17 |
+| [0095](0095-an-identity-is-a-place-work-lives.md) | 身分也是一個「工作住的地方」 | Accepted | 2026-08-17 |

@@ -1,10 +1,14 @@
 """A relation declares what may sit at each end (ADR-0078).
 
-The bug these pin is not a crash, it is a success: before this, filing a project under
-an identity with ``contains`` returned 201 Created, wrote the edge, logged the event —
-and no read path anywhere acknowledged it, because identity↔container is ``owns``. A
-wrong relation was indistinguishable from a right one until somebody noticed the screen
-had not changed.
+The bug these pin is not a crash, it is a success: before this, picking the wrong relation
+returned 201 Created, wrote the edge, logged the event — and no read path anywhere
+acknowledged it. A wrong relation was indistinguishable from a right one until somebody
+noticed the screen had not changed.
+
+The original example here was ``identity contains project``. That one is *legal* since
+ADR-0095 — an identity holds the container role, because it is a level people file work
+under — so the refusal is now pinned with a type that declares a capability role and no
+structural one, which is the shape the rule is actually about.
 
 So the tests come in two halves. One asserts the refusal *teaches*: the error names the
 relation the caller should have used. The other asserts the declarations describe the
@@ -17,7 +21,7 @@ import hashlib
 import pytest
 
 from app.models import ApiKey, Edge, EdgeType, Node, NodeType
-from app.services import graph
+from app.services import ancestry, graph
 from app.services.graph_registry import BUILTIN_EDGE_TYPES, relation_vocabulary
 from tests.factories import make_project, make_task
 
@@ -49,41 +53,70 @@ def identity_and_project(db):
 class TestTheRefusalNamesTheRightRelation:
     """An agent always reads the error; it does not always read the docs."""
 
-    def test_identity_cannot_contain_a_project_and_is_told_to_use_owns(self, db, identity_and_project):
-        identity, project = identity_and_project
+    @pytest.fixture()
+    def persona_type(self, db):
+        """A type that declares a capability and no structural role — cannot be a parent."""
+        db.add(NodeType(key="persona", label="Persona", roles=[graph.ROLE_SHAREABLE]))
+        db.commit()
+        return "persona"
+
+    def test_a_type_with_no_structural_role_cannot_contain_and_is_told_so(self, db, persona_type):
+        persona = Node(type=persona_type, title="Reviewer")
+        db.add(persona)
+        project = make_project(db, name="Payments Reliability")
+        db.commit()
 
         with pytest.raises(ValueError) as exc:
-            graph.add_edge(db, identity.id, project.id, graph.REL_CONTAINS)
+            graph.add_edge(db, persona.id, project.id, graph.REL_CONTAINS)
 
         detail = str(exc.value)
-        assert "identity -> project" in detail
+        assert "persona -> project" in detail
         assert "container or a task" in detail
-        assert "'owns'" in detail
 
-    def test_the_same_pair_through_the_internal_api_is_a_400_not_a_201(self, client, db, identity_and_project):
-        identity, project = identity_and_project
+    def test_the_same_pair_through_the_internal_api_is_a_400_not_a_201(self, client, db, persona_type):
+        persona = Node(type=persona_type, title="Reviewer")
+        db.add(persona)
+        project = make_project(db, name="Payments Reliability")
+        db.commit()
 
         resp = client.post(
-            f"/api/nodes/{identity.id}/edges",
+            f"/api/nodes/{persona.id}/edges",
             json={"target_id": project.id, "rel_type": "contains"},
         )
 
         assert resp.status_code == 400
-        assert "'owns'" in resp.json()["detail"]
-        assert db.query(Edge).filter(Edge.rel_type == "contains", Edge.source_id == identity.id).count() == 0
+        assert "container or a task" in resp.json()["detail"]
+        assert db.query(Edge).filter(Edge.rel_type == "contains", Edge.source_id == persona.id).count() == 0
 
-    def test_the_same_pair_through_the_external_api_is_a_400_not_a_201(self, client, db, identity_and_project):
-        identity, project = identity_and_project
+    def test_the_same_pair_through_the_external_api_is_a_400_not_a_201(self, client, db, persona_type):
+        persona = Node(type=persona_type, title="Reviewer")
+        db.add(persona)
+        project = make_project(db, name="Payments Reliability")
+        db.commit()
         key = _key(db, "edges_write", ["read", "write"])
 
         resp = client.post(
-            f"/api/v1/nodes/{identity.id}/edges",
+            f"/api/v1/nodes/{persona.id}/edges",
             json={"target_id": project.id, "rel_type": "contains"},
             headers={"X-API-Key": key},
         )
 
         assert resp.status_code == 400
-        assert "'owns'" in resp.json()["detail"]
+        assert "container or a task" in resp.json()["detail"]
+
+    def test_an_identity_may_now_contain_a_project(self, db, identity_and_project):
+        """ADR-0095: the user's own hierarchy is organization -> identity -> project, and
+        it was stored as ``contains`` edges the rule used to refuse to recreate."""
+        identity, project = identity_and_project
+
+        edge = graph.add_edge(db, identity.id, project.id, graph.REL_CONTAINS)
+        db.commit()
+
+        assert edge.rel_type == "contains"
+        assert [n.id for n in graph.children_of(db, identity.id)] == [project.id]
+        # And the project can say so: the trail is what puts it on screen (ADR-0094).
+        trails = ancestry.ancestry_for(db, [project.id])[project.id].trails
+        assert [[r.title for r in trail] for trail in trails] == [["Engineering Lead"]]
 
     def test_owns_is_accepted_for_that_same_pair(self, db, identity_and_project):
         identity, project = identity_and_project

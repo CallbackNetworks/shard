@@ -203,8 +203,13 @@ class TestTheOwnerCanReadTheKey:
         assert again["callback_token"] == config["callback_token"]
         assert again["secret"] == config["secret"]
 
-    def test_a_node_with_no_webhook_role_has_no_config(self, client, sample_identity):
-        resp = client.get(f"/api/nodes/{sample_identity.id}/webhook")
+    def test_a_node_with_no_webhook_role_has_no_config(self, client, db):
+        # A label is neither a container nor a task, so no build result can be posted
+        # against it. (Identity used to be the example here; it holds the container
+        # role since ADR-0095 and therefore logs callbacks like any other container.)
+        label = graph.create_label(db, project_id=None, name="chore")
+        db.commit()
+        resp = client.get(f"/api/nodes/{label.id}/webhook")
         assert resp.status_code == 400
 
 

@@ -130,13 +130,17 @@ class TestBothDoorsGiveTheSameAnswer:
         assert external["path"] == f"/webhook/callback/{external['callback_token']}"
 
     @pytest.mark.parametrize("verb", ["reveal", "rotate"])
-    def test_a_type_that_receives_no_callbacks_is_refused_the_same_way(self, client, admin_key, sample_identity, verb):
+    def test_a_type_that_receives_no_callbacks_is_refused_the_same_way(self, client, db, admin_key, verb):
+        # A label: neither container nor task, so nothing can be posted against it.
+        # Identity played this part until ADR-0095 gave it the container role.
+        label = graph.create_label(db, project_id=None, name="chore")
+        db.commit()
         if verb == "reveal":
-            internal = client.get(f"/api/nodes/{sample_identity.id}/webhook")
-            external = client.get(f"/api/v1/nodes/{sample_identity.id}/webhook", headers=_hdr(admin_key))
+            internal = client.get(f"/api/nodes/{label.id}/webhook")
+            external = client.get(f"/api/v1/nodes/{label.id}/webhook", headers=_hdr(admin_key))
         else:
-            internal = client.post(f"/api/nodes/{sample_identity.id}/webhook/rotate-secret")
-            external = client.post(f"/api/v1/nodes/{sample_identity.id}/webhook/rotate-secret", headers=_hdr(admin_key))
+            internal = client.post(f"/api/nodes/{label.id}/webhook/rotate-secret")
+            external = client.post(f"/api/v1/nodes/{label.id}/webhook/rotate-secret", headers=_hdr(admin_key))
 
         assert internal.status_code == external.status_code == 400
         assert internal.json()["detail"] == external.json()["detail"]

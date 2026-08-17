@@ -128,7 +128,12 @@ BUILTIN_NODE_TYPES: list[dict] = [
         "label": "Identity",
         "icon": "user",
         "color": "#f472b6",
-        "roles": [graph.ROLE_SHAREABLE, graph.ROLE_SUBSCRIBABLE],
+        # ``container`` since ADR-0095: an identity is a level people actually file work
+        # under, not only a name to hang ownership on. ADR-0040 gave that role to
+        # ``organization`` alone and left identity as owner-only — production then stored
+        # 6 identity -> project ``contains`` edges the rule would now refuse, and the
+        # hierarchy on screen was one the app could no longer rebuild.
+        "roles": [graph.ROLE_CONTAINER, graph.ROLE_SHAREABLE, graph.ROLE_SUBSCRIBABLE],
         # The whole reason the Identity page still exists: three fields no generic
         # surface could draw. Declared, they stop being a reason for a page.
         "fields": [
@@ -197,9 +202,11 @@ BUILTIN_EDGE_TYPES: list[dict] = [
         "description": (
             "Parent -> child: where a node lives. The aggregation skeleton — progress, "
             "project size and every subtree rollup follow it. A type that declares roles "
-            "must hold 'container' or 'task' to be the source, so an identity cannot be a "
-            "parent here: use 'owns' to say whose work something is. A type declaring no "
-            "roles is generic and may nest freely."
+            "must hold 'container' or 'task' to be the source; a type declaring no roles "
+            "is generic and may nest freely. Identity holds 'container' (ADR-0095), so a "
+            "persona may be a level work is filed under — reach for 'owns' when you mean "
+            "whose something is rather than where it lives, because only 'contains' "
+            "carries the rollups."
         ),
     },
     {

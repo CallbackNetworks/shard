@@ -20,7 +20,9 @@ def test_builtin_roles_seeded(db):
 
 
 def test_role_key_helpers(db):
-    assert graph.container_type_keys(db) == {graph.NODE_PROJECT, graph.NODE_GOAL}
+    # identity joined the container role in ADR-0095: a persona is a level work is
+    # filed under, which is how production already stored it.
+    assert graph.container_type_keys(db) == {graph.NODE_PROJECT, graph.NODE_GOAL, graph.NODE_IDENTITY}
     assert graph.task_type_keys(db) == {graph.NODE_TASK}
 
 
@@ -223,10 +225,11 @@ def test_builtin_container_role_immutable_via_roles(client):
 
 def test_builtin_capability_role_toggle_allowed(client):
     # A cross-cutting capability (not container/task) may be toggled on a built-in:
-    # identity keeps its shareable role but drops subscribable.
-    r = client.patch("/api/graph-types/nodes/identity", json={"roles": ["shareable"]})
+    # identity keeps its shareable role but drops subscribable. Its structural role has
+    # to come along unchanged — that half is frozen (ADR-0034/0035, ADR-0095).
+    r = client.patch("/api/graph-types/nodes/identity", json={"roles": ["container", "shareable"]})
     assert r.status_code == 200
-    assert r.json()["roles"] == ["shareable"]
+    assert r.json()["roles"] == ["container", "shareable"]
 
 
 def test_organization_user_defined_type_plays_all_roles(client, db):
