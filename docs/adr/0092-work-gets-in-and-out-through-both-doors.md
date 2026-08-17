@@ -36,6 +36,10 @@ ADR-0091 清掉了三個表面比對後剩下的「維運類」內部獨有路�
 
 ## Consequences
 
-正面：一個 agent 現在可以把 GitHub 的 issue 整批倒進來、把規劃好的任務發佈成真的 issue、看見並清空未歸檔的收件匣（`triage-inbox` 這個 prompt 終於有資料可看）、讀回自己寫過的決策記錄、把上一個衝刺輪成下一個草稿。ADR-0084→0085→0091→0092 這條線走完之後，三個表面的機械比對只剩下 API key 管理（刻意不開，一把 `write` key 生出 `admin` key 就是提權）、assistant 對話、以及純 UI 偏好（saved filters、dashboard widgets）。
+正面：一個 agent 現在可以把 GitHub 的 issue 整批倒進來、把規劃好的任務發佈成真的 issue、看見並清空未歸檔的收件匣（`triage-inbox` 這個 prompt 終於有資料可看）、讀回自己寫過的決策記錄、把上一個衝刺輪成下一個草稿。ADR-0084→0085→0091→0092 這條線走完後，內部獨有路由從 66 條降到 46 條，剩下的分成三類：
+
+1. **刻意不開**：API key 管理（一把 `write` key 生得出 `admin` key 就是提權）、`/auth/*`（瀏覽器 session 本來就不該有第二道門）、assistant 對話、純 UI 偏好（saved filters、dashboard widgets、`/settings/preferences/{key}`）。
+2. **換條路已經做得到，不該再開第二個**：`graph-types/{nodes,edges}` ≙ `/api/v1/{node-types,edge-types}`、`identities`／`goals` ≙ `/nodes?type=`、cycle 成員與任務跨專案歸屬 ≙ `/nodes/{id}/edges`、`regenerate-token` ≙ `webhook/rotate-token`、`integrations/{id}/deliveries` ≙ `/deliveries?integration_id=`。
+3. **還沒補、但確實是缺口**：`analytics/usage`（LLM 用量與成本）、`focus-targets`、`identities/hub-stats`、`graph-types/data-keys/managed`（要正確使用 `/api/v1/node-types` 就需要它）、`tasks/reorder`。這些是下一輪的名單，不是已完成的宣稱。
 
 負面與代價：匯入器現在可以由 API key 觸發，而匯入是**批次建立任務**，所以一把 `write` key 打錯一次的後果從「一個任務」變成「一百個任務」。部分成功的契約讓這件事更難察覺 —— 200 加上一個 `imported` 數字，沒有東西會叫住呼叫者。緩解方式是既有的：`import.{source}` 活動記錄照舊寫入，而 ADR-0091 的 `POST /api/v1/backup/run` 現在也是 agent 叫得動的，所以「先拍快照再倒資料」在同一次對話裡做得到。另外 `issue_sync_admin` 在函式內部 import `routers/issue_sync`，方向是反的；那 866 行的模組該搬進 services，但那是一次沒有任何使用者面向問題的搬家，留給下一次。
