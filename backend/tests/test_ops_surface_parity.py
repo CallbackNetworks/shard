@@ -169,6 +169,33 @@ class TestLLMSettings:
             client.put("/api/v1/settings/llm", json={"provider": "claude"}, headers=_hdr(read_key)).status_code == 403
         )
 
+    def test_base_url_round_trips_through_both_doors_and_is_not_redacted(self, client, admin_key):
+        resp = client.put(
+            "/api/v1/settings/llm",
+            json={"provider": "openai", "base_url": "https://gateway.example/v1"},
+            headers=_hdr(admin_key),
+        )
+        assert resp.json()["llm_base_url"] == "https://gateway.example/v1"
+        internal = client.get("/api/settings").json()
+        assert internal["llm_base_url"] == "https://gateway.example/v1"
+
+    def test_writing_a_model_returns_a_best_effort_check_that_never_blocks_the_save(self, client, admin_key):
+        """No anthropic/openai package is installed in this image by default (ADR-0096),
+        so this degrades to unchecked — and the write still succeeds (ADR-0097)."""
+        resp = client.put(
+            "/api/v1/settings/llm",
+            json={"provider": "claude", "model": "claude-sonnet-4-6", "api_key": "sk-x"},
+            headers=_hdr(admin_key),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["llm_model"] == "claude-sonnet-4-6"
+        assert resp.json()["model_check"]["checked"] is False
+        assert resp.json()["model_check"]["ok"] is None
+
+    def test_no_model_check_when_model_is_not_part_of_the_write(self, client, admin_key):
+        resp = client.put("/api/v1/settings/llm", json={"provider": "openai"}, headers=_hdr(admin_key))
+        assert "model_check" not in resp.json()
+
 
 class TestIcalToken:
     def test_the_token_is_the_same_one_through_both_doors(self, client, admin_key):

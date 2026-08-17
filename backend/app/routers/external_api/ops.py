@@ -93,11 +93,18 @@ def api_update_settings(
     "/settings/llm",
     summary="Change the assistant's provider",
     description=(
-        "Partial update of `provider` (`claude`|`openai`|`stub`), `model` and `api_key`. "
-        'A field left out is unchanged; `""` clears that field\'s override back to its '
-        "environment default. Takes effect on the next message sent, no restart needed. "
-        "Requires `admin` scope, on the same rule as `/settings/ical-token`: the key is a "
-        "credential, and this is the only door that can set one."
+        "Partial update of `provider` (`claude`|`openai`|`stub` — a wire protocol, not a "
+        "vendor), `model`, `api_key` and `base_url`. `base_url` reaches any endpoint that "
+        "speaks the same protocol — Cloudflare AI Gateway, a self-hosted OpenAI-compatible "
+        'gateway — without a new `provider` value. A field left out is unchanged; `""` '
+        "clears that field's override back to its environment default. Takes effect on the "
+        "next message sent, no restart needed. When `model` is part of the request, the "
+        "response carries a best-effort `model_check` ({checked, ok, detail}) from querying "
+        "the provider's own model list — `checked: false` means no verdict could be reached "
+        "(package not installed, endpoint unsupported, network failure), not that the model "
+        "is wrong; it never blocks the write. Requires `admin` scope, on the same rule as "
+        "`/settings/ical-token`: the key is a credential, and this is the only door that can "
+        "set one."
     ),
     responses=_auth_errors,
 )

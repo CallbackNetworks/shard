@@ -63,7 +63,26 @@ def test_get_provider_falls_back_to_env_when_no_override(db):
 
             provider = get_provider(db)
             assert isinstance(provider, OpenAIProvider)
-            mock_openai.AsyncOpenAI.assert_called_with(api_key="env-key")
+            mock_openai.AsyncOpenAI.assert_called_with(api_key="env-key", base_url=None)
+
+
+def test_get_provider_passes_base_url_through(db):
+    """A Cloudflare AI Gateway / self-hosted OpenAI-compatible endpoint is reached with
+    the same provider="openai" and a custom base_url, no new provider class (ADR-0097)."""
+    from app.services import llm_settings
+
+    with patch.dict("os.environ", {}, clear=False):
+        llm_settings.update(
+            db,
+            {"provider": "openai", "api_key": "gw-key", "base_url": "https://gateway.example/v1"},
+        )
+        mock_openai = MagicMock()
+        mock_openai.AsyncOpenAI.return_value = MagicMock()
+        with patch.dict("sys.modules", {"openai": mock_openai}):
+            from app.services.llm import get_provider
+
+            get_provider(db)
+            mock_openai.AsyncOpenAI.assert_called_with(api_key="gw-key", base_url="https://gateway.example/v1")
 
 
 @pytest.mark.asyncio

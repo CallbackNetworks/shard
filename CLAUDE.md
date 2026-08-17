@@ -58,9 +58,10 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | `AUTH_LOCKOUT_SECONDS` | Login lockout window in seconds (default `300`) |
 | `AUTH_PROXY_HEADER` | Forward-auth: trust this header from an upstream SSO proxy (e.g. `Cf-Access-Authenticated-User-Email`). Only safe when the origin is reachable exclusively via that proxy — see ADR-0030 |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_USE_TLS` | Email notifications |
-| `LLM_PROVIDER` | `claude` \| `openai` \| `stub` (default `stub`) |
-| `LLM_API_KEY` | API key for the chosen LLM provider |
-| `LLM_MODEL` | Model name (e.g. `claude-sonnet-4-6` for Claude, `gpt-4o` for OpenAI) |
+| `LLM_PROVIDER` | `claude` \| `openai` \| `stub` (default `stub`) — a wire protocol, not a vendor. Overridable at runtime via Settings/`/api/settings/llm` (ADR-0096); this is just the fallback default |
+| `LLM_API_KEY` | API key for the chosen LLM provider. Same runtime-override rule as `LLM_PROVIDER` |
+| `LLM_MODEL` | Model name (e.g. `claude-sonnet-4-6` for Claude, `gpt-4o` for OpenAI). Same runtime-override rule |
+| `LLM_BASE_URL` | Optional: point `claude`/`openai` at a compatible endpoint instead of the vendor's default (Cloudflare AI Gateway, a self-hosted OpenAI-compatible gateway — ADR-0097). Same runtime-override rule |
 | `SUMMARY_HOUR` | Hour (UTC) to send daily summary email (default `8`) |
 | `BACKUP_ENABLED` | Automatic daily backup on/off (default `1`; runtime-adjustable) |
 | `BACKUP_HOUR` | Hour (UTC) for the daily backup (default `3`; runtime-adjustable) |
@@ -206,7 +207,7 @@ The upgrade runs as a deploy step (`python -m app.db_schema`) after `pull` and b
 
 **Scheduler** (`services/scheduler.py`): asyncio loop, ticks every 3600 s. `_run_tick` runs seven checks, each isolated in its own try/except so one failure cannot starve the rest: due-date reminders (`task.due_soon`/`task.overdue`), recurring task generation, failed webhook retries, daily summary email (once per day at `SUMMARY_HOUR` UTC to all email-type integrations), weekly digest (`DIGEST_DAY`), SLA aging, and the daily backup.
 
-**LLM assistant** (`services/llm.py` + `services/assistant_tools.py`): provider-agnostic. `get_provider()` reads `LLM_PROVIDER` env var and returns `ClaudeProvider`, `OpenAIProvider`, or `StubProvider`. Tools: `get_summary`, `list_tasks`, `create_task`, `update_task`, `create_subtask`, `manage_labels`, `analyze_workload`, `search`, `get_activity`.
+**LLM assistant** (`services/llm.py` + `services/assistant_tools.py`): provider-agnostic. `get_provider(db)` resolves the effective provider/model/api_key/base_url per call via `services/llm_settings.py` (DB override, else env var — ADR-0096) and returns `ClaudeProvider`, `OpenAIProvider`, or `StubProvider`; a change made through Settings/`/api/settings/llm` takes effect on the next message, no restart. `provider` names a wire protocol (Anthropic Messages API or OpenAI Chat Completions API shape), not a vendor — `base_url` reaches any same-protocol third-party endpoint, e.g. Cloudflare AI Gateway or a self-hosted OpenAI-compatible gateway (ADR-0097). Saving a `model` triggers a best-effort check against the provider's own model list (never blocks the write — a missing SDK package, an unsupported `/models` endpoint, or a network failure all degrade to "unverified", not "wrong"). Tools: `get_summary`, `list_tasks`, `create_task`, `update_task`, `create_subtask`, `manage_labels`, `analyze_workload`, `search`, `get_activity`.
 
 **The assistant is one implementation with two layouts** (`components/assistant/`, ADR-0089): the page and the floating panel used to hold a full copy each — their own `axios.create` plus auth interceptor, their own SSE reader, their own `PROMPT_TEMPLATES` — and the prompt lists had drifted, so "Plan today" and the decisions prompt sent *different text* depending on which one you clicked, and only the panel's told the assistant to write decision records. Now `useAssistantChat` owns the conversation and the stream, `ChatMessages`/`PromptChips` own the rendering, and the four conversation calls live in `api/client.js` with everything else. Prompt bodies come from the locale files so the question goes out in the language being read. A reply renders through `MarkdownPreview`; the *streaming* bubble stays plain text on purpose. The panel hides itself on `/assistant`. An unconfigured provider yields an `error` event that is forwarded and never persisted — it used to be stored as a turn the assistant had spoken.
 

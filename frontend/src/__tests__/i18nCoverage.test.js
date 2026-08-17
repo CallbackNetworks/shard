@@ -95,7 +95,7 @@ describe('the two locales describe the same app', () => {
       'integrations.signingSecretPlaceholder', 'integrations.authBearer',
       'integrations.authBasic', 'integrations.authApiKey', 'integrations.taskCreated',
       'webhookLogs.httpCode', 'project.colId', 'overview.colPct',
-      'project.repoUrlPlaceholder',
+      'project.repoUrlPlaceholder', 'settings.llmBaseUrl',
     ])
     const identical = Object.keys(en).filter(k => zh[k] === en[k] && !PROPER_NOUNS.has(k))
     expect(identical).toEqual([])

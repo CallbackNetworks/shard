@@ -1,9 +1,11 @@
 """
 Provider-agnostic LLM abstraction for the Assistant feature.
 
-Provider/model/key are resolved per call from ``services.llm_settings`` (DB override,
-else env var — ADR-0096), not read once at import time, so a change made through
-Settings takes effect on the next message without a restart.
+Provider/model/key/base_url are resolved per call from ``services.llm_settings`` (DB
+override, else env var — ADR-0096), not read once at import time, so a change made
+through Settings takes effect on the next message without a restart. ``base_url``
+(ADR-0097) is how a same-protocol third-party endpoint — Cloudflare AI Gateway, a
+self-hosted OpenAI-compatible gateway — is reached without a new provider class.
 """
 
 import json
@@ -56,11 +58,11 @@ class StubProvider(LLMProvider):
 
 
 class ClaudeProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
         try:
             import anthropic
 
-            self.client = anthropic.AsyncAnthropic(api_key=api_key)
+            self.client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url or None)
             self.model = model or "claude-sonnet-4-6"
         except ImportError as err:
             raise RuntimeError("anthropic package not installed. Add 'anthropic' to requirements.txt") from err
@@ -103,11 +105,11 @@ class ClaudeProvider(LLMProvider):
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
         try:
             from openai import AsyncOpenAI
 
-            self.client = AsyncOpenAI(api_key=api_key)
+            self.client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
             self.model = model or "gpt-4o"
         except ImportError as err:
             raise RuntimeError("openai package not installed. Add 'openai' to requirements.txt") from err
@@ -172,7 +174,7 @@ class OpenAIProvider(LLMProvider):
 def get_provider(db: Session) -> LLMProvider:
     config = llm_settings.get_effective_llm_config(db)
     if config["provider"] == "claude":
-        return ClaudeProvider(api_key=config["api_key"], model=config["model"])
+        return ClaudeProvider(api_key=config["api_key"], model=config["model"], base_url=config["base_url"])
     elif config["provider"] == "openai":
-        return OpenAIProvider(api_key=config["api_key"], model=config["model"])
+        return OpenAIProvider(api_key=config["api_key"], model=config["model"], base_url=config["base_url"])
     return StubProvider()

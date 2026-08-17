@@ -41,7 +41,7 @@ def put_system_settings(body: SystemSettingsUpdate, db: Session = Depends(get_db
 
 @router.put("/llm")
 def put_llm_settings(body: LLMSettingsUpdate, db: Session = Depends(get_db)):
-    """Update the assistant's provider/model/API key (persisted, no restart needed)."""
+    """Update the assistant's provider/model/API key/base_url (persisted, no restart needed)."""
     return settings_admin.update_llm(db, body.model_dump(exclude_none=True))
 
 

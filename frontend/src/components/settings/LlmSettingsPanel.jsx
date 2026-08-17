@@ -16,29 +16,34 @@ export default function LlmSettingsPanel({ settings }) {
 
   const [provider, setProvider] = useState(settings.llm_provider)
   const [model, setModel] = useState(settings.llm_model || '')
+  const [baseUrl, setBaseUrl] = useState(settings.llm_base_url || '')
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [clearKey, setClearKey] = useState(false)
   const [showKey, setShowKey] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [message, setMessage] = useState(null)
+  const [modelCheck, setModelCheck] = useState(null)
 
   useEffect(() => {
     if (dirty) return
     setProvider(settings.llm_provider)
     setModel(settings.llm_model || '')
-  }, [settings.llm_provider, settings.llm_model, dirty])
+    setBaseUrl(settings.llm_base_url || '')
+  }, [settings.llm_provider, settings.llm_model, settings.llm_base_url, dirty])
 
   const mut = useMutation({
     mutationFn: updateLlmSettings,
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['settings'] })
       setApiKeyDraft('')
       setClearKey(false)
       setDirty(false)
       setMessage({ type: 'success', text: t('settings.llmSaved') })
+      setModelCheck(data?.model_check ?? null)
     },
     onError: (err) => {
       setMessage({ type: 'error', text: err.response?.data?.detail || 'Error' })
+      setModelCheck(null)
     },
   })
 
@@ -49,10 +54,11 @@ export default function LlmSettingsPanel({ settings }) {
   }
 
   const handleSave = () => {
-    const payload = { provider, model }
+    const payload = { provider, model, base_url: baseUrl }
     if (clearKey) payload.api_key = ''
     else if (apiKeyDraft) payload.api_key = apiKeyDraft
     setMessage(null)
+    setModelCheck(null)
     mut.mutate(payload)
   }
 
@@ -71,8 +77,34 @@ export default function LlmSettingsPanel({ settings }) {
       <ControlRow label={t('settings.model')} hint={t('settings.llmModelHint')}>
         <input
           value={model}
-          onChange={e => { setModel(e.target.value); setDirty(true) }}
+          onChange={e => { setModel(e.target.value); setDirty(true); setModelCheck(null) }}
           placeholder={t('settings.llmModelPlaceholder')}
+          className="kt-input"
+          style={{ fontFamily: 'monospace', fontSize: 12 }}
+        />
+      </ControlRow>
+
+      {modelCheck?.checked && modelCheck.ok === true && (
+        <div style={{ fontSize: 12, color: DARK.success, marginTop: -8, marginBottom: 12 }}>
+          {t('settings.llmModelVerified')}
+        </div>
+      )}
+      {modelCheck?.checked && modelCheck.ok === false && (
+        <div style={{ fontSize: 12, color: DARK.warning, marginTop: -8, marginBottom: 12 }}>
+          {t('settings.llmModelNotFoundPrefix')}: {modelCheck.detail}
+        </div>
+      )}
+      {modelCheck && !modelCheck.checked && modelCheck.detail && (
+        <div style={{ fontSize: 12, color: DARK.textDim, marginTop: -8, marginBottom: 12 }}>
+          {t('settings.llmModelUnverifiedPrefix')}: {modelCheck.detail}
+        </div>
+      )}
+
+      <ControlRow label={t('settings.llmBaseUrl')} hint={t('settings.llmBaseUrlHint')}>
+        <input
+          value={baseUrl}
+          onChange={e => { setBaseUrl(e.target.value); setDirty(true) }}
+          placeholder={t('settings.llmBaseUrlPlaceholder')}
           className="kt-input"
           style={{ fontFamily: 'monospace', fontSize: 12 }}
         />

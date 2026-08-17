@@ -56,6 +56,7 @@ class LLMSettingsUpdate(BaseModel):
     provider: str | None = None
     model: str | None = None
     api_key: str | None = None
+    base_url: str | None = None
 
 
 def auth_mode() -> str:
