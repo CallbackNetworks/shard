@@ -477,3 +477,53 @@ export const detachNodeEdge = (id, targetId, relType) =>
 // Unfiled tasks (zero project membership; ADR-0032/0033)
 export const getUnfiledTasks = () => api.get('/tasks/unfiled').then(r => r.data)
 export const fileTaskIntoProject = (taskId, projectId) => api.post(`/tasks/${taskId}/memberships/${projectId}`).then(r => r.data)
+
+// ── Assistant (ADR-0089) ──────────────────────────────────────────────────
+// These lived twice, as a private `axios.create({ baseURL: '/api' })` plus its
+// own auth interceptor inside both the Assistant page and the floating panel.
+// A second instance is a second set of rules: neither copy passed through the
+// response interceptor above, so an assistant write was never queued offline
+// and an error never reached the toast stack.
+export const getAssistantConversations = (q) =>
+  api.get('/assistant/conversations', { params: q ? { q } : {} }).then(r => r.data)
+export const getAssistantConversation = (id) =>
+  api.get(`/assistant/conversations/${id}`).then(r => r.data)
+export const createAssistantConversation = () =>
+  api.post('/assistant/conversations').then(r => r.data)
+export const deleteAssistantConversation = (id) => api.delete(`/assistant/conversations/${id}`)
+
+/**
+ * Send a message and read the SSE reply.
+ *
+ * `fetch`, not the axios instance, because this response is a stream — but the
+ * URL and the auth header are resolved here, beside every other call, so the
+ * two chat surfaces cannot drift on either. `onEvent` receives each decoded
+ * event; malformed frames are skipped rather than aborting the stream.
+ */
+export async function streamAssistantMessage(conversationId, content, onEvent) {
+  const token = localStorage.getItem('auth_token')
+  const resp = await fetch(`/api/assistant/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ content }),
+  })
+  if (!resp.ok || !resp.body) {
+    throw new Error(`Assistant request failed (${resp.status})`)
+  }
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        onEvent(JSON.parse(line.slice(6)))
+      } catch { /* a partial frame is not an error worth aborting the stream for */ }
+    }
+  }
+}

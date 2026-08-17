@@ -90,3 +90,4 @@
 | [0086](0086-a-field-you-can-read-is-a-field-you-can-write.md) | 讀得到的東西就要寫得了 | Accepted | 2026-08-16 |
 | [0087](0087-the-last-duplicate-share-implementation.md) | 最後一份重複的分享實作 | Accepted | 2026-08-16 |
 | [0088](0088-a-colour-means-one-thing.md) | 一個顏色只能代表一件事 | Accepted | 2026-08-16 |
+| [0089](0089-one-assistant-one-definition-of-overdue.md) | 一個助理，一個「逾期」的定義 | Accepted | 2026-08-16 |

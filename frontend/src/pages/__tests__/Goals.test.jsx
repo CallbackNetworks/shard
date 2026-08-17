@@ -2,13 +2,9 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 
-// Mock react-i18next
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (k) => k,
-    i18n: { language: 'en', changeLanguage: vi.fn() },
-  }),
-}))
+// Resolve real English, so these assertions describe what a user sees rather
+// than the shape of the catalogue (ADR-0089).
+vi.mock('react-i18next', async () => (await import('../../test/i18nMock')).reactI18nextMock())
 
 // Mock useBreakpoint
 vi.mock('../../hooks/useBreakpoint', () => ({
@@ -48,6 +44,8 @@ const mockGoals = [
     description: 'Release version 2.0 with new features',
     status: 'active',
     progress: 45,
+    total_tasks: 20,
+    done_tasks: 9,
     target_date: '2026-12-31',
     projects: [{ project_id: 1, project_name: 'Project A', progress: 50 }],
   },
@@ -57,6 +55,8 @@ const mockGoals = [
     description: 'Reach 90% coverage',
     status: 'completed',
     progress: 100,
+    total_tasks: 8,
+    done_tasks: 8,
     target_date: '2026-06-01',
     projects: [],
   },
@@ -66,6 +66,8 @@ const mockGoals = [
     description: null,
     status: 'cancelled',
     progress: 10,
+    total_tasks: 10,
+    done_tasks: 1,
     target_date: null,
     projects: [],
   },
@@ -104,20 +106,22 @@ function setup(options = {}) {
 describe('Goals', () => {
   it('renders the goals title', () => {
     setup()
-    expect(screen.getByText('goals.title')).toBeTruthy()
+    expect(screen.getByText("Goals")).toBeTruthy()
   })
 
   it('renders the subtitle', () => {
     setup()
-    expect(screen.getByText('goals.subtitle')).toBeTruthy()
+    expect(screen.getByText("Track and measure progress across projects")).toBeTruthy()
   })
 
   it('renders status filter tabs', () => {
     setup()
-    expect(screen.getByText('goals.filterAll')).toBeTruthy()
-    expect(screen.getByText('goals.filterActive')).toBeTruthy()
-    expect(screen.getByText('goals.filterCompleted')).toBeTruthy()
-    expect(screen.getByText('goals.filterCancelled')).toBeTruthy()
+    expect(screen.getByText("All")).toBeTruthy()
+    // "Active"/"Completed" also label a goal's own status chip, so match the
+    // tabs by count rather than assuming a single occurrence.
+    expect(screen.getAllByText("Active").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("Completed").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("Cancelled").length).toBeGreaterThan(0)
   })
 
   it('renders tab counts', () => {
@@ -148,30 +152,39 @@ describe('Goals', () => {
     expect(screen.getByText('10%')).toBeTruthy()
   })
 
+  // A goal with nothing linked has no measurement to show, so it says so rather
+  // than drawing an empty bar that reads as "measured zero" (ADR-0089).
+  it('says so when a goal has no tasks linked instead of showing 0%', () => {
+    setup({ goals: [{ ...mockGoals[0], progress: 0, total_tasks: 0, done_tasks: 0 }] })
+    expect(screen.getByText('No tasks linked yet')).toBeTruthy()
+    expect(screen.queryByText('0%')).toBeNull()
+  })
+
   it('shows empty state when no goals exist', () => {
     setup({ goals: [] })
-    expect(screen.getByText('goals.empty')).toBeTruthy()
-    expect(screen.getByText('goals.emptyHint')).toBeTruthy()
+    expect(screen.getByText("No goals yet")).toBeTruthy()
+    expect(screen.getByText("Create a goal to track progress across projects")).toBeTruthy()
   })
 
   it('renders create button', () => {
     setup()
-    expect(screen.getByText('goals.create')).toBeTruthy()
+    expect(screen.getByText("New Goal")).toBeTruthy()
   })
 
   it('opens form modal when create button is clicked', () => {
     setup()
     // Click the create button in the header
-    const createButtons = screen.getAllByText('goals.create')
+    const createButtons = screen.getAllByText("New Goal")
     fireEvent.click(createButtons[0])
-    // Form modal should appear with the create title
-    expect(screen.getByText('goals.createTitle')).toBeTruthy()
-    expect(screen.getByPlaceholderText('goals.titlePlaceholder')).toBeTruthy()
+    // Form modal should appear with the create title (the header button carries
+    // the same words, so there are two by now).
+    expect(screen.getAllByText("New Goal").length).toBeGreaterThan(1)
+    expect(screen.getByPlaceholderText("e.g. Launch MVP by Q2")).toBeTruthy()
   })
 
   it('shows loading state', () => {
     setup({ isLoading: true, goals: [] })
-    expect(screen.getByText('loading')).toBeTruthy()
+    expect(screen.getByText("Loading\u2026")).toBeTruthy()
   })
 
   it('renders linked project chips on goal cards', () => {

@@ -4,6 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Markdown } from 'tiptap-markdown'
+import { useTranslation } from 'react-i18next'
 import {
   Bold, Italic, Strikethrough, Heading1, Heading2, Heading3,
   List, ListOrdered, Code, Quote, Link as LinkIcon, FileCode,
@@ -76,6 +77,7 @@ function Toolbar({ editor }) {
 }
 
 export default function MarkdownEditor({ value, onChange, placeholder, minHeight = 80 }) {
+  const { t } = useTranslation()
   const [mode, setMode] = useState('wysiwyg') // 'wysiwyg' | 'markdown'
   const [mdSource, setMdSource] = useState(value || '')
   const suppressUpdate = useRef(false)
@@ -178,33 +180,12 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
           onClick={() => editor?.commands.focus()}
         >
           <EditorContent editor={editor} />
-          <style>{`
-            .tiptap { outline: none; color: var(--kt-ink); }
-            .tiptap p { margin: 0 0 0.4em; }
-            .tiptap h1 { font-size: 1.5em; font-weight: 700; margin: 0.4em 0 0.2em; }
-            .tiptap h2 { font-size: 1.25em; font-weight: 700; margin: 0.4em 0 0.2em; }
-            .tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
-            .tiptap ul, .tiptap ol { padding-left: 1.4em; margin: 0.3em 0; }
-            .tiptap li { margin: 0.1em 0; }
-            .tiptap code { background: rgba(var(--kt-ink-rgb), 0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: var(--kt-hit); }
-            .tiptap pre { background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
-            .tiptap pre code { background: none; padding: 0; color: inherit; }
-            .tiptap blockquote { border-left: 3px solid rgba(var(--kt-ink-rgb), 0.15); padding-left: 12px; margin: 0.4em 0; color: rgba(var(--kt-ink-rgb), 0.4); }
-            .tiptap a { color: #facc15; text-decoration: underline; }
-            .tiptap p.is-editor-empty:first-child::before {
-              content: attr(data-placeholder);
-              float: left;
-              color: rgba(var(--kt-ink-rgb), 0.2);
-              pointer-events: none;
-              height: 0;
-            }
-          `}</style>
         </div>
       ) : (
         <textarea
           value={mdSource}
           onChange={handleMdChange}
-          placeholder={placeholder || 'Write markdown...'}
+          placeholder={placeholder || t('markdown.placeholder')}
           style={{
             width: '100%',
             minHeight,

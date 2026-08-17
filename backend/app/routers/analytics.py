@@ -18,12 +18,12 @@ def get_overview(db: Session = Depends(get_db)):
     week_ago = now - timedelta(days=7)
 
     def _task_count():
-        return db.query(func.count(Node.id)).filter(Node.type == graph.NODE_TASK)
+        return db.query(func.count(Node.id)).filter(graph.task_type_filter(db))
 
     total_tasks = _task_count().scalar() or 0
     done_tasks = _task_count().filter(Node.status == "done").scalar() or 0
     in_progress = _task_count().filter(Node.status == "in_progress").scalar() or 0
-    overdue = _task_count().filter(Node.due_date < now, Node.status.notin_(["done", "failed"])).scalar() or 0
+    overdue = _task_count().filter(*graph.overdue_clause(now)).scalar() or 0
 
     # Most active project last 7 days
     activity_counts = (
@@ -161,7 +161,7 @@ def get_status_trend(
     result = []
     for i in range(days - 1, -1, -1):
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
-        q = db.query(Node.status, func.count(Node.id)).filter(Node.type == graph.NODE_TASK, Node.created_at <= day)
+        q = db.query(Node.status, func.count(Node.id)).filter(graph.task_type_filter(db), Node.created_at <= day)
         if project_id:
             q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
         rows = q.group_by(Node.status).all()

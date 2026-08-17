@@ -105,7 +105,12 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
 
         try:
             async for event in provider.chat(messages, TOOLS, SYSTEM_PROMPT):
-                if event["type"] == "text":
+                if event["type"] == "error":
+                    # A provider-level failure is not a turn in the conversation:
+                    # it is forwarded to the client and never written to history
+                    # (ADR-0089).
+                    yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
+                elif event["type"] == "text":
                     assistant_text.append(event["text"])
                     yield f"data: {json.dumps({'type': 'text', 'text': event['text']})}\n\n"
                 elif event["type"] == "tool_call":

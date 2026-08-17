@@ -75,6 +75,8 @@ async def test_stub_provider_chat():
     async for event in provider.chat(messages=[], tools=[]):
         events.append(event)
     assert len(events) == 2
-    assert events[0]["type"] == "text"
-    assert "not configured" in events[0]["text"]
+    # An unconfigured provider reports a configuration error, not an answer, so
+    # the router never persists it as a turn in the conversation (ADR-0089).
+    assert events[0]["type"] == "error"
+    assert "configured" in events[0]["message"]
     assert events[1]["type"] == "done"

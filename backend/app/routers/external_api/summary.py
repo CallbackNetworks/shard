@@ -93,11 +93,7 @@ def api_summary(
                     }
                 )
 
-            is_overdue = (
-                t.due_date
-                and t.due_date.replace(tzinfo=None) < now.replace(tzinfo=None)
-                and t.status not in ("done", "failed")
-            )
+            is_overdue = graph.is_overdue(t, now)
             if is_overdue:
                 overdue += counts
 

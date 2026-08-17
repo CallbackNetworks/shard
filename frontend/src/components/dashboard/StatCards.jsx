@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BRAND, DARK, STATUS_COLOR } from '../../constants/theme'
 import s from '../../pages/Dashboard.module.css'
+import { countOverdue } from '../../utils/overdue'
 
 /* ── Sparkline SVG ────────────────────────────────────────────────── */
 function computeSparkline(activities) {
@@ -73,9 +74,7 @@ export default function StatCards({ projects, activities }) {
   const allTasks = projects.flatMap(p => p.tasks || [])
   const totalTasks = allTasks.length
   const doneTasks = allTasks.filter(task => task.status === 'done').length
-  const overdueTasks = allTasks.filter(task =>
-    task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
-  ).length
+  const overdueTasks = countOverdue(allTasks)
   const completionRate = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0
 
   const today = new Date().toDateString()

@@ -892,6 +892,11 @@ class GoalOut(BaseModel):
     updated_at: datetime
     projects: list["GoalProjectOut"] = []
     progress: float = 0.0
+    # The subtree size behind `progress` (ADR-0065's rollup). Without it a goal
+    # with no work linked and a goal whose work is untouched both read "0%", and
+    # only one of those is a measurement (ADR-0089).
+    total_tasks: int = 0
+    done_tasks: int = 0
 
 
 class GoalProjectOut(BaseModel):

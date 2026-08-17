@@ -32,7 +32,10 @@ def _enrich_goal(goal: graph.GoalView, db: Session) -> GoalOut:
 
     out = GoalOut.model_validate(goal)
     out.projects = projects
-    out.progress = graph.goal_subtree_progress(db, goal.id)
+    stats = graph.container_subtree_stats(db, goal.id)
+    out.progress = stats.progress
+    out.total_tasks = stats.total_tasks
+    out.done_tasks = stats.done_tasks
     return out
 
 

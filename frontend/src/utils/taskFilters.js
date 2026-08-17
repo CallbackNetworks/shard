@@ -1,3 +1,4 @@
+import { isOverdue } from './overdue'
 // Pure task-list filtering shared by ProjectDetail. Each dimension uses 'all'
 // as the no-op sentinel, mirroring the filter controls; 'due' is a keyword
 // ('overdue' | 'this_week' | 'no_date') rather than an exact match.
@@ -18,7 +19,9 @@ export function filterTasks(list, filters = {}) {
   if (assignee !== 'all') result = result.filter(t => t.assignee === assignee)
   if (agent !== 'all') result = result.filter(t => t.assigned_agent_name === agent)
   if (due === 'overdue') {
-    result = result.filter(t => t.due_date && new Date(t.due_date) < new Date())
+    // Same rule as every overdue *count* in the app (ADR-0089). This filter used
+    // to check only the date, so "Overdue" listed finished work as well.
+    result = result.filter(t => isOverdue(t))
   } else if (due === 'this_week') {
     const now = new Date()
     const end = new Date()

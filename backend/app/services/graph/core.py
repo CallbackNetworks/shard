@@ -32,6 +32,31 @@ REL_DEPENDS_ON = "depends_on"  # blocked task -> prerequisite task
 REL_LABELED = "labeled"  # task -> label
 REL_IN_CYCLE = "in_cycle"  # task -> cycle
 
+# A task is overdue when it is past its due date and still open. "Still open"
+# excludes ``failed`` as well as ``done`` (ADR-0089): a failed task is not late,
+# it is failed — a different problem, already counted under its own status. Every
+# overdue query in the app resolves through this, and the frontend's
+# ``utils/overdue.js`` states the same rule for the counts it derives client-side.
+CLOSED_STATUSES = ["done", "failed"]
+
+
+def overdue_clause(now):
+    """SQLAlchemy criteria for "this task is overdue", for use in ``.filter(*...)``."""
+    return (Node.due_date < now, Node.status.notin_(CLOSED_STATUSES))
+
+
+def is_overdue(task, now):
+    """The same rule for a loaded object, where a query is not what is at hand.
+
+    Naive/aware datetimes are normalised because rows written before the app
+    stored timezones come back naive and would raise on comparison.
+    """
+    due = getattr(task, "due_date", None)
+    if due is None or task.status in CLOSED_STATUSES:
+        return False
+    return due.replace(tzinfo=None) < now.replace(tzinfo=None)
+
+
 # Widest ``IN (...)`` batch a level-at-a-time traversal will build. Well under every
 # supported driver's bind-parameter ceiling (SQLite's historical 999 included).
 _IN_CHUNK = 500
@@ -103,6 +128,18 @@ def container_type_keys(db: Session) -> set[str]:
 def task_type_keys(db: Session) -> set[str]:
     """Node-type keys that play the task/item role (seeded: ``task``)."""
     return _type_keys_with_role(db, ROLE_TASK)
+
+
+def task_type_filter(db: Session):
+    """SQL criterion for "this node is a task", including task-like custom types.
+
+    ``Node.type == NODE_TASK`` is the literal built-in only. A custom type that
+    declares the task role is a first-class task everywhere else (ADR-0033,
+    ADR-0035), so a count written against the literal silently omits it — which
+    is why the analytics page reported fewer overdue tasks than the dashboard
+    even once both agreed on what "overdue" means (ADR-0089).
+    """
+    return Node.type.in_(sorted(task_type_keys(db)))
 
 
 def shareable_type_keys(db: Session) -> set[str]:

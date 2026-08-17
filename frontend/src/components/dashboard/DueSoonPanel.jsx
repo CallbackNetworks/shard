@@ -4,17 +4,16 @@ import { useNavigate } from 'react-router'
 import { Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import TaskRow from './TaskRow'
 import s from '../../pages/Dashboard.module.css'
+import { isDueWithin } from '../../utils/overdue'
 
 export default function DueSoonPanel({ projects }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(true)
 
-  const now = new Date()
-  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const dueSoonTasks = projects.flatMap(p =>
     (p.tasks || [])
-      .filter(task => task.due_date && task.status !== 'done' && new Date(task.due_date) <= nextWeek)
+      .filter(task => isDueWithin(task, 7))
       .map(task => ({ ...task, projectName: p.name, projectId: p.id }))
   ).sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
 

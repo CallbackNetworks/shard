@@ -4,6 +4,7 @@ import { STATUS_COLOR } from '../../constants/theme'
 import useScrollReveal from './useScrollReveal'
 import GuestNotes from './GuestNotes'
 import { relativeTime, formatMinutes, formatDate } from './utils'
+import { isOverdue as isTaskOverdue, countOverdue } from '../../utils/overdue'
 
 const STATUS_COLOR_MAP = STATUS_COLOR
 const STATUS_LABEL = { done: 'DONE', in_progress: 'ACTIVE', failed: 'FAILED', todo: 'TODO' }
@@ -20,7 +21,7 @@ function hasDetails(task) {
 function TaskRow({ task, index, bp, share }) {
   const [open, setOpen] = useState(false)
   const sc = STATUS_COLOR_MAP[task.status] || 'rgba(var(--kt-ink-rgb), 0.28)'
-  const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
+  const isOverdue = isTaskOverdue(task)
   const isMobile = bp === 'mobile'
   const expandable = hasDetails(task) || share.enabled
 
@@ -180,7 +181,7 @@ export default function ShareProjectCard({ project, index: _index, bp, token, gu
   const done = tasks.filter(t => t.status === 'done').length
   const active = tasks.filter(t => t.status === 'in_progress').length
   const failed = tasks.filter(t => t.status === 'failed').length
-  const overdue = tasks.filter(t => t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()).length
+  const overdue = countOverdue(tasks)
   const total = project.total_tasks || 0
   const visibleTasks = expanded ? tasks : tasks.slice(0, 5)
   const hasMore = tasks.length > 5

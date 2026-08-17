@@ -34,10 +34,21 @@ class LLMProvider(ABC):
 
 
 class StubProvider(LLMProvider):
+    """The no-provider case. It reports a *configuration* problem, not an answer.
+
+    This used to yield the notice as a `text` event, so the router persisted
+    "LLM provider not configured..." into the conversation as something the
+    assistant had said — a deployment detail became permanent chat history, and
+    it stayed there after the provider was configured (ADR-0089).
+    """
+
     async def chat(self, messages, tools, system=None):
         yield {
-            "type": "text",
-            "text": "LLM provider not configured. Set LLM_PROVIDER, LLM_API_KEY, and LLM_MODEL env vars.",
+            "type": "error",
+            "message": (
+                "No LLM provider is configured. Set LLM_PROVIDER (claude|openai), "
+                "LLM_API_KEY and LLM_MODEL, then restart the backend."
+            ),
         }
         yield {"type": "done"}
 

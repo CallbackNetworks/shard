@@ -19,19 +19,7 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router'
 
 // Resolve real English rather than echoing the key, so these assertions keep
 // describing what a user sees (ADR-0088).
-vi.mock('react-i18next', async () => {
-  const en = (await import('../../i18n/en.json')).default
-  const t = (key, opts = {}) => {
-    const plural = opts.count === 1 ? `${key}_one` : `${key}_other`
-    let out = en[plural] ?? en[key] ?? key
-    for (const [k, v] of Object.entries(opts)) out = out.replaceAll(`{{${k}}}`, v)
-    return out
-  }
-  return {
-    useTranslation: () => ({ t, i18n: { language: 'en', changeLanguage: () => {} } }),
-    Trans: ({ i18nKey }) => t(i18nKey),
-  }
-})
+vi.mock('react-i18next', async () => (await import('../../test/i18nMock')).reactI18nextMock())
 
 vi.mock('../../hooks/useBreakpoint', () => ({ default: () => 'desktop' }))
 vi.mock('../../utils/uiPrefs', () => ({

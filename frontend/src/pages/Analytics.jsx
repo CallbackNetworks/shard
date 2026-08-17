@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart2, TrendingUp, Activity, Flame, Download, Crosshair } from 'lucide-react'
 import { getProjects, getCycles, getAnalyticsOverview, getAnalyticsHeatmap, getAnalyticsBurndown, getAnalyticsVelocity, getAnalyticsStatusTrend, getEstimationCalibration } from '../api/client'
-import { BRAND, STATUS_COLOR } from '../constants/theme'
+import { BRAND, STATUS_COLOR, STATUS_MAP } from '../constants/theme'
 import SvgTooltip from '../components/charts/SvgTooltip'
 import ActivityHeatmap from '../components/charts/ActivityHeatmap'
 import StatCard from '../components/charts/StatCard'
@@ -141,6 +141,7 @@ function VelocityChart({ data }) {
 
 // ——— Status Trend ———
 function StatusTrendChart({ data }) {
+  const { t } = useTranslation()
   const [hover, setHover] = useState(null)
   if (!data || data.length === 0) return null
   const W = 500, H = 160, PAD = { t: 10, r: 20, b: 30, l: 40 }
@@ -205,7 +206,9 @@ function StatusTrendChart({ data }) {
       {statuses.map((s, i) => (
         <g key={s}>
           <rect x={PAD.l + i * 80} y={H - 22} width={10} height={4} rx={2} fill={STATUS_COLOR[s]} />
-          <text x={PAD.l + i * 80 + 14} y={H - 16} fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.3)">{s}</text>
+          <text x={PAD.l + i * 80 + 14} y={H - 16} fontSize={9} fill="rgba(var(--kt-ink-rgb), 0.3)">
+            {STATUS_MAP[s] ? t(STATUS_MAP[s].labelKey) : s}
+          </text>
         </g>
       ))}
     </svg>

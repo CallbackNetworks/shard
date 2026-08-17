@@ -40,7 +40,7 @@ def api_analytics_overview(
     pid_task_ids = graph.contained_task_ids(db, pid) if pid else None
 
     def _task_count(*filters):
-        q = db.query(func.count(Node.id)).filter(Node.type == graph.NODE_TASK)
+        q = db.query(func.count(Node.id)).filter(graph.task_type_filter(db))
         if pid:
             q = q.filter(Node.id.in_(pid_task_ids))
         return (q.filter(*filters).scalar() or 0) if filters else (q.scalar() or 0)
@@ -48,7 +48,7 @@ def api_analytics_overview(
     total_tasks = _task_count()
     done_tasks = _task_count(Node.status == "done")
     in_progress = _task_count(Node.status == "in_progress")
-    overdue = _task_count(Node.due_date < now, Node.status.notin_(["done", "failed"]))
+    overdue = _task_count(*graph.overdue_clause(now))
 
     proj_q = db.query(func.count(Node.id)).filter(Node.type == graph.NODE_PROJECT)
     if pid:
@@ -133,7 +133,7 @@ def api_analytics_status_trend(
     result = []
     for i in range(days - 1, -1, -1):
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
-        q = db.query(Node.status, func.count(Node.id)).filter(Node.type == graph.NODE_TASK, Node.created_at <= day)
+        q = db.query(Node.status, func.count(Node.id)).filter(graph.task_type_filter(db), Node.created_at <= day)
         if project_id:
             q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
         rows = q.group_by(Node.status).all()

@@ -1,7 +1,8 @@
 import { STATUS_COLOR } from '../constants/theme'
+import { isOverdue } from '../utils/overdue'
 
 export function taskRisk(task, now = new Date()) {
-  const overdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < now
+  const overdue = isOverdue(task, now)
   if (task.status === 'failed') return 'failed'
   if (overdue) return 'overdue'
   if (task.priority === 'high' || task.is_pinned) return 'priority'

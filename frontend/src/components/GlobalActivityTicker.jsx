@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import { getActivity, getProjects } from '../api/client'
 import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
+import { countOverdue } from '../utils/overdue'
 
 const FALLBACK_ITEMS = [
   'SHARD ONLINE',
@@ -135,9 +136,7 @@ export default function GlobalActivityTicker() {
   const alerts = useMemo(() => {
     const tasks = projects.flatMap(getProjectTasks)
     const now = new Date()
-    const overdue = tasks.filter(task =>
-      task.due_date && task.status !== 'done' && new Date(task.due_date) < now
-    ).length
+    const overdue = countOverdue(tasks, now)
     const failed = tasks.filter(task => task.status === 'failed').length
     const highActive = tasks.filter(task =>
       task.priority === 'high' && !['done', 'failed'].includes(task.status)

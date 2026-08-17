@@ -54,11 +54,7 @@ def get_hub_stats(db: Session = Depends(get_db)):
                     p_stats["total_tasks"] += 1
                     if t.status in p_stats:
                         p_stats[t.status] += 1
-                    if (
-                        t.due_date
-                        and t.due_date.replace(tzinfo=None) < now.replace(tzinfo=None)
-                        and t.status not in ("done", "failed")
-                    ):
+                    if graph.is_overdue(t, now):
                         p_stats["overdue"] += 1
                 projects_data.append({"id": p.id, "name": p.name, "status": p.status, **p_stats})
                 for k in ident_stats:

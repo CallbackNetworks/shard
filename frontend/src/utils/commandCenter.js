@@ -1,3 +1,11 @@
+// Re-exported, not redefined (ADR-0089). This file already had CLOSED_STATUSES
+// = {done, failed} for its own lane logic while its own overdue check excluded
+// only `done`, so the dashboard hero's "N overdue" and the analytics page
+// disagreed by exactly the failed-and-past-due tasks.
+import { isOverdue } from './overdue'
+
+export { isOverdue }
+
 const CLOSED_STATUSES = new Set(['done', 'failed'])
 
 function toTime(value) {
@@ -35,12 +43,6 @@ export function flattenProjectTasks(projects = []) {
       projectStatus: project.status,
     }))
   )
-}
-
-export function isOverdue(task, now = new Date()) {
-  const due = toTime(task?.due_date)
-  if (!due || task?.status === 'done') return false
-  return due < now.getTime()
 }
 
 export function isDoneToday(task, now = new Date()) {

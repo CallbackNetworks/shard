@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Clock } from 'lucide-react'
 import { STATUS_MAP, PRIORITY, DARK, STATUS_COLOR } from '../../constants/theme'
 import s from '../../pages/Dashboard.module.css'
+import { isOverdue } from '../../utils/overdue'
 
 /* ── Task row (shared by Due Soon and My Work sections) ───────────── */
 export default function TaskRow({ t: task, i, total, onClick }) {
   const [hov, setHov] = useState(false)
   const sc = STATUS_MAP[task.status]?.color || DARK.textMid
   const pc = PRIORITY[task.priority]?.color || DARK.textMid
-  const overdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
+  const overdue = isOverdue(task)
   return (
     // The dashboard's primary click target, so it is a real button: as a
     // <div onClick> it could not be reached or activated from the keyboard.

@@ -237,8 +237,7 @@ async def _send_daily_summary(db: Session) -> None:
         db.query(Node)
         .filter(
             Node.type == graph.NODE_TASK,
-            Node.due_date < now,
-            Node.status.notin_(["done", "failed"]),
+            *graph.overdue_clause(now),
         )
         .all()
     )
@@ -377,8 +376,7 @@ async def _send_weekly_digest(db: Session) -> None:
         db.query(Node)
         .filter(
             Node.type == graph.NODE_TASK,
-            Node.due_date < now,
-            Node.status.notin_(["done", "failed"]),
+            *graph.overdue_clause(now),
         )
         .all()
     )

@@ -272,9 +272,7 @@ async def _tool_get_summary(db: Session) -> str:
         total = len([t for t in p_tasks if t.id not in sub])
         done = sum(1 for t in p_tasks if t.status == "done" and t.id not in sub)
         in_prog = sum(1 for t in p_tasks if t.status == "in_progress" and t.id not in sub)
-        overdue = sum(
-            1 for t in p_tasks if t.due_date and t.due_date < datetime.now(UTC) and t.status not in ("done", "failed")
-        )
+        overdue = sum(1 for t in p_tasks if graph.is_overdue(t, datetime.now(UTC)))
         result.append(
             {
                 "id": p.id,
@@ -447,7 +445,7 @@ def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
             by_assignee[assignee]["done"] += 1
         elif t.status == "in_progress":
             by_assignee[assignee]["in_progress"] += 1
-        if t.due_date and t.due_date < now and t.status not in ("done", "failed"):
+        if graph.is_overdue(t, now):
             overdue += 1
         if t.time_estimate:
             total_estimate += t.time_estimate

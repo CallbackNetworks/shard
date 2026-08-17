@@ -184,6 +184,9 @@ function GoalCard({ goal, onEdit, onDelete }) {
   const [hovered, setHovered] = useState(false)
   const statusStyle = STATUS_COLORS[goal.status] || STATUS_COLORS.active
   const progress = goal.progress != null ? Math.round(goal.progress) : 0
+  // "0%" and "nothing linked" are different states; only one of them is a
+  // measurement (ADR-0089). The API reports the subtree size beside the rate.
+  const measured = (goal.total_tasks ?? 0) > 0
 
   const isOverdue = goal.target_date && goal.status === 'active' && new Date(goal.target_date) < new Date()
   const daysLeft = goal.target_date
@@ -243,12 +246,16 @@ function GoalCard({ goal, onEdit, onDelete }) {
           {/* Progress bar */}
           <div style={{ marginTop: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 10, color: '#6b7280' }}>{t('goals.progress')}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: progress >= 100 ? DARK.success : DARK.textMid }}>
-                {progress}%
+              <span style={{ fontSize: 10, color: DARK.textDim }}>
+                {measured ? t('goals.progressOf', { done: goal.done_tasks ?? 0, total: goal.total_tasks }) : t('goals.noTasksLinked')}
               </span>
+              {measured && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: progress >= 100 ? DARK.success : DARK.textMid }}>
+                  {progress}%
+                </span>
+              )}
             </div>
-            <div className="kt-progress-track" style={{
+            {measured && <div className="kt-progress-track" style={{
               height: 4, borderRadius: 0, background: 'rgba(var(--kt-ink-rgb), 0.08)', overflow: 'hidden',
             }}>
               <div className="kt-progress-fill" style={{
@@ -261,7 +268,7 @@ function GoalCard({ goal, onEdit, onDelete }) {
                   : DARK.warning,
                 transition: 'width 0.3s ease',
               }} />
-            </div>
+            </div>}
           </div>
 
           {/* Linked projects chips */}

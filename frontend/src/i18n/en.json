@@ -408,7 +408,7 @@
   "assistant.promptRecentText": "What happened recently? Show the latest activity.",
   "assistant.promptPlanToday": "Plan today",
   "assistant.promptPlanTodayText": "Based on my current tasks, suggest what I should focus on today. Prioritize overdue and high-priority items.",
-  "assistant.promptDecisions": "Analyze Decisions",
+  "assistant.promptDecisions": "Record decisions",
   "assistant.selectConversation": "Select a conversation",
   "assistant.selectOrCreate": "Select a conversation or start a new one",
   "assistant.startPrompt": "Or try a quick prompt:",
@@ -1061,5 +1061,10 @@
   "offline.pending_other": "{{count}} pending changes",
   "timeTracker.stop": "Stop timer",
   "timeTracker.start": "Start timer",
-  "overview.taskTitlePlaceholder": "Task title…"
+  "overview.taskTitlePlaceholder": "Task title…",
+  "assistant.send": "Send",
+  "assistant.promptDecisionsText": "Analyze my projects and identify key decisions that have been made or should be recorded. For each decision, create a decision record with context, the decision itself, and consequences. Tag relevant tasks with the decision labels.",
+  "markdown.placeholder": "Write markdown…",
+  "goals.noTasksLinked": "No tasks linked yet",
+  "goals.progressOf": "{{done}} of {{total}} done"
 }

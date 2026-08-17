@@ -2926,10 +2926,21 @@ h1 {
   border-color: var(--kt-hit);
   color: var(--kt-bg) !important;
 }
+/* A destructive action is quiet until you reach for it (ADR-0089). This was the
+   brand amber — the same treatment as the primary button — so on the rules page
+   the delete button was the loudest control in the row, louder than Pause and
+   Edit beside it. Colour arrives on hover and focus, where it confirms what the
+   button does rather than advertising it. */
 .kt-btn-danger {
-  background: rgba(250,204,21,0.12);
-  border-color: rgba(250,204,21,0.28);
-  color: var(--kt-hit);
+  background: transparent;
+  border-color: var(--kt-line);
+  color: var(--kt-muted);
+}
+.kt-btn-danger:hover,
+.kt-btn-danger:focus-visible {
+  background: var(--kt-status-failed-bg);
+  border-color: var(--kt-status-failed);
+  color: var(--kt-status-failed);
 }
 .kt-btn-accept {
   background: rgba(250,204,21,0.12);
@@ -4025,4 +4036,53 @@ select[style*="border-radius"],
   .kt-issue-edit-touch {
     display: inline-flex;
   }
+}
+
+/* ── Markdown output (MarkdownPreview / MarkdownEditor, ADR-0089) ──
+   Declared once here rather than in a <style> block per rendered instance. */
+
+.tiptap { outline: none; color: var(--kt-ink); }
+.tiptap p { margin: 0 0 0.4em; }
+.tiptap h1 { font-size: 1.5em; font-weight: 700; margin: 0.4em 0 0.2em; }
+.tiptap h2 { font-size: 1.25em; font-weight: 700; margin: 0.4em 0 0.2em; }
+.tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
+.tiptap ul, .tiptap ol { padding-left: 1.4em; margin: 0.3em 0; }
+.tiptap li { margin: 0.1em 0; }
+.tiptap code { background: rgba(var(--kt-ink-rgb), 0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: var(--kt-hit); }
+.tiptap pre { background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
+.tiptap pre code { background: none; padding: 0; color: inherit; }
+.tiptap blockquote { border-left: 3px solid rgba(var(--kt-ink-rgb), 0.15); padding-left: 12px; margin: 0.4em 0; color: rgba(var(--kt-ink-rgb), 0.4); }
+.tiptap a { color: var(--kt-hit); text-decoration: underline; }
+/* Editor-only: the tiptap placeholder. The rest of the block above is shared
+   with the read-only preview — it used to be duplicated in MarkdownEditor with
+   a hardcoded #facc15 link colour, so links in the editor and links in the
+   preview were different colours, and the editor's failed on white. */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: rgba(var(--kt-ink-rgb), 0.2);
+  pointer-events: none;
+  height: 0;
+}
+
+/* ── Native select chrome (ADR-0089) ──
+   `.kt-input` styled the box but not the control: without `appearance: none` a
+   <select> keeps the platform's own background and arrow, so every dropdown in
+   the app rendered as a slab of system white on the dark theme. The chevron is
+   drawn here instead, in a neutral that reads on both themes. */
+select.kt-input,
+select.kt-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+/* The dropdown list itself is drawn by the OS; these are the only two
+   properties it honours, and without them a dark-theme list is white. */
+select.kt-input option,
+select.kt-select option {
+  background: var(--kt-elev);
+  color: var(--kt-ink);
 }

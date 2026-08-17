@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DARK, STATUS_COLOR, PRIORITY } from '../constants/theme'
 import { formatMinutes } from '../utils/formatTime'
+import { isOverdue as taskIsOverdue, countOverdue } from '../utils/overdue'
 import { formatTimestamp } from '../utils/datetime'
 import QuickAddTask from './overview/QuickAddTask'
 import PinButton from './overview/PinButton'
@@ -40,7 +41,7 @@ export function urgencyScore(project) {
   const total   = tasks.length
   const failed  = tasks.filter(t => t.status === 'failed').length
   const highIp  = tasks.filter(t => t.priority === 'high' && t.status === 'in_progress').length
-  const overdue = tasks.filter(t => t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()).length
+  const overdue = countOverdue(tasks)
   return Math.min(1, (failed * 2 + highIp * 1.5 + overdue * 1.2) / (total * 2))
 }
 
@@ -175,7 +176,7 @@ export function ViewProgress({ projects, pinned, onTogglePin }) {
         const tasks   = p.tasks || []
         const done    = tasks.filter(t => t.status === 'done').length
         const total   = p.total_tasks || 0
-        const overdue = tasks.filter(t => t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()).length
+        const overdue = countOverdue(tasks)
         return (
           <GlassRow key={p.id} accentColor={color}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
@@ -336,7 +337,7 @@ export function ViewTasks({ projects }) {
             {/* Task rows */}
             {isOpen && topTasks.map((t, i) => {
               const sc = STATUS_COLOR_MAP[t.status] || DIM
-              const isOverdue = t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()
+              const isOverdue = taskIsOverdue(t)
               const isExpanded = expandedTask === t.id
               const subtasks = allTasks.filter(sub => sub.parent_id === t.id)
               const hasDetail = t.description || t.progress_pct != null || t.start_date ||
@@ -523,7 +524,7 @@ export function ViewCompare({ projects }) {
         const done    = tasks.filter(t => t.status === 'done').length
         const active  = tasks.filter(t => t.status === 'in_progress').length
         const failed  = tasks.filter(t => t.status === 'failed').length
-        const overdue = tasks.filter(t => t.due_date && t.status !== 'done' && new Date(t.due_date) < new Date()).length
+        const overdue = countOverdue(tasks)
         const total   = p.total_tasks || 0
         const pct     = Math.round(p.progress || 0)
         const u       = urgencyScore(p)

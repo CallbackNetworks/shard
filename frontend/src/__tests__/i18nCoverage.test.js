@@ -30,7 +30,6 @@ function walk(dir) {
 const NO_PROSE = new Set([
   'components/ProgressBar.jsx',
   'components/MarkdownPreview.jsx',
-  'components/MarkdownEditor.jsx',
   'components/shared/EmptyState.jsx',
   'components/shared/FormField.jsx',
   'components/shared/TabBar.jsx',
@@ -97,9 +96,6 @@ describe('the two locales describe the same app', () => {
       'integrations.authBasic', 'integrations.authApiKey', 'integrations.taskCreated',
       'webhookLogs.httpCode', 'project.colId', 'overview.colPct',
       'project.repoUrlPlaceholder',
-      'assistant.promptSummaryText', 'assistant.promptOverdueText',
-      'assistant.promptWorkloadText', 'assistant.promptRecentText',
-      'assistant.promptPlanTodayText',
     ])
     const identical = Object.keys(en).filter(k => zh[k] === en[k] && !PROPER_NOUNS.has(k))
     expect(identical).toEqual([])
