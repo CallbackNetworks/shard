@@ -37,6 +37,24 @@ SettingsAction = Literal["get", "bounds", "update", "ical_token", "rotate_ical_t
 BackupAction = Literal["status", "run", "restore"]
 ImportSource = Literal["github", "linear", "trello"]
 UnfiledAction = Literal["list", "file"]
+CrudAction = Literal["create", "update", "delete"]
+CycleAction = Literal["list", "get", "compare", "duplicate"]
+RecurrenceAction = Literal["get", "create", "update", "delete"]
+TemplateAction = Literal["list", "create", "update", "delete"]
+ShareAction = Literal["rotate_token", "set_pin", "clear_pin", "set_expiry", "set_guest_notes", "views"]
+NotificationAction = Literal["unread_count", "read", "read_all", "delete"]
+TransferAction = Literal["export", "import"]
+EmailAction = Literal["status", "send"]
+AnalyticsReport = Literal[
+    "burndown",
+    "cycle_burndown",
+    "velocity",
+    "heatmap",
+    "status_trend",
+    "critical_path",
+    "estimation_calibration",
+    "estimate_suggestion",
+]
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://backend:8000")
 API_KEY = os.environ.get("API_KEY", "")
@@ -315,8 +333,11 @@ async def _get_project_detail(project_id: str) -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _get_container_subtree(node_id: str) -> str:
-    result = await _get(f"/nodes/{node_id}/subtree")
+async def _get_container_subtree(node_id: str, view: str = "containers") -> str:
+    # The two halves of a container's children have one endpoint each (ADR-0065): the child
+    # containers with their own rollups, or the board of tasks living directly in it.
+    path = "contained-tasks" if view == "tasks" else "subtree"
+    result = await _get(f"/nodes/{node_id}/{path}")
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -330,11 +351,22 @@ async def _list_node_types() -> str:
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _create_node_type(key: str, label: str, roles: list[str] | None = None) -> str:
-    body: dict = {"key": key, "label": label}
-    if roles:
-        body["roles"] = roles
-    result = await _post("/node-types", body)
+async def _manage_types(kind: str, action: str, key: str | None = None, config: dict | None = None) -> str:
+    base = "/node-types" if kind == "node" else "/edge-types"
+    if action == "create":
+        if not config or not config.get("key") or not config.get("label"):
+            return "Error: config with at least key and label is required to create a type"
+        result = await _post(base, config)
+    elif action == "update":
+        if not key or not config:
+            return "Error: key and config are required to update a type"
+        result = await _patch(f"{base}/{key}", config)
+    elif action == "delete":
+        if not key:
+            return "Error: key is required to delete a type"
+        result = await _delete(f"{base}/{key}")
+    else:
+        return f"Error: unknown action '{action}'"
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -408,12 +440,34 @@ async def _manage_integration(action: str, integration_id: str | None = None, co
         result = await _post(f"/integrations/{integration_id}/test")
     elif action == "events":
         result = await _get("/integrations/events")
+    elif action == "sources":
+        result = await _get("/integrations/sources")
+    elif action == "templates":
+        result = await _get(
+            f"/integrations/templates/{integration_id}" if integration_id else "/integrations/templates"
+        )
+    elif action == "health":
+        if not integration_id:
+            return "Error: integration_id is required to read health"
+        result = await _get(f"/integrations/{integration_id}/health")
+    elif action == "retry_all":
+        if not integration_id:
+            return "Error: integration_id is required to retry every failed delivery"
+        result = await _post(f"/integrations/{integration_id}/retry-all")
     else:
         return f"Error: unknown action '{action}'"
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _list_deliveries(integration_id: str | None = None, status: str | None = None, limit: int = 20) -> str:
+async def _list_deliveries(
+    integration_id: str | None = None,
+    status: str | None = None,
+    limit: int = 20,
+    delivery_id: str | None = None,
+) -> str:
+    if delivery_id:
+        result = await _get(f"/deliveries/{delivery_id}")
+        return json.dumps(result) if not isinstance(result, str) else result
     params = {"limit": limit}
     if integration_id:
         params["integration_id"] = integration_id
@@ -560,8 +614,191 @@ async def _export_decision(decision_id: str) -> str:
     return await _get_text(f"/decisions/{decision_id}/export")
 
 
-async def _duplicate_cycle(project_id: str, cycle_id: str) -> str:
-    result = await _post(f"/projects/{project_id}/cycles/{cycle_id}/duplicate")
+async def _manage_cycles(
+    action: str,
+    project_id: str,
+    cycle_id: str | None = None,
+    compare_with: str | None = None,
+) -> str:
+    base = f"/projects/{project_id}/cycles"
+    if action == "list":
+        result = await _get(base)
+    elif action == "get":
+        if not cycle_id:
+            return "Error: cycle_id is required"
+        result = await _get(f"{base}/{cycle_id}")
+    elif action == "compare":
+        if not cycle_id or not compare_with:
+            return "Error: cycle_id and compare_with are required to compare cycles"
+        result = await _get(f"{base}/{cycle_id}/compare", params={"compare_with": compare_with})
+    elif action == "duplicate":
+        if not cycle_id:
+            return "Error: cycle_id is required"
+        result = await _post(f"{base}/{cycle_id}/duplicate")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+# One tool over eight reports, because they answer one question — "how is this going?" —
+# and eight tool names would crowd the menu the model actually reads.
+_ANALYTICS_PATHS = {
+    "burndown": "/analytics/burndown",
+    "cycle_burndown": "/analytics/cycle-burndown",
+    "velocity": "/analytics/velocity",
+    "heatmap": "/analytics/heatmap",
+    "status_trend": "/analytics/status-trend",
+    "estimation_calibration": "/analytics/estimation-calibration",
+    "estimate_suggestion": "/analytics/estimate-suggestion",
+}
+
+
+async def _get_analytics(
+    report: str,
+    project_id: str | None = None,
+    cycle_id: str | None = None,
+    days: int | None = None,
+    raw_estimate: int | None = None,
+) -> str:
+    if report == "critical_path":
+        if not project_id:
+            return "Error: project_id is required for the critical path"
+        result = await _get(f"/analytics/critical-path/{project_id}")
+        return json.dumps(result) if not isinstance(result, str) else result
+
+    path = _ANALYTICS_PATHS.get(report)
+    if not path:
+        return f"Error: unknown report '{report}'"
+    if report in ("burndown", "cycle_burndown") and not cycle_id:
+        return f"Error: cycle_id is required for the {report} report"
+    if report == "estimate_suggestion" and raw_estimate is None:
+        return "Error: raw_estimate is required for the estimate_suggestion report"
+
+    params = {
+        k: v
+        for k, v in {
+            "project_id": project_id,
+            "cycle_id": cycle_id,
+            "days": days,
+            "raw_estimate": raw_estimate,
+        }.items()
+        if v is not None
+    }
+    result = await _get(path, params=params or None)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_recurrence(action: str, project_id: str, task_id: str, config: dict | None = None) -> str:
+    path = f"/projects/{project_id}/tasks/{task_id}/recurrence"
+    if action == "get":
+        result = await _get(path)
+    elif action == "create":
+        if not config:
+            return "Error: config is required to create a recurrence rule"
+        result = await _post(path, config)
+    elif action == "update":
+        if not config:
+            return "Error: config is required to update a recurrence rule"
+        result = await _patch(path, config)
+    elif action == "delete":
+        result = await _delete(path)
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_templates(
+    action: str, template_id: str | None = None, config: dict | None = None, project_id: str | None = None
+) -> str:
+    if action == "list":
+        result = await _get("/templates", params={"project_id": project_id} if project_id else None)
+    elif action == "create":
+        if not config:
+            return "Error: config is required to create a template"
+        result = await _post("/templates", config)
+    elif action == "update":
+        if not template_id or not config:
+            return "Error: template_id and config are required to update a template"
+        result = await _patch(f"/templates/{template_id}", config)
+    elif action == "delete":
+        if not template_id:
+            return "Error: template_id is required to delete a template"
+        result = await _delete(f"/templates/{template_id}")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_share(action: str, node_id: str, config: dict | None = None) -> str:
+    base = f"/nodes/{node_id}/share"
+    cfg = config or {}
+    if action == "rotate_token":
+        result = await _post(f"{base}/rotate-token")
+    elif action == "set_pin":
+        if not cfg.get("pin"):
+            return "Error: config {'pin': '...'} is required to set a PIN"
+        result = await _post(f"{base}/set-pin", cfg)
+    elif action == "clear_pin":
+        result = await _delete(f"{base}/pin")
+    elif action == "set_expiry":
+        # An explicit null clears the expiry, so the key must be present either way.
+        result = await _post(f"{base}/set-expiry", {"expires_at": cfg.get("expires_at")})
+    elif action == "set_guest_notes":
+        if "allowed" not in cfg:
+            return "Error: config {'allowed': true|false} is required"
+        result = await _post(f"{base}/set-guest-notes", {"allowed": bool(cfg["allowed"])})
+    elif action == "views":
+        result = await _get(f"/nodes/{node_id}/share-views")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_notifications(action: str, notification_id: str | None = None) -> str:
+    if action == "unread_count":
+        result = await _get("/notifications/unread-count")
+    elif action == "read":
+        if not notification_id:
+            return "Error: notification_id is required to mark one read"
+        result = await _patch(f"/notifications/{notification_id}/read")
+    elif action == "read_all":
+        result = await _post("/notifications/mark-all-read")
+    elif action == "delete":
+        if not notification_id:
+            return "Error: notification_id is required to delete one"
+        result = await _delete(f"/notifications/{notification_id}")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _transfer_tasks(action: str, project_id: str, tasks: list[dict] | None = None) -> str:
+    if action == "export":
+        result = await _get(f"/projects/{project_id}/tasks/export")
+    elif action == "import":
+        if tasks is None:
+            return "Error: tasks is required to import"
+        result = await _post(f"/projects/{project_id}/tasks/import", {"tasks": tasks})
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _get_graph_map(types: str | None = None, include: str | None = None, limit: int | None = None) -> str:
+    params = {k: v for k, v in {"types": types, "include": include, "limit": limit}.items() if v is not None}
+    result = await _get("/graph/map", params=params or None)
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_email(action: str, to: list[str] | None = None, subject: str = "", body: str = "") -> str:
+    if action == "status":
+        result = await _get("/email/status")
+    elif action == "send":
+        if not to or not subject or not body:
+            return "Error: to, subject and body are all required to send"
+        result = await _post("/email/send", {"to": to, "subject": subject, "body": body})
+    else:
+        return f"Error: unknown action '{action}'"
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -807,12 +1044,14 @@ async def get_project_detail(project_id: str) -> str:
         "Get a container's task rollup over everything it contains, plus the containers "
         "directly inside it (each with its own rollup). Use this on a project or any "
         "container to find work that lives one or more levels down: list_tasks and "
-        "get_project_detail only show a container's own tasks, not nested containers."
+        "get_project_detail only show a container's own tasks, not nested containers. "
+        "view='tasks' returns the other half instead — the board of tasks living directly "
+        "in this container, without descending (ADR-0065)."
     )
 )
-async def get_container_subtree(node_id: str) -> str:
+async def get_container_subtree(node_id: str, view: Literal["containers", "tasks"] = "containers") -> str:
     """node_id is a project, goal or custom container."""
-    return await _get_container_subtree(node_id=node_id)
+    return await _get_container_subtree(node_id=node_id, view=view)
 
 
 @mcp.tool(
@@ -840,14 +1079,25 @@ async def list_node_types() -> str:
 
 @mcp.tool(
     description=(
-        "Register a new node type (a new layer, e.g. an 'organization' above projects). "
-        "Pass roles=['container'] for a layer that holds other nodes. Requires an admin "
-        "API key. Creating a type is rare — check list_node_types first."
+        "Create, update or delete a node or edge type — the registry other data is shaped "
+        "by, so this needs an admin key (ADR-0079). kind='node' registers a layer: config "
+        "{key, label, roles?: ['container'|'task'], fields?: [{key,label,kind,store}], "
+        "icon?, color?}. kind='edge' registers a relation: config {key, label, description?, "
+        "allowed_source?, allowed_target?} where each end is {types:[...]} or {roles:[...]} "
+        "and omitting it means unconstrained — a relation with no endpoint declarations is "
+        "the state ADR-0078 exists to prevent, so declare them. Built-in types cannot be "
+        "deleted and a type in use cannot be deleted. Check list_node_types / "
+        "list_edge_types first; creating a type is rare."
     )
 )
-async def create_node_type(key: str, label: str, roles: list[str] | None = None) -> str:
-    """key is the lowercase identifier written into each node's `type`."""
-    return await _create_node_type(key=key, label=label, roles=roles)
+async def manage_types(
+    kind: Literal["node", "edge"],
+    action: CrudAction,
+    key: str | None = None,
+    config: dict | None = None,
+) -> str:
+    """key identifies an existing type for update/delete; for create it goes inside config."""
+    return await _manage_types(kind=kind, action=action, key=key, config=config)
 
 
 @mcp.tool(
@@ -932,11 +1182,16 @@ async def list_integrations() -> str:
         "auth_config?, custom_headers?, project_id?}. Use action='events' first to see which "
         "event names are deliverable — an unknown one is refused. 'test' fires a synthetic "
         "delivery and returns what the target answered. On update, a null credential value "
-        "means unchanged, not deleted (ADR-0063)."
+        "means unchanged, not deleted (ADR-0063). Reads that describe the surface rather "
+        "than one integration: 'events' (deliverable event names), 'sources' (causes an "
+        "integration can narrow to), 'templates' (ready-made configs for common CI/CD "
+        "platforms; pass integration_id to fetch one by template id), 'health' (delivery "
+        "success rate for one integration) and 'retry_all' (re-send every failed delivery "
+        "for one integration)."
     )
 )
 async def manage_integration(
-    action: Literal["create", "update", "delete", "test", "events"],
+    action: Literal["create", "update", "delete", "test", "events", "sources", "templates", "health", "retry_all"],
     integration_id: str | None = None,
     config: dict | None = None,
 ) -> str:
@@ -948,11 +1203,18 @@ async def manage_integration(
         "List outbound webhook delivery attempts, newest first, with the response the target "
         "gave and the next scheduled retry. The failure mode of a webhook is silence, so "
         "this is how you find out yours is not arriving. Filter by integration_id or status "
-        "(pending/success/failed/dead)."
+        "(pending/success/failed/dead), or pass delivery_id to fetch one attempt in full — "
+        "with the request headers redacted, since a delivery log is a second path out for a "
+        "credential (ADR-0085)."
     )
 )
-async def list_deliveries(integration_id: str | None = None, status: str | None = None, limit: int = 20) -> str:
-    return await _list_deliveries(integration_id=integration_id, status=status, limit=limit)
+async def list_deliveries(
+    integration_id: str | None = None,
+    status: str | None = None,
+    limit: int = 20,
+    delivery_id: str | None = None,
+) -> str:
+    return await _list_deliveries(integration_id=integration_id, status=status, limit=limit, delivery_id=delivery_id)
 
 
 @mcp.tool(description="Retry one failed or dead webhook delivery. The retry backoff starts over.")
@@ -1059,14 +1321,142 @@ async def export_decision(decision_id: str) -> str:
 
 @mcp.tool(
     description=(
-        "Roll a cycle over: create a draft cycle holding fresh todo copies of every task in "
-        "an existing one (ADR-0092). Title, description, priority, assignee and estimate "
-        "follow; status and time spent do not — what is copied is the intent to do the work, "
-        "not the record of having done it."
+        "Read and roll over cycles (sprints). 'list'/'get' return a cycle with its task ids "
+        "and done count; 'compare' puts two side by side — task counts, completion rates, "
+        "estimate vs actual — which is how you tell whether a sprint went better than the "
+        "last one. 'duplicate' rolls a cycle over: a draft cycle holding fresh todo copies "
+        "of every task in the source, carrying title, description, priority, assignee and "
+        "estimate but not status or time spent, because what is copied is the intent to do "
+        "the work, not the record of having done it. Cycle *membership* is an edge — use "
+        "manage_edges with rel_type='in_cycle' to put a task into one."
     )
 )
-async def duplicate_cycle(project_id: str, cycle_id: str) -> str:
-    return await _duplicate_cycle(project_id=project_id, cycle_id=cycle_id)
+async def manage_cycles(
+    action: CycleAction,
+    project_id: str,
+    cycle_id: str | None = None,
+    compare_with: str | None = None,
+) -> str:
+    return await _manage_cycles(action=action, project_id=project_id, cycle_id=cycle_id, compare_with=compare_with)
+
+
+@mcp.tool(
+    description=(
+        "One planning report at a time (ADR-0093). 'burndown'/'cycle_burndown' need "
+        "cycle_id; 'velocity' is throughput per cycle; 'heatmap' is completions per day; "
+        "'status_trend' takes days; 'critical_path' needs project_id and returns the "
+        "dependency chain that decides the finish date; 'estimation_calibration' compares "
+        "past estimates against actuals; 'estimate_suggestion' takes raw_estimate and "
+        "corrects it by that history. analyze_workload answers 'what is the state of "
+        "things' — this answers 'how is it trending, and what will it take'."
+    )
+)
+async def get_analytics(
+    report: AnalyticsReport,
+    project_id: str | None = None,
+    cycle_id: str | None = None,
+    days: int | None = None,
+    raw_estimate: int | None = None,
+) -> str:
+    """Which of project_id / cycle_id / raw_estimate is required depends on the report."""
+    return await _get_analytics(
+        report=report, project_id=project_id, cycle_id=cycle_id, days=days, raw_estimate=raw_estimate
+    )
+
+
+@mcp.tool(
+    description=(
+        "Read or set a task's recurrence (ADR-0093). config for create/update: "
+        "{frequency: daily|weekly|monthly, next_run_at: ISO timestamp, interval_value?: int, "
+        "day_of_week?: 0-6, day_of_month?: 1-31, end_date?: ISO, active?: bool}. The "
+        "scheduler generates the next task from this rule, so a wrong next_run_at is the "
+        "difference between a task appearing tomorrow and never. A task has at most one "
+        "rule; 'create' on a task that has one replaces it."
+    )
+)
+async def manage_recurrence(action: RecurrenceAction, project_id: str, task_id: str, config: dict | None = None) -> str:
+    return await _manage_recurrence(action=action, project_id=project_id, task_id=task_id, config=config)
+
+
+@mcp.tool(
+    description=(
+        "List, create, update or delete task templates (ADR-0093). config for create: "
+        "{name, description?, priority?, subtasks?: [str], label_names?: [str], "
+        "project_id?}. A template with no project_id is global. This is how a repeated "
+        "piece of work stops being retyped — define the shape once, instantiate it later."
+    )
+)
+async def manage_templates(
+    action: TemplateAction,
+    template_id: str | None = None,
+    config: dict | None = None,
+    project_id: str | None = None,
+) -> str:
+    return await _manage_templates(action=action, template_id=template_id, config=config, project_id=project_id)
+
+
+@mcp.tool(
+    description=(
+        "Configure a node's public share page (ADR-0093). 'rotate_token' issues a new "
+        "public URL and breaks the old link immediately — it needs an admin key, because "
+        "the token *is* the URL (ADR-0087). 'set_pin' takes config {pin: '1234'} and "
+        "'clear_pin' removes it; 'set_expiry' takes {expires_at: ISO or null} where null "
+        "means never; 'set_guest_notes' takes {allowed: bool} for whether visitors may "
+        "leave notes; 'views' reports how many times the page has been opened. The share "
+        "token itself is only returned to an admin key."
+    )
+)
+async def manage_share(action: ShareAction, node_id: str, config: dict | None = None) -> str:
+    """node_id is any shareable node — a project, an identity or a custom container."""
+    return await _manage_share(action=action, node_id=node_id, config=config)
+
+
+@mcp.tool(
+    description=(
+        "Act on notifications (ADR-0093): 'unread_count', 'read' one, 'read_all', or "
+        "'delete' one. Reading the list itself is get_notifications — this is the half that "
+        "was missing, so an agent could see a notification and never clear it."
+    )
+)
+async def manage_notifications(action: NotificationAction, notification_id: str | None = None) -> str:
+    return await _manage_notifications(action=action, notification_id=notification_id)
+
+
+@mcp.tool(
+    description=(
+        "Export a project's tasks as JSON, or import a batch back (ADR-0093). Unlike "
+        "import_tasks, which speaks Trello/Linear/GitHub, this is the platform's own shape "
+        "and round-trips: what export gives you is what import takes. Use it to move work "
+        "between projects or to snapshot a project's tasks before restructuring them."
+    )
+)
+async def transfer_tasks(action: TransferAction, project_id: str, tasks: list[dict] | None = None) -> str:
+    """tasks is the list from a previous export; required only for 'import'."""
+    return await _transfer_tasks(action=action, project_id=project_id, tasks=tasks)
+
+
+@mcp.tool(
+    description=(
+        "The whole graph in one call — nodes and the edges between them (ADR-0093). Narrow "
+        "with types (comma-separated node types) and limit. This is the orientation call: "
+        "it shows which containers exist and how they nest, which listing projects cannot, "
+        "because a custom layer above or below a project is invisible to a project list."
+    )
+)
+async def get_graph_map(types: str | None = None, include: str | None = None, limit: int | None = None) -> str:
+    return await _get_graph_map(types=types, include=include, limit=limit)
+
+
+@mcp.tool(
+    description=(
+        "Check whether outbound email is configured, or send a message (ADR-0093). 'send' "
+        "needs to (a list of addresses), subject and body, and goes out through the same "
+        "SMTP settings the daily summary uses — so 'status' returning unconfigured is why a "
+        "send would fail. This actually sends mail; it is not a draft."
+    )
+)
+async def manage_email(action: EmailAction, to: list[str] | None = None, subject: str = "", body: str = "") -> str:
+    return await _manage_email(action=action, to=to, subject=subject, body=body)
 
 
 @mcp.tool(

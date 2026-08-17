@@ -94,3 +94,4 @@
 | [0090](0090-a-task-like-type-is-a-task-everywhere.md) | 宣告了 task 角色，就在每一個地方都是任務 | Accepted | 2026-08-16 |
 | [0091](0091-configuring-the-instance-is-not-a-browser-only-act.md) | 設定這台實例本身，也不能只有瀏覽器做得到 | Accepted | 2026-08-16 |
 | [0092](0092-work-gets-in-and-out-through-both-doors.md) | 工作進得來、出得去、歸得了檔，兩道門都要能做 | Accepted | 2026-08-16 |
+| [0093](0093-the-mcp-registry-catches-up-with-the-api.md) | MCP 註冊表要跟得上 API | Accepted | 2026-08-16 |

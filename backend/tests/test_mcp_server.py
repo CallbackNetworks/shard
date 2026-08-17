@@ -567,10 +567,40 @@ async def test_list_node_types():
 
 
 @pytest.mark.asyncio
-async def test_create_node_type():
-    with _patch_client("post", _mock_response(json_data={"key": "organization", "roles": ["container"]})):
-        text = await _call("create_node_type", {"key": "organization", "label": "Organization", "roles": ["container"]})
+async def test_manage_types_create_node_type():
+    config = {"key": "organization", "label": "Organization", "roles": ["container"]}
+    with _patch_client("post", _mock_response(json_data=config)):
+        text = await _call("manage_types", {"kind": "node", "action": "create", "config": config})
     assert json.loads(text)["key"] == "organization"
+
+
+@pytest.mark.asyncio
+async def test_manage_types_creates_an_edge_type_with_its_endpoints():
+    """A relation with no endpoint declarations is the state ADR-0078 closed, and edge-type
+    writes had no MCP path at all until ADR-0093."""
+    config = {
+        "key": "mentors",
+        "label": "Mentors",
+        "allowed_source": {"types": ["identity"]},
+        "allowed_target": {"types": ["identity"]},
+    }
+    with _patch_client("post", _mock_response(json_data=config)) as patched:
+        text = await _call("manage_types", {"kind": "edge", "action": "create", "config": config})
+    assert json.loads(text)["key"] == "mentors"
+    assert patched.return_value.post.await_args.args[0] == "/edge-types"
+
+
+@pytest.mark.asyncio
+async def test_manage_types_delete_targets_the_right_registry():
+    with _patch_client("delete", _mock_response(status_code=204)) as patched:
+        await _call("manage_types", {"kind": "node", "action": "delete", "key": "organization"})
+    assert patched.return_value.delete.await_args.args[0] == "/node-types/organization"
+
+
+@pytest.mark.asyncio
+async def test_manage_types_create_without_a_config_costs_no_round_trip():
+    text = await _call("manage_types", {"kind": "node", "action": "create"})
+    assert "config" in text
 
 
 # ── Tools: list_edge_types / manage_edges (ADR-0078) ────────────────
@@ -792,10 +822,181 @@ async def test_export_decision_returns_markdown_not_json():
 
 
 @pytest.mark.asyncio
-async def test_duplicate_cycle():
+async def test_manage_cycles_duplicate():
     with _patch_client("post", _mock_response(json_data={"id": "c2", "name": "Sprint 4 (copy)"})):
-        text = await _call("duplicate_cycle", {"project_id": "p1", "cycle_id": "c1"})
+        text = await _call("manage_cycles", {"action": "duplicate", "project_id": "p1", "cycle_id": "c1"})
     assert json.loads(text)["name"].endswith("(copy)")
+
+
+@pytest.mark.asyncio
+async def test_manage_cycles_list_and_get():
+    with _patch_client("get", _mock_response(json_data=[{"id": "c1", "name": "Sprint 3"}])):
+        text = await _call("manage_cycles", {"action": "list", "project_id": "p1"})
+    assert json.loads(text)[0]["name"] == "Sprint 3"
+
+
+@pytest.mark.asyncio
+async def test_manage_cycles_compare_needs_both_sides():
+    text = await _call("manage_cycles", {"action": "compare", "project_id": "p1", "cycle_id": "c1"})
+    assert "compare_with" in text
+
+
+@pytest.mark.asyncio
+async def test_manage_cycles_compare():
+    with _patch_client("get", _mock_response(json_data={"cycle_a": {}, "cycle_b": {}})) as patched:
+        await _call(
+            "manage_cycles",
+            {"action": "compare", "project_id": "p1", "cycle_id": "c1", "compare_with": "c0"},
+        )
+    assert patched.return_value.get.await_args.kwargs["params"] == {"compare_with": "c0"}
+
+
+# ── Tools: the registry catches up with /api/v1 (ADR-0093) ──────────
+
+
+@pytest.mark.asyncio
+async def test_get_analytics_routes_each_report_to_its_own_endpoint():
+    with _patch_client("get", _mock_response(json_data={"points": []})) as patched:
+        await _call("get_analytics", {"report": "velocity", "project_id": "p1"})
+    assert patched.return_value.get.await_args.args[0] == "/analytics/velocity"
+
+    with _patch_client("get", _mock_response(json_data={"chain": []})) as patched:
+        await _call("get_analytics", {"report": "critical_path", "project_id": "p1"})
+    # The only report whose subject is a path segment rather than a query parameter.
+    assert patched.return_value.get.await_args.args[0] == "/analytics/critical-path/p1"
+
+
+@pytest.mark.asyncio
+async def test_get_analytics_refuses_a_report_missing_its_subject():
+    """A burndown without a cycle is not a burndown; failing here costs no round trip."""
+    assert "cycle_id" in await _call("get_analytics", {"report": "burndown"})
+    assert "project_id" in await _call("get_analytics", {"report": "critical_path"})
+    assert "raw_estimate" in await _call("get_analytics", {"report": "estimate_suggestion"})
+
+
+@pytest.mark.asyncio
+async def test_get_analytics_rejects_an_unknown_report():
+    with pytest.raises(ToolError):
+        await _call("get_analytics", {"report": "vibes"})
+
+
+@pytest.mark.asyncio
+async def test_manage_recurrence_crud():
+    rule = {"frequency": "weekly", "next_run_at": "2026-09-01T09:00:00Z"}
+    with _patch_client("post", _mock_response(json_data=rule)):
+        text = await _call(
+            "manage_recurrence",
+            {"action": "create", "project_id": "p1", "task_id": "t1", "config": rule},
+        )
+    assert json.loads(text)["frequency"] == "weekly"
+
+    with _patch_client("delete", _mock_response(status_code=204)):
+        text = await _call("manage_recurrence", {"action": "delete", "project_id": "p1", "task_id": "t1"})
+    assert json.loads(text)["status"] == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_manage_recurrence_create_without_config():
+    text = await _call("manage_recurrence", {"action": "create", "project_id": "p1", "task_id": "t1"})
+    assert "config is required" in text
+
+
+@pytest.mark.asyncio
+async def test_manage_templates_crud():
+    with _patch_client("get", _mock_response(json_data=[{"id": "tpl1", "name": "Release checklist"}])):
+        text = await _call("manage_templates", {"action": "list"})
+    assert json.loads(text)[0]["name"] == "Release checklist"
+
+    with _patch_client("patch", _mock_response(json_data={"id": "tpl1", "name": "Renamed"})):
+        text = await _call(
+            "manage_templates", {"action": "update", "template_id": "tpl1", "config": {"name": "Renamed"}}
+        )
+    assert json.loads(text)["name"] == "Renamed"
+
+
+@pytest.mark.asyncio
+async def test_manage_share_set_expiry_sends_an_explicit_null_to_clear():
+    """Omitting the key would leave the expiry untouched; the clear has to be explicit."""
+    with _patch_client("post", _mock_response(json_data={"ok": True})) as patched:
+        await _call("manage_share", {"action": "set_expiry", "node_id": "n1"})
+    assert patched.return_value.post.await_args.kwargs["json"] == {"expires_at": None}
+
+
+@pytest.mark.asyncio
+async def test_manage_share_pin_and_views():
+    with _patch_client("post", _mock_response(json_data={"ok": True})):
+        text = await _call("manage_share", {"action": "set_pin", "node_id": "n1", "config": {"pin": "4242"}})
+    assert json.loads(text)["ok"] is True
+
+    assert "pin" in await _call("manage_share", {"action": "set_pin", "node_id": "n1"})
+
+    with _patch_client("get", _mock_response(json_data={"count": 12})):
+        text = await _call("manage_share", {"action": "views", "node_id": "n1"})
+    assert json.loads(text)["count"] == 12
+
+
+@pytest.mark.asyncio
+async def test_manage_notifications_clears_what_get_notifications_can_only_see():
+    with _patch_client("post", _mock_response(json_data={"updated": 5})):
+        text = await _call("manage_notifications", {"action": "read_all"})
+    assert json.loads(text)["updated"] == 5
+
+    assert "notification_id" in await _call("manage_notifications", {"action": "read"})
+
+
+@pytest.mark.asyncio
+async def test_transfer_tasks_round_trips_the_platforms_own_shape():
+    exported = {"tasks": [{"title": "One"}]}
+    with _patch_client("get", _mock_response(json_data=exported)):
+        text = await _call("transfer_tasks", {"action": "export", "project_id": "p1"})
+    assert json.loads(text)["tasks"][0]["title"] == "One"
+
+    with _patch_client("post", _mock_response(json_data={"imported": 1})) as patched:
+        await _call("transfer_tasks", {"action": "import", "project_id": "p2", "tasks": [{"title": "One"}]})
+    assert patched.return_value.post.await_args.kwargs["json"] == {"tasks": [{"title": "One"}]}
+
+
+@pytest.mark.asyncio
+async def test_get_graph_map():
+    with _patch_client("get", _mock_response(json_data={"nodes": [], "edges": []})) as patched:
+        await _call("get_graph_map", {"types": "project,goal", "limit": 50})
+    assert patched.return_value.get.await_args.kwargs["params"] == {"types": "project,goal", "limit": 50}
+
+
+@pytest.mark.asyncio
+async def test_manage_email_send_requires_every_part():
+    text = await _call("manage_email", {"action": "send", "to": ["a@b.c"], "subject": "hi"})
+    assert "body" in text
+
+    with _patch_client("post", _mock_response(json_data={"sent": True})):
+        text = await _call("manage_email", {"action": "send", "to": ["a@b.c"], "subject": "hi", "body": "there"})
+    assert json.loads(text)["sent"] is True
+
+
+@pytest.mark.asyncio
+async def test_manage_integration_reaches_health_and_retry_all():
+    with _patch_client("get", _mock_response(json_data={"healthy": False})) as patched:
+        await _call("manage_integration", {"action": "health", "integration_id": "i1"})
+    assert patched.return_value.get.await_args.args[0] == "/integrations/i1/health"
+
+    with _patch_client("post", _mock_response(json_data={"retried": 3})) as patched:
+        await _call("manage_integration", {"action": "retry_all", "integration_id": "i1"})
+    assert patched.return_value.post.await_args.args[0] == "/integrations/i1/retry-all"
+
+
+@pytest.mark.asyncio
+async def test_list_deliveries_can_fetch_one():
+    with _patch_client("get", _mock_response(json_data={"id": "d1", "status": "failed"})) as patched:
+        text = await _call("list_deliveries", {"delivery_id": "d1"})
+    assert json.loads(text)["id"] == "d1"
+    assert patched.return_value.get.await_args.args[0] == "/deliveries/d1"
+
+
+@pytest.mark.asyncio
+async def test_container_subtree_can_ask_for_the_board_half():
+    with _patch_client("get", _mock_response(json_data=[])) as patched:
+        await _call("get_container_subtree", {"node_id": "n1", "view": "tasks"})
+    assert patched.return_value.get.await_args.args[0] == "/nodes/n1/contained-tasks"
 
 
 # ── Tools: CI/CD triggers, integrations, deliveries, rules (ADR-0085) ──
@@ -912,7 +1113,7 @@ async def test_manage_attachments_upload_without_bytes_says_so():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 42
+    assert len(tools) == 50
 
 
 @pytest.mark.asyncio
@@ -948,7 +1149,7 @@ async def test_list_tools_names():
         # ADR-0079: `type` is required on every node write and nothing listed the
         # legal values; creating a layer was a UI-only capability.
         "list_node_types",
-        "create_node_type",
+        "manage_types",
         # ADR-0084: inbound CI/CD credentials were readable only from the internal API,
         # which in production sits behind the password gate — so no agent could reach it.
         "manage_webhook",
@@ -975,7 +1176,16 @@ async def test_list_tools_names():
         "manage_unfiled",
         "list_decisions",
         "export_decision",
-        "duplicate_cycle",
+        "manage_cycles",
+        # ADR-0093: the MCP registry catches up with what /api/v1 already offers.
+        "get_analytics",
+        "manage_recurrence",
+        "manage_templates",
+        "manage_share",
+        "manage_notifications",
+        "transfer_tasks",
+        "get_graph_map",
+        "manage_email",
     }
     assert names == expected
 
