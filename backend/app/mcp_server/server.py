@@ -33,6 +33,8 @@ Priority = Literal["low", "medium", "high"]
 ProjectStatus = Literal["active", "archived"]
 ManageAction = Literal["list", "add", "remove"]
 WebhookAction = Literal["reveal", "rotate_secret", "rotate_token", "history"]
+SettingsAction = Literal["get", "bounds", "update", "ical_token", "rotate_ical_token"]
+BackupAction = Literal["status", "run", "restore"]
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://backend:8000")
 API_KEY = os.environ.get("API_KEY", "")
@@ -74,6 +76,14 @@ async def _post(path: str, body: dict | list | None = None, params: dict | None 
 async def _patch(path: str, body: dict | None = None) -> dict | list | str:
     client = _get_client()
     resp = await client.patch(path, json=body)
+    if resp.status_code >= 400:
+        return f"Error {resp.status_code}: {resp.text}"
+    return resp.json()
+
+
+async def _put(path: str, body: dict | None = None) -> dict | list | str:
+    client = _get_client()
+    resp = await client.put(path, json=body)
     if resp.status_code >= 400:
         return f"Error {resp.status_code}: {resp.text}"
     return resp.json()
@@ -472,6 +482,38 @@ async def _manage_attachments(
     return json.dumps(result) if not isinstance(result, str) else result
 
 
+async def _manage_settings(action: str, settings: dict | None = None) -> str:
+    if action == "get":
+        result = await _get("/settings")
+    elif action == "bounds":
+        result = await _get("/settings/bounds")
+    elif action == "update":
+        if not settings:
+            return "Error: settings is required to update"
+        result = await _put("/settings/system", settings)
+    elif action == "ical_token":
+        result = await _get("/settings/ical-token")
+    elif action == "rotate_ical_token":
+        result = await _post("/settings/ical-token/rotate")
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
+async def _manage_backup(action: str, filename: str | None = None, confirm: str = "") -> str:
+    if action == "status":
+        result = await _get("/backup/status")
+    elif action == "run":
+        result = await _post("/backup/run")
+    elif action == "restore":
+        if not filename:
+            return "Error: filename is required to restore"
+        result = await _post(f"/backup/restore/{filename}", None, params={"confirm": confirm})
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
+
+
 # ── MCP tools ────────────────────────────────────────────────────────
 #
 # One decorated function per tool (ADR-0077). The schema is derived from the
@@ -865,6 +907,41 @@ async def list_deliveries(integration_id: str | None = None, status: str | None 
 @mcp.tool(description="Retry one failed or dead webhook delivery. The retry backoff starts over.")
 async def retry_delivery(delivery_id: str) -> str:
     return await _retry_delivery(delivery_id=delivery_id)
+
+
+@mcp.tool(
+    description=(
+        "Read or change how this instance behaves (ADR-0091). 'get' returns the scheduler's "
+        "timings — summary_hour, due_soon_window_hours, reminder_cooldown_hours, "
+        "backup_enabled, backup_hour, backup_keep — plus which auth mode and LLM provider "
+        "are configured. 'bounds' returns each setting's legal min/max; call it before "
+        "'update', because an out-of-range value is refused rather than clamped and an "
+        "unknown key is refused rather than ignored. 'update' takes a partial dict of those "
+        "settings and takes effect without a restart. 'ical_token' returns the calendar feed "
+        "token and its subscribe path; 'rotate_ical_token' issues a new one and breaks every "
+        "client already subscribed. Everything but 'get'/'bounds' needs an admin-scope key."
+    )
+)
+async def manage_settings(action: SettingsAction, settings: dict | None = None) -> str:
+    """settings is the partial dict of scheduler timings, required only for 'update'."""
+    return await _manage_settings(action=action, settings=settings)
+
+
+@mcp.tool(
+    description=(
+        "Take, inspect or restore a backup (ADR-0091). 'status' reports whether the daily "
+        "backup is on, when it runs, how many are kept, and lists the archives on disk. "
+        "'run' takes one now and prunes beyond backup_keep — the call to make before a bulk "
+        "change you are unsure about. 'restore' replaces ALL data with an archive already on "
+        "the server and is irreversible: it needs the filename from 'status' and "
+        "confirm='replace'. Needs an admin-scope key. Downloading an archive is deliberately "
+        "not a tool — it is the whole database, credentials included; use "
+        "GET /api/v1/backup/export for that."
+    )
+)
+async def manage_backup(action: BackupAction, filename: str | None = None, confirm: str = "") -> str:
+    """filename and confirm='replace' are both required for 'restore'."""
+    return await _manage_backup(action=action, filename=filename, confirm=confirm)
 
 
 @mcp.tool(

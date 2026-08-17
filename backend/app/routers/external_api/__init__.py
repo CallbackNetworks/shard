@@ -20,6 +20,7 @@ from app.routers.external_api.labels import sub_router as labels_router
 from app.routers.external_api.node_types import sub_router as node_types_router
 from app.routers.external_api.nodes import sub_router as nodes_router
 from app.routers.external_api.notifications import sub_router as notifications_router
+from app.routers.external_api.ops import sub_router as ops_router
 from app.routers.external_api.progress import sub_router as progress_router
 from app.routers.external_api.projects import sub_router as projects_router
 from app.routers.external_api.search import sub_router as search_router
@@ -68,3 +69,5 @@ router.include_router(workflow_rules_router)
 # ADR-0086: the read/write asymmetries — recurrence, attachments, cycle reads. (The
 # transfer router is included further up, where its literal path segment must win.)
 router.include_router(task_resources_router)
+# ADR-0091: the operational surface — system settings, backups, the calendar feed token.
+router.include_router(ops_router)

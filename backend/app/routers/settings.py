@@ -1,5 +1,3 @@
-import os
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -7,8 +5,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import UserPreference
 from app.routers import auth as auth_mod
-from app.services.ical_token import get_global_ical_token, rotate_global_ical_token
-from app.services.runtime_settings import get_system_settings, update_system_settings
+from app.services import settings_admin
+from app.services.settings_admin import SystemSettingsUpdate
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -26,50 +24,31 @@ DASHBOARD_WIDGETS = [
 @router.get("")
 def get_settings(request: Request, db: Session = Depends(get_db)):
     """Return current system settings (non-sensitive)."""
-    runtime = get_system_settings(db)
-    if auth_mod.AUTH_PROXY_HEADER:
-        auth_mode = "proxy"
-    elif auth_mod.AUTH_PASSWORD:
-        auth_mode = "password"
-    else:
-        auth_mode = "none"
-    return {
-        "auth_enabled": auth_mod.auth_enabled(),
-        "auth_mode": auth_mode,
-        "llm_provider": os.getenv("LLM_PROVIDER", "stub"),
-        "llm_model": os.getenv("LLM_MODEL", ""),
-        "smtp_configured": bool(os.getenv("SMTP_HOST")),
-        "mcp_transport": os.getenv("MCP_TRANSPORT", "stdio"),
-        **runtime,
-    }
+    return settings_admin.read(db)
 
 
-class SystemSettingsUpdate(BaseModel):
-    summary_hour: int | None = None
-    due_soon_window_hours: int | None = None
-    reminder_cooldown_hours: int | None = None
-    backup_enabled: int | None = None
-    backup_hour: int | None = None
-    backup_keep: int | None = None
+@router.get("/bounds")
+def get_settings_bounds():
+    """The legal range of every writable setting."""
+    return settings_admin.bounds()
 
 
 @router.put("/system")
 def put_system_settings(body: SystemSettingsUpdate, db: Session = Depends(get_db)):
     """Update runtime-adjustable scheduler settings (persisted, no restart needed)."""
-    updated = update_system_settings(db, body.model_dump(exclude_none=True))
-    return updated
+    return settings_admin.update(db, body.model_dump(exclude_none=True))
 
 
 @router.get("/ical-token")
 def get_ical_token(db: Session = Depends(get_db)):
     """Return the global iCal token for the personal 'all projects' feed."""
-    return {"token": get_global_ical_token(db)}
+    return settings_admin.ical_token(db)
 
 
 @router.post("/ical-token/rotate")
 def rotate_ical_token(db: Session = Depends(get_db)):
     """Issue a new global iCal token, invalidating the previous subscribe URL."""
-    return {"token": rotate_global_ical_token(db)}
+    return settings_admin.rotate_ical_token(db)
 
 
 class PasswordChangeRequest(BaseModel):

@@ -13,6 +13,7 @@ import os
 from sqlalchemy.orm import Session
 
 from app.models import UserPreference
+from app.services.errors import Unprocessable
 
 SETTINGS_KEY = "system-settings"
 
@@ -35,7 +36,7 @@ def _defaults() -> dict[str, int]:
     }
 
 
-# Allowed inclusive range for each field, used to clamp user input.
+# Allowed inclusive range for each field. Enforced, not clamped — see ``update_system_settings``.
 FIELD_BOUNDS: dict[str, tuple[int, int]] = {
     "summary_hour": (0, 23),
     "due_soon_window_hours": (1, 336),  # up to 14 days
@@ -60,16 +61,37 @@ def get_system_settings(db: Session) -> dict[str, int]:
     return result
 
 
-def update_system_settings(db: Session, updates: dict) -> dict[str, int]:
-    """Apply and persist overrides. Unknown keys are ignored; values are clamped."""
-    current = get_system_settings(db)
+def validate_updates(updates: dict) -> dict[str, int]:
+    """The requested overrides as ints, or the refusal (ADR-0091).
+
+    This used to clamp: ``backup_hour: 99`` was silently stored as 23 and answered ``200``
+    with the clamped value. A person moving a number input never produces 99, so the clamp
+    read as harmless defensiveness; an agent composing a settings payload from a plan is
+    exactly the caller that does, and it would be told its change was applied. Out of range
+    is a contradiction in the request, not a fact about the world — 422, like a rule whose
+    conditions its trigger never supplies (ADR-0055).
+    """
+    validated: dict[str, int] = {}
     for key, value in updates.items():
-        if key in FIELD_BOUNDS and value is not None:
-            lo, hi = FIELD_BOUNDS[key]
-            try:
-                current[key] = max(lo, min(hi, int(value)))
-            except (TypeError, ValueError):
-                continue
+        if value is None:
+            continue
+        if key not in FIELD_BOUNDS:
+            raise Unprocessable(f"unknown setting '{key}'; known settings are {', '.join(sorted(FIELD_BOUNDS))}")
+        try:
+            number = int(value)
+        except (TypeError, ValueError) as exc:
+            raise Unprocessable(f"'{key}' must be a whole number") from exc
+        lo, hi = FIELD_BOUNDS[key]
+        if not lo <= number <= hi:
+            raise Unprocessable(f"'{key}' must be between {lo} and {hi}, got {number}")
+        validated[key] = number
+    return validated
+
+
+def update_system_settings(db: Session, updates: dict) -> dict[str, int]:
+    """Apply and persist overrides, refusing anything out of range."""
+    current = get_system_settings(db)
+    current.update(validate_updates(updates))
 
     pref = db.query(UserPreference).filter(UserPreference.key == SETTINGS_KEY).first()
     if pref:

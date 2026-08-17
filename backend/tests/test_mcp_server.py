@@ -647,6 +647,78 @@ async def test_manage_webhook_history():
     assert json.loads(text)[0]["provider"] == "github"
 
 
+# ── Tools: manage_settings, manage_backup (ADR-0091) ────────────────
+
+
+@pytest.mark.asyncio
+async def test_manage_settings_get():
+    with _patch_client("get", _mock_response(json_data={"summary_hour": 8, "auth_mode": "password"})):
+        text = await _call("manage_settings", {"action": "get"})
+    assert json.loads(text)["summary_hour"] == 8
+
+
+@pytest.mark.asyncio
+async def test_manage_settings_bounds_precedes_a_guessed_write():
+    """The vocabulary exists so a payload is composed, not guessed (ADR-0056)."""
+    with _patch_client("get", _mock_response(json_data={"backup_hour": {"min": 0, "max": 23}})):
+        text = await _call("manage_settings", {"action": "bounds"})
+    assert json.loads(text)["backup_hour"]["max"] == 23
+
+
+@pytest.mark.asyncio
+async def test_manage_settings_update():
+    with _patch_client("put", _mock_response(json_data={"summary_hour": 6})):
+        text = await _call("manage_settings", {"action": "update", "settings": {"summary_hour": 6}})
+    assert json.loads(text)["summary_hour"] == 6
+
+
+@pytest.mark.asyncio
+async def test_manage_settings_update_without_settings_costs_no_round_trip():
+    text = await _call("manage_settings", {"action": "update"})
+    assert "settings is required" in text
+
+
+@pytest.mark.asyncio
+async def test_manage_settings_rotate_ical_token():
+    with _patch_client("post", _mock_response(json_data={"token": "new", "path": "/ical/all/new.ics"})):
+        text = await _call("manage_settings", {"action": "rotate_ical_token"})
+    assert json.loads(text)["path"] == "/ical/all/new.ics"
+
+
+@pytest.mark.asyncio
+async def test_manage_backup_status():
+    payload = {"enabled": True, "hour": 3, "keep": 7, "backups": []}
+    with _patch_client("get", _mock_response(json_data=payload)):
+        text = await _call("manage_backup", {"action": "status"})
+    assert json.loads(text)["keep"] == 7
+
+
+@pytest.mark.asyncio
+async def test_manage_backup_run():
+    with _patch_client("post", _mock_response(json_data={"filename": "shard-backup-20260101-000000.zip"})):
+        text = await _call("manage_backup", {"action": "run"})
+    assert json.loads(text)["filename"].startswith("shard-backup-")
+
+
+@pytest.mark.asyncio
+async def test_manage_backup_restore_needs_a_filename():
+    """The irreversible one refuses before it can reach the network."""
+    text = await _call("manage_backup", {"action": "restore", "confirm": "replace"})
+    assert "filename is required" in text
+
+
+@pytest.mark.asyncio
+async def test_manage_backup_restore_passes_the_confirmation_through():
+    with _patch_client("post", _mock_response(json_data={"table_counts": {"nodes": 3}})) as patched:
+        text = await _call(
+            "manage_backup",
+            {"action": "restore", "filename": "shard-backup-20260101-000000.zip", "confirm": "replace"},
+        )
+    assert json.loads(text)["table_counts"]["nodes"] == 3
+    # The guard is the server's, so the tool must actually carry the confirmation to it.
+    assert patched.return_value.post.await_args.kwargs["params"] == {"confirm": "replace"}
+
+
 # ── Tools: CI/CD triggers, integrations, deliveries, rules (ADR-0085) ──
 
 
@@ -761,7 +833,7 @@ async def test_manage_attachments_upload_without_bytes_says_so():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 34
+    assert len(tools) == 36
 
 
 @pytest.mark.asyncio
@@ -815,6 +887,9 @@ async def test_list_tools_names():
         "manage_workflow_rules",
         # ADR-0086: an agent's output is mostly files and it had nowhere to put one.
         "manage_attachments",
+        # ADR-0091: the operational surface — how this instance behaves, and its backups.
+        "manage_settings",
+        "manage_backup",
     }
     assert names == expected
 

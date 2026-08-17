@@ -1,5 +1,8 @@
 """Tests for the settings router and runtime-adjustable system settings."""
 
+import pytest
+
+from app.services.errors import Unprocessable
 from app.services.runtime_settings import get_system_settings, update_system_settings
 
 
@@ -29,12 +32,13 @@ class TestUpdateSystemSettings:
         assert body["due_soon_window_hours"] == 48
         assert body["reminder_cooldown_hours"] == 23
 
-    def test_values_are_clamped(self, client):
+    def test_out_of_range_values_are_refused_not_clamped(self, client):
+        """These used to be clamped and answered 200 with a value nobody asked for (ADR-0091)."""
+        before = client.get("/api/settings").json()
         resp = client.put("/api/settings/system", json={"summary_hour": 99, "due_soon_window_hours": 0})
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["summary_hour"] == 23  # clamped to max
-        assert body["due_soon_window_hours"] == 1  # clamped to min
+        assert resp.status_code == 422
+        assert "between 0 and 23" in resp.json()["detail"]
+        assert client.get("/api/settings").json() == before
 
     def test_partial_update_leaves_others(self, client):
         client.put("/api/settings/system", json={"summary_hour": 10})
@@ -55,7 +59,9 @@ class TestRuntimeSettingsService:
             "backup_keep": 7,
         }
 
-    def test_ignores_unknown_keys(self, db):
-        result = update_system_settings(db, {"bogus": 5, "summary_hour": 9})
-        assert "bogus" not in result
-        assert result["summary_hour"] == 9
+    def test_refuses_unknown_keys(self, db):
+        """A misspelled setting used to be dropped in silence — a 200 for a change that
+        never happened, which is the same defect as the clamp (ADR-0091)."""
+        with pytest.raises(Unprocessable):
+            update_system_settings(db, {"bogus": 5, "summary_hour": 9})
+        assert get_system_settings(db)["summary_hour"] != 9
