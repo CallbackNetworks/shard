@@ -291,7 +291,7 @@ def ical_feed_all(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(g
     """Personal feed: every due-dated task across all projects (global token)."""
     if not verify_global_ical_token(db, token):
         raise HTTPException(status_code=404, detail="Calendar not found")
-    nodes = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.due_date.isnot(None)).all()
+    nodes = db.query(Node).filter(graph.task_type_filter(db), Node.due_date.isnot(None)).all()
     return _render_calendar("All tasks", [graph.task_view(n, db) for n in nodes], alarm)
 
 
@@ -317,7 +317,7 @@ def ical_feed_node(token: str, alarm: int = _ALARM_QUERY, db: Session = Depends(
         container_ids = [node.id]
     task_ids = {tid for cid in container_ids for tid in graph.contained_task_ids(db, cid)}
     nodes = (
-        db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids), Node.due_date.isnot(None)).all()
+        db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(task_ids), Node.due_date.isnot(None)).all()
         if task_ids
         else []
     )

@@ -45,7 +45,7 @@ def export_rows(db: Session, project_id: str) -> list[dict]:
     task_ids = graph.contained_task_ids(db, project_id)
     task_nodes = (
         db.query(Node)
-        .filter(Node.type == graph.NODE_TASK, Node.id.in_(task_ids))
+        .filter(graph.task_type_filter(db), Node.id.in_(task_ids))
         .order_by(Node.position.asc(), Node.created_at.asc())
         .all()
         if task_ids

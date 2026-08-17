@@ -66,7 +66,7 @@ async def _check_and_fire(db: Session) -> None:
     candidate_nodes = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             Node.due_date != None,
             Node.status.notin_(["done", "failed"]),
             Node.due_date <= due_soon_cutoff,
@@ -236,7 +236,7 @@ async def _send_daily_summary(db: Session) -> None:
     overdue_tasks = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             *graph.overdue_clause(now),
         )
         .all()
@@ -245,7 +245,7 @@ async def _send_daily_summary(db: Session) -> None:
     due_today = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             Node.due_date >= now.replace(hour=0, minute=0, second=0),
             Node.due_date <= now.replace(hour=23, minute=59, second=59),
             Node.status.notin_(["done", "failed"]),
@@ -255,7 +255,7 @@ async def _send_daily_summary(db: Session) -> None:
 
     in_progress = (
         db.query(Node)
-        .filter(Node.type == graph.NODE_TASK, Node.status == "in_progress", graph.top_level_task_filter(db))
+        .filter(graph.task_type_filter(db), Node.status == "in_progress", graph.top_level_task_filter(db))
         .all()
     )
 
@@ -264,7 +264,7 @@ async def _send_daily_summary(db: Session) -> None:
     completed_yesterday = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             Node.status == "done",
             Node.updated_at >= yesterday.replace(hour=0, minute=0, second=0),
             Node.updated_at <= yesterday.replace(hour=23, minute=59, second=59),
@@ -353,7 +353,7 @@ async def _send_weekly_digest(db: Session) -> None:
     completed_this_week = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             Node.status == "done",
             Node.updated_at >= week_ago,
         )
@@ -364,7 +364,7 @@ async def _send_weekly_digest(db: Session) -> None:
     created_this_week = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             Node.created_at >= week_ago,
             graph.top_level_task_filter(db),
         )
@@ -375,7 +375,7 @@ async def _send_weekly_digest(db: Session) -> None:
     overdue_tasks = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             *graph.overdue_clause(now),
         )
         .all()
@@ -487,7 +487,7 @@ async def _check_sla_aging(db: Session) -> None:
     stuck_tasks = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             Node.status == "in_progress",
             Node.updated_at <= escalation_cutoff,
         )

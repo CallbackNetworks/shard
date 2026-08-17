@@ -91,3 +91,4 @@
 | [0087](0087-the-last-duplicate-share-implementation.md) | 最後一份重複的分享實作 | Accepted | 2026-08-16 |
 | [0088](0088-a-colour-means-one-thing.md) | 一個顏色只能代表一件事 | Accepted | 2026-08-16 |
 | [0089](0089-one-assistant-one-definition-of-overdue.md) | 一個助理，一個「逾期」的定義 | Accepted | 2026-08-16 |
+| [0090](0090-a-task-like-type-is-a-task-everywhere.md) | 宣告了 task 角色，就在每一個地方都是任務 | Accepted | 2026-08-16 |

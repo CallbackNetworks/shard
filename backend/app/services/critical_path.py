@@ -32,7 +32,7 @@ def compute_critical_path(db: Session, project_id: str) -> dict:
     nodes = (
         db.query(Node)
         .filter(
-            Node.type == graph.NODE_TASK,
+            graph.task_type_filter(db),
             Node.id.in_(task_ids),
             Node.status.notin_(["done", "failed"]),
             graph.top_level_task_filter(db),

@@ -288,7 +288,7 @@ async def _tool_get_summary(db: Session) -> str:
 
 
 def _tool_list_tasks(db: Session, project_id: str, status: str | None = None) -> str:
-    q = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
+    q = db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status:
         q = q.filter(Node.status == status)
     tasks = [graph.task_view(n, db) for n in q.order_by(Node.created_at.desc()).limit(50).all()]
@@ -421,7 +421,7 @@ async def _tool_manage_labels(
 
 
 def _tool_analyze_workload(db: Session, project_id: str | None = None) -> str:
-    q = db.query(Node).filter(Node.type == graph.NODE_TASK, graph.top_level_task_filter(db))
+    q = db.query(Node).filter(graph.task_type_filter(db), graph.top_level_task_filter(db))
     if project_id:
         q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
     tasks = [graph.task_view(n, db) for n in q.all()]
@@ -471,7 +471,7 @@ def _tool_search(db: Session, query: str) -> str:
     # Python for dialect-safe substring matching (ADR-0033, node-only tasks).
     tasks = [
         graph.task_view(n, db)
-        for n in db.query(Node).filter(Node.type == graph.NODE_TASK).all()
+        for n in db.query(Node).filter(graph.task_type_filter(db)).all()
         if q in (n.title or "").lower() or q in ((n.data or {}).get("description") or "").lower()
     ][:20]
     projects = graph.search_projects(db, q, limit=10)
@@ -516,7 +516,7 @@ def _tool_analyze_decisions(db: Session, project_id: str) -> str:
     # Tasks with details
     task_nodes = (
         db.query(Node)
-        .filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
+        .filter(graph.task_type_filter(db), Node.id.in_(graph.contained_task_ids(db, project_id)))
         .order_by(Node.created_at.desc())
         .limit(100)
         .all()

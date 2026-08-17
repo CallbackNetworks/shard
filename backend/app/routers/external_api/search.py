@@ -44,7 +44,7 @@ def api_search(
     scope = set(graph.contained_task_ids(db, project_id)) if project_id else None
     matched = [
         n
-        for n in db.query(Node).filter(Node.type == graph.NODE_TASK).order_by(Node.updated_at.desc()).all()
+        for n in db.query(Node).filter(graph.task_type_filter(db)).order_by(Node.updated_at.desc()).all()
         if (ql in (n.title or "").lower() or ql in ((n.data or {}).get("description") or "").lower())
         and (scope is None or n.id in scope)
     ][offset : offset + limit]

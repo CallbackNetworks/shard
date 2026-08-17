@@ -42,7 +42,7 @@ def search(
         # Python for dialect-safe LIKE fallback (ADR-0033, node-only tasks).
         ql = q.lower()
         scope = set(graph.contained_task_ids(db, project_id)) if project_id else None
-        nodes = db.query(Node).filter(Node.type == graph.NODE_TASK).order_by(Node.updated_at.desc()).all()
+        nodes = db.query(Node).filter(graph.task_type_filter(db)).order_by(Node.updated_at.desc()).all()
         matched = [
             n
             for n in nodes
@@ -63,7 +63,7 @@ def search(
             total = len(p_task_ids)
             done = (
                 db.query(func.count(Node.id))
-                .filter(Node.id.in_(p_task_ids), Node.type == graph.NODE_TASK, Node.status == "done")
+                .filter(Node.id.in_(p_task_ids), graph.task_type_filter(db), Node.status == "done")
                 .scalar()
                 or 0
                 if p_task_ids

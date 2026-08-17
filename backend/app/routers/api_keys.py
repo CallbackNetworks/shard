@@ -80,7 +80,7 @@ def get_agent_summary(db: Session = Depends(get_db)):
     key_id_set = set(key_ids)
     all_tasks = [
         graph.task_view(n, db)
-        for n in db.query(Node).filter(Node.type == graph.NODE_TASK).all()
+        for n in db.query(Node).filter(graph.task_type_filter(db)).all()
         if (n.data or {}).get("assigned_agent_key_id") in key_id_set
     ]
 

@@ -61,7 +61,7 @@ def burndown(db: Session, cycle_id: str) -> list[dict]:
         done_count = (
             db.query(func.count(Node.id))
             .filter(
-                Node.type == graph.NODE_TASK,
+                graph.task_type_filter(db),
                 Node.id.in_(task_ids),
                 Node.status == "done",
                 Node.updated_at <= day_end,
@@ -87,7 +87,7 @@ def cycle_burndown(db: Session, cycle_id: str) -> list[dict]:
     if not cycle_task_ids:
         return []
 
-    tasks = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(cycle_task_ids)).all()
+    tasks = db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(cycle_task_ids)).all()
     total = len(tasks)
 
     start = cycle.start_date or min((t.created_at for t in tasks), default=datetime.now(UTC))
@@ -126,7 +126,7 @@ def _completed_estimated(db: Session, project_id: str | None, cap: int) -> list:
     ``time_estimate``/``time_spent`` live in ``node.data`` (JSON), so they are filtered in
     Python after the hot-column query for dialect-safety (ADR-0033).
     """
-    q = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.status == "done")
+    q = db.query(Node).filter(graph.task_type_filter(db), Node.status == "done")
     if project_id:
         q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
     return [

@@ -87,7 +87,7 @@ def _find_external_task(
     # external_provider/id/repo live in node.data (JSON); scan the project's task
     # nodes and match in Python (ADR-0033, node-only tasks).
     for node in db.query(Node).filter(
-        Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id))
+        graph.task_type_filter(db), Node.id.in_(graph.contained_task_ids(db, project_id))
     ):
         data = node.data or {}
         if (
@@ -487,7 +487,7 @@ async def _handle_pr_event(pr_data: dict, project_id: str, db: Session) -> dict:
         tasks_with_pr_url = [
             graph.task_view(n, db)
             for n in db.query(Node).filter(
-                Node.type == graph.NODE_TASK,
+                graph.task_type_filter(db),
                 Node.id.in_(graph.contained_task_ids(db, project_id)),
                 Node.status != "done",
             )

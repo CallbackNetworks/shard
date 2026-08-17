@@ -40,7 +40,7 @@ def api_list_tasks(
 ):
     _require_scope(api_key, "read")
     _check_project_access(api_key, project_id)
-    query = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(graph.contained_task_ids(db, project_id)))
+    query = db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status_filter:
         query = query.filter(Node.status == status_filter)
     if priority:

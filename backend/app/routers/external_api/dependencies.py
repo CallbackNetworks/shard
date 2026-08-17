@@ -39,7 +39,7 @@ def api_get_dependencies(
     _get_task_or_404(project_id, task_id, db)
 
     def _summaries(ids):
-        rows = db.query(Node).filter(Node.type == graph.NODE_TASK, Node.id.in_(ids)).all() if ids else []
+        rows = db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(ids)).all() if ids else []
         return [{"task_id": t.id, "title": t.title, "status": t.status} for t in rows]
 
     blocked_by = _summaries(graph.prerequisite_ids(db, task_id))
