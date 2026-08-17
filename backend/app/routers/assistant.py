@@ -97,7 +97,7 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
 
     messages = [{"role": m.role if m.role != "tool" else "user", "content": m.content} for m in history]
 
-    provider = get_provider()
+    provider = get_provider(db)
 
     async def event_stream():
         assistant_text = []

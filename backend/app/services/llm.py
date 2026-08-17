@@ -1,19 +1,21 @@
 """
 Provider-agnostic LLM abstraction for the Assistant feature.
-Set LLM_PROVIDER env var to: "claude" | "openai" | "stub"
+
+Provider/model/key are resolved per call from ``services.llm_settings`` (DB override,
+else env var — ADR-0096), not read once at import time, so a change made through
+Settings takes effect on the next message without a restart.
 """
 
 import json
 import logging
-import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
-logger = logging.getLogger(__name__)
+from sqlalchemy.orm import Session
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "stub")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "")
+from app.services import llm_settings
+
+logger = logging.getLogger(__name__)
 
 
 class LLMProvider(ABC):
@@ -46,20 +48,20 @@ class StubProvider(LLMProvider):
         yield {
             "type": "error",
             "message": (
-                "No LLM provider is configured. Set LLM_PROVIDER (claude|openai), "
-                "LLM_API_KEY and LLM_MODEL, then restart the backend."
+                "No LLM provider is configured. Set it in Settings, or via the "
+                "LLM_PROVIDER (claude|openai)/LLM_API_KEY/LLM_MODEL env vars."
             ),
         }
         yield {"type": "done"}
 
 
 class ClaudeProvider(LLMProvider):
-    def __init__(self):
+    def __init__(self, api_key: str, model: str):
         try:
             import anthropic
 
-            self.client = anthropic.AsyncAnthropic(api_key=LLM_API_KEY)
-            self.model = LLM_MODEL or "claude-sonnet-4-6"
+            self.client = anthropic.AsyncAnthropic(api_key=api_key)
+            self.model = model or "claude-sonnet-4-6"
         except ImportError as err:
             raise RuntimeError("anthropic package not installed. Add 'anthropic' to requirements.txt") from err
 
@@ -101,12 +103,12 @@ class ClaudeProvider(LLMProvider):
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self):
+    def __init__(self, api_key: str, model: str):
         try:
             from openai import AsyncOpenAI
 
-            self.client = AsyncOpenAI(api_key=LLM_API_KEY)
-            self.model = LLM_MODEL or "gpt-4o"
+            self.client = AsyncOpenAI(api_key=api_key)
+            self.model = model or "gpt-4o"
         except ImportError as err:
             raise RuntimeError("openai package not installed. Add 'openai' to requirements.txt") from err
 
@@ -167,9 +169,10 @@ class OpenAIProvider(LLMProvider):
         yield {"type": "done"}
 
 
-def get_provider() -> LLMProvider:
-    if LLM_PROVIDER == "claude":
-        return ClaudeProvider()
-    elif LLM_PROVIDER == "openai":
-        return OpenAIProvider()
+def get_provider(db: Session) -> LLMProvider:
+    config = llm_settings.get_effective_llm_config(db)
+    if config["provider"] == "claude":
+        return ClaudeProvider(api_key=config["api_key"], model=config["model"])
+    elif config["provider"] == "openai":
+        return OpenAIProvider(api_key=config["api_key"], model=config["model"])
     return StubProvider()

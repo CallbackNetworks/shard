@@ -27,7 +27,7 @@ from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
 from app.services import backup_admin, settings_admin
 from app.services.errors import Invalid
-from app.services.settings_admin import SystemSettingsUpdate
+from app.services.settings_admin import LLMSettingsUpdate, SystemSettingsUpdate
 
 sub_router = APIRouter()
 
@@ -87,6 +87,27 @@ def api_update_settings(
 ):
     _require_scope(api_key, "admin")
     return settings_admin.update(db, body.model_dump(exclude_none=True))
+
+
+@sub_router.put(
+    "/settings/llm",
+    summary="Change the assistant's provider",
+    description=(
+        "Partial update of `provider` (`claude`|`openai`|`stub`), `model` and `api_key`. "
+        'A field left out is unchanged; `""` clears that field\'s override back to its '
+        "environment default. Takes effect on the next message sent, no restart needed. "
+        "Requires `admin` scope, on the same rule as `/settings/ical-token`: the key is a "
+        "credential, and this is the only door that can set one."
+    ),
+    responses=_auth_errors,
+)
+def api_update_llm_settings(
+    body: LLMSettingsUpdate,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "admin")
+    return settings_admin.update_llm(db, body.model_dump(exclude_none=True))
 
 
 @sub_router.get(

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings2, Shield, Bot, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, CalendarClock, RefreshCw } from 'lucide-react'
+import { Settings2, Shield, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, CalendarClock, RefreshCw } from 'lucide-react'
 import { getSettings, setPreference, updateSystemSettings, getIcalToken, rotateGlobalIcalToken } from '../api/client'
 import { DARK } from '../constants/theme'
 import { ControlRow, InfoRow, SectionTitle, Segmented, StatusBadge } from '../components/settings/primitives'
 import BackupPanel from '../components/settings/BackupPanel'
+import LlmSettingsPanel from '../components/settings/LlmSettingsPanel'
 import PasswordForm from '../components/settings/PasswordForm'
 import { useTheme } from '../context/ThemeContext'
 import { NAV_GROUPS, orderGroupItems } from '../constants/nav'
@@ -76,12 +77,6 @@ export default function Settings() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ical-token'] }),
   })
   const icalUrl = icalToken?.token ? `${window.location.origin}/ical/all/${icalToken.token}.ics` : ''
-
-  const providerLabel = {
-    claude: 'Claude (Anthropic)',
-    openai: 'OpenAI',
-    stub: 'Not configured',
-  }
 
   return (
     <div className="kt-page">
@@ -372,6 +367,9 @@ export default function Settings() {
             <InfoRow label={t('settings.email')}>
               <StatusBadge ok={settings.smtp_configured} label={settings.smtp_configured ? t('settings.configured') : t('settings.notConfigured')} />
             </InfoRow>
+            <InfoRow label="MCP Transport">
+              {settings.mcp_transport}
+            </InfoRow>
           </div>
 
           {/* Notifications & Reminders (backend-persisted) */}
@@ -405,25 +403,7 @@ export default function Settings() {
           <BackupPanel settings={settings} onUpdateSystem={(patch) => systemMut.mutate(patch)} />
 
           {/* AI Assistant */}
-          <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
-            <SectionTitle
-              icon={<Bot size={16} color={DARK.success} />}
-              title={t('settings.aiAssistant')}
-            />
-            <InfoRow label={t('settings.provider')}>
-              {providerLabel[settings.llm_provider] || settings.llm_provider}
-            </InfoRow>
-            {settings.llm_model && (
-              <InfoRow label={t('settings.model')}>
-                <code style={{ fontSize: 12, background: 'rgba(var(--kt-ink-rgb), 0.06)', padding: '2px 6px' }}>
-                  {settings.llm_model}
-                </code>
-              </InfoRow>
-            )}
-            <InfoRow label="MCP Transport">
-              {settings.mcp_transport}
-            </InfoRow>
-          </div>
+          <LlmSettingsPanel settings={settings} />
 
           {/* Password Change */}
           {settings.auth_enabled && <PasswordForm />}

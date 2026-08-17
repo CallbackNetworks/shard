@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.routers import auth as auth_mod
+from app.services import llm_settings
 from app.services.ical_token import get_global_ical_token, rotate_global_ical_token
 from app.services.runtime_settings import FIELD_BOUNDS, get_system_settings, update_system_settings
 
@@ -43,6 +44,20 @@ class SystemSettingsUpdate(BaseModel):
     backup_keep: int | None = None
 
 
+class LLMSettingsUpdate(BaseModel):
+    """A partial write of the assistant's provider config (ADR-0096).
+
+    ``extra="forbid"`` for the same reason as ``SystemSettingsUpdate``. A field left out
+    is unchanged; ``""`` clears that field's override back to its environment default.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str | None = None
+    model: str | None = None
+    api_key: str | None = None
+
+
 def auth_mode() -> str:
     if auth_mod.AUTH_PROXY_HEADER:
         return "proxy"
@@ -60,10 +75,9 @@ def read(db: Session) -> dict:
     return {
         "auth_enabled": auth_mod.auth_enabled(),
         "auth_mode": auth_mode(),
-        "llm_provider": os.getenv("LLM_PROVIDER", "stub"),
-        "llm_model": os.getenv("LLM_MODEL", ""),
         "smtp_configured": bool(os.getenv("SMTP_HOST")),
         "mcp_transport": os.getenv("MCP_TRANSPORT", "stdio"),
+        **llm_settings.read(db),
         **get_system_settings(db),
     }
 
@@ -81,6 +95,12 @@ def bounds() -> dict[str, dict[str, int]]:
 def update(db: Session, updates: dict) -> dict[str, int]:
     """Persist scheduler overrides. Out-of-range values are refused, never clamped."""
     return update_system_settings(db, updates)
+
+
+def update_llm(db: Session, updates: dict) -> dict:
+    """Persist an assistant provider override. Takes effect on the next message sent —
+    ``services/llm.get_provider`` reads it per-request, not once at process start."""
+    return llm_settings.update(db, updates)
 
 
 def ical_token(db: Session) -> dict:

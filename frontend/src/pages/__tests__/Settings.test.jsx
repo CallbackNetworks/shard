@@ -30,6 +30,7 @@ vi.mock('../../api/client', () => ({
   changePassword: vi.fn(),
   setPreference: vi.fn(() => Promise.resolve()),
   updateSystemSettings: vi.fn(() => Promise.resolve()),
+  updateLlmSettings: vi.fn(() => Promise.resolve()),
   getBackupStatus: vi.fn(() => Promise.resolve({ backups: [] })),
   runBackup: vi.fn(() => Promise.resolve({})),
   exportBackup: vi.fn(() => Promise.resolve({ data: new Blob(), headers: {} })),
@@ -56,6 +57,7 @@ const mockSettings = {
   reminder_cooldown_hours: 23,
   llm_provider: 'claude',
   llm_model: 'claude-sonnet',
+  llm_api_key_configured: false,
   mcp_transport: 'stdio',
 }
 
@@ -143,7 +145,7 @@ describe('Settings', () => {
   it('shows the LLM model name', () => {
     setup()
     expect(screen.getByText('settings.model')).toBeTruthy()
-    expect(screen.getByText('claude-sonnet')).toBeTruthy()
+    expect(screen.getByDisplayValue('claude-sonnet')).toBeTruthy()
   })
 
   it('shows the MCP transport', () => {

@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models import UserPreference
 from app.routers import auth as auth_mod
 from app.services import settings_admin
-from app.services.settings_admin import SystemSettingsUpdate
+from app.services.settings_admin import LLMSettingsUpdate, SystemSettingsUpdate
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -37,6 +37,12 @@ def get_settings_bounds():
 def put_system_settings(body: SystemSettingsUpdate, db: Session = Depends(get_db)):
     """Update runtime-adjustable scheduler settings (persisted, no restart needed)."""
     return settings_admin.update(db, body.model_dump(exclude_none=True))
+
+
+@router.put("/llm")
+def put_llm_settings(body: LLMSettingsUpdate, db: Session = Depends(get_db)):
+    """Update the assistant's provider/model/API key (persisted, no restart needed)."""
+    return settings_admin.update_llm(db, body.model_dump(exclude_none=True))
 
 
 @router.get("/ical-token")

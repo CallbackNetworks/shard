@@ -33,7 +33,7 @@ Priority = Literal["low", "medium", "high"]
 ProjectStatus = Literal["active", "archived"]
 ManageAction = Literal["list", "add", "remove"]
 WebhookAction = Literal["reveal", "rotate_secret", "rotate_token", "history"]
-SettingsAction = Literal["get", "bounds", "update", "ical_token", "rotate_ical_token"]
+SettingsAction = Literal["get", "bounds", "update", "llm_update", "ical_token", "rotate_ical_token"]
 BackupAction = Literal["status", "run", "restore"]
 ImportSource = Literal["github", "linear", "trello"]
 UnfiledAction = Literal["list", "file"]
@@ -556,6 +556,10 @@ async def _manage_settings(action: str, settings: dict | None = None) -> str:
         if not settings:
             return "Error: settings is required to update"
         result = await _put("/settings/system", settings)
+    elif action == "llm_update":
+        if not settings:
+            return "Error: settings is required to update"
+        result = await _put("/settings/llm", settings)
     elif action == "ical_token":
         result = await _get("/settings/ical-token")
     elif action == "rotate_ical_token":
@@ -1229,15 +1233,19 @@ async def retry_delivery(delivery_id: str) -> str:
 
 @mcp.tool(
     description=(
-        "Read or change how this instance behaves (ADR-0091). 'get' returns the scheduler's "
-        "timings — summary_hour, due_soon_window_hours, reminder_cooldown_hours, "
-        "backup_enabled, backup_hour, backup_keep — plus which auth mode and LLM provider "
-        "are configured. 'bounds' returns each setting's legal min/max; call it before "
+        "Read or change how this instance behaves (ADR-0091, ADR-0096). 'get' returns the "
+        "scheduler's timings — summary_hour, due_soon_window_hours, reminder_cooldown_hours, "
+        "backup_enabled, backup_hour, backup_keep — plus llm_provider, llm_model and "
+        "llm_api_key_configured (never the key itself), auth mode and whether SMTP is set "
+        "up. 'bounds' returns each scheduler setting's legal min/max; call it before "
         "'update', because an out-of-range value is refused rather than clamped and an "
         "unknown key is refused rather than ignored. 'update' takes a partial dict of those "
-        "settings and takes effect without a restart. 'ical_token' returns the calendar feed "
-        "token and its subscribe path; 'rotate_ical_token' issues a new one and breaks every "
-        "client already subscribed. Everything but 'get'/'bounds' needs an admin-scope key."
+        "scheduler settings and takes effect without a restart. 'llm_update' takes a partial "
+        "dict of {provider: claude|openai|stub, model, api_key} for the assistant; a field "
+        'left out is unchanged, and "" clears that field back to its environment default — '
+        "also no restart. 'ical_token' returns the calendar feed token and its subscribe "
+        "path; 'rotate_ical_token' issues a new one and breaks every client already "
+        "subscribed. Everything but 'get'/'bounds' needs an admin-scope key."
     )
 )
 async def manage_settings(action: SettingsAction, settings: dict | None = None) -> str:

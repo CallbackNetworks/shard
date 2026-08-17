@@ -96,12 +96,77 @@ class TestSystemSettings:
     def test_settings_carry_no_credential(self, client, admin_key):
         body = client.get("/api/v1/settings", headers=_hdr(admin_key)).json()
         assert "smtp_configured" in body
-        assert not any("password" in k or "key" in k or "secret" in k for k in body)
+        assert "llm_api_key_configured" in body
+        assert isinstance(body["llm_api_key_configured"], bool)
+        # A "*_configured" boolean is the ADR-0063 presence flag, not the credential
+        # itself (same shape as smtp_configured) — everything else must stay clean.
+        suspect = {
+            k: v
+            for k, v in body.items()
+            if not k.endswith("_configured") and ("password" in k or "key" in k or "secret" in k)
+        }
+        assert not suspect
 
     def test_reading_is_read_scope_and_writing_is_admin(self, client, read_key):
         assert client.get("/api/v1/settings", headers=_hdr(read_key)).status_code == 200
         assert (
             client.put("/api/v1/settings/system", json={"summary_hour": 5}, headers=_hdr(read_key)).status_code == 403
+        )
+
+
+class TestLLMSettings:
+    def test_default_is_stub_and_unconfigured(self, client, admin_key, monkeypatch):
+        monkeypatch.delenv("LLM_PROVIDER", raising=False)
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        body = client.get("/api/v1/settings", headers=_hdr(admin_key)).json()
+        assert body["llm_provider"] == "stub"
+        assert body["llm_api_key_configured"] is False
+
+    def test_a_write_through_v1_is_visible_through_the_internal_door(self, client, admin_key):
+        resp = client.put(
+            "/api/v1/settings/llm",
+            json={"provider": "claude", "model": "claude-sonnet-4-6", "api_key": "sk-test"},
+            headers=_hdr(admin_key),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["llm_provider"] == "claude"
+        assert resp.json()["llm_api_key_configured"] is True
+        # And never the key itself, from either door.
+        assert "sk-test" not in resp.text
+
+        internal = client.get("/api/settings").json()
+        assert internal["llm_provider"] == "claude"
+        assert internal["llm_model"] == "claude-sonnet-4-6"
+        assert internal["llm_api_key_configured"] is True
+
+    def test_a_write_through_the_internal_door_is_visible_through_v1(self, client, admin_key):
+        client.put("/api/settings/llm", json={"provider": "openai", "api_key": "sk-internal"})
+        external = client.get("/api/v1/settings", headers=_hdr(admin_key)).json()
+        assert external["llm_provider"] == "openai"
+        assert external["llm_api_key_configured"] is True
+
+    def test_omitted_api_key_leaves_it_unchanged(self, client, admin_key):
+        client.put("/api/v1/settings/llm", json={"provider": "claude", "api_key": "sk-keep"}, headers=_hdr(admin_key))
+        resp = client.put("/api/v1/settings/llm", json={"model": "claude-opus-5"}, headers=_hdr(admin_key))
+        assert resp.json()["llm_api_key_configured"] is True
+        assert resp.json()["llm_model"] == "claude-opus-5"
+
+    def test_empty_string_clears_back_to_env_default(self, client, admin_key, monkeypatch):
+        monkeypatch.setenv("LLM_PROVIDER", "openai")
+        client.put("/api/v1/settings/llm", json={"provider": "claude"}, headers=_hdr(admin_key))
+        resp = client.put("/api/v1/settings/llm", json={"provider": ""}, headers=_hdr(admin_key))
+        assert resp.json()["llm_provider"] == "openai"
+
+    def test_an_unknown_provider_is_refused_identically(self, client, admin_key):
+        internal = client.put("/api/settings/llm", json={"provider": "bogus"})
+        external = client.put("/api/v1/settings/llm", json={"provider": "bogus"}, headers=_hdr(admin_key))
+        assert internal.status_code == external.status_code == 422
+        assert internal.json()["detail"] == external.json()["detail"]
+
+    def test_reading_is_read_scope_and_writing_is_admin(self, client, read_key):
+        assert client.get("/api/v1/settings", headers=_hdr(read_key)).status_code == 200
+        assert (
+            client.put("/api/v1/settings/llm", json={"provider": "claude"}, headers=_hdr(read_key)).status_code == 403
         )
 
 
