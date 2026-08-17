@@ -37,15 +37,11 @@ export default defineConfig({
         navigateFallbackAllowlist: [/^\//, /^\/share/],
         runtimeCaching: [
           {
-            // Workbox matches RegExp patterns against the full URL, so a
-            // path-anchored regex like /^\/api\//  never matches — use a
-            // matchCallback on the pathname instead.
+            // Authenticated API data is authoritative and user-specific. Never
+            // fall back to a stale service-worker response after a database
+            // change, restore, or transient network failure.
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
-            },
+            handler: 'NetworkOnly',
           },
         ],
       },
