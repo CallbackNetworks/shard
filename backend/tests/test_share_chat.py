@@ -6,13 +6,14 @@ when a PIN gate is unmet. These are asserted directly against the `system` promp
 recording fake provider receives — not inferred from what the model says back.
 """
 
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 
-from app.models import ShareChatLog
+from app.models import ApiKey, ShareChatLog
 from app.services import graph
 from app.services.rate_limiter import _share_chat_limiter, _share_limiter
 from tests.factories import make_project
@@ -162,3 +163,60 @@ class TestLoggingAndRateLimit:
                 assert _chat(client, sample_identity.share_token).status_code == 200
             # A different token is unaffected by the first one's limit.
             assert _chat(client, "a-different-share-token").status_code == 200
+
+
+class TestOwnerReadBothDoors:
+    """ADR-0099: share-chat-log gets a v1 (+ MCP) door, same rule as share-views."""
+
+    def _admin_key(self, db):
+        raw = "tdp_test_share_chat_admin"
+        db.add(
+            ApiKey(
+                name="share-chat-admin",
+                key=raw,
+                key_hash=hashlib.sha256(raw.encode()).hexdigest(),
+                key_last4=raw[-4:],
+                scopes=["read", "write", "admin"],
+                active=True,
+            )
+        )
+        db.commit()
+        return raw
+
+    def _read_key(self, db):
+        raw = "tdp_test_share_chat_read"
+        db.add(
+            ApiKey(
+                name="share-chat-read",
+                key=raw,
+                key_hash=hashlib.sha256(raw.encode()).hexdigest(),
+                key_last4=raw[-4:],
+                scopes=["read"],
+                active=True,
+            )
+        )
+        db.commit()
+        return raw
+
+    def test_both_doors_report_the_same_log(self, client, db, sample_identity, sample_project):
+        fake = _RecordingProvider(reply="the answer")
+        with patch("app.routers.share.get_provider", return_value=fake):
+            _chat(client, sample_identity.share_token, content="How's it going?")
+
+        key = self._read_key(db)
+        internal = client.get(f"/api/nodes/{sample_identity.id}/share-chat-log").json()
+        external = client.get(f"/api/v1/nodes/{sample_identity.id}/share-chat-log", headers={"X-API-Key": key}).json()
+        assert len(internal) == len(external) == 1
+        assert internal[0]["question"] == external[0]["question"] == "How's it going?"
+        assert "ip_hash" not in external[0]
+
+    def test_a_read_scope_key_is_enough(self, client, db, sample_identity, sample_project):
+        key = self._read_key(db)
+        resp = client.get(f"/api/v1/nodes/{sample_identity.id}/share-chat-log", headers={"X-API-Key": key})
+        assert resp.status_code == 200
+
+    def test_no_key_is_refused(self, client, sample_identity, sample_project):
+        # X-API-Key is a required header on every v1 route — FastAPI's own 422 for a
+        # missing required param, distinct from the 401 an invalid/inactive key gets.
+        resp = client.get(f"/api/v1/nodes/{sample_identity.id}/share-chat-log")
+        assert resp.status_code == 422

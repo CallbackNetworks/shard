@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import Edge, EdgeType, GraphEvent, Node, NodeType, ShareChatLog
+from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
 from app.schemas import (
     AncestryOut,
     ContainerSubtree,
@@ -423,13 +423,6 @@ def get_node_share_chat_log(
     db: Session = Depends(get_db),
 ):
     """What visitors asked the public read-only Q&A assistant on this node's share page
-    (ADR-0098). Never the ``ip_hash`` column — that exists only for the rate limiter and
-    abuse bookkeeping, not for display."""
-    return (
-        db.query(ShareChatLog)
-        .filter(ShareChatLog.node_id == node_id)
-        .order_by(ShareChatLog.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    (ADR-0098, ADR-0099). Never the ``ip_hash`` column — that exists only for the rate
+    limiter and abuse bookkeeping, not for display."""
+    return share_admin.chat_log(db, node_id, limit=limit, offset=offset)

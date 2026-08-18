@@ -20,7 +20,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import Node
+from app.models import Node, ShareChatLog
 from app.services import graph
 from app.services.activity import share_view_count
 from app.services.errors import Invalid, NotFound
@@ -83,3 +83,16 @@ def view_count(db: Session, node_id: str) -> dict:
     # Matches rows written under identity_id / project_id / node_id alike: retiring a route
     # must not retire its history (ADR-0073).
     return {"view_count": share_view_count(db, node_id)}
+
+
+def chat_log(db: Session, node_id: str, limit: int = 20, offset: int = 0) -> list[ShareChatLog]:
+    """What visitors asked the public read-only Q&A assistant on this node's share page
+    (ADR-0098, ADR-0099). One function for both doors, same rule as everything else here."""
+    return (
+        db.query(ShareChatLog)
+        .filter(ShareChatLog.node_id == node_id)
+        .order_by(ShareChatLog.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )

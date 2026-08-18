@@ -100,3 +100,4 @@
 | [0096](0096-the-assistants-provider-is-a-runtime-setting.md) | 助理要打哪個 provider 是一個執行期設定，不是一個部署決策 | Accepted | 2026-08-17 |
 | [0097](0097-provider-is-a-protocol-base-url-is-the-vendor.md) | provider 選的是協定，vendor 是 base_url 決定的 | Accepted | 2026-08-17 |
 | [0098](0098-the-public-assistant-only-knows-what-the-page-shows.md) | 公開的問答助理只能知道分享頁本來就顯示的東西 | Accepted | 2026-08-18 |
+| [0099](0099-a-share-chat-log-gets-its-own-agent-door.md) | share-chat-log 也要有 v1/MCP 的門 | Accepted | 2026-08-18 |

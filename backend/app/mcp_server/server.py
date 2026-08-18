@@ -41,7 +41,7 @@ CrudAction = Literal["create", "update", "delete"]
 CycleAction = Literal["list", "get", "compare", "duplicate"]
 RecurrenceAction = Literal["get", "create", "update", "delete"]
 TemplateAction = Literal["list", "create", "update", "delete"]
-ShareAction = Literal["rotate_token", "set_pin", "clear_pin", "set_expiry", "set_guest_notes", "views"]
+ShareAction = Literal["rotate_token", "set_pin", "clear_pin", "set_expiry", "set_guest_notes", "views", "chat_log"]
 NotificationAction = Literal["unread_count", "read", "read_all", "delete"]
 TransferAction = Literal["export", "import"]
 EmailAction = Literal["status", "send"]
@@ -753,6 +753,8 @@ async def _manage_share(action: str, node_id: str, config: dict | None = None) -
         result = await _post(f"{base}/set-guest-notes", {"allowed": bool(cfg["allowed"])})
     elif action == "views":
         result = await _get(f"/nodes/{node_id}/share-views")
+    elif action == "chat_log":
+        result = await _get(f"/nodes/{node_id}/share-chat-log")
     else:
         return f"Error: unknown action '{action}'"
     return json.dumps(result) if not isinstance(result, str) else result
@@ -1420,8 +1422,9 @@ async def manage_templates(
         "the token *is* the URL (ADR-0087). 'set_pin' takes config {pin: '1234'} and "
         "'clear_pin' removes it; 'set_expiry' takes {expires_at: ISO or null} where null "
         "means never; 'set_guest_notes' takes {allowed: bool} for whether visitors may "
-        "leave notes; 'views' reports how many times the page has been opened. The share "
-        "token itself is only returned to an admin key."
+        "leave notes; 'views' reports how many times the page has been opened; 'chat_log' "
+        "returns what visitors asked the page's read-only Q&A assistant (ADR-0098). The "
+        "share token itself is only returned to an admin key."
     )
 )
 async def manage_share(action: ShareAction, node_id: str, config: dict | None = None) -> str:

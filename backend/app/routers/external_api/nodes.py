@@ -33,6 +33,7 @@ from app.schemas import (
     NodeCreate,
     NodeOut,
     NodeUpdate,
+    ShareChatLogOut,
     TaskOut,
     WebhookEventOut,
 )
@@ -528,6 +529,30 @@ def api_get_share_views(node_id: str, db: Session = Depends(get_db), api_key: Ap
     _require_scope(api_key, "read")
     _load_shareable(node_id, db, api_key)
     return share_admin.view_count(db, node_id)
+
+
+@sub_router.get(
+    "/nodes/{node_id}/share-chat-log",
+    response_model=list[ShareChatLogOut],
+    summary="What visitors asked the public read-only Q&A assistant on this node's share page",
+    description=(
+        "The question/answer pairs logged by `POST /share/node/{token}/chat` (ADR-0098). "
+        "Never the `ip_hash` column — that exists only for the rate limiter, not for "
+        "display. Requires `read` scope, same as `share-views`: this describes what "
+        "happened on the public page, it does not hand out a credential."
+    ),
+    responses=_auth_errors,
+)
+def api_get_share_chat_log(
+    node_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    _load_shareable(node_id, db, api_key)
+    return share_admin.chat_log(db, node_id, limit=limit, offset=offset)
 
 
 # ── Inbound CI/CD callback credentials (ADR-0084) ─────────────────
