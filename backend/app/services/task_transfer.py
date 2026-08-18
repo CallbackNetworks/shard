@@ -58,10 +58,14 @@ def export_rows(db: Session, project_id: str) -> list[dict]:
             "status": t.status,
             "priority": t.priority,
             "assignee": t.assignee or "",
-            "due_date": t.due_date.isoformat() if t.due_date else "",
-            "start_date": t.start_date.isoformat() if t.start_date else "",
-            "time_estimate": t.time_estimate if t.time_estimate is not None else "",
-            "time_spent": t.time_spent if t.time_spent is not None else "",
+            # None, not "" (ADR-0102 fix): TaskImportItem types these as datetime|None /
+            # int|None, and "" is neither — the row `import` produced for the field
+            # `export` had just left blank could not be read back. csv.DictWriter already
+            # renders None as an empty cell on its own, so the CSV door is unaffected.
+            "due_date": t.due_date.isoformat() if t.due_date else None,
+            "start_date": t.start_date.isoformat() if t.start_date else None,
+            "time_estimate": t.time_estimate if t.time_estimate is not None else None,
+            "time_spent": t.time_spent if t.time_spent is not None else None,
         }
         for t in (graph.task_view(n, db) for n in task_nodes)
     ]

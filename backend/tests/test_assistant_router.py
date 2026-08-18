@@ -9,13 +9,16 @@ from app.models import AssistantConversation, AssistantMessage
 class _RecordingProvider:
     """Records exactly what it was called with; yields a canned reply + usage."""
 
-    def __init__(self, reply="a canned answer", usage=None):
+    def __init__(self, reply="a canned answer", usage=None, tool_call=None):
         self.reply = reply
         self.usage = usage
+        self.tool_call = tool_call  # {"name": ..., "input": {...}}
         self.calls: list[dict] = []
 
     async def chat(self, messages, tools, system=None):
         self.calls.append({"messages": messages, "tools": tools, "system": system})
+        if self.tool_call:
+            yield {"type": "tool_call", "name": self.tool_call["name"], "input": self.tool_call["input"], "id": "t1"}
         yield {"type": "text", "text": self.reply}
         if self.usage:
             yield {"type": "usage", **self.usage}
@@ -150,3 +153,34 @@ def test_send_message_without_usage_leaves_token_columns_null(client, db):
     )
     assert saved.input_tokens is None
     assert saved.output_tokens is None
+
+
+def test_send_message_dispatches_a_new_adr0102_tool_through_the_full_sse_loop(client, db):
+    """The SSE loop is generic over TOOLS/dispatch_tool — this proves a newly added
+    tool (not just the pre-existing ones) actually reaches dispatch_tool and its result
+    comes back through tool_result, not just that dispatch_tool works when called
+    directly (already covered by test_assistant_tools_v2.py)."""
+    from tests.factories import make_project, make_task
+
+    conv = AssistantConversation()
+    db.add(conv)
+    p = make_project(db, name="SSE Tool Project", status="active")
+    db.add(p)
+    db.flush()
+    t = make_task(db, project_id=p.id, title="SSE Tool Task")
+    db.add(t)
+    db.commit()
+    db.refresh(conv)
+
+    fake = _RecordingProvider(
+        reply="Added a comment.", tool_call={"name": "add_comment", "input": {"task_id": t.id, "body": "via SSE"}}
+    )
+    with patch("app.routers.assistant.get_provider", return_value=fake):
+        resp = client.post(f"/api/assistant/conversations/{conv.id}/messages", json={"content": "comment on it"})
+    assert resp.status_code == 200
+    assert "tool_result" in resp.text
+    assert "via SSE" in resp.text
+
+    from app.models import Comment
+
+    assert db.query(Comment).filter(Comment.task_id == t.id, Comment.body == "via SSE").count() == 1
