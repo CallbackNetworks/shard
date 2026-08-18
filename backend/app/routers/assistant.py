@@ -102,6 +102,7 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
     async def event_stream():
         assistant_text = []
         tool_calls_made = []
+        usage = None
 
         try:
             async for event in provider.chat(messages, TOOLS, SYSTEM_PROMPT):
@@ -125,6 +126,10 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
 
                     yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'result': result[:500]})}\n\n"
 
+                elif event["type"] == "usage":
+                    # Not forwarded over SSE — this is bookkeeping (ADR-0100), not a turn.
+                    usage = event
+
                 elif event["type"] == "done":
                     # Save assistant message
                     if assistant_text:
@@ -133,6 +138,8 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
                             role="assistant",
                             content="".join(assistant_text),
                             tool_calls=tool_calls_made if tool_calls_made else None,
+                            input_tokens=usage["input_tokens"] if usage else None,
+                            output_tokens=usage["output_tokens"] if usage else None,
                         )
                         db.add(msg)
                         db.commit()

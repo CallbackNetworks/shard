@@ -20,15 +20,18 @@ from tests.factories import make_project
 
 
 class _RecordingProvider:
-    """Records exactly what it was called with; yields a canned reply."""
+    """Records exactly what it was called with; yields a canned reply (+ usage)."""
 
-    def __init__(self, reply="a canned answer"):
+    def __init__(self, reply="a canned answer", usage=None):
         self.reply = reply
+        self.usage = usage
         self.calls: list[dict] = []
 
     async def chat(self, messages, tools, system=None):
         self.calls.append({"messages": messages, "tools": tools, "system": system})
         yield {"type": "text", "text": self.reply}
+        if self.usage:
+            yield {"type": "usage", **self.usage}
         yield {"type": "done"}
 
 
@@ -130,6 +133,24 @@ class TestLoggingAndRateLimit:
         assert len(rows) == 1
         assert rows[0].question == "How's it going?"
         assert rows[0].answer == "the project is on track"
+
+    def test_token_usage_is_persisted_when_the_provider_reports_it(self, client, db, sample_identity, sample_project):
+        fake = _RecordingProvider(reply="ok", usage={"input_tokens": 300, "output_tokens": 60})
+        with patch("app.routers.share.get_provider", return_value=fake):
+            _chat(client, sample_identity.share_token)
+
+        row = db.query(ShareChatLog).filter(ShareChatLog.node_id == sample_identity.id).one()
+        assert row.input_tokens == 300
+        assert row.output_tokens == 60
+
+    def test_no_usage_reported_leaves_token_columns_null_not_zero(self, client, db, sample_identity, sample_project):
+        fake = _RecordingProvider(reply="ok")
+        with patch("app.routers.share.get_provider", return_value=fake):
+            _chat(client, sample_identity.share_token)
+
+        row = db.query(ShareChatLog).filter(ShareChatLog.node_id == sample_identity.id).one()
+        assert row.input_tokens is None
+        assert row.output_tokens is None
 
     def test_the_owner_can_read_the_log_but_never_the_ip_hash(self, client, db, sample_identity, sample_project):
         fake = _RecordingProvider()

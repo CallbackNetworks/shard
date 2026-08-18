@@ -150,6 +150,15 @@ export default function LlmSettingsPanel({ settings }) {
         />
       </InfoRow>
 
+      <InfoRow label={t('settings.llmUsageTitle', { days: settings.llm_usage_window_days ?? 30 })}>
+        <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
+          {t('settings.llmUsageValue', {
+            input: (settings.llm_usage_input_tokens ?? 0).toLocaleString(),
+            output: (settings.llm_usage_output_tokens ?? 0).toLocaleString(),
+          })}
+        </span>
+      </InfoRow>
+
       {message && (
         <div style={{ fontSize: 12, marginTop: 8, color: message.type === 'error' ? DARK.danger : DARK.success }}>
           {message.text}

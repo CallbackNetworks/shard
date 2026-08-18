@@ -241,6 +241,11 @@ class AssistantMessage(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tool_calls: Mapped[list | None] = mapped_column(JSON, nullable=True)
     tool_call_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Token counts from the provider's own response (ADR-0100), null when the provider
+    # didn't report them (StubProvider, or a row written before this column existed) —
+    # never 0, which would misreport as "this reply cost nothing."
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     conversation: Mapped["AssistantConversation"] = relationship("AssistantConversation", back_populates="messages")
@@ -266,6 +271,9 @@ class ShareChatLog(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     ip_hash: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Same rule as AssistantMessage's columns (ADR-0100): null means unreported, not free.
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 

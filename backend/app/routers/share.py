@@ -715,9 +715,26 @@ class ShareChatRequest(BaseModel):
     messages: list[ShareChatMessage] = Field(..., min_length=1, max_length=20)
 
 
-def _log_share_chat(db: Session, *, node_id: str, question: str, answer: str, ip_hash: str) -> None:
+def _log_share_chat(
+    db: Session,
+    *,
+    node_id: str,
+    question: str,
+    answer: str,
+    ip_hash: str,
+    usage: dict | None = None,
+) -> None:
     try:
-        db.add(ShareChatLog(node_id=node_id, question=question, answer=answer, ip_hash=ip_hash))
+        db.add(
+            ShareChatLog(
+                node_id=node_id,
+                question=question,
+                answer=answer,
+                ip_hash=ip_hash,
+                input_tokens=usage["input_tokens"] if usage else None,
+                output_tokens=usage["output_tokens"] if usage else None,
+            )
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -746,6 +763,7 @@ async def share_chat(token: str, body: ShareChatRequest, request: Request, db: S
 
     async def event_stream():
         answer_text = []
+        usage = None
         try:
             async for event in provider.chat(messages, [], system):
                 if event["type"] == "error":
@@ -753,10 +771,17 @@ async def share_chat(token: str, body: ShareChatRequest, request: Request, db: S
                 elif event["type"] == "text":
                     answer_text.append(event["text"])
                     yield f"data: {json.dumps({'type': 'text', 'text': event['text']})}\n\n"
+                elif event["type"] == "usage":
+                    usage = event
                 elif event["type"] == "done":
                     if answer_text:
                         _log_share_chat(
-                            db, node_id=node_id, question=question, answer="".join(answer_text), ip_hash=ip_hash
+                            db,
+                            node_id=node_id,
+                            question=question,
+                            answer="".join(answer_text),
+                            ip_hash=ip_hash,
+                            usage=usage,
                         )
                     yield f"data: {json.dumps({'type': 'done'})}\n\n"
                     return

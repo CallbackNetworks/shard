@@ -22,11 +22,15 @@ OpenAI-compatible gateway, an internal proxy — is `provider="openai"` plus its
 """
 
 import os
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import UserPreference
+from app.models import AssistantMessage, ShareChatLog, UserPreference
 from app.services.errors import Unprocessable
+
+USAGE_WINDOW_DAYS = 30
 
 SETTINGS_KEY = "llm-settings"
 PROVIDERS = ("claude", "openai", "stub")
@@ -53,6 +57,38 @@ def get_effective_llm_config(db: Session) -> dict:
     }
 
 
+def usage_summary(db: Session, days: int = USAGE_WINDOW_DAYS) -> dict:
+    """Token counts, not cost (ADR-0100): no pricing table exists anywhere in this app,
+    and per-model $/token rates drift — a number this app made up would go stale
+    silently. Sums both the owner's own conversations (``AssistantMessage``) and the
+    public share assistant's exchanges (``ShareChatLog``), since both spend against the
+    same configured provider. A row with no usage recorded (``StubProvider``, or one
+    written before this column existed) contributes 0, not an error.
+    """
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    assistant_in, assistant_out = (
+        db.query(
+            func.coalesce(func.sum(AssistantMessage.input_tokens), 0),
+            func.coalesce(func.sum(AssistantMessage.output_tokens), 0),
+        )
+        .filter(AssistantMessage.created_at >= cutoff)
+        .first()
+    )
+    share_in, share_out = (
+        db.query(
+            func.coalesce(func.sum(ShareChatLog.input_tokens), 0),
+            func.coalesce(func.sum(ShareChatLog.output_tokens), 0),
+        )
+        .filter(ShareChatLog.created_at >= cutoff)
+        .first()
+    )
+    return {
+        "llm_usage_window_days": days,
+        "llm_usage_input_tokens": int(assistant_in) + int(share_in),
+        "llm_usage_output_tokens": int(assistant_out) + int(share_out),
+    }
+
+
 def read(db: Session) -> dict:
     """Effective provider/model/base_url plus whether a key is configured — never the key.
 
@@ -65,6 +101,7 @@ def read(db: Session) -> dict:
         "llm_model": config["model"],
         "llm_base_url": config["base_url"],
         "llm_api_key_configured": bool(config["api_key"]),
+        **usage_summary(db),
     }
 
 

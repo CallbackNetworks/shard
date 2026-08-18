@@ -742,6 +742,8 @@
   "settings.llmApiKeyClear": "Clear",
   "settings.llmApiKeyStatus": "API Key Status",
   "settings.llmSaved": "Assistant settings saved",
+  "settings.llmUsageTitle": "Token usage (last {{days}}d)",
+  "settings.llmUsageValue": "{{input}} in / {{output}} out",
   "settings.llmBaseUrl": "Base URL",
   "settings.llmBaseUrlHint": "Reach a compatible endpoint — Cloudflare AI Gateway, a self-hosted gateway — instead of the provider's default",
   "settings.llmBaseUrlPlaceholder": "Default endpoint",

@@ -32,6 +32,7 @@ class LLMProvider(ABC):
         Yield event dicts:
           {"type": "text", "text": "..."}
           {"type": "tool_call", "name": "...", "input": {...}, "id": "..."}
+          {"type": "usage", "input_tokens": int, "output_tokens": int}  # ADR-0100, not always yielded
           {"type": "done"}
         """
         ...
@@ -99,6 +100,12 @@ class ClaudeProvider(LLMProvider):
                         for block in msg.content:
                             if block.type == "tool_use":
                                 yield {"type": "tool_call", "name": block.name, "input": block.input, "id": block.id}
+                        if msg.usage:
+                            yield {
+                                "type": "usage",
+                                "input_tokens": msg.usage.input_tokens,
+                                "output_tokens": msg.usage.output_tokens,
+                            }
                         yield {"type": "done"}
                         return
 
@@ -138,10 +145,22 @@ class OpenAIProvider(LLMProvider):
             messages=formatted_messages,
             tools=formatted_tools if formatted_tools else None,
             stream=True,
+            stream_options={"include_usage": True},
         )
 
         tool_calls_acc = {}  # index -> {id, name, arguments_str}
+        usage_event = None
+        # No early `break` on finish_reason: with stream_options.include_usage, the
+        # usage-carrying chunk arrives *after* it, with choices=[] (so `delta` is None
+        # and the chunk falls through via `continue`, below) — breaking on finish_reason
+        # would exit before that chunk ever arrives. The stream ends on its own (ADR-0100).
         async for chunk in stream:
+            if chunk.usage:
+                usage_event = {
+                    "type": "usage",
+                    "input_tokens": chunk.usage.prompt_tokens,
+                    "output_tokens": chunk.usage.completion_tokens,
+                }
             delta = chunk.choices[0].delta if chunk.choices else None
             if not delta:
                 continue
@@ -158,8 +177,6 @@ class OpenAIProvider(LLMProvider):
                         tool_calls_acc[idx]["name"] = tc.function.name
                     if tc.function.arguments:
                         tool_calls_acc[idx]["arguments"] += tc.function.arguments
-            if chunk.choices[0].finish_reason:
-                break
 
         for idx in sorted(tool_calls_acc.keys()):
             tc = tool_calls_acc[idx]
@@ -169,6 +186,8 @@ class OpenAIProvider(LLMProvider):
                 inp = {}
             yield {"type": "tool_call", "name": tc["name"], "input": inp, "id": tc["id"]}
 
+        if usage_event:
+            yield usage_event
         yield {"type": "done"}
 
 

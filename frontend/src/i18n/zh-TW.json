@@ -746,6 +746,8 @@
   "settings.llmApiKeyClear": "清除",
   "settings.llmApiKeyStatus": "API 金鑰狀態",
   "settings.llmSaved": "助理設定已儲存",
+  "settings.llmUsageTitle": "Token 用量(近 {{days}} 天)",
+  "settings.llmUsageValue": "輸入 {{input}} / 輸出 {{output}}",
   "settings.llmBaseUrl": "Base URL",
   "settings.llmBaseUrlHint": "改打相容端點(例如 Cloudflare AI Gateway、自架 gateway),而不是該 provider 的預設位置",
   "settings.llmBaseUrlPlaceholder": "使用預設端點",
