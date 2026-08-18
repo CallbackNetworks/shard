@@ -25,4 +25,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# --workers 1, deliberately (ADR-0101): this is a single-user personal tool, so the
+# concurrency win from a second worker is marginal, and staying at 1 makes the
+# in-memory rate limiters in services/rate_limiter.py fully authoritative — no more
+# "get up to 2x the intended quota by luck of which worker answers your request."
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
