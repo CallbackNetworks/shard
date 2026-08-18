@@ -43,6 +43,10 @@ JUSTIFIED = {
     ("POST", "/share/node/{token}/verify"),
     ("POST", "/share/node/{token}/notes"),
     ("POST", "/share/node/{token}/tasks/{task_id}/notes"),
+    # Same reasoning again, for the public read-only Q&A assistant (ADR-0098): the token
+    # (+ PIN, checked before any provider call) is the credential. It answers only from
+    # what this same token already returns via the GET above — nothing wider is reachable.
+    ("POST", "/share/node/{token}/chat"),
     # A calendar client cannot log in either; the token in the path is the credential.
     ("GET", "/ical/node/{token}.ics"),
     ("GET", "/ical/all/{token}.ics"),

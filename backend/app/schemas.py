@@ -250,6 +250,15 @@ class WebhookEventOut(BaseModel):
     created_at: datetime
 
 
+class ShareChatLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    question: str
+    answer: str
+    created_at: datetime
+
+
 # --- Integration ---
 
 

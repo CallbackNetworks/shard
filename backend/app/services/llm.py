@@ -80,8 +80,9 @@ class ClaudeProvider(LLMProvider):
             "model": self.model,
             "max_tokens": 4096,
             "messages": messages,
-            "tools": formatted_tools,
         }
+        if formatted_tools:
+            kwargs["tools"] = formatted_tools
         if system:
             kwargs["system"] = system
 

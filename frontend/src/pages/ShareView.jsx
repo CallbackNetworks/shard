@@ -9,6 +9,7 @@ import ShareScrollNav, { SECTIONS } from '../components/share/ShareScrollNav'
 import ShareProjectCard from '../components/share/ShareProjectCard'
 import ShareActivityFeed from '../components/share/ShareActivityFeed'
 import SharePinGate from '../components/share/SharePinGate'
+import ShareChatWidget from '../components/share/ShareChatWidget'
 import ShareFooter from '../components/share/ShareFooter'
 import useBreakpoint from '../components/share/useBreakpoint'
 import EmptyState from '../components/shared/EmptyState'
@@ -138,6 +139,11 @@ export default function ShareView() {
               guestNotesEnabled={meta.guest_notes_enabled === true}
             />
           ))}
+        </div>
+
+        {/* Section: Ask (public read-only Q&A assistant, ADR-0098) */}
+        <div id="share-section-ask" style={{ paddingTop: 24 }}>
+          <ShareChatWidget token={token} />
         </div>
 
         {/* Section: Activity */}

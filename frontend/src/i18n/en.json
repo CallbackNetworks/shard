@@ -637,6 +637,8 @@
   "nodeShare.guestNotes": "Guest notes",
   "nodeShare.guestNotesHint": "Let visitors leave notes on the share page.",
   "nodeShare.views": "{{n}} share page views",
+  "nodeShare.chatLogTitle": "Visitor questions",
+  "nodeShare.chatLogEmpty": "No questions asked yet.",
   "graphTypes.usage": "{{n}} in use",
   "graphTypes.usageHint": "Types in use cannot be deleted",
   "graphTypes.roleContainment": "Containment",

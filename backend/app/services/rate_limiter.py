@@ -38,12 +38,27 @@ class RateLimiter:
 
 _share_limiter = RateLimiter(max_requests=60, window_seconds=60)
 _api_limiter = RateLimiter(max_requests=120, window_seconds=60)
+_share_chat_limiter = RateLimiter(max_requests=20, window_seconds=3600)
 
 
 async def share_rate_limit(request: Request):
     client_ip = request.client.host if request.client else "unknown"
     if not _share_limiter.check(client_ip):
         raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+
+
+def share_chat_rate_limit(token: str) -> None:
+    """20 questions per share token per hour.
+
+    Keyed by the token itself, not the caller's IP: the token is the scarce, gate-kept
+    resource an LLM call costs money against, and it must hold no matter which client
+    is asking (page widget or a direct API call — both are legitimate, ADR-0098).
+    Same trust level as ``share_rate_limit``: in-memory, per-process, so it is not
+    shared across the multiple uvicorn workers a production deploy runs and resets on
+    restart — a stopgap, not a hard cap.
+    """
+    if not _share_chat_limiter.check(token):
+        raise HTTPException(status_code=429, detail="Too many questions for this share link. Try again later.")
 
 
 async def api_rate_limit(request: Request):

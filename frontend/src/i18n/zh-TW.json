@@ -643,6 +643,8 @@
   "nodeShare.guestNotes": "訪客留言",
   "nodeShare.guestNotesHint": "允許造訪分享頁的人留下留言。",
   "nodeShare.views": "分享頁瀏覽 {{n}} 次",
+  "nodeShare.chatLogTitle": "訪客提問",
+  "nodeShare.chatLogEmpty": "還沒有人問過問題。",
   "graphTypes.usage": "{{n}} 個使用中",
   "graphTypes.usageHint": "使用中的型別無法刪除",
   "graphTypes.roleContainment": "包含",

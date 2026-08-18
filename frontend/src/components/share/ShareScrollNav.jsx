@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 const SECTIONS = [
   { key: 'overview', label: 'OVERVIEW' },
   { key: 'projects', label: 'PROJECTS' },
+  { key: 'ask', label: 'ASK' },
   { key: 'activity', label: 'ACTIVITY' },
 ]
 

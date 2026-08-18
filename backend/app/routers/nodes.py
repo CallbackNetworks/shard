@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
+from app.models import Edge, EdgeType, GraphEvent, Node, NodeType, ShareChatLog
 from app.schemas import (
     AncestryOut,
     ContainerSubtree,
@@ -26,6 +26,7 @@ from app.schemas import (
     NodeCreate,
     NodeOut,
     NodeUpdate,
+    ShareChatLogOut,
     TaskOut,
     WebhookEventOut,
 )
@@ -412,3 +413,23 @@ def get_node_webhook_events(
     """Build history for a node. Moved here from ``GET /webhook/events/{id}``, which sat
     under the auth-bypassed ``/webhook/`` prefix and was readable by anybody (ADR-0085)."""
     return webhook_credentials.build_history(db, webhook_credentials.load(db, node_id), limit=limit, offset=offset)
+
+
+@router.get("/{node_id}/share-chat-log", response_model=list[ShareChatLogOut])
+def get_node_share_chat_log(
+    node_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """What visitors asked the public read-only Q&A assistant on this node's share page
+    (ADR-0098). Never the ``ip_hash`` column — that exists only for the rate limiter and
+    abuse bookkeeping, not for display."""
+    return (
+        db.query(ShareChatLog)
+        .filter(ShareChatLog.node_id == node_id)
+        .order_by(ShareChatLog.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )

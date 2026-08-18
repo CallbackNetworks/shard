@@ -1,11 +1,14 @@
 import hashlib
 import hmac
+import json
 import logging
 import os
 import secrets
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -13,11 +16,13 @@ from app.database import get_db
 from app.models import (
     ActivityLog,
     Comment,
+    ShareChatLog,
 )
 from app.services import graph
 from app.services.activity import log_activity
+from app.services.llm import get_provider
 from app.services.pin_utils import check_pin
-from app.services.rate_limiter import share_rate_limit
+from app.services.rate_limiter import share_chat_rate_limit, share_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -685,3 +690,82 @@ def create_guest_task_note(
     in_scope = [pid for pid in project_ids if pid in set(member_ids)]
     note_project_id = in_scope[0] if in_scope else (member_ids[0] if member_ids else None)
     return _create_note(db, note_project_id, task.id, body, request)
+
+
+# ── Public Q&A assistant (ADR-0098) ─────────────────────────────────
+
+
+CHAT_SYSTEM_PROMPT = """You are answering questions from an anonymous visitor to a public,
+read-only share page for a personal task-tracking tool. You may only use the JSON data given
+to you below — it is exactly what this share link already displays. You have no other tools,
+cannot take any action (nothing you say changes anything), and know nothing about any other
+project, task, or person beyond what is in this JSON. If asked about anything outside it,
+say you don't have that information. Be concise. Respond in the same language the visitor uses.
+
+SHARE DATA:
+"""
+
+
+class ShareChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
+class ShareChatRequest(BaseModel):
+    messages: list[ShareChatMessage] = Field(..., min_length=1, max_length=20)
+
+
+def _log_share_chat(db: Session, *, node_id: str, question: str, answer: str, ip_hash: str) -> None:
+    try:
+        db.add(ShareChatLog(node_id=node_id, question=question, answer=answer, ip_hash=ip_hash))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
+@router.post("/node/{token}/chat", dependencies=[Depends(share_rate_limit), Depends(share_chat_rate_limit)])
+async def share_chat(token: str, body: ShareChatRequest, request: Request, db: Session = Depends(get_db)):
+    """Answer a visitor's question using nothing but the same data ``GET /share/node/{token}``
+    already returns them (ADR-0098). No tools, no dispatch: the payload this call injects
+    into the system prompt *is* ``get_share_node``'s own return value, so there is exactly
+    one place — this function call — where "what can the assistant know" is decided, and it
+    is the same answer as "what does the page already show."
+
+    Reachable directly by API, not only through the page's widget, same as every other
+    ``/share/*`` endpoint (token [+ PIN] is the credential, not the calling client)."""
+    payload = get_share_node(token, request, db)
+    if payload.get("meta", {}).get("requires_pin"):
+        raise HTTPException(status_code=403, detail="PIN verification required")
+    node_id = payload["identity"]["id"]
+
+    system = CHAT_SYSTEM_PROMPT + json.dumps(payload)
+    messages = [m.model_dump() for m in body.messages]
+    provider = get_provider(db)
+    question = body.messages[-1].content
+    ip_hash = _hash_ip(request.client.host if request.client else "unknown")
+
+    async def event_stream():
+        answer_text = []
+        try:
+            async for event in provider.chat(messages, [], system):
+                if event["type"] == "error":
+                    yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
+                elif event["type"] == "text":
+                    answer_text.append(event["text"])
+                    yield f"data: {json.dumps({'type': 'text', 'text': event['text']})}\n\n"
+                elif event["type"] == "done":
+                    if answer_text:
+                        _log_share_chat(
+                            db, node_id=node_id, question=question, answer="".join(answer_text), ip_hash=ip_hash
+                        )
+                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                    return
+        except Exception as exc:
+            logger.error("Share chat streaming error: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

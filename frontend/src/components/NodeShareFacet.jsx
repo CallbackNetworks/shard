@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Share2, RefreshCw, Copy, Check, Rss, Lock, Clock, MessageSquare, Eye } from 'lucide-react'
+import { Share2, RefreshCw, Copy, Check, Rss, Lock, Clock, MessageSquare, Eye, Bot, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   rotateNodeShareToken, setNodeSharePin, clearNodeSharePin, setNodeShareExpiry,
-  setNodeGuestNotes, getNodeShareViews,
+  setNodeGuestNotes, getNodeShareViews, getNodeShareChatLog,
 } from '../api/client'
 import { DARK } from '../constants/theme'
 
@@ -43,6 +43,7 @@ export default function NodeShareFacet({ node, subscribable, invalidateKeys }) {
   const qc = useQueryClient()
   const [copied, setCopied] = useState(null)
   const [pinInput, setPinInput] = useState('')
+  const [chatLogOpen, setChatLogOpen] = useState(false)
   const { token, pinSet, expiresAt, guestNotes } = shareState(node)
   const [expiryInput, setExpiryInput] = useState(toLocalInput(expiresAt))
 
@@ -76,6 +77,12 @@ export default function NodeShareFacet({ node, subscribable, invalidateKeys }) {
     queryKey: ['node-share-views', node.id],
     queryFn: () => getNodeShareViews(node.id),
     enabled: !!token,
+  })
+
+  const { data: chatLog } = useQuery({
+    queryKey: ['node-share-chat-log', node.id],
+    queryFn: () => getNodeShareChatLog(node.id),
+    enabled: !!token && chatLogOpen,
   })
 
   const copy = (value, key) => {
@@ -212,6 +219,35 @@ export default function NodeShareFacet({ node, subscribable, invalidateKeys }) {
               <Eye size={12} color={DARK.textDim} />
               {t('nodeShare.views', { n: views?.view_count ?? 0 })}
             </span>
+          </div>
+
+          {/* Visitor Q&A log (ADR-0098) */}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${DARK.border}` }}>
+            <button
+              type="button"
+              onClick={() => setChatLogOpen(v => !v)}
+              style={{ ...subLabel, cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+            >
+              <Bot size={12} color={DARK.textDim} />
+              {t('nodeShare.chatLogTitle')}
+              {chatLogOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {chatLogOpen && (
+              <div style={{ marginTop: 8 }}>
+                {chatLog?.length === 0 && (
+                  <div style={{ fontSize: 11, color: DARK.textDim }}>{t('nodeShare.chatLogEmpty')}</div>
+                )}
+                {chatLog?.map(entry => (
+                  <div key={entry.id} style={{ marginBottom: 10, fontSize: 12 }}>
+                    <div style={{ color: DARK.text, fontWeight: 600 }}>{entry.question}</div>
+                    <div style={{ color: DARK.textDim, marginTop: 2 }}>{entry.answer}</div>
+                    <div style={{ color: DARK.textDim, fontSize: 10, marginTop: 2 }}>
+                      {new Date(entry.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

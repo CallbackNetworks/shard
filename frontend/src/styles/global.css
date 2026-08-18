@@ -985,6 +985,63 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   color: var(--kt-hit);
   font-size: 11px;
 }
+.kt-share-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+.kt-share-chat-msg {
+  align-self: flex-start;
+  max-width: 80%;
+  padding: 8px 10px;
+  border-left: 2px solid rgba(var(--kt-ink-rgb), 0.12);
+  background: rgba(var(--kt-ink-rgb), 0.02);
+  color: rgba(var(--kt-ink-rgb), 0.65);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.kt-share-chat-msg.is-user {
+  align-self: flex-end;
+  border-left: none;
+  border-right: 2px solid color-mix(in srgb, var(--share-accent, #818cf8) 55%, transparent);
+  background: rgba(var(--kt-ink-rgb), 0.04);
+  color: rgba(var(--kt-ink-rgb), 0.8);
+}
+.kt-share-chat-msg.is-pending {
+  color: rgba(var(--kt-ink-rgb), 0.4);
+  font-style: italic;
+}
+.kt-share-chat-form {
+  display: flex;
+  gap: 6px;
+}
+.kt-share-chat-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  color: rgba(var(--kt-ink-rgb), 0.75);
+  font-size: 12px;
+}
+.kt-share-chat-form button {
+  padding: 5px 12px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  background: rgba(var(--kt-ink-rgb), 0.05);
+  color: rgba(var(--kt-ink-rgb), 0.6);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+}
+.kt-share-chat-form button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
 .kt-share-show-more {
   width: 100%;
   min-height: 32px;

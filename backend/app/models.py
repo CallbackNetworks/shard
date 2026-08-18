@@ -246,6 +246,29 @@ class AssistantMessage(Base):
     conversation: Mapped["AssistantConversation"] = relationship("AssistantConversation", back_populates="messages")
 
 
+class ShareChatLog(Base):
+    """One exchange with the public read-only Q&A assistant on a share page (ADR-0098).
+
+    Deliberately not a row in ``AssistantConversation``/``AssistantMessage``: those model
+    a stateful, owner-identified conversation thread, and an anonymous visitor's one-off
+    exchange shares no real invariant with that besides "involves an LLM" — mixing them
+    would mean every owner-facing conversation query needs a permanent filter. A flat log
+    matches this app's existing shape for this kind of thing (``ActivityLog``,
+    ``WebhookDelivery``): one row per event, queried by the node it happened on.
+    """
+
+    __tablename__ = "share_chat_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    node_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    ip_hash: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
 class Attachment(Base):
     """File attached to a task."""
 

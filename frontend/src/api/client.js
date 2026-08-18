@@ -424,6 +424,37 @@ export const postShareProjectNote = (token, payload) =>
   axios.post(`/share/node/${token}/notes`, payload, { withCredentials: true }).then(r => r.data)
 export const postShareTaskNote = (token, taskId, payload) =>
   axios.post(`/share/node/${token}/tasks/${taskId}/notes`, payload, { withCredentials: true }).then(r => r.data)
+// Public read-only Q&A assistant (ADR-0098). Plain fetch, not axios: SSE needs the raw
+// response body stream. `credentials: 'include'` carries the PIN session cookie, same as
+// the rest of this door; no Authorization header — the token (+ PIN) is the credential.
+export async function streamShareChatMessage(token, messages, onEvent) {
+  const resp = await fetch(`/share/node/${token}/chat`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+  })
+  if (!resp.ok || !resp.body) {
+    const detail = await resp.json().catch(() => null)
+    throw new Error(detail?.detail || `Share chat request failed (${resp.status})`)
+  }
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        onEvent(JSON.parse(line.slice(6)))
+      } catch { /* a partial frame is not an error worth aborting the stream for */ }
+    }
+  }
+}
 // Identity and project share controls are the generic node ones below — there is no
 // entity-shaped copy of any of them (ADR-0070, ADR-0073).
 
@@ -441,6 +472,8 @@ export const clearNodeSharePin = (id) => api.delete(`/nodes/${id}/share/pin`).th
 export const setNodeShareExpiry = (id, expires_at) => api.post(`/nodes/${id}/share/set-expiry`, { expires_at }).then(r => r.data)
 export const setNodeGuestNotes = (id, allowed) => api.post(`/nodes/${id}/share/set-guest-notes`, { allowed }).then(r => r.data)
 export const getNodeShareViews = (id) => api.get(`/nodes/${id}/share-views`).then(r => r.data)
+// What visitors asked the public read-only Q&A assistant on this node's share page (ADR-0098).
+export const getNodeShareChatLog = (id) => api.get(`/nodes/${id}/share-chat-log`).then(r => r.data)
 // Which data keys belong to a feature rather than the user (ADR-0074). Served, not
 // mirrored here — a second copy of a vocabulary is exactly what ADR-0056/0058 cost.
 export const getManagedDataKeys = () => api.get('/graph-types/data-keys/managed').then(r => r.data)
