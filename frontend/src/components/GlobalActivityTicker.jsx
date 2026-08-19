@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
@@ -13,6 +13,15 @@ const FALLBACK_ITEMS = [
   'DECISIONS LOG',
   'GOALS LIVE',
 ]
+
+// A fixed animation-duration makes the scroll speed a function of how much
+// activity there is: more items (or longer labels) means the same distance
+// covers more content in the same time, so the strip visibly speeds up as
+// the feed grows. Pin px/sec instead and derive the duration from the
+// measured track width so a busy feed reads at the same pace as a quiet one.
+const TICKER_PX_PER_SECOND = 55
+const TICKER_MIN_DURATION = 24
+const TICKER_MAX_DURATION = 240
 
 function eventLabel(entry) {
   if (!entry) return null
@@ -155,6 +164,25 @@ export default function GlobalActivityTicker() {
   const chart = useMemo(() => buildActivityHeat(activities), [activities])
   const spark = useMemo(() => sparkPaths(chart.cells), [chart.cells])
 
+  const tickerTrackRef = useRef(null)
+  const [tickerDuration, setTickerDuration] = useState(TICKER_MIN_DURATION)
+  const tickerContentKey = tickerItems.join('|')
+
+  useEffect(() => {
+    const el = tickerTrackRef.current
+    if (!el) return
+    const measure = () => {
+      const loopWidth = el.scrollWidth / 2
+      if (!loopWidth) return
+      const seconds = loopWidth / TICKER_PX_PER_SECOND
+      setTickerDuration(Math.min(TICKER_MAX_DURATION, Math.max(TICKER_MIN_DURATION, seconds)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [tickerContentKey])
+
   return (
     <>
       <div className="kt-notice-stack">
@@ -171,7 +199,11 @@ export default function GlobalActivityTicker() {
           </div>
         )}
         <div className="kt-ticker" aria-label="Recent activity">
-          <div className="kt-ticker-track">
+          <div
+            className="kt-ticker-track"
+            ref={tickerTrackRef}
+            style={{ animationDuration: `${tickerDuration}s` }}
+          >
             {loopItems.map((item, index) => (
               <span key={`${item}-${index}`}>{item}</span>
             ))}
