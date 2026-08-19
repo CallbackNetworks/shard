@@ -110,8 +110,9 @@ def _verify_model(provider: str, model: str, api_key: str, base_url: str) -> dic
 
     Never raises and never blocks the save: a gateway that does not implement
     ``/models``, a transient network failure, or the SDK package simply not being
-    installed (ADR-0096: ``anthropic``/``openai`` are opt-in, not in requirements.txt
-    by default) are all facts about the world, not a contradiction in the request —
+    installed (``anthropic`` is still opt-in, not in requirements.txt by default —
+    ADR-0103 made ``openai`` a real dependency, but a deployment can still be missing
+    the other one) are all facts about the world, not a contradiction in the request —
     the ADR-0055 distinction between a 422 and a warning applies here too. ``checked``
     is False whenever no verdict could be reached at all; ``ok`` is only meaningful
     when ``checked`` is True.

@@ -18,3 +18,10 @@ ruff==0.8.6
 # long-running dev container kept working. We are now *on* 2.0, deliberately,
 # via `MCPServer` (ADR-0077); the pin still matters for the same reason.
 mcp==2.0.0
+# OpenAI SDK for the assistant's "openai" protocol provider (ADR-0096/0097/0103) — the
+# protocol most third-party gateways (Cloudflare AI Gateway, opencode's zen, most
+# self-hosted OpenAI-compatible endpoints) speak. No longer opt-in like the ADR-0096
+# comments elsewhere still say: picking provider="openai" in Settings is reachable from
+# the UI with no signal that a package install was also required, so it has to just work.
+# `anthropic` stays opt-in — add it here too if you configure provider="claude".
+openai==3.3.0

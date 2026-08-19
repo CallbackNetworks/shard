@@ -39,22 +39,30 @@ class LLMProvider(ABC):
 
 
 class StubProvider(LLMProvider):
-    """The no-provider case. It reports a *configuration* problem, not an answer.
+    """The no-provider (or misconfigured-provider) case. It reports a *configuration*
+    problem, not an answer.
 
     This used to yield the notice as a `text` event, so the router persisted
     "LLM provider not configured..." into the conversation as something the
     assistant had said — a deployment detail became permanent chat history, and
     it stayed there after the provider was configured (ADR-0089).
+
+    Also stands in when `ClaudeProvider`/`OpenAIProvider` construction itself fails
+    (ADR-0103) — `get_provider` catches that and hands back a `StubProvider` with the
+    real reason as `message`, rather than letting the exception reach the route
+    handler: `get_provider(db)` runs before `event_stream()`'s try/except in both
+    callers (`routers/assistant.py`, `routers/share.py`), so an uncaught exception
+    there was a 500, not the graceful SSE error every other failure mode gets.
     """
 
+    def __init__(self, message: str | None = None):
+        self.message = message or (
+            "No LLM provider is configured. Set it in Settings, or via the "
+            "LLM_PROVIDER (claude|openai)/LLM_API_KEY/LLM_MODEL env vars."
+        )
+
     async def chat(self, messages, tools, system=None):
-        yield {
-            "type": "error",
-            "message": (
-                "No LLM provider is configured. Set it in Settings, or via the "
-                "LLM_PROVIDER (claude|openai)/LLM_API_KEY/LLM_MODEL env vars."
-            ),
-        }
+        yield {"type": "error", "message": self.message}
         yield {"type": "done"}
 
 
@@ -192,9 +200,17 @@ class OpenAIProvider(LLMProvider):
 
 
 def get_provider(db: Session) -> LLMProvider:
+    """Never raises (ADR-0103): a provider whose SDK package isn't installed degrades to
+    a `StubProvider` carrying the real reason, the same shape as "not configured" —
+    both callers only have graceful-error handling *inside* their SSE loop, not around
+    this call.
+    """
     config = llm_settings.get_effective_llm_config(db)
-    if config["provider"] == "claude":
-        return ClaudeProvider(api_key=config["api_key"], model=config["model"], base_url=config["base_url"])
-    elif config["provider"] == "openai":
-        return OpenAIProvider(api_key=config["api_key"], model=config["model"], base_url=config["base_url"])
+    try:
+        if config["provider"] == "claude":
+            return ClaudeProvider(api_key=config["api_key"], model=config["model"], base_url=config["base_url"])
+        elif config["provider"] == "openai":
+            return OpenAIProvider(api_key=config["api_key"], model=config["model"], base_url=config["base_url"])
+    except RuntimeError as exc:
+        return StubProvider(message=str(exc))
     return StubProvider()

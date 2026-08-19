@@ -241,3 +241,16 @@ class TestOwnerReadBothDoors:
         # missing required param, distinct from the 401 an invalid/inactive key gets.
         resp = client.get(f"/api/v1/nodes/{sample_identity.id}/share-chat-log")
         assert resp.status_code == 422
+
+
+class TestMissingProviderPackage:
+    def test_a_missing_sdk_package_is_a_graceful_200_not_a_500(self, client, db, sample_identity, sample_project):
+        """ADR-0103, same bug as the internal assistant's: get_provider(db) ran before
+        this endpoint's own try/except too."""
+        from app.services import llm_settings
+
+        llm_settings.update(db, {"provider": "openai", "api_key": "sk-test"})
+        with patch.dict("sys.modules", {"openai": None}):
+            resp = _chat(client, sample_identity.share_token)
+        assert resp.status_code == 200
+        assert "openai package not installed" in resp.text

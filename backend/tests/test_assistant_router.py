@@ -184,3 +184,29 @@ def test_send_message_dispatches_a_new_adr0102_tool_through_the_full_sse_loop(cl
     from app.models import Comment
 
     assert db.query(Comment).filter(Comment.task_id == t.id, Comment.body == "via SSE").count() == 1
+
+
+def test_a_provider_missing_its_sdk_package_is_a_graceful_200_not_a_500(client, db):
+    """ADR-0103, exercised through the real endpoint with the real get_provider() — not
+    a mock — since that's exactly the layer the original bug lived in: get_provider(db)
+    ran before event_stream()'s try/except, so an uncaught RuntimeError from a missing
+    package was an unhandled 500, not the SSE error every other failure mode gets."""
+    from app.services import llm_settings
+
+    conv = AssistantConversation()
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+
+    llm_settings.update(db, {"provider": "openai", "api_key": "sk-test"})
+    with patch.dict("sys.modules", {"openai": None}):
+        resp = client.post(f"/api/assistant/conversations/{conv.id}/messages", json={"content": "hi"})
+
+    assert resp.status_code == 200
+    assert "openai package not installed" in resp.text
+    assert (
+        db.query(AssistantMessage)
+        .filter(AssistantMessage.conversation_id == conv.id, AssistantMessage.role == "assistant")
+        .count()
+        == 0
+    )

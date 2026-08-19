@@ -67,6 +67,30 @@ def test_get_provider_falls_back_to_env_when_no_override(db):
             mock_openai.AsyncOpenAI.assert_called_with(api_key="env-key", base_url=None)
 
 
+def test_get_provider_degrades_gracefully_when_the_sdk_package_is_missing(db):
+    """ADR-0103: get_provider() must never raise — ClaudeProvider/OpenAIProvider's
+    ImportError-wrapping RuntimeError used to reach the caller uncaught, and both
+    routers call get_provider() *before* their SSE loop's try/except, so this was a
+    500, not the graceful "not configured" error every other failure mode gets."""
+    from app.services.llm import StubProvider, get_provider
+
+    with patch.dict("os.environ", {"LLM_PROVIDER": "openai", "LLM_API_KEY": "test-key"}, clear=False):
+        with patch.dict("sys.modules", {"openai": None}):
+            provider = get_provider(db)
+            assert isinstance(provider, StubProvider)
+            assert "openai package not installed" in provider.message
+
+
+def test_get_provider_degrades_gracefully_for_claude_too(db):
+    from app.services.llm import StubProvider, get_provider
+
+    with patch.dict("os.environ", {"LLM_PROVIDER": "claude", "LLM_API_KEY": "test-key"}, clear=False):
+        with patch.dict("sys.modules", {"anthropic": None}):
+            provider = get_provider(db)
+            assert isinstance(provider, StubProvider)
+            assert "anthropic package not installed" in provider.message
+
+
 def test_get_provider_passes_base_url_through(db):
     """A Cloudflare AI Gateway / self-hosted OpenAI-compatible endpoint is reached with
     the same provider="openai" and a custom base_url, no new provider class (ADR-0097)."""
