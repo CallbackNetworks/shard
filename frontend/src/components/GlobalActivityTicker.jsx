@@ -15,13 +15,38 @@ const FALLBACK_ITEMS = [
 ]
 
 // A fixed animation-duration makes the scroll speed a function of how much
-// activity there is: more items (or longer labels) means the same distance
-// covers more content in the same time, so the strip visibly speeds up as
-// the feed grows. Pin px/sec instead and derive the duration from the
-// measured track width so a busy feed reads at the same pace as a quiet one.
+// content there is: more items (or longer labels) means the same distance
+// covers more content in the same time, so a track visibly speeds up as its
+// feed grows. Pin px/sec instead and derive the duration from the measured
+// track width so a busy feed reads at the same pace as a quiet one.
 const TICKER_PX_PER_SECOND = 55
 const TICKER_MIN_DURATION = 24
 const TICKER_MAX_DURATION = 240
+const ALERT_PX_PER_SECOND = 42
+const ALERT_MIN_DURATION = 14
+const ALERT_MAX_DURATION = 60
+
+function useTickerPace(contentKey, { pxPerSecond, minDuration, maxDuration }) {
+  const trackRef = useRef(null)
+  const [duration, setDuration] = useState(minDuration)
+
+  useEffect(() => {
+    const el = trackRef.current
+    if (!el) return
+    const measure = () => {
+      const loopWidth = el.scrollWidth / 2
+      if (!loopWidth) return
+      const seconds = loopWidth / pxPerSecond
+      setDuration(Math.min(maxDuration, Math.max(minDuration, seconds)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [contentKey, pxPerSecond, minDuration, maxDuration])
+
+  return [trackRef, duration]
+}
 
 function eventLabel(entry) {
   if (!entry) return null
@@ -164,33 +189,35 @@ export default function GlobalActivityTicker() {
   const chart = useMemo(() => buildActivityHeat(activities), [activities])
   const spark = useMemo(() => sparkPaths(chart.cells), [chart.cells])
 
-  const tickerTrackRef = useRef(null)
-  const [tickerDuration, setTickerDuration] = useState(TICKER_MIN_DURATION)
-  const tickerContentKey = tickerItems.join('|')
+  const [tickerTrackRef, tickerDuration] = useTickerPace(tickerItems.join('|'), {
+    pxPerSecond: TICKER_PX_PER_SECOND,
+    minDuration: TICKER_MIN_DURATION,
+    maxDuration: TICKER_MAX_DURATION,
+  })
 
-  useEffect(() => {
-    const el = tickerTrackRef.current
-    if (!el) return
-    const measure = () => {
-      const loopWidth = el.scrollWidth / 2
-      if (!loopWidth) return
-      const seconds = loopWidth / TICKER_PX_PER_SECOND
-      setTickerDuration(Math.min(TICKER_MAX_DURATION, Math.max(TICKER_MIN_DURATION, seconds)))
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [tickerContentKey])
+  const loopAlerts = alerts.length > 0 ? [...alerts, ...alerts] : []
+  const [alertTrackRef, alertDuration] = useTickerPace(alerts.join('|'), {
+    pxPerSecond: ALERT_PX_PER_SECOND,
+    minDuration: ALERT_MIN_DURATION,
+    maxDuration: ALERT_MAX_DURATION,
+  })
 
   return (
     <>
       <div className="kt-notice-stack">
         {alerts.length > 0 && (
-          <div className="kt-alert-strip" role="status" aria-live="polite">
-            <div className="kt-alert-strip-list">
-              {alerts.map(alert => (
-                <span key={alert}>
+          <div className="kt-alert-strip" aria-label="Alerts">
+            <span className="kt-sr-only" role="status" aria-live="polite">
+              {alerts.join(' · ')}
+            </span>
+            <div
+              className="kt-alert-strip-track"
+              aria-hidden="true"
+              ref={alertTrackRef}
+              style={{ animationDuration: `${alertDuration}s` }}
+            >
+              {loopAlerts.map((alert, index) => (
+                <span key={`${alert}-${index}`}>
                   <AlertTriangle size={13} />
                   {alert}
                 </span>

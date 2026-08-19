@@ -2503,23 +2503,47 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
-/* Static, not a marquee: at most three counters, and they fit. */
-.kt-alert-strip-list {
+.kt-alert-strip::before,
+.kt-alert-strip::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 32px;
+  z-index: 1;
+  pointer-events: none;
+}
+.kt-alert-strip::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--kt-bg), transparent);
+}
+.kt-alert-strip::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--kt-bg), transparent);
+}
+/* Content is duplicated for a seamless loop and marked aria-hidden; the
+   single-pass announcement lives in a separate .kt-sr-only live region so
+   the loop doesn't get read out once per repeat (see ADR-0088). */
+.kt-alert-strip-track {
   display: flex;
   align-items: center;
   gap: 26px;
+  width: max-content;
   height: 100%;
   padding: 0 14px;
-  overflow: hidden;
   white-space: nowrap;
+  animation-name: kineticTicker;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-duration: 40s;
 }
-.kt-alert-strip-list span {
+.kt-alert-strip-track span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   opacity: 0.85;
 }
-.kt-alert-strip-list span::after {
+.kt-alert-strip-track span::after {
   content: '';
   width: 3px;
   height: 3px;
@@ -3831,7 +3855,8 @@ select[style*="border-radius"],
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
   }
-  :root:not([data-motion="full"]) .kt-ticker-track {
+  :root:not([data-motion="full"]) .kt-ticker-track,
+  :root:not([data-motion="full"]) .kt-alert-strip-track {
     animation: none !important;
   }
   :root:not([data-motion="full"]) .kt-route-shell {
@@ -3849,6 +3874,7 @@ select[style*="border-radius"],
   transition-duration: 0.001ms !important;
 }
 :root[data-motion="reduced"] .kt-ticker-track,
+:root[data-motion="reduced"] .kt-alert-strip-track,
 :root[data-motion="reduced"] .kt-route-shell {
   animation: none !important;
 }
@@ -3961,14 +3987,6 @@ select[style*="border-radius"],
   .kt-mini-drawer {
     left: var(--rail-w);
     width: min(300px, calc(100vw - var(--rail-w)));
-  }
-  /* Three counters do not always fit 390px; scroll them rather than clip. */
-  .kt-alert-strip-list {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .kt-alert-strip-list::-webkit-scrollbar {
-    display: none;
   }
   .layout-main {
     margin-left: 0 !important;
