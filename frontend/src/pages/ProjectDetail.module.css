@@ -432,11 +432,13 @@
   background: var(--kt-bg);
 }
 
-/* ── Floating Quick-Add button ── */
+/* ── Floating Quick-Add button ──
+   Stacked above the assistant FAB (bottom:20/right:20/44px, AssistantPanel.jsx)
+   so the two floating buttons don't overlap. */
 .fab {
   position: fixed;
-  bottom: 28px;
-  right: 28px;
+  bottom: 76px;
+  right: 20px;
   width: 48px;
   height: 48px;
   border-radius: 0;
