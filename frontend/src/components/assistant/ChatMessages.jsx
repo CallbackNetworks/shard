@@ -79,11 +79,16 @@ export function StreamingMessage({ events, maxWidth = '70%' }) {
   const toolStarts = events.filter(e => e.type === 'tool_start')
   const toolResults = events.filter(e => e.type === 'tool_result')
   const error = events.find(e => e.type === 'error')
+  // A tool result is never the last thing the assistant says (ADR-0104: it always
+  // gets fed back for another round) — if it's the most recent event, the next
+  // round is in flight and there's nothing else to show yet but this.
+  const awaitingNextRound = events.length > 0 && events[events.length - 1].type === 'tool_result'
   return (
     <div style={{ marginBottom: 14 }}>
       {toolStarts.map((ts, i) => (
         <ToolBlock key={i} name={ts.name} result={toolResults.find(tr => tr.name === ts.name)?.result} />
       ))}
+      {awaitingNextRound && <ThinkingRow />}
       {text && (
         <div style={{
           maxWidth, padding: '10px 14px', fontSize: 13, lineHeight: 1.6,
