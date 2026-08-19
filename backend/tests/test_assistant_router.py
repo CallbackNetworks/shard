@@ -7,7 +7,13 @@ from app.models import AssistantConversation, AssistantMessage
 
 
 class _RecordingProvider:
-    """Records exactly what it was called with; yields a canned reply + usage."""
+    """Records exactly what it was called with; yields a canned reply + usage.
+
+    A tool call is only offered on the *first* call, mirroring real Claude/OpenAI
+    behavior: a response with a tool call never carries trailing text in the same
+    turn (ADR-0104) — the router must call `chat()` again with the tool's result
+    before any text appears. Every call after the first yields the text reply.
+    """
 
     def __init__(self, reply="a canned answer", usage=None, tool_call=None):
         self.reply = reply
@@ -17,8 +23,10 @@ class _RecordingProvider:
 
     async def chat(self, messages, tools, system=None):
         self.calls.append({"messages": messages, "tools": tools, "system": system})
-        if self.tool_call:
+        if self.tool_call and len(self.calls) == 1:
             yield {"type": "tool_call", "name": self.tool_call["name"], "input": self.tool_call["input"], "id": "t1"}
+            yield {"type": "done"}
+            return
         yield {"type": "text", "text": self.reply}
         if self.usage:
             yield {"type": "usage", **self.usage}
@@ -180,10 +188,86 @@ def test_send_message_dispatches_a_new_adr0102_tool_through_the_full_sse_loop(cl
     assert resp.status_code == 200
     assert "tool_result" in resp.text
     assert "via SSE" in resp.text
+    assert len(fake.calls) == 2  # round 1: tool call, round 2: fed the result, replies in text
 
     from app.models import Comment
 
     assert db.query(Comment).filter(Comment.task_id == t.id, Comment.body == "via SSE").count() == 1
+
+    saved = (
+        db.query(AssistantMessage)
+        .filter(AssistantMessage.conversation_id == conv.id, AssistantMessage.role == "assistant")
+        .first()
+    )
+    assert saved.content == "Added a comment."
+
+
+def test_a_tool_call_gets_a_second_round_trip_before_the_user_sees_any_text(client, db):
+    """ADR-0104: a real provider never carries text in the same turn as a tool call —
+    without a second round trip the user gets nothing back at all. Directly asserts the
+    'text' SSE event only appears after 'tool_result', not that a comment landed."""
+    from tests.factories import make_project, make_task
+
+    conv = AssistantConversation()
+    db.add(conv)
+    p = make_project(db, name="Round Trip Project", status="active")
+    db.add(p)
+    db.flush()
+    t = make_task(db, project_id=p.id, title="Round Trip Task")
+    db.add(t)
+    db.commit()
+    db.refresh(conv)
+
+    fake = _RecordingProvider(
+        reply="Here's what I found.",
+        tool_call={"name": "list_tasks", "input": {"project_id": p.id}},
+    )
+    with patch("app.routers.assistant.get_provider", return_value=fake):
+        resp = client.post(f"/api/assistant/conversations/{conv.id}/messages", json={"content": "what's on my plate?"})
+    assert resp.status_code == 200
+    tool_idx = resp.text.index("tool_result")
+    text_idx = resp.text.index("Here's what I found.")
+    assert tool_idx < text_idx
+
+    # The second round's messages carry the first round's tool result as context.
+    assert len(fake.calls) == 2
+    second_round_contents = [m["content"] for m in fake.calls[1]["messages"]]
+    assert any("list_tasks" in c for c in second_round_contents)
+
+
+def test_a_provider_stuck_calling_tools_forever_stops_at_the_round_cap(client, db):
+    """Guards against a model (or a bug) that never produces a final answer — without
+    this, an assistant conversation could dispatch a write tool unboundedly."""
+    from app.routers.assistant import MAX_TOOL_ROUNDS
+
+    conv = AssistantConversation()
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+
+    class _AlwaysToolCallProvider:
+        def __init__(self):
+            self.calls = 0
+
+        async def chat(self, messages, tools, system=None):
+            self.calls += 1
+            yield {"type": "tool_call", "name": "get_summary", "input": {}, "id": f"t{self.calls}"}
+            yield {"type": "done"}
+
+    fake = _AlwaysToolCallProvider()
+    with patch("app.routers.assistant.get_provider", return_value=fake):
+        resp = client.post(f"/api/assistant/conversations/{conv.id}/messages", json={"content": "loop forever"})
+    assert resp.status_code == 200
+    assert fake.calls == MAX_TOOL_ROUNDS
+    assert "too many tool calls" in resp.text
+
+    # No text was ever produced, so nothing gets persisted as the assistant's reply.
+    assert (
+        db.query(AssistantMessage)
+        .filter(AssistantMessage.conversation_id == conv.id, AssistantMessage.role == "assistant")
+        .count()
+        == 0
+    )
 
 
 def test_a_provider_missing_its_sdk_package_is_a_graceful_200_not_a_500(client, db):

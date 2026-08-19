@@ -23,6 +23,12 @@ You have access to tools to read and modify tasks, projects, and activity.
 Be concise and helpful. When the user asks about tasks, use tools to get current data rather than making up information.
 Respond in the same language the user uses."""
 
+# A tool call ends a provider's turn (finish_reason "tool_calls"/"tool_use") — the model
+# never continues with text in that same response, for either protocol. The tool's result
+# has to go back as a new turn before the model can say anything. This caps how many such
+# round trips one message may cause, so a model stuck calling tools can't loop forever.
+MAX_TOOL_ROUNDS = 8
+
 
 @router.get("/conversations", response_model=list[AssistantConversationSummary])
 def list_conversations(
@@ -102,50 +108,74 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
     async def event_stream():
         assistant_text = []
         tool_calls_made = []
-        usage = None
+        input_tokens_total = None
+        output_tokens_total = None
+        round_messages = list(messages)
 
         try:
-            async for event in provider.chat(messages, TOOLS, SYSTEM_PROMPT):
-                if event["type"] == "error":
-                    # A provider-level failure is not a turn in the conversation:
-                    # it is forwarded to the client and never written to history
-                    # (ADR-0089).
-                    yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
-                elif event["type"] == "text":
-                    assistant_text.append(event["text"])
-                    yield f"data: {json.dumps({'type': 'text', 'text': event['text']})}\n\n"
-                elif event["type"] == "tool_call":
-                    tool_name = event["name"]
-                    tool_input = event["input"]
-                    tool_id = event.get("id", "")
+            for _round_num in range(MAX_TOOL_ROUNDS):
+                round_had_tool_call = False
 
-                    yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'input': tool_input})}\n\n"
+                async for event in provider.chat(round_messages, TOOLS, SYSTEM_PROMPT):
+                    if event["type"] == "error":
+                        # A provider-level failure is not a turn in the conversation:
+                        # it is forwarded to the client and never written to history
+                        # (ADR-0089).
+                        yield f"data: {json.dumps({'type': 'error', 'message': event['message']})}\n\n"
+                        return
+                    elif event["type"] == "text":
+                        assistant_text.append(event["text"])
+                        yield f"data: {json.dumps({'type': 'text', 'text': event['text']})}\n\n"
+                    elif event["type"] == "tool_call":
+                        round_had_tool_call = True
+                        tool_name = event["name"]
+                        tool_input = event["input"]
+                        tool_id = event.get("id", "")
 
-                    result = await dispatch_tool(tool_name, tool_input, db)
-                    tool_calls_made.append({"name": tool_name, "id": tool_id, "result": result})
+                        yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'input': tool_input})}\n\n"
 
-                    yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'result': result[:500]})}\n\n"
+                        result = await dispatch_tool(tool_name, tool_input, db)
+                        tool_calls_made.append({"name": tool_name, "id": tool_id, "result": result})
 
-                elif event["type"] == "usage":
-                    # Not forwarded over SSE — this is bookkeeping (ADR-0100), not a turn.
-                    usage = event
+                        yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'result': result[:500]})}\n\n"
 
-                elif event["type"] == "done":
-                    # Save assistant message
-                    if assistant_text:
-                        msg = AssistantMessage(
-                            conversation_id=conv_id,
-                            role="assistant",
-                            content="".join(assistant_text),
-                            tool_calls=tool_calls_made if tool_calls_made else None,
-                            input_tokens=usage["input_tokens"] if usage else None,
-                            output_tokens=usage["output_tokens"] if usage else None,
-                        )
-                        db.add(msg)
-                        db.commit()
+                        # Fed back as plain turns, not a native tool-result block: the
+                        # provider abstraction only knows role/content (ADR-0096), and a
+                        # reloaded conversation already flattens a stored "tool" role to
+                        # "user" the same way (see `messages` above) — this keeps the one
+                        # convention instead of teaching each provider a second shape.
+                        round_messages.append({"role": "assistant", "content": f"[Calling tool {tool_name}]"})
+                        round_messages.append({"role": "user", "content": f"[Result of {tool_name}]: {result}"})
 
-                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                    return
+                    elif event["type"] == "usage":
+                        # Not forwarded over SSE — this is bookkeeping (ADR-0100), not a
+                        # turn. Summed across rounds: each round is a separate completion.
+                        input_tokens_total = (input_tokens_total or 0) + event["input_tokens"]
+                        output_tokens_total = (output_tokens_total or 0) + event["output_tokens"]
+
+                    elif event["type"] == "done":
+                        break
+
+                if not round_had_tool_call:
+                    break
+            else:
+                # Hit MAX_TOOL_ROUNDS without a final text-only round — say so rather
+                # than silently ending on whatever the last tool_result was.
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Stopped after too many tool calls in a row.'})}\n\n"
+
+            if assistant_text:
+                msg = AssistantMessage(
+                    conversation_id=conv_id,
+                    role="assistant",
+                    content="".join(assistant_text),
+                    tool_calls=tool_calls_made if tool_calls_made else None,
+                    input_tokens=input_tokens_total,
+                    output_tokens=output_tokens_total,
+                )
+                db.add(msg)
+                db.commit()
+
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
         except Exception as exc:
             logger.error("Assistant streaming error: %s", exc)
