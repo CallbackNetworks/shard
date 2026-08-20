@@ -773,6 +773,8 @@
   "settings.defaultPriorityHint": "Priority pre-selected for new tasks",
   "settings.reduceMotion": "Reduce Motion",
   "settings.reduceMotionHint": "Minimize animations and transitions",
+  "settings.assistantFab": "Floating Assistant Button",
+  "settings.assistantFabHint": "Show the chat toggle in the corner of every page. The Assistant page itself is unaffected.",
   "settings.on": "On",
   "settings.off": "Off",
   "settings.accent": "Accent Color",

@@ -777,6 +777,8 @@
   "settings.defaultPriorityHint": "新任務預先選取的優先級",
   "settings.reduceMotion": "減少動態效果",
   "settings.reduceMotionHint": "降低動畫與轉場效果",
+  "settings.assistantFab": "浮動助理按鈕",
+  "settings.assistantFabHint": "在每個頁面右下角顯示對話開關。不影響「助理」頁面本身。",
   "settings.on": "開啟",
   "settings.off": "關閉",
   "settings.accent": "強調色",

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { MessageCircle, X, Plus, Send, ChevronDown } from 'lucide-react'
 import { BRAND, DARK } from '../constants/theme'
+import { useUiPrefs } from '../utils/uiPrefs'
 import useAssistantChat from './assistant/useAssistantChat'
 import PromptChips from './assistant/PromptChips'
 import { MessageBubble, StreamingMessage, ThinkingRow } from './assistant/ChatMessages'
@@ -18,11 +19,12 @@ import { MessageBubble, StreamingMessage, ThinkingRow } from './assistant/ChatMe
 export default function AssistantPanel() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
+  const uiPrefs = useUiPrefs()
   const [open, setOpen] = useState(false)
   const [showConvList, setShowConvList] = useState(false)
 
   const onAssistantPage = pathname === '/assistant' || pathname.startsWith('/assistant/')
-  const chat = useAssistantChat({ enabled: open && !onAssistantPage })
+  const chat = useAssistantChat({ enabled: open && !onAssistantPage && !uiPrefs.assistantFabHidden })
 
   // Opening the panel resumes the most recent conversation rather than landing
   // on an empty shell.
@@ -36,7 +38,7 @@ export default function AssistantPanel() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chat.send() }
   }
 
-  if (onAssistantPage) return null
+  if (onAssistantPage || uiPrefs.assistantFabHidden) return null
 
   if (!open) {
     return (

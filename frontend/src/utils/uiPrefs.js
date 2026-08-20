@@ -66,6 +66,7 @@ export const DEFAULT_UI_PREFS = {
   railExpanded: true, // rail shows labels and reserves its own gutter
   sidebarHidden: [], // list of nav `to` paths to hide
   sidebarOrder: [], // list of nav `to` paths giving explicit order
+  assistantFabHidden: false, // hide the floating assistant toggle (Assistant page/rail entry stay)
   timeFormat: '24h',
   weekStart: 'sunday',
   timestampStyle: 'relative',

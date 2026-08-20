@@ -193,6 +193,16 @@ export default function Settings() {
             ]}
           />
         </ControlRow>
+        <ControlRow label={t('settings.assistantFab')} hint={t('settings.assistantFabHint')}>
+          <Segmented
+            value={uiPrefs.assistantFabHidden ? 'off' : 'on'}
+            onChange={v => persistPref('assistantFabHidden', v === 'off')}
+            options={[
+              { value: 'off', label: t('settings.off') },
+              { value: 'on', label: t('settings.on') },
+            ]}
+          />
+        </ControlRow>
       </div>
 
       {/* Date & time display */}
