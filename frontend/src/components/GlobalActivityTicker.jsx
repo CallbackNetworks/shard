@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle } from 'lucide-react'
-import { getActivity, getProjects } from '../api/client'
+import { AlertTriangle, X } from 'lucide-react'
+import { getActivity, getProjects, getActivityWatches, createActivityWatch, deleteActivityWatch } from '../api/client'
 import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
 import { countOverdue } from '../utils/overdue'
+import ActivityWatchPicker from './ActivityWatchPicker'
 
 const FALLBACK_ITEMS = [
   'SHARD ONLINE',
@@ -79,6 +80,19 @@ function formatTimelineTime(value) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+// A "node" watch matches by whichever field names its subject: task_id for its own
+// activity, project_id for a container's own + its whole subtree (the same scope
+// GET /activity?project_id already reports), meta.node_id for anything else
+// (mirrors SHARE_VIEW_META_KEYS's multi-key match in services/activity.py).
+function matchesWatch(entry, watch) {
+  if (watch.kind === 'node') {
+    return entry.task_id === watch.target_id
+      || entry.project_id === watch.target_id
+      || entry?.meta?.node_id === watch.target_id
+  }
+  return entry.node_type === watch.target_type
+}
+
 const ACTIVITY_KINDS = ['task', 'project', 'decision', 'goal', 'webhook', 'alert']
 const ACTIVITY_BUCKETS = 52
 
@@ -111,12 +125,15 @@ function sparkPaths(cells) {
 }
 
 // Bucket recent activity by time, then lightly smooth it so the strip reads
-// as a continuous cool->hot heat line rather than isolated specks.
-function buildActivityHeat(activities) {
-  const now = Date.now()
+// as a continuous cool->hot heat line rather than isolated specks. ``axis``
+// pins the same [minTime, maxTime] a sibling curve used, so watch curves stay
+// aligned to the base curve's time axis instead of each fitting its own span
+// (each curve still auto-scales its own height to its own peak).
+function buildActivityHeat(activities, axis = null) {
+  const now = axis?.maxTime ?? Date.now()
   const times = activities.map(eventTime)
   const fallbackStart = now - 6 * 60 * 60 * 1000
-  const minTime = times.length ? Math.min(...times, fallbackStart) : fallbackStart
+  const minTime = axis?.minTime ?? (times.length ? Math.min(...times, fallbackStart) : fallbackStart)
   const span = Math.max(now - minTime, 60 * 60 * 1000)
   const bucketMs = span / ACTIVITY_BUCKETS
 
@@ -152,10 +169,13 @@ function buildActivityHeat(activities) {
 
 export default function GlobalActivityTicker() {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const prefs = useUiPrefs()
+  // Enough entries for a busy watch curve to read as more than a couple of dots;
+  // the scrolling ticker text above only ever shows the newest handful anyway.
   const { data: activities = [] } = useQuery({
     queryKey: ['global-activity-ticker'],
-    queryFn: () => getActivity({ limit: 34 }),
+    queryFn: () => getActivity({ limit: 200 }),
     refetchInterval: refreshInterval(45000, prefs),
     staleTime: 30000,
   })
@@ -166,6 +186,24 @@ export default function GlobalActivityTicker() {
     refetchInterval: 60000,
     staleTime: 30000,
   })
+
+  const { data: watches = [] } = useQuery({
+    queryKey: ['activity-watches'],
+    queryFn: getActivityWatches,
+    staleTime: 60000,
+  })
+
+  const addWatch = useMutation({
+    mutationFn: createActivityWatch,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['activity-watches'] }),
+  })
+  const removeWatch = useMutation({
+    mutationFn: deleteActivityWatch,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['activity-watches'] }),
+  })
+
+  const handleAddNode = (node) => addWatch.mutate({ kind: 'node', target_id: node.id, label: node.title })
+  const handleAddType = (typeKey, typeLabel) => addWatch.mutate({ kind: 'node_type', target_type: typeKey, label: typeLabel })
 
   const alerts = useMemo(() => {
     const tasks = projects.flatMap(getProjectTasks)
@@ -188,6 +226,16 @@ export default function GlobalActivityTicker() {
   const loopItems = [...tickerItems, ...tickerItems]
   const chart = useMemo(() => buildActivityHeat(activities), [activities])
   const spark = useMemo(() => sparkPaths(chart.cells), [chart.cells])
+
+  // Each registered watch gets its own curve, bucketed over the same window as the
+  // base curve so the shapes stay comparable; a quiet watch just draws a flat line.
+  const watchCurves = useMemo(() => (
+    watches.map(watch => {
+      const matched = activities.filter(entry => matchesWatch(entry, watch))
+      const axis = { minTime: chart.minTime, maxTime: chart.maxTime }
+      return { ...watch, spark: sparkPaths(buildActivityHeat(matched, axis).cells) }
+    })
+  ), [watches, activities, chart.minTime, chart.maxTime])
 
   const [tickerTrackRef, tickerDuration] = useTickerPace(tickerItems.join('|'), {
     pxPerSecond: TICKER_PX_PER_SECOND,
@@ -271,11 +319,48 @@ export default function GlobalActivityTicker() {
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
           />
+          {watchCurves.map(watch => (
+            <path
+              key={watch.id}
+              d={watch.spark.line}
+              fill="none"
+              stroke={watch.color}
+              strokeWidth="1.25"
+              strokeOpacity="0.85"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
         </svg>
         <div className="kt-heatscale" aria-label="Activity intensity scale">
           <span>LOW</span>
           <i />
           <span>HIGH</span>
+        </div>
+        <div className="kt-watch-legend">
+          <span className="kt-watch-chip">
+            <i style={{ background: '#facc15' }} />
+            <span>{t('ticker.watchAll')}</span>
+          </span>
+          {watchCurves.map(watch => (
+            <span className="kt-watch-chip" key={watch.id}>
+              <i style={{ background: watch.color }} />
+              <span>{watch.label}</span>
+              <button
+                type="button"
+                aria-label={t('ticker.watchRemove', { label: watch.label })}
+                onClick={() => removeWatch.mutate(watch.id)}
+              >
+                <X size={9} />
+              </button>
+            </span>
+          ))}
+          <ActivityWatchPicker
+            onAddNode={handleAddNode}
+            onAddType={handleAddType}
+            excludeNodeIds={watches.filter(w => w.kind === 'node').map(w => w.target_id)}
+          />
         </div>
       </div>
     </>

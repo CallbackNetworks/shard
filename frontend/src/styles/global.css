@@ -1894,7 +1894,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-route-shell {
   min-height: calc(100% - 28px);
-  padding-bottom: 56px;
+  padding-bottom: 88px;
   animation: routeReveal 0.34s cubic-bezier(.2,.8,.2,1) both;
 }
 .layout-main::before {
@@ -2717,6 +2717,116 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-heatscale span {
   white-space: nowrap;
+}
+.kt-watch-legend {
+  grid-column: 1 / -1;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 10px 7px;
+  border-top: 1px solid var(--kt-line);
+}
+.kt-watch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px 2px 6px;
+  border-radius: 9999px;
+  background: rgba(var(--kt-ink-rgb), 0.05);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  color: var(--kt-muted);
+  white-space: nowrap;
+  max-width: 160px;
+}
+.kt-watch-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kt-watch-chip i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.kt-watch-chip button {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 2px;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.kt-watch-chip button:hover {
+  opacity: 1;
+}
+.kt-watch-add-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.kt-watch-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: none;
+  border: 1px dashed rgba(var(--kt-ink-rgb), 0.18);
+  color: var(--kt-faint);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kt-watch-add:hover {
+  border-color: var(--accent);
+  color: var(--kt-ink);
+}
+.kt-watch-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  width: 260px;
+  background: var(--kt-elev);
+  border: 1px solid var(--kt-line);
+  border-radius: 8px;
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
+  padding: 10px;
+  z-index: 80;
+}
+.kt-watch-popover-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.kt-watch-popover-tab {
+  flex: 1;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 0;
+  text-align: center;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: rgba(var(--kt-ink-rgb), 0.04);
+  color: var(--kt-faint);
+  cursor: pointer;
+}
+.kt-watch-popover-tab.active {
+  background: rgba(var(--kt-ink-rgb), 0.08);
+  color: var(--kt-ink);
+  border-color: rgba(var(--kt-ink-rgb), 0.12);
 }
 .kt-loading {
   position: relative;
@@ -3948,6 +4058,9 @@ select[style*="border-radius"],
     height: 12px;
   }
   .kt-heatscale {
+    display: none;
+  }
+  .kt-watch-legend {
     display: none;
   }
   /* On a phone the rail is an off-canvas drawer, not a rack of icons: it is

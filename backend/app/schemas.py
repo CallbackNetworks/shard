@@ -727,6 +727,33 @@ class ActivityLogOut(BaseModel):
     detail: str | None
     meta: dict | None = None
     created_at: datetime
+    # Not an ActivityLog column: the router resolves it from the live ``nodes`` table
+    # per entry (ADR-0105), so a watch can filter by type without a schema migration.
+    node_type: str | None = None
+
+
+# --- Activity Watches (ADR-0105) ---
+
+
+class ActivityWatchCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str  # "node" | "node_type"
+    target_id: str | None = None
+    target_type: str | None = None
+    label: str | None = None
+
+
+class ActivityWatchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    kind: str
+    target_id: str | None
+    target_type: str | None
+    label: str
+    color: str
+    created_at: datetime
 
 
 # --- External API response schemas ---

@@ -18,6 +18,7 @@ from app.database import engine
 from app.models import Base
 from app.routers import (
     activity,
+    activity_watches,
     analytics,
     api_keys,
     assistant,
@@ -282,6 +283,7 @@ api_router.include_router(decisions.router)
 api_router.include_router(cycles.router)
 api_router.include_router(api_keys.router)
 api_router.include_router(activity.router)
+api_router.include_router(activity_watches.router)
 api_router.include_router(identities.router)
 api_router.include_router(focus.router)
 api_router.include_router(comments.router)

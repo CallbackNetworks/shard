@@ -106,3 +106,4 @@
 | [0102](0102-the-internal-assistant-catches-up-to-mcp-on-its-own-domain.md) | 內部助理補齊跟 MCP 同一個範圍的落差，不多不少 | Accepted | 2026-08-18 |
 | [0103](0103-openai-is-a-real-dependency-and-get-provider-cannot-crash.md) | openai 變成真的依賴，而且 get_provider 不能讓請求整個炸掉 | Accepted | 2026-08-18 |
 | [0104](0104-a-tool-call-needs-a-second-round-trip.md) | 工具叫完了，還要再打一次才輪得到文字回答 | Accepted | 2026-08-19 |
+| [0105](0105-user-registered-activity-watch-curves.md) | 活動跑馬燈下面的曲線可以自己註冊 | Accepted | 2026-08-19 |

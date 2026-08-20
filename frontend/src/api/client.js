@@ -219,6 +219,9 @@ export const getFocusTargets = () => api.get('/focus-targets').then(r => r.data)
 
 // Activity
 export const getActivity = (params = {}) => api.get('/activity', { params }).then(r => r.data)
+export const getActivityWatches = () => api.get('/activity-watches').then(r => r.data)
+export const createActivityWatch = (data) => api.post('/activity-watches', data).then(r => r.data)
+export const deleteActivityWatch = (id) => api.delete(`/activity-watches/${id}`)
 
 // Comments
 export const getComments = (projectId, taskId) =>

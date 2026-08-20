@@ -128,6 +128,26 @@ class ActivityLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
+class ActivityWatch(Base):
+    """A curve a user registered on the activity ticker (ADR-0105).
+
+    ``kind="node"`` watches one node's own activity (``target_id``); ``kind="node_type"``
+    watches every node of a type (``target_type``). No column is added to ``activity_logs``
+    itself — matching resolves against the live ``nodes`` table at read time, the same
+    choice ``share_view_count`` made for its multi-key match (services/activity.py).
+    """
+
+    __tablename__ = "activity_watches"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)  # "node" | "node_type"
+    target_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    target_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    color: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
