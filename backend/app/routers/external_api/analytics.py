@@ -4,7 +4,7 @@ External API v1 — Analytics endpoints.
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -14,7 +14,9 @@ from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
     _get_api_key,
+    _project_ids_in_scope,
     _require_scope,
+    _resolve_project_scope,
 )
 from app.services import analytics_admin, graph
 
@@ -36,13 +38,17 @@ def api_analytics_overview(
     _require_scope(api_key, "read")
     now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
-    pid = api_key.project_id  # None means platform-wide
-    pid_task_ids = graph.contained_task_ids(db, pid) if pid else None
+    scoped_project_ids = _project_ids_in_scope(db, api_key)  # None means platform-wide
+    scoped_task_ids = None
+    if scoped_project_ids is not None:
+        scoped_task_ids = set()
+        for spid in scoped_project_ids:
+            scoped_task_ids |= set(graph.contained_task_ids(db, spid))
 
     def _task_count(*filters):
         q = db.query(func.count(Node.id)).filter(graph.task_type_filter(db))
-        if pid:
-            q = q.filter(Node.id.in_(pid_task_ids))
+        if scoped_task_ids is not None:
+            q = q.filter(Node.id.in_(scoped_task_ids))
         return (q.filter(*filters).scalar() or 0) if filters else (q.scalar() or 0)
 
     total_tasks = _task_count()
@@ -51,16 +57,16 @@ def api_analytics_overview(
     overdue = _task_count(*graph.overdue_clause(now))
 
     proj_q = db.query(func.count(Node.id)).filter(Node.type == graph.NODE_PROJECT)
-    if pid:
-        proj_q = proj_q.filter(Node.id == pid)
+    if scoped_project_ids is not None:
+        proj_q = proj_q.filter(Node.id.in_(scoped_project_ids))
     total_projects = proj_q.scalar() or 0
     active_projects = proj_q.filter(Node.status == "active").scalar() or 0
 
     act_q = db.query(ActivityLog.project_id, func.count(ActivityLog.id).label("cnt")).filter(
         ActivityLog.created_at >= week_ago, ActivityLog.project_id.isnot(None)
     )
-    if pid:
-        act_q = act_q.filter(ActivityLog.project_id == pid)
+    if scoped_project_ids is not None:
+        act_q = act_q.filter(ActivityLog.project_id.in_(scoped_project_ids))
     top_activity = act_q.group_by(ActivityLog.project_id).order_by(func.count(ActivityLog.id).desc()).first()
     most_active_project = None
     if top_activity:
@@ -95,8 +101,7 @@ def api_analytics_heatmap(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    if api_key.project_id:
-        project_id = api_key.project_id
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
     now = datetime.now(UTC)
     end_dt = datetime.fromisoformat(end) if end else now
     start_dt = datetime.fromisoformat(start) if start else end_dt - timedelta(days=365)
@@ -106,7 +111,9 @@ def api_analytics_heatmap(
         day_col,
         func.count(ActivityLog.id).label("count"),
     ).filter(ActivityLog.created_at >= start_dt, ActivityLog.created_at <= end_dt)
-    if project_id:
+    if scoped_project_ids is not None:
+        q = q.filter(ActivityLog.project_id.in_(scoped_project_ids))
+    elif project_id:
         q = q.filter(ActivityLog.project_id == project_id)
     rows = q.group_by(day_col).order_by(day_col).all()
     return [{"date": str(r.day), "count": r.count} for r in rows]
@@ -127,14 +134,20 @@ def api_analytics_status_trend(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    if api_key.project_id:
-        project_id = api_key.project_id
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    scoped_task_ids = None
+    if scoped_project_ids is not None:
+        scoped_task_ids = set()
+        for spid in scoped_project_ids:
+            scoped_task_ids |= set(graph.contained_task_ids(db, spid))
     now = datetime.now(UTC)
     result = []
     for i in range(days - 1, -1, -1):
         day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
         q = db.query(Node.status, func.count(Node.id)).filter(graph.task_type_filter(db), Node.created_at <= day)
-        if project_id:
+        if scoped_task_ids is not None:
+            q = q.filter(Node.id.in_(scoped_task_ids))
+        elif project_id:
             q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
         rows = q.group_by(Node.status).all()
         entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
@@ -159,10 +172,7 @@ def api_analytics_velocity(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    pid = api_key.project_id or project_id
-    if not pid:
-        raise HTTPException(status_code=400, detail="project_id is required")
-    _check_project_access(api_key, pid)
+    pid = _resolve_project_scope(db, api_key, project_id, required=True)
     cycles = [c for c in graph.cycles_in_project(db, pid) if c.status == "completed"]
     cycles.sort(key=lambda c: (c.start_date is None, c.start_date))
     result = []
@@ -201,7 +211,7 @@ def api_analytics_velocity(
 )
 def api_critical_path(project_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return analytics_admin.critical_path(db, project_id)
 
 
@@ -245,7 +255,8 @@ def api_estimation_calibration(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    return analytics_admin.estimation_calibration(db, project_id or api_key.project_id, limit)
+    pid = _resolve_project_scope(db, api_key, project_id)
+    return analytics_admin.estimation_calibration(db, pid, limit)
 
 
 @sub_router.get(
@@ -266,4 +277,5 @@ def api_estimate_suggestion(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    return analytics_admin.estimate_suggestion(db, raw_estimate, project_id or api_key.project_id)
+    pid = _resolve_project_scope(db, api_key, project_id)
+    return analytics_admin.estimate_suggestion(db, raw_estimate, pid)

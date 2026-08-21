@@ -11,6 +11,7 @@ from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
     _get_api_key,
+    _projects_in_scope,
     _require_scope,
 )
 from app.routers.external_api.helpers import _enrich_project
@@ -31,11 +32,7 @@ def api_list_projects(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    if api_key.project_id:
-        project = graph.get_project(db, api_key.project_id)
-        projects = [project] if project else []
-    else:
-        projects = graph.all_projects(db)
+    projects = _projects_in_scope(db, api_key)
     return [_enrich_project(p, db) for p in projects]
 
 
@@ -51,7 +48,7 @@ def api_get_project(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

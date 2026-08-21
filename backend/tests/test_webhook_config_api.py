@@ -194,7 +194,7 @@ class TestWhoMayAsk:
                 key_hash=hashlib.sha256(raw.encode()).hexdigest(),
                 key_last4=raw[-4:],
                 scopes=["read", "write", "admin"],
-                project_id=other.id,
+                container_id=other.id,
                 active=True,
             )
         )

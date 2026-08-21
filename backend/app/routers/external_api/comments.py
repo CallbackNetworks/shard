@@ -36,7 +36,7 @@ def api_list_comments(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     _get_task_or_404(project_id, task_id, db)
     return db.query(Comment).filter(Comment.task_id == task_id).order_by(Comment.created_at.asc()).all()
 
@@ -59,7 +59,7 @@ async def api_create_comment(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     task = _get_task_or_404(project_id, task_id, db)
 
     data = body.model_dump()
@@ -101,7 +101,7 @@ def api_update_comment(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     _get_task_or_404(project_id, task_id, db)
     comment = db.query(Comment).filter(Comment.id == comment_id, Comment.task_id == task_id).first()
     if not comment:
@@ -127,7 +127,7 @@ def api_delete_comment(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     _get_task_or_404(project_id, task_id, db)
     comment = db.query(Comment).filter(Comment.id == comment_id, Comment.task_id == task_id).first()
     if not comment:

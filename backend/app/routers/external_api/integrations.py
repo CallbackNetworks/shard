@@ -8,9 +8,10 @@ Reads take ``read``, writes take ``write`` — the same scopes ``/subscriptions`
 used for the same objects. Purging the delivery log takes ``admin``: it destroys history
 rather than data, and history is what an audit reads.
 
-A project-scoped key sees and writes only integrations bound to its project. An *unscoped*
-integration (``project_id: null``) receives events from every project, so a project-scoped
-key can read it but not edit it: it is not that key's to change.
+A container-scoped key (project or identity, ADR-0107) sees and writes only integrations
+bound to a project within its scope. An *unscoped* integration (``project_id: null``)
+receives events from every project, so a scoped key can read it but not edit it: it is not
+that key's to change.
 """
 
 from datetime import datetime
@@ -20,23 +21,24 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey, Integration
-from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
+from app.routers.external_api.auth import _auth_errors, _get_api_key, _project_ids_in_scope, _require_scope
 from app.schemas import IntegrationCreate, IntegrationOut, IntegrationUpdate, WebhookDeliveryOut
 from app.services import delivery_admin, integration_admin
 
 sub_router = APIRouter()
 
 
-def _owned(api_key: ApiKey, integration: Integration, *, writing: bool) -> None:
-    """403 unless a project-scoped key governs this integration.
+def _owned(db: Session, api_key: ApiKey, integration: Integration, *, writing: bool) -> None:
+    """403 unless a container-scoped key governs this integration (ADR-0107).
 
-    Reading an unscoped integration is allowed — its events reach this key's project, so it
-    is part of the answer to "what is subscribed to my project". Writing one is not: it is
-    shared with every other project.
+    Reading an unscoped integration is allowed — its events reach every project this key
+    can see, so it is part of the answer to "what is subscribed to my work". Writing one is
+    not: it is shared with every other project too.
     """
-    if not api_key.project_id:
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is None:
         return
-    if integration.project_id == api_key.project_id:
+    if integration.project_id in scoped_project_ids:
         return
     if integration.project_id is None and not writing:
         return
@@ -45,7 +47,7 @@ def _owned(api_key: ApiKey, integration: Integration, *, writing: bool) -> None:
 
 def _load_owned(db: Session, api_key: ApiKey, integration_id: str, *, writing: bool) -> Integration:
     integration = integration_admin.load(db, integration_id)
-    _owned(api_key, integration, writing=writing)
+    _owned(db, api_key, integration, writing=writing)
     return integration
 
 
@@ -108,7 +110,13 @@ def api_get_template(template_id: str, api_key: ApiKey = Depends(_get_api_key)):
 )
 def api_list_integrations(db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "read")
-    return integration_admin.list_integrations(db, project_id=api_key.project_id)
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is None:
+        return integration_admin.list_integrations(db)
+    if len(scoped_project_ids) == 1:
+        return integration_admin.list_integrations(db, project_id=scoped_project_ids[0])
+    allowed = set(scoped_project_ids)
+    return [i for i in integration_admin.list_integrations(db) if i.project_id is None or i.project_id in allowed]
 
 
 @sub_router.post(
@@ -128,8 +136,9 @@ def api_create_integration(
     body: IntegrationCreate, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
 ):
     _require_scope(api_key, "write")
-    if api_key.project_id and body.project_id != api_key.project_id:
-        raise HTTPException(status_code=403, detail="API key can only create integrations within its project")
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None and body.project_id not in scoped_project_ids:
+        raise HTTPException(status_code=403, detail="API key can only create integrations within its scope")
     return integration_admin.create(db, body)
 
 

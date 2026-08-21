@@ -173,7 +173,7 @@ class TestProjectScoping:
             key_last4=raw_key[-4:],
             scopes=["read"],
             active=True,
-            project_id=p.id,
+            container_id=p.id,
         )
         db.add(key)
         db.commit()
@@ -198,10 +198,47 @@ class TestProjectScoping:
             key_last4=raw_key[-4:],
             scopes=["read"],
             active=True,
-            project_id=p.id,
+            container_id=p.id,
         )
         db.add(key)
         db.commit()
+
+        r = client.get(f"/api/v1/projects/{other.id}", headers={"X-API-Key": raw_key})
+        assert r.status_code == 403
+
+    def test_identity_scoped_key_sees_every_project_it_contains(self, client, db):
+        from app.services import graph
+
+        identity = graph.create_identity(db, name="Work", color="#5e6ad2")
+        p1 = make_project(db, name="P1")
+        p2 = make_project(db, name="P2")
+        other = make_project(db, name="Other")
+        db.add_all([p1, p2, other])
+        db.flush()
+        graph.add_edge(db, identity.id, p1.id, graph.REL_CONTAINS)
+        graph.add_edge(db, identity.id, p2.id, graph.REL_CONTAINS)
+        db.commit()
+
+        raw_key = "tdp_identity_scoped"
+        key = ApiKey(
+            name="Identity Scoped",
+            key=raw_key,
+            key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
+            key_last4=raw_key[-4:],
+            scopes=["read"],
+            active=True,
+            container_id=identity.id,
+        )
+        db.add(key)
+        db.commit()
+
+        r = client.get("/api/v1/projects", headers={"X-API-Key": raw_key})
+        assert r.status_code == 200
+        ids = {p["id"] for p in r.json()}
+        assert ids == {p1.id, p2.id}
+
+        r = client.get(f"/api/v1/projects/{p1.id}", headers={"X-API-Key": raw_key})
+        assert r.status_code == 200
 
         r = client.get(f"/api/v1/projects/{other.id}", headers={"X-API-Key": raw_key})
         assert r.status_code == 403

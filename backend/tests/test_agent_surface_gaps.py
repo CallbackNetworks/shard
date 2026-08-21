@@ -22,7 +22,7 @@ from app.models import ApiKey, TaskTemplate
 from tests.factories import make_task
 
 
-def _key(db, name, scopes, project_id=None):
+def _key(db, name, scopes, container_id=None):
     raw = f"tdp_test_{name}"
     db.add(
         ApiKey(
@@ -31,7 +31,7 @@ def _key(db, name, scopes, project_id=None):
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=scopes,
-            project_id=project_id,
+            container_id=container_id,
             active=True,
         )
     )

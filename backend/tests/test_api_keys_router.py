@@ -22,13 +22,38 @@ def test_create_api_key_with_project_scope(client, sample_project):
         json={
             "name": "Project Key",
             "scopes": ["read"],
-            "project_id": sample_project.id,
+            "container_id": sample_project.id,
         },
     )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["project_id"] == sample_project.id
+    assert data["container_id"] == sample_project.id
     assert data["scopes"] == ["read"]
+
+
+def test_create_api_key_with_identity_scope(client, sample_identity):
+    resp = client.post(
+        "/api/api-keys",
+        json={
+            "name": "Identity Key",
+            "scopes": ["read"],
+            "container_id": sample_identity.id,
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["container_id"] == sample_identity.id
+
+
+def test_create_api_key_rejects_non_container(client, db):
+    from app.services import graph
+
+    task = graph.create_task(db, title="Not a container")
+    db.commit()
+    resp = client.post(
+        "/api/api-keys",
+        json={"name": "Bad Scope", "scopes": ["read"], "container_id": task.id},
+    )
+    assert resp.status_code == 422
 
 
 def test_list_shows_key_preview(client):

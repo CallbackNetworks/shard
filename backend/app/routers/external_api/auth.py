@@ -41,53 +41,106 @@ def _require_scope(api_key: ApiKey, scope: str):
         raise HTTPException(status_code=403, detail=f"API key missing '{scope}' scope")
 
 
-def _check_project_access(api_key: ApiKey, project_id: str):
-    if api_key.project_id and api_key.project_id != project_id:
-        raise HTTPException(status_code=403, detail="API key does not have access to this project")
+def _container_ids_for(db: Session, node_id: str) -> set[str]:
+    """A node's own id plus every ``contains`` ancestor (ADR-0107).
 
-
-def _node_project_id(db: Session, node) -> str | None:
-    """The project that governs a node for access control (ADR-0042).
-
-    A project node governs itself; any other node is governed by its nearest
-    ``project``-type ``contains`` ancestor; a top-level node (goal/identity/orphan
-    task) has no governing project.
+    A key scoped to a project matches only that project; a key scoped to an
+    identity matches it and everything the identity contains, transitively —
+    the same rule, no distinction between the two container types.
     """
     from app.services import graph
 
-    if node.type == graph.NODE_PROJECT:
-        return node.id
-    ancestor = graph.nearest_ancestor_of_type(db, node.id, graph.NODE_PROJECT)
-    return ancestor.id if ancestor is not None else None
+    return {node_id} | {a.id for a in graph.ancestors_of(db, node_id)}
+
+
+def _check_project_access(db: Session, api_key: ApiKey, project_id: str):
+    if api_key.container_id and api_key.container_id not in _container_ids_for(db, project_id):
+        raise HTTPException(status_code=403, detail="API key does not have access to this project")
 
 
 def _node_accessible(api_key: ApiKey, db: Session, node) -> bool:
-    """Whether a project-scoped key may see/touch this node (unrestricted keys: always)."""
-    return not api_key.project_id or _node_project_id(db, node) == api_key.project_id
+    """Whether a container-scoped key may see/touch this node (unrestricted keys: always)."""
+    return not api_key.container_id or api_key.container_id in _container_ids_for(db, node.id)
 
 
 def _check_node_access(api_key: ApiKey, db: Session, node):
-    """403 unless the key governs this node's project (ADR-0042)."""
+    """403 unless the key's container governs this node (ADR-0107)."""
     if not _node_accessible(api_key, db, node):
         raise HTTPException(status_code=403, detail="API key does not have access to this node")
 
 
-def _check_create_access(api_key: ApiKey, db: Session, container_id: str | None, parent_id: str | None):
-    """403 unless a new node's governing project matches a project-scoped key (ADR-0042).
+def _project_ids_in_scope(db: Session, api_key: ApiKey) -> list[str] | None:
+    """Every project id a container-scoped key may act on; ``None`` means unrestricted (ADR-0107).
 
-    The target project is resolved from the containment hint; a project-scoped key
-    therefore cannot create top-level nodes (project/goal/identity/orphan task) — those
-    need an unrestricted key.
+    A project-scoped key resolves to itself; an identity-scoped key (or any other
+    container) resolves to every project in its ``contains`` subtree — there is no
+    single default project to fall back to, so callers needing one must decide
+    what an empty or multi-project result means for them.
     """
-    if not api_key.project_id:
-        return
+    from app.models import Node
     from app.services import graph
 
+    if not api_key.container_id:
+        return None
+    node = graph.get_node(db, api_key.container_id)
+    if node is not None and node.type == graph.NODE_PROJECT:
+        return [api_key.container_id]
+    subtree_ids = graph.descendants_of(db, api_key.container_id)
+    if not subtree_ids:
+        return []
+    rows = db.query(Node.id).filter(Node.id.in_(subtree_ids), Node.type == graph.NODE_PROJECT).all()
+    return [r[0] for r in rows]
+
+
+def _projects_in_scope(db: Session, api_key: ApiKey, *, status: str | None = None) -> list:
+    """The project objects ``_project_ids_in_scope`` resolves to, status-filtered like ``graph.all_projects``."""
+    from app.services import graph
+
+    project_ids = _project_ids_in_scope(db, api_key)
+    if project_ids is None:
+        return graph.all_projects(db, status=status)
+    projects = [p for pid in project_ids if (p := graph.get_project(db, pid)) is not None]
+    if status:
+        projects = [p for p in projects if p.status == status]
+    return projects
+
+
+def _resolve_project_scope(
+    db: Session, api_key: ApiKey, project_id: str | None, *, required: bool = False
+) -> str | None:
+    """A single project id to filter a read by, validated against a container-scoped key.
+
+    An explicit id must fall inside the key's scope (403 otherwise). With no explicit id, a
+    key scoped to exactly one project defaults to it; a key scoped to more than one (an
+    identity with several projects) has no single default that wouldn't either narrow
+    silently or leak outside its scope, so the caller must say which one (400).
+    """
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if project_id is not None:
+        if scoped_project_ids is not None and project_id not in scoped_project_ids:
+            raise HTTPException(status_code=403, detail="API key does not have access to this project")
+        return project_id
+    if scoped_project_ids is None:
+        if required:
+            raise HTTPException(status_code=400, detail="project_id is required")
+        return None
+    if len(scoped_project_ids) == 1:
+        return scoped_project_ids[0]
+    raise HTTPException(status_code=400, detail="project_id is required for a key scoped to more than one project")
+
+
+def _check_create_access(api_key: ApiKey, db: Session, container_id: str | None, parent_id: str | None):
+    """403 unless a new node's containment hint falls under a container-scoped key (ADR-0107).
+
+    The target is resolved from the containment hint; a container-scoped key
+    therefore cannot create top-level nodes (project/goal/identity/orphan task) —
+    those need an unrestricted key.
+    """
+    if not api_key.container_id:
+        return
     ref = container_id or parent_id
-    ref_node = graph.get_node(db, ref) if ref is not None else None
-    target_project = _node_project_id(db, ref_node) if ref_node is not None else None
-    if target_project != api_key.project_id:
-        raise HTTPException(status_code=403, detail="API key can only create nodes within its project")
+    if ref is None or api_key.container_id not in _container_ids_for(db, ref):
+        raise HTTPException(status_code=403, detail="API key can only create nodes within its scope")
 
 
 def _build_actor(api_key: ApiKey, agent_id: str | None = None) -> str:

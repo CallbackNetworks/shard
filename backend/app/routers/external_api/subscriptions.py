@@ -127,7 +127,7 @@ def api_create_subscription(
 ):
     _require_scope(api_key, "write")
     if body.project_id:
-        _check_project_access(api_key, body.project_id)
+        _check_project_access(db, api_key, body.project_id)
 
     _validate_events_or_422(db, body.events)
 

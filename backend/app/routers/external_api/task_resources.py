@@ -59,7 +59,7 @@ def api_get_recurrence(
     project_id: str, task_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return recurrence_admin.get(db, project_id, task_id)
 
 
@@ -83,7 +83,7 @@ def api_set_recurrence(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return recurrence_admin.create(db, project_id, task_id, body)
 
 
@@ -102,7 +102,7 @@ def api_update_recurrence(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return recurrence_admin.update(db, project_id, task_id, body)
 
 
@@ -116,7 +116,7 @@ def api_delete_recurrence(
     project_id: str, task_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     recurrence_admin.delete(db, project_id, task_id)
 
 
@@ -141,7 +141,7 @@ def api_list_attachments(
     project_id: str, task_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return attachment_admin.list_for_task(db, project_id, task_id)
 
 
@@ -165,7 +165,7 @@ def api_upload_attachment(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     try:
         content = base64.b64decode(body.content_base64, validate=True)
     except (binascii.Error, ValueError) as exc:
@@ -194,7 +194,7 @@ def api_download_attachment(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     att = attachment_admin.readable_path(db, task_id, attachment_id)
     # Not FileResponse: the v1 redaction middleware walks JSON bodies and a streaming file
     # response would be handed to it as an opaque iterator. Bytes are bounded at 20MB.
@@ -220,7 +220,7 @@ def api_delete_attachment(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     attachment_admin.delete(db, task_id, attachment_id)
 
 
@@ -241,7 +241,7 @@ def api_delete_attachment(
 )
 def api_list_cycles(project_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return cycle_admin.list_cycles(db, project_id)
 
 
@@ -255,7 +255,7 @@ def api_get_cycle(
     project_id: str, cycle_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return cycle_admin.get_cycle(db, project_id, cycle_id)
 
 
@@ -273,5 +273,5 @@ def api_compare_cycle(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     return cycle_admin.compare(db, project_id, cycle_id, compare_with)

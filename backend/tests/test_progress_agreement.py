@@ -174,7 +174,7 @@ def test_v1_subtree_hides_containers_outside_a_scoped_key(client, db, nested_pro
             key_last4=raw[-4:],
             scopes=["read"],
             active=True,
-            project_id=other.id,
+            container_id=other.id,
         )
     )
     db.commit()

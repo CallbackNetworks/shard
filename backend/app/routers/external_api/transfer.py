@@ -21,6 +21,7 @@ from app.routers.external_api.auth import (
     _build_actor,
     _check_project_access,
     _get_api_key,
+    _project_ids_in_scope,
     _require_scope,
 )
 from app.schemas import (
@@ -62,10 +63,16 @@ def api_list_templates(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    scope = project_id or api_key.project_id
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if project_id is not None:
+        if scoped_project_ids is not None and project_id not in scoped_project_ids:
+            raise HTTPException(status_code=403, detail="API key does not have access to this project")
+        scope_ids = [project_id]
+    else:
+        scope_ids = scoped_project_ids
     q = db.query(TaskTemplate)
-    if scope:
-        q = q.filter((TaskTemplate.project_id == scope) | (TaskTemplate.project_id.is_(None)))
+    if scope_ids is not None:
+        q = q.filter((TaskTemplate.project_id.in_(scope_ids)) | (TaskTemplate.project_id.is_(None)))
     return q.order_by(TaskTemplate.created_at.desc()).all()
 
 
@@ -81,8 +88,9 @@ def api_create_template(
     body: TaskTemplateCreate, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)
 ):
     _require_scope(api_key, "write")
-    if api_key.project_id and body.project_id != api_key.project_id:
-        raise HTTPException(status_code=403, detail="API key can only create templates within its project")
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None and body.project_id not in scoped_project_ids:
+        raise HTTPException(status_code=403, detail="API key can only create templates within its scope")
     tpl = TaskTemplate(**body.model_dump())
     db.add(tpl)
     db.commit()
@@ -104,7 +112,8 @@ def api_update_template(
 ):
     _require_scope(api_key, "write")
     tpl = _template_or_404(db, template_id)
-    if api_key.project_id and tpl.project_id != api_key.project_id:
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None and tpl.project_id not in scoped_project_ids:
         raise HTTPException(status_code=403, detail="API key does not have access to this template")
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(tpl, field, value)
@@ -122,7 +131,8 @@ def api_update_template(
 def api_delete_template(template_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "write")
     tpl = _template_or_404(db, template_id)
-    if api_key.project_id and tpl.project_id != api_key.project_id:
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None and tpl.project_id not in scoped_project_ids:
         raise HTTPException(status_code=403, detail="API key does not have access to this template")
     db.delete(tpl)
     db.commit()
@@ -149,7 +159,7 @@ def api_export_tasks(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     rows = task_transfer.export_rows(db, project_id)
     if format == "csv":
         import csv
@@ -184,7 +194,7 @@ async def api_import_tasks(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     created_ids = await task_transfer.import_tasks(db, project_id, body.tasks, actor=_build_actor(api_key))
     await ws_manager.broadcast("task.imported", {"project_id": project_id, "task_ids": created_ids})
     return TaskImportResult(imported=len(created_ids), task_ids=created_ids)

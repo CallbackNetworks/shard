@@ -39,7 +39,7 @@ def api_list_tasks(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     query = db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status_filter:
         query = query.filter(Node.status == status_filter)
@@ -62,7 +62,7 @@ def api_get_task(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     task = graph.get_task(db, task_id)
     if not task or task_id not in graph.contained_task_ids(db, project_id):
         raise HTTPException(status_code=404, detail="Task not found")
@@ -91,7 +91,7 @@ async def api_bulk_create_tasks(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -134,7 +134,7 @@ async def api_bulk_update_tasks(
 ):
     """Bulk update tasks. Each item needs 'id' and fields to update."""
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     _ALLOWED_FIELDS = {
         "title",
         "description",

@@ -136,7 +136,7 @@ def test_a_project_scoped_key_is_not_told_what_is_above_its_project(client, db, 
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=["read"],
-            project_id=mine.id,
+            container_id=mine.id,
             active=True,
         )
     )

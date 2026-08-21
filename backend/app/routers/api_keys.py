@@ -21,6 +21,15 @@ def _hash_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
+def _validate_container(db: Session, container_id: str | None) -> None:
+    """A key's scope must be a project or identity — anything else can't be walked via ``contains`` (ADR-0107)."""
+    if container_id is None:
+        return
+    node = graph.get_node(db, container_id)
+    if node is None or not graph.has_role(db, node.type, graph.ROLE_CONTAINER):
+        raise HTTPException(status_code=422, detail="container_id must reference a project or identity")
+
+
 @router.get("", response_model=list[ApiKeyOut])
 def list_api_keys(db: Session = Depends(get_db)):
     keys = db.query(ApiKey).order_by(ApiKey.created_at.desc()).all()
@@ -29,13 +38,14 @@ def list_api_keys(db: Session = Depends(get_db)):
 
 @router.post("", response_model=ApiKeyCreateOut, status_code=status.HTTP_201_CREATED)
 def create_api_key(body: ApiKeyCreate, db: Session = Depends(get_db)):
+    _validate_container(db, body.container_id)
     raw_key = _generate_key()
     api_key = ApiKey(
         name=body.name,
         key=None,
         key_hash=_hash_key(raw_key),
         key_last4=raw_key[-4:],
-        project_id=body.project_id,
+        container_id=body.container_id,
         scopes=body.scopes,
     )
     db.add(api_key)
@@ -50,7 +60,10 @@ def update_api_key(key_id: str, body: ApiKeyUpdate, db: Session = Depends(get_db
     api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
-    for field, value in body.model_dump(exclude_none=True).items():
+    fields = body.model_dump(exclude_none=True)
+    if "container_id" in fields:
+        _validate_container(db, fields["container_id"])
+    for field, value in fields.items():
         setattr(api_key, field, value)
     db.commit()
     db.refresh(api_key)
@@ -114,7 +127,7 @@ def get_agent_summary(db: Session = Depends(get_db)):
             AgentTaskSummary(
                 agent_id=key.id,
                 agent_name=key.name,
-                project_id=key.project_id,
+                container_id=key.container_id,
                 active=key.active,
                 last_used_at=key.last_used_at,
                 task_counts=counts,

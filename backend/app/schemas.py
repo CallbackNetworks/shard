@@ -426,13 +426,13 @@ class RecurrenceRuleOut(BaseModel):
 
 class ApiKeyCreate(BaseModel):
     name: str
-    project_id: str | None = None
+    container_id: str | None = None  # project or identity node; null = access everything (ADR-0107)
     scopes: list[Literal["read", "write", "admin"]] = ["read", "write"]
 
 
 class ApiKeyUpdate(BaseModel):
     name: str | None = None
-    project_id: str | None = None
+    container_id: str | None = None
     scopes: list[Literal["read", "write", "admin"]] | None = None
     active: bool | None = None
 
@@ -443,7 +443,7 @@ class ApiKeyOut(BaseModel):
     id: str
     name: str
     key_preview: str = ""  # "tdp_****xxxx" — masked after creation
-    project_id: str | None
+    container_id: str | None
     scopes: list[str]
     active: bool
     last_used_at: datetime | None
@@ -458,7 +458,7 @@ class ApiKeyOut(BaseModel):
             id=m.id,
             name=m.name,
             key_preview=preview,
-            project_id=m.project_id,
+            container_id=m.container_id,
             scopes=m.scopes,
             active=m.active,
             last_used_at=m.last_used_at,
@@ -476,7 +476,7 @@ class ApiKeyCreateOut(ApiKeyOut):
 class AgentTaskSummary(BaseModel):
     agent_id: str
     agent_name: str
-    project_id: str | None
+    container_id: str | None
     active: bool
     last_used_at: datetime | None
     task_counts: dict  # {"todo": N, "in_progress": N, "done": N, "failed": N}

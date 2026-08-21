@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey
-from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
+from app.routers.external_api.auth import _auth_errors, _get_api_key, _projects_in_scope, _require_scope
 from app.schemas import AgentContextOut, AgentProjectInfo, AgentProjectTaskInfo
 from app.services import graph
 from app.services.graph_registry import relation_vocabulary, type_vocabulary
@@ -31,11 +31,7 @@ def api_agent_context(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    if api_key.project_id:
-        project = graph.get_project(db, api_key.project_id)
-        projects = [project] if project and project.status == "active" else []
-    else:
-        projects = graph.all_projects(db, status="active")
+    projects = _projects_in_scope(db, api_key, status="active")
 
     priority_order = {"high": 0, "medium": 1, "low": 2}
 

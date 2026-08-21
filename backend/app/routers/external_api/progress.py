@@ -46,7 +46,7 @@ async def api_report_progress(
     x_agent_id: str | None = Header(None, alias="X-Agent-Id"),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     task = _get_task_or_404(project_id, task_id, db)
 
     progress_changes: dict = {}

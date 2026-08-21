@@ -108,3 +108,4 @@
 | [0104](0104-a-tool-call-needs-a-second-round-trip.md) | 工具叫完了，還要再打一次才輪得到文字回答 | Accepted | 2026-08-19 |
 | [0105](0105-user-registered-activity-watch-curves.md) | 活動跑馬燈下面的曲線可以自己註冊 | Accepted | 2026-08-19 |
 | [0106](0106-one-event-catalog-for-triggers-and-notifications.md) | 規則的觸發條件跟通知事件合成同一份清單 | Accepted | 2026-08-20 |
+| [0107](0107-api-key-scope-is-a-container-not-a-project.md) | API 金鑰的範圍是一個 container，不只是一個 project | Accepted | 2026-08-21 |

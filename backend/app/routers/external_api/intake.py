@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey
-from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
+from app.routers.external_api.auth import _auth_errors, _get_api_key, _project_ids_in_scope, _require_scope
 from app.schemas import CycleOut, LabelOut, TaskOut
 from app.services import cycle_admin, decision_admin, issue_sync_admin, task_filing, task_import
 from app.services.task_import import GitHubImport, ImportResult, LinearImport, TrelloImport
@@ -194,7 +194,16 @@ def api_list_decisions(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    return decision_admin.list_decisions(db, project_id=project_id or api_key.project_id, status=status)
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is None:
+        return decision_admin.list_decisions(db, project_id=project_id, status=status)
+    if project_id is not None:
+        if project_id not in scoped_project_ids:
+            return []
+        return decision_admin.list_decisions(db, project_id=project_id, status=status)
+    allowed = set(scoped_project_ids)
+    results = decision_admin.list_decisions(db, status=status)
+    return [d for d in results if d.project_id in allowed]
 
 
 @sub_router.get(

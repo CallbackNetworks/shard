@@ -21,7 +21,7 @@ from app.models import ApiKey, Integration, WebhookDelivery
 from tests.factories import make_task
 
 
-def _key(db, name, scopes, project_id=None):
+def _key(db, name, scopes, container_id=None):
     raw = f"tdp_test_{name}"
     db.add(
         ApiKey(
@@ -30,7 +30,7 @@ def _key(db, name, scopes, project_id=None):
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=scopes,
-            project_id=project_id,
+            container_id=container_id,
             active=True,
         )
     )
@@ -165,7 +165,7 @@ class TestWorkflowRules:
         assert resp.status_code == 403
 
     def test_a_project_scoped_key_cannot_write_a_global_rule(self, client, db, sample_project):
-        scoped = _key(db, "sur_scoped_rule", ["read", "write"], project_id=sample_project.id)
+        scoped = _key(db, "sur_scoped_rule", ["read", "write"], container_id=sample_project.id)
         resp = client.post(
             "/api/v1/workflow-rules",
             headers=_hdr(scoped),

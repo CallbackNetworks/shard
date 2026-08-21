@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog, ApiKey
-from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
+from app.routers.external_api.auth import (
+    _auth_errors,
+    _get_api_key,
+    _project_ids_in_scope,
+    _projects_in_scope,
+    _require_scope,
+)
 from app.schemas import SummaryOut
 from app.services import graph
 
@@ -39,11 +45,7 @@ def api_summary(
 
     now = datetime.now(UTC)
 
-    if api_key.project_id:
-        project = graph.get_project(db, api_key.project_id)
-        projects = [project] if project else []
-    else:
-        projects = graph.all_projects(db)
+    projects = _projects_in_scope(db, api_key)
 
     total_projects = len(projects)
     active_projects = sum(1 for p in projects if p.status == "active")
@@ -148,8 +150,9 @@ def api_summary(
 
     # Recent activity
     activity_query = db.query(ActivityLog).order_by(ActivityLog.created_at.desc())
-    if api_key.project_id:
-        activity_query = activity_query.filter(ActivityLog.project_id == api_key.project_id)
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None:
+        activity_query = activity_query.filter(ActivityLog.project_id.in_(scoped_project_ids))
     recent = activity_query.limit(20).all()
 
     def _time_ago(dt):

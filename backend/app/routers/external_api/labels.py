@@ -34,7 +34,7 @@ def api_list_labels(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -62,7 +62,7 @@ async def api_add_label_to_task(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     _get_task_or_404(project_id, task_id, db)
     label = graph.get_label(db, label_id, project_id=project_id)
     if not label:
@@ -88,7 +88,7 @@ async def api_remove_label_from_task(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     if not graph.unset_label(db, task_id, label_id):
         raise HTTPException(status_code=404, detail="Label not assigned to task")
     await dispatch_edge_removed(db, task_id, label_id, graph.REL_LABELED, actor=f"api:{api_key.name}")

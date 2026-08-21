@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, AlertTriangle, X, Key } from 'lucide-react'
-import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects } from '../api/client'
+import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects, getIdentities } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -23,8 +23,9 @@ export default function ApiKeys() {
   const qc = useQueryClient()
   const { data: apiKeys = [], isLoading } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys })
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const { data: identities = [] } = useQuery({ queryKey: ['identities'], queryFn: getIdentities })
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', project_id: '', scopes: ['read', 'write'] })
+  const [form, setForm] = useState({ name: '', container_id: '', scopes: ['read', 'write'] })
   const [copiedId, setCopiedId] = useState(null)
   const [newKey, setNewKey] = useState(null)   // full key shown once after creation
 
@@ -36,7 +37,7 @@ export default function ApiKeys() {
     onSuccess: (data) => {
       invalidate()
       setShowCreate(false)
-      setForm({ name: '', project_id: '', scopes: ['read', 'write'] })
+      setForm({ name: '', container_id: '', scopes: ['read', 'write'] })
       setNewKey(data.key)
       addToast(t('apiKeys.createdSuccess'), 'success')
     }
@@ -59,6 +60,15 @@ export default function ApiKeys() {
     }))
   }
 
+  const scopeLabel = (containerId) => {
+    if (!containerId) return t('apiKeys.allContainers')
+    const project = projects.find(p => p.id === containerId)
+    if (project) return t('apiKeys.scopeProject', { name: project.name })
+    const identity = identities.find(i => i.id === containerId)
+    if (identity) return t('apiKeys.scopePersona', { name: identity.name })
+    return containerId
+  }
+
   const copyKey = (id, key) => {
     navigator.clipboard.writeText(key)
     setCopiedId(id)
@@ -68,7 +78,7 @@ export default function ApiKeys() {
   const handleCreate = () => {
     createMut.mutate({
       ...form,
-      project_id: form.project_id || null,
+      container_id: form.container_id || null,
     })
   }
 
@@ -128,11 +138,20 @@ export default function ApiKeys() {
                 placeholder={t('apiKeys.namePlaceholder')}
                 className="kt-input" style={{ marginTop: 4 }} />
             </label>
-            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('apiKeys.projectScope')}
-              <select value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('apiKeys.containerScope')}
+              <select value={form.container_id} onChange={e => setForm(f => ({ ...f, container_id: e.target.value }))}
                 className="kt-input" style={{ marginTop: 4, cursor: 'pointer' }}>
-                <option value="">{t('apiKeys.allProjects')}</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="">{t('apiKeys.allContainers')}</option>
+                {projects.length > 0 && (
+                  <optgroup label={t('apiKeys.scopeProjectsGroup')}>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </optgroup>
+                )}
+                {identities.length > 0 && (
+                  <optgroup label={t('apiKeys.scopePersonasGroup')}>
+                    {identities.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                  </optgroup>
+                )}
               </select>
             </label>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('apiKeys.scopes')}
@@ -205,9 +224,7 @@ export default function ApiKeys() {
                     ))}
                   </div>
                   <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>
-                    {ak.project_id
-                      ? `Project: ${projects.find(p => p.id === ak.project_id)?.name || ak.project_id}`
-                      : 'All projects'}
+                    {scopeLabel(ak.container_id)}
                     {ak.last_used_at && ` · Last used: ${new Date(ak.last_used_at).toLocaleString()}`}
                     {` · Created: ${new Date(ak.created_at).toLocaleString()}`}
                   </div>

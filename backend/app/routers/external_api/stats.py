@@ -34,7 +34,7 @@ def api_project_stats(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     project = graph.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

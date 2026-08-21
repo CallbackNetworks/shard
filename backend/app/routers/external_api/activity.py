@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActivityLog, ApiKey
-from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
+from app.routers.external_api.auth import _auth_errors, _get_api_key, _project_ids_in_scope, _require_scope
 from app.schemas import ActivityEntryOut
 
 sub_router = APIRouter()
@@ -30,8 +30,9 @@ def api_activity(
 ):
     _require_scope(api_key, "read")
     query = db.query(ActivityLog)
-    if api_key.project_id:
-        query = query.filter(ActivityLog.project_id == api_key.project_id)
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None:
+        query = query.filter(ActivityLog.project_id.in_(scoped_project_ids))
     elif project_id:
         query = query.filter(ActivityLog.project_id == project_id)
     entries = query.order_by(ActivityLog.created_at.desc()).limit(min(limit, 200)).all()

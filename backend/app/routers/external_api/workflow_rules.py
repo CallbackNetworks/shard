@@ -9,8 +9,9 @@ so anything it offers is something the engine understands. Composing a rule with
 guessing at trigger names, condition fields and action types, and the failure mode of a
 wrong guess is a rule that saves cleanly and never fires.
 
-A project-scoped key sees global rules (``project_id: null``) because they apply to its
-project, but may only write rules bound to it.
+A container-scoped key (project or identity, ADR-0107) sees global rules
+(``project_id: null``) because they apply to everything in its scope, but may only write
+rules bound within it.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,16 +19,17 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey
-from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
+from app.routers.external_api.auth import _auth_errors, _get_api_key, _project_ids_in_scope, _require_scope
 from app.schemas import WorkflowRuleCreate, WorkflowRuleOut, WorkflowRuleUpdate
 from app.services import rule_admin
 
 sub_router = APIRouter()
 
 
-def _check_write_scope_project(api_key: ApiKey, project_id: str | None) -> None:
-    if api_key.project_id and project_id != api_key.project_id:
-        raise HTTPException(status_code=403, detail="API key can only write rules within its project")
+def _check_write_scope_project(db: Session, api_key: ApiKey, project_id: str | None) -> None:
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None and project_id not in scoped_project_ids:
+        raise HTTPException(status_code=403, detail="API key can only write rules within its scope")
 
 
 @sub_router.get(
@@ -48,7 +50,17 @@ def api_list_rules(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    return rule_admin.list_rules(db, project_id=project_id or api_key.project_id)
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if project_id is not None:
+        if scoped_project_ids is not None and project_id not in scoped_project_ids:
+            raise HTTPException(status_code=403, detail="API key does not have access to this project")
+        return rule_admin.list_rules(db, project_id=project_id)
+    if scoped_project_ids is None:
+        return rule_admin.list_rules(db)
+    if len(scoped_project_ids) == 1:
+        return rule_admin.list_rules(db, project_id=scoped_project_ids[0])
+    allowed = set(scoped_project_ids)
+    return [r for r in rule_admin.list_rules(db) if r.project_id is None or r.project_id in allowed]
 
 
 @sub_router.get(
@@ -69,7 +81,13 @@ def api_rule_vocabulary(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    return rule_admin.vocabulary(db, project_id=project_id or api_key.project_id)
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if project_id is not None:
+        if scoped_project_ids is not None and project_id not in scoped_project_ids:
+            raise HTTPException(status_code=403, detail="API key does not have access to this project")
+        return rule_admin.vocabulary(db, project_id=project_id)
+    single = scoped_project_ids[0] if scoped_project_ids and len(scoped_project_ids) == 1 else None
+    return rule_admin.vocabulary(db, project_id=single)
 
 
 @sub_router.post(
@@ -88,7 +106,7 @@ def api_rule_vocabulary(
 )
 def api_create_rule(body: WorkflowRuleCreate, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "write")
-    _check_write_scope_project(api_key, body.project_id)
+    _check_write_scope_project(db, api_key, body.project_id)
     return rule_admin.create(db, body)
 
 
@@ -101,7 +119,8 @@ def api_create_rule(body: WorkflowRuleCreate, db: Session = Depends(get_db), api
 def api_get_rule(rule_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "read")
     rule = rule_admin.get(db, rule_id)
-    if api_key.project_id and rule.project_id not in (api_key.project_id, None):
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None and rule.project_id is not None and rule.project_id not in scoped_project_ids:
         raise HTTPException(status_code=403, detail="API key does not have access to this rule")
     return rule
 
@@ -124,7 +143,7 @@ def api_update_rule(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_write_scope_project(api_key, rule_admin.load(db, rule_id).project_id)
+    _check_write_scope_project(db, api_key, rule_admin.load(db, rule_id).project_id)
     return rule_admin.update(db, rule_id, body)
 
 
@@ -136,7 +155,7 @@ def api_update_rule(
 )
 def api_delete_rule(rule_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "write")
-    _check_write_scope_project(api_key, rule_admin.load(db, rule_id).project_id)
+    _check_write_scope_project(db, api_key, rule_admin.load(db, rule_id).project_id)
     rule_admin.delete(db, rule_id)
 
 

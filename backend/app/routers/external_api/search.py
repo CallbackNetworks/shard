@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ApiKey, Node
-from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
+from app.routers.external_api.auth import _auth_errors, _get_api_key, _project_ids_in_scope, _require_scope
 from app.routers.external_api.helpers import _enrich_task_for_search
 from app.services import graph
 
@@ -34,14 +34,19 @@ def api_search(
 ):
     _require_scope(api_key, "read")
 
-    # Project-scoped keys override the project_id filter
-    if api_key.project_id:
-        project_id = api_key.project_id
+    # Container-scoped keys override the caller's project_id filter with their own scope.
+    scoped_project_ids = _project_ids_in_scope(db, api_key)
+    if scoped_project_ids is not None:
+        project_id = scoped_project_ids[0] if len(scoped_project_ids) == 1 else None
+        scope = set()
+        for pid in scoped_project_ids:
+            scope |= set(graph.contained_task_ids(db, pid))
+    else:
+        scope = set(graph.contained_task_ids(db, project_id)) if project_id else None
 
     # title/description live on the task node (description in JSON data); scan in
     # Python for dialect-safe substring matching (ADR-0033, node-only tasks).
     ql = q.lower()
-    scope = set(graph.contained_task_ids(db, project_id)) if project_id else None
     matched = [
         n
         for n in db.query(Node).filter(graph.task_type_filter(db)).order_by(Node.updated_at.desc()).all()
@@ -51,8 +56,12 @@ def api_search(
     tasks = [graph.task_view(n, db) for n in matched]
 
     projects = []
-    if not project_id:
-        for p in graph.search_projects(db, q, limit=20):
+    if scoped_project_ids is None or len(scoped_project_ids) > 1:
+        candidate_projects = graph.search_projects(db, q, limit=20)
+        if scoped_project_ids is not None:
+            allowed = set(scoped_project_ids)
+            candidate_projects = [p for p in candidate_projects if p.id in allowed]
+        for p in candidate_projects:
             p_tasks = graph.subtree_task_views(db, p.id, top_level_only=True)
             total = len(p_tasks)
             done = sum(1 for t in p_tasks if t.status == "done")

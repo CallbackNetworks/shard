@@ -35,7 +35,7 @@ def api_get_dependencies(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     _get_task_or_404(project_id, task_id, db)
 
     def _summaries(ids):
@@ -67,7 +67,7 @@ async def api_add_dependency(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     task = _get_task_or_404(project_id, task_id, db)
     blocker = graph.get_task(db, depends_on_id)
     if not blocker or depends_on_id not in graph.contained_task_ids(db, project_id):
@@ -96,7 +96,7 @@ async def api_remove_dependency(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "write")
-    _check_project_access(api_key, project_id)
+    _check_project_access(db, api_key, project_id)
     if not graph.remove_edge(db, task_id, depends_on_id, graph.REL_DEPENDS_ON):
         raise HTTPException(status_code=404, detail="Dependency not found")
     await dispatch_edge_removed(db, task_id, depends_on_id, graph.REL_DEPENDS_ON, actor=f"api:{api_key.name}")
