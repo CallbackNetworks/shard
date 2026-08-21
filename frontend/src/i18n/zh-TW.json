@@ -522,6 +522,8 @@
   "agent.noTasks": "尚無任務指派給代理",
   "agent.selfAssigned": "自行認領",
   "agent.noAgents": "尚未設定代理",
+  "agent.recentActivity": "最近活動",
+  "agent.noRecentActivity": "尚無活動紀錄",
   "nav.decisions": "決策記錄",
   "decisions.title": "決策記錄",
   "decisions.subtitle": "追蹤專案的架構與流程決策",

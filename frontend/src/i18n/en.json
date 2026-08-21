@@ -516,6 +516,8 @@
   "agent.noTasks": "No tasks assigned to agents",
   "agent.selfAssigned": "Self-assigned",
   "agent.noAgents": "No agents configured",
+  "agent.recentActivity": "Recent activity",
+  "agent.noRecentActivity": "No recent activity",
   "nav.decisions": "Decisions",
   "decisions.title": "Decisions",
   "decisions.subtitle": "Track architectural and process decisions across projects",

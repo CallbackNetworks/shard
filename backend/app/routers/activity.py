@@ -35,6 +35,9 @@ def _with_node_type(db: Session, entries: list[ActivityLog]) -> list[ActivityLog
 @router.get("", response_model=list[ActivityLogOut])
 def list_activity(
     project_id: str | None = None,
+    actor: str | None = Query(
+        default=None, description="Prefix match, e.g. 'api:My Key' also matches 'api:My Key:sub-agent'"
+    ),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -42,5 +45,7 @@ def list_activity(
     query = db.query(ActivityLog)
     if project_id:
         query = query.filter(ActivityLog.project_id == project_id)
+    if actor:
+        query = query.filter(ActivityLog.actor.like(f"{actor}%"))
     entries = query.order_by(ActivityLog.created_at.desc()).offset(offset).limit(limit).all()
     return _with_node_type(db, entries)

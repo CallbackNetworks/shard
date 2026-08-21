@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Bot, ChevronDown, ChevronRight, Clock } from 'lucide-react'
-import { getAgentSummary } from '../api/client'
+import { getAgentSummary, getActivity } from '../api/client'
 import { DARK, STATUS_MAP } from '../constants/theme'
 import { PriorityChip } from './TaskIcons'
+import ActivityFeed from './dashboard/ActivityFeed'
 
 function StatusBar({ counts }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
@@ -32,6 +33,12 @@ function AgentCard({ agent, index }) {
   const lastSeen = agent.last_used_at
     ? new Date(agent.last_used_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null
+
+  const { data: recentActivity = [] } = useQuery({
+    queryKey: ['agent-activity', agent.agent_name],
+    queryFn: () => getActivity({ actor: `api:${agent.agent_name}`, limit: 10 }),
+    enabled: expanded,
+  })
 
   return (
     <div style={{
@@ -92,14 +99,12 @@ function AgentCard({ agent, index }) {
               </span>
             )
           })}
-          {total > 0 && (
-            <button
-              onClick={() => setExpanded(v => !v)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 2 }}
-            >
-              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
-          )}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 2 }}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
         </div>
       </div>
 
@@ -121,6 +126,19 @@ function AgentCard({ agent, index }) {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {expanded && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.06)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            {t('agent.recentActivity')}
+          </div>
+          {recentActivity.length > 0 ? (
+            <ActivityFeed activities={recentActivity} />
+          ) : (
+            <div style={{ fontSize: 11, color: '#4b5563', padding: '4px 0' }}>{t('agent.noRecentActivity')}</div>
+          )}
         </div>
       )}
     </div>
