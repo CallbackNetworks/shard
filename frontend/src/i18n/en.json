@@ -298,6 +298,8 @@
   "rules.editDialog": "Edit Workflow Rule",
   "rules.namePlaceholder": "e.g. Auto-escalate urgent tasks",
   "rules.trigger": "Trigger",
+  "rules.triggerGroup.structural": "Structural",
+  "rules.triggerGroup.event": "Events",
   "rules.conditions": "Conditions (all must match)",
   "rules.addCondition": "Add Condition",
   "rules.ruleActions": "Actions",

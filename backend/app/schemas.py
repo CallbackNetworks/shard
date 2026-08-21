@@ -634,36 +634,22 @@ class WorkflowAction(BaseModel):
         return self
 
 
-def _check_trigger(v: str | None) -> str | None:
-    from app.services.rules_engine import SUPPORTED_TRIGGERS
-
-    return v if v is None else _reject_unknown("trigger", v, set(SUPPORTED_TRIGGERS))
-
-
 class WorkflowRuleCreate(BaseModel):
     name: str
     project_id: str | None = None
+    # Validity depends on the notification catalog (a DB read), so it is checked in
+    # rule_admin (ADR-0106) rather than here — the same split Integration.events already
+    # uses (event_catalog.validate_events).
     trigger: str
     conditions: list[WorkflowCondition] = []
     actions: list[WorkflowAction] = Field(min_length=1)
     active: bool = True
-
-    @field_validator("trigger")
-    @classmethod
-    def _known_trigger(cls, v: str) -> str:
-        return _check_trigger(v)
 
 
 class WorkflowRuleUpdate(BaseModel):
     name: str | None = None
     project_id: str | None = None
     trigger: str | None = None
-
-    @field_validator("trigger")
-    @classmethod
-    def _known_trigger(cls, v: str | None) -> str | None:
-        return _check_trigger(v)
-
     conditions: list[WorkflowCondition] | None = None
     actions: list[WorkflowAction] | None = None
     active: bool | None = None

@@ -55,8 +55,13 @@ vi.mock('../../api/client', () => ({
 
 import WorkflowRules from '../WorkflowRules'
 
+const STRUCTURAL_TRIGGERS = ['node.created', 'node.updated', 'node.deleted', 'edge.added', 'edge.removed']
+const EVENT_TRIGGERS = ['task.done', 'task.status_changed', 'comment.created']
+
 const VOCABULARY = {
-  triggers: ['node.created', 'node.updated', 'node.deleted', 'edge.added', 'edge.removed'],
+  triggers: [...STRUCTURAL_TRIGGERS, ...EVENT_TRIGGERS],
+  structural_triggers: STRUCTURAL_TRIGGERS,
+  event_triggers: EVENT_TRIGGERS,
   trigger_context_fields: {
     'node.created': [],
     'node.updated': ['changed_field'],

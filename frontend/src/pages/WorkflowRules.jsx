@@ -194,7 +194,11 @@ function RuleModal({ initial, onSave, onClose, t }) {
   // against that project, so offering the whole installation's labels here would offer
   // values that warn the moment they are saved.
   const vocabulary = useRuleVocabulary(form.project_id)
-  const triggers = vocabulary?.triggers ?? []
+  // Two kinds of trigger, one merged catalog (ADR-0106): structural graph events and the
+  // named events integrations already subscribe to. Grouped here purely for the picker —
+  // both validate identically on the write surface.
+  const structuralTriggers = vocabulary?.structural_triggers ?? []
+  const eventTriggers = vocabulary?.event_triggers ?? []
   const conditionFields = vocabulary?.condition_fields ?? []
   const conditionOps = vocabulary?.condition_ops ?? []
   const actionTypes = vocabulary?.action_types ?? []
@@ -250,8 +254,18 @@ function RuleModal({ initial, onSave, onClose, t }) {
       </FormField>
       <FormField label="Trigger">
         <select value={form.trigger} onChange={e => set('trigger', e.target.value)} className="kt-input">
-          {withCurrent(triggers, form.trigger)
-            .map(tr => <option key={tr} value={tr}>{triggerLabel(tr, t)}</option>)}
+          <optgroup label={t('rules.triggerGroup.structural')}>
+            {structuralTriggers.map(tr => <option key={tr} value={tr}>{triggerLabel(tr, t)}</option>)}
+          </optgroup>
+          <optgroup label={t('rules.triggerGroup.event')}>
+            {eventTriggers.map(tr => <option key={tr} value={tr}>{triggerLabel(tr, t)}</option>)}
+          </optgroup>
+          {/* A value the rule was saved with stays selectable even if the engine has since
+              dropped it (same reasoning as withCurrent, above) — kept outside both groups
+              since it belongs to neither. */}
+          {form.trigger && !structuralTriggers.includes(form.trigger) && !eventTriggers.includes(form.trigger) && (
+            <option value={form.trigger}>{triggerLabel(form.trigger, t)}</option>
+          )}
         </select>
       </FormField>
       <FormField label="Conditions (all must match)">

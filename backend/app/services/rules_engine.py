@@ -560,8 +560,8 @@ async def _fire(db: Session, node, event: str) -> int:
     from app.services.notifier import fire_node_notifications, fire_notifications
 
     if _is_task(db, node):
-        return await fire_notifications(db, node, event, source="rule", actor="workflow")
-    return await fire_node_notifications(db, node, event, source="rule", actor="workflow")
+        return await fire_notifications(db, node, event, source="rule", actor="workflow", trigger_rules=False)
+    return await fire_node_notifications(db, node, event, source="rule", actor="workflow", trigger_rules=False)
 
 
 async def _exec_action(
@@ -606,7 +606,9 @@ async def _exec_action(
         )
         db.add(comment)
         db.flush()
-        record["subscribers"] = await fire_notifications(db, task, "comment.created", source="rule", actor="workflow")
+        record["subscribers"] = await fire_notifications(
+            db, task, "comment.created", source="rule", actor="workflow", trigger_rules=False
+        )
         return task, record
 
     if atype == "fire_event":

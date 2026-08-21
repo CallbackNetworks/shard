@@ -135,7 +135,12 @@ def test_run_rules_is_only_called_from_a_dispatcher():
 
     # task_mutations owns the node triggers; graph_dispatch owns task.label_added,
     # which is an edge transition and has no node-level equivalent (ADR-0045).
+    # notifier owns named-event triggers (ADR-0106): _deliver is the one place every
+    # fire_notifications/fire_project_notifications/fire_node_notifications call funnels
+    # through, so it is the single dispatch point for that trigger kind too — the same
+    # "not scattered per-caller" invariant this guard enforces, extended to a third kind.
     assert callers == {
         "services/task_mutations.py",
         "services/graph_dispatch.py",
+        "services/notifier.py",
     }, f"run_rules must only be called from a dispatcher, but found: {sorted(callers)}"

@@ -61,14 +61,17 @@ async def _fire_status_events(
     *,
     source: str,
     actor: str | None,
+    trigger_rules: bool = True,
 ) -> None:
     """Fire the status-change notification pair, plus project.complete when applicable."""
-    await fire_notifications(db, task, "task.status_changed", source=source, actor=actor)
-    await fire_notifications(db, task, f"task.{new_status}", source=source, actor=actor)
+    await fire_notifications(db, task, "task.status_changed", source=source, actor=actor, trigger_rules=trigger_rules)
+    await fire_notifications(db, task, f"task.{new_status}", source=source, actor=actor, trigger_rules=trigger_rules)
     if new_status == "done" and project_id is not None:
         project_tasks = graph.tasks_in_project(db, project_id)
         if project_tasks and all(t.status == "done" for t in project_tasks):
-            await fire_notifications(db, task, "project.complete", source=source, actor=actor)
+            await fire_notifications(
+                db, task, "project.complete", source=source, actor=actor, trigger_rules=trigger_rules
+            )
 
 
 async def apply_task_update(
@@ -174,9 +177,11 @@ async def apply_task_update(
     task = graph.get_task(db, task_id)
 
     if status_changed:
-        await _fire_status_events(db, task, changes["status"], project_id, source=source, actor=actor)
+        await _fire_status_events(
+            db, task, changes["status"], project_id, source=source, actor=actor, trigger_rules=trigger_rules
+        )
     if "assignee" in changes and changes["assignee"] != old_assignee:
-        await fire_notifications(db, task, "task.assigned", source=source, actor=actor)
+        await fire_notifications(db, task, "task.assigned", source=source, actor=actor, trigger_rules=trigger_rules)
 
     if sync_external:
         # Deferred import: issue_sync lives in routers (imports this layer's

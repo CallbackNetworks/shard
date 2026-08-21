@@ -298,6 +298,8 @@
   "rules.editDialog": "編輯工作流規則",
   "rules.namePlaceholder": "例如 自動升級緊急任務",
   "rules.trigger": "觸發條件",
+  "rules.triggerGroup.structural": "結構事件",
+  "rules.triggerGroup.event": "通知事件",
   "rules.conditions": "條件（全部符合）",
   "rules.addCondition": "新增條件",
   "rules.ruleActions": "操作",

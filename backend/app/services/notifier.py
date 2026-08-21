@@ -388,6 +388,7 @@ async def fire_notifications(
     *,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
+    trigger_rules: bool = True,
 ) -> int:
     """Fire a task-scoped event to every integration subscribed to it.
 
@@ -399,11 +400,14 @@ async def fire_notifications(
     "delivered to nobody" — an event with no subscriber is the silent empty set this
     module keeps producing (ADR-0047), and only the caller knows whether that is worth
     reporting.
+
+    ``trigger_rules=False`` is for events a rule itself caused: they still notify and log,
+    but must not trigger another rule (ADR-0048/0106).
     """
     project: graph.ProjectView | None = graph.project_of_task(db, task.id)
     if project is None:
         return 0
-    return await _deliver(db, project, event, task=task, source=source, actor=actor)
+    return await _deliver(db, project, event, task=task, source=source, actor=actor, trigger_rules=trigger_rules)
 
 
 async def fire_project_notifications(
@@ -413,6 +417,7 @@ async def fire_project_notifications(
     *,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
+    trigger_rules: bool = True,
 ) -> int:
     """Fire an event that belongs to the project itself and has no task.
 
@@ -420,7 +425,7 @@ async def fire_project_notifications(
     payload omits the ``task`` key entirely rather than inventing a placeholder;
     consumers must treat it as optional (ADR-0047).
     """
-    return await _deliver(db, project, event, task=None, source=source, actor=actor)
+    return await _deliver(db, project, event, task=None, source=source, actor=actor, trigger_rules=trigger_rules)
 
 
 async def fire_node_notifications(
@@ -430,6 +435,7 @@ async def fire_node_notifications(
     *,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
+    trigger_rules: bool = True,
 ) -> int:
     """Fire an event for a node that is neither a task nor a project (ADR-0049).
 
@@ -438,7 +444,9 @@ async def fire_node_notifications(
     the event is unscoped and only global integrations hear it.
     """
     project = graph.container_of_node(db, node.id)
-    return await _deliver(db, project, event, task=None, node=node, source=source, actor=actor)
+    return await _deliver(
+        db, project, event, task=None, node=node, source=source, actor=actor, trigger_rules=trigger_rules
+    )
 
 
 async def _deliver(
@@ -450,6 +458,7 @@ async def _deliver(
     node=None,
     source: str = DEFAULT_SOURCE,
     actor: str | None = None,
+    trigger_rules: bool = True,
 ) -> int:
     source = normalize_source(source)
 
@@ -485,29 +494,42 @@ async def _deliver(
         }
 
     matching = matching_integrations(db, project, event, source=source)
-    if not matching:
-        return 0
 
-    email_integrations = [i for i in matching if i.type == "email"]
-    webhook_integrations = [i for i in matching if i.type != "email"]
+    if matching:
+        email_integrations = [i for i in matching if i.type == "email"]
+        webhook_integrations = [i for i in matching if i.type != "email"]
 
-    # Send email notifications
-    for integration in email_integrations:
-        if not integration.email_to:
-            logger.warning("Email integration %s has no recipients", integration.name)
-            continue
-        recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
-        prefix = integration.email_subject_prefix or "[Shard]"
-        subject, html = build_notification_email(event, payload, prefix)
-        await asyncio.to_thread(send_email, recipients, subject, html)
+        # Send email notifications
+        for integration in email_integrations:
+            if not integration.email_to:
+                logger.warning("Email integration %s has no recipients", integration.name)
+                continue
+            recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
+            prefix = integration.email_subject_prefix or "[Shard]"
+            subject, html = build_notification_email(event, payload, prefix)
+            await asyncio.to_thread(send_email, recipients, subject, html)
 
-    # Send webhook notifications with delivery logging (background — non-blocking)
-    for integration in webhook_integrations:
-        await _dispatch_webhook(db, integration, event, payload, background=True)
+        # Send webhook notifications with delivery logging (background — non-blocking)
+        for integration in webhook_integrations:
+            await _dispatch_webhook(db, integration, event, payload, background=True)
 
-    # Create in-app notification (project-scoped; a node with no container has no feed)
-    if project is not None:
-        _create_notification(db, event, task, project)
+        # Create in-app notification (project-scoped; a node with no container has no feed)
+        if project is not None:
+            _create_notification(db, event, task, project)
+
+    # Whether a rule cares about this event and whether any integration does are unrelated
+    # questions (ADR-0106): the rule trigger runs even when ``matching`` is empty, which is
+    # why this cannot live inside the ``if matching`` branch above.
+    if trigger_rules:
+        subject = task if task is not None else node
+        if subject is None and project is not None:
+            subject = graph.get_node(db, project.id)
+        if subject is not None:
+            # Deferred import: rules_engine deferred-imports this module the other way
+            # (``_fire``), so a module-level import here would be circular.
+            from app.services.rules_engine import run_rules
+
+            await run_rules(db, event, subject, {})
 
     return len(matching)
 

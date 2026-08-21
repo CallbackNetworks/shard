@@ -13,6 +13,7 @@ does not exist, so no runtime assertion can reach it.
 
 import re
 
+from app.services.event_catalog import TRIGGERABLE_EVENTS
 from app.services.notifier import (
     _SOURCE_ALIASES,
     DEFAULT_SOURCE,
@@ -124,7 +125,12 @@ class TestTheEditorIsServedTheVocabulary:
         r = client.get("/api/workflow-rules/vocabulary")
         assert r.status_code == 200
         body = r.json()
-        assert body["triggers"] == SUPPORTED_TRIGGERS
+        # The merged catalog (ADR-0106): structural triggers plus triggerable named events,
+        # split out for the editor to group its picker but also offered flat as the one
+        # list a ``trigger`` value is validated against.
+        assert body["structural_triggers"] == SUPPORTED_TRIGGERS
+        assert body["event_triggers"] == TRIGGERABLE_EVENTS
+        assert body["triggers"] == SUPPORTED_TRIGGERS + TRIGGERABLE_EVENTS
         assert body["condition_fields"] == sorted(CONDITION_FIELDS)
         assert body["condition_ops"] == sorted(CONDITION_OPS)
         assert body["action_types"] == sorted(ACTION_TYPES)

@@ -65,6 +65,21 @@ def _check_trigger_conditions(trigger: str, conditions) -> None:
         )
 
 
+def _check_trigger_known(db: Session, trigger: str) -> None:
+    """Reject a trigger that is neither a structural trigger nor a triggerable event.
+
+    Moved here rather than a pydantic validator (ADR-0106): which named events are
+    triggerable depends on the notification catalog, which needs a session to read the same
+    way ``Integration.events`` already does (``event_catalog.validate_events``).
+    """
+    from app.services.event_catalog import validate_trigger
+
+    try:
+        validate_trigger(db, trigger)
+    except ValueError as exc:
+        raise Unprocessable(str(exc)) from exc
+
+
 def load(db: Session, rule_id: str) -> WorkflowRule:
     rule = db.query(WorkflowRule).filter(WorkflowRule.id == rule_id).first()
     if not rule:
@@ -86,6 +101,7 @@ def get(db: Session, rule_id: str) -> WorkflowRule:
 
 
 def create(db: Session, body: WorkflowRuleCreate) -> WorkflowRule:
+    _check_trigger_known(db, body.trigger)
     _check_trigger_conditions(body.trigger, body.conditions)
     rule = WorkflowRule(
         name=body.name,
@@ -110,8 +126,11 @@ def update(db: Session, rule_id: str, body: WorkflowRuleUpdate) -> WorkflowRule:
         data["actions"] = [a if isinstance(a, dict) else a.model_dump() for a in data["actions"]]
     # Checked against the merged result: a PATCH that changes only the trigger can strand
     # conditions that were legal under the old one.
+    merged_trigger = data.get("trigger") or rule.trigger
+    if "trigger" in data and data["trigger"] is not None:
+        _check_trigger_known(db, merged_trigger)
     _check_trigger_conditions(
-        data.get("trigger") or rule.trigger,
+        merged_trigger,
         data["conditions"] if data.get("conditions") is not None else rule.conditions,
     )
     for k, v in data.items():
@@ -133,11 +152,20 @@ def vocabulary(db: Session, *, project_id: str | None = None) -> dict:
     is what the schema validates writes against, so anything offered is by construction
     something the engine understands.
     """
+    from app.services.event_catalog import TRIGGERABLE_EVENTS
+
     return {
-        "triggers": SUPPORTED_TRIGGERS,
+        # The merged catalog (ADR-0106): a rule may trigger on either kind, so this is the
+        # one flat list a caller validates a ``trigger`` value against. The two halves below
+        # are split out purely so an editor can group its picker the way the events catalog
+        # already groups the integration event checklist.
+        "triggers": SUPPORTED_TRIGGERS + TRIGGERABLE_EVENTS,
+        "structural_triggers": SUPPORTED_TRIGGERS,
+        "event_triggers": TRIGGERABLE_EVENTS,
         # Which condition fields each trigger can carry, so a composer offers only the ones
         # that mean something there instead of building a rule the write surface then
-        # rejects (ADR-0055).
+        # rejects (ADR-0055). Event triggers carry no change-context fields (the event name
+        # already encodes what happened), so they are absent here and fall back to "none".
         "trigger_context_fields": {k: sorted(v) for k, v in TRIGGER_CONTEXT_FIELDS.items()},
         "condition_fields": sorted(CONDITION_FIELDS),
         "condition_ops": sorted(CONDITION_OPS),
