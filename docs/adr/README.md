@@ -4,7 +4,7 @@
 |-----|-------|--------|------|
 | [0001](0001-ci-cd-tooling.md) | CI/CD Tooling | Accepted | 2026-05-29 |
 | [0002](0002-code-quality-tools.md) | Code Quality Tools | Accepted | 2026-05-29 |
-| [0003](0003-docker-dev-prod-split.md) | Docker Dev/Prod Split | Accepted | 2026-05-29 |
+| [0003](0003-docker-dev-prod-split.md) | Docker Dev/Prod Split | Superseded by ADR-0108 | 2026-05-29 |
 | [0004](0004-decision-records-as-enhanced-labels.md) | Decision Records as Enhanced Labels | Accepted | 2026-05-29 |
 | [0005](0005-mcp-server-http-proxy.md) | MCP Server HTTP Proxy Architecture | Accepted | 2026-05-29 |
 | [0006](0006-cicd-adapter-architecture.md) | CI/CD Adapter Architecture for Multi-Platform Webhook Support | Accepted | 2026-05-30 |
@@ -109,3 +109,4 @@
 | [0105](0105-user-registered-activity-watch-curves.md) | 活動跑馬燈下面的曲線可以自己註冊 | Accepted | 2026-08-19 |
 | [0106](0106-one-event-catalog-for-triggers-and-notifications.md) | 規則的觸發條件跟通知事件合成同一份清單 | Accepted | 2026-08-20 |
 | [0107](0107-api-key-scope-is-a-container-not-a-project.md) | API 金鑰的範圍是一個 container，不只是一個 project | Accepted | 2026-08-21 |
+| [0108](0108-the-production-compose-is-generated-not-overridden.md) | 正式環境的 compose 是生成的，不是覆蓋出來的 | Accepted | 2026-08-22 |

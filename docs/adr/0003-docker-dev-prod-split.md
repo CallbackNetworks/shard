@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0108
+
+(Only the compose-override half is superseded. The separate dev/prod Dockerfiles decided here
+remain in force and in use.)
 
 ## Date
 

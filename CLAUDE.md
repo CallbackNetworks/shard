@@ -38,8 +38,16 @@ docker compose up --build
 
 ### Production build
 
+**Production is deployed by the CD pipeline, not from this working copy** (ADR-0008, ADR-0108).
+Pushing to `main` builds the `Dockerfile.prod` images, publishes them, and the `deploy` job
+*generates* the production compose file on the deploy host. There is no prod compose file in
+this repo to run — a compose override could never remove the dev stack's bind mounts anyway,
+which is why the old `docker-compose.prod.yml` was retired.
+
+To exercise the production images locally (this is what CI's `integration` job does):
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.ci.yml --profile integration up --build backend-prod frontend-prod
 # Remote MCP needs no extra service: the backend serves /mcp when MCP_HTTP_TOKEN is set (ADR-0080).
 ```
 
