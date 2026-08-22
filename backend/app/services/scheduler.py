@@ -323,7 +323,11 @@ async def _send_daily_summary(db: Session) -> None:
     for intg in integrations:
         to_addrs = [addr.strip() for addr in (intg.email_to or "").split(",") if addr.strip()]
         if to_addrs:
-            email_sender.send_email(to_addrs, subject, html)
+            # smtplib is synchronous and connects with a 10s timeout, so calling it
+            # bare here would block the event loop this tick runs on — and with it
+            # every in-flight request in the worker (production runs one, ADR-0101).
+            # notifier.py has always done it this way; the scheduler had not.
+            await asyncio.to_thread(email_sender.send_email, to_addrs, subject, html)
             logger.info("Sent daily summary to %s", to_addrs)
 
 
@@ -465,7 +469,8 @@ async def _send_weekly_digest(db: Session) -> None:
     for intg in integrations:
         to_addrs = [addr.strip() for addr in (intg.email_to or "").split(",") if addr.strip()]
         if to_addrs:
-            email_sender.send_email(to_addrs, subject, html)
+            # Off the event loop, same reason as the daily summary above.
+            await asyncio.to_thread(email_sender.send_email, to_addrs, subject, html)
             logger.info("Sent weekly digest to %s", to_addrs)
 
 

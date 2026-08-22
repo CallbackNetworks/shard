@@ -5,6 +5,8 @@ from collections import defaultdict
 
 from fastapi import HTTPException, Request
 
+from app.services.client_ip import client_ip
+
 
 class RateLimiter:
     def __init__(self, max_requests: int = 60, window_seconds: int = 60):
@@ -42,8 +44,10 @@ _share_chat_limiter = RateLimiter(max_requests=20, window_seconds=3600)
 
 
 async def share_rate_limit(request: Request):
-    client_ip = request.client.host if request.client else "unknown"
-    if not _share_limiter.check(client_ip):
+    # Same resolver the login throttle uses (ADR-0109). Reading request.client.host
+    # directly, as this did, collapses every visitor behind a reverse proxy onto the
+    # proxy's address — 60/min then applies to all of them together.
+    if not _share_limiter.check(client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
 
 

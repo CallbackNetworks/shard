@@ -276,9 +276,12 @@ jobs:
           DB_SSL_MODE: ${{ vars.DB_SSL_MODE }}
           AUTH_PASSWORD: ${{ secrets.AUTH_PASSWORD }}
           AUTH_PROXY_HEADER: ${{ vars.AUTH_PROXY_HEADER }}
+          TRUSTED_PROXY_HOPS: ${{ vars.TRUSTED_PROXY_HOPS }}
           AUTH_TOKEN_TTL: ${{ vars.AUTH_TOKEN_TTL }}
           AUTH_MAX_ATTEMPTS: ${{ vars.AUTH_MAX_ATTEMPTS }}
           AUTH_LOCKOUT_SECONDS: ${{ vars.AUTH_LOCKOUT_SECONDS }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
           SMTP_HOST: ${{ vars.SMTP_HOST }}
           SMTP_PORT: ${{ vars.SMTP_PORT }}
           SMTP_USER: ${{ vars.SMTP_USER }}
@@ -288,7 +291,13 @@ jobs:
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
           SUMMARY_HOUR: ${{ vars.SUMMARY_HOUR }}
+          DIGEST_DAY: ${{ vars.DIGEST_DAY }}
+          BACKUP_ENABLED: ${{ vars.BACKUP_ENABLED }}
+          BACKUP_HOUR: ${{ vars.BACKUP_HOUR }}
+          BACKUP_KEEP: ${{ vars.BACKUP_KEEP }}
+          BACKUP_DIR: ${{ vars.BACKUP_DIR }}
           AGENT_CONTEXT_INSTRUCTIONS: ${{ vars.AGENT_CONTEXT_INSTRUCTIONS }}
           MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
           MCP_HTTP_TOKEN: ${{ secrets.MCP_HTTP_TOKEN }}
@@ -304,9 +313,17 @@ jobs:
           DB_SSL_MODE=${DB_SSL_MODE:-}
           AUTH_PASSWORD=${AUTH_PASSWORD:-}
           AUTH_PROXY_HEADER=${AUTH_PROXY_HEADER:-}
+          # The generated compose always puts the frontend's nginx in front of the
+          # backend, so one hop is the floor for this topology (ADR-0109). Raise the
+          # TRUSTED_PROXY_HOPS variable to 2 if a CDN fronts that nginx. Guessing low
+          # is the safe direction: everyone buckets under the proxy and the throttle
+          # is merely too strict, where guessing high would let a caller forge theirs.
+          TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-1}
           AUTH_TOKEN_TTL=${AUTH_TOKEN_TTL:-604800}
           AUTH_MAX_ATTEMPTS=${AUTH_MAX_ATTEMPTS:-5}
           AUTH_LOCKOUT_SECONDS=${AUTH_LOCKOUT_SECONDS:-300}
+          SECRET_KEY=${SECRET_KEY:-}
+          CORS_ORIGINS=${CORS_ORIGINS:-}
           SMTP_HOST=${SMTP_HOST:-}
           SMTP_PORT=${SMTP_PORT:-587}
           SMTP_USER=${SMTP_USER:-}
@@ -316,11 +333,37 @@ jobs:
           LLM_PROVIDER=${LLM_PROVIDER:-stub}
           LLM_API_KEY=${LLM_API_KEY:-}
           LLM_MODEL=${LLM_MODEL:-}
+          LLM_BASE_URL=${LLM_BASE_URL:-}
           SUMMARY_HOUR=${SUMMARY_HOUR:-8}
+          DIGEST_DAY=${DIGEST_DAY:-1}
+          BACKUP_ENABLED=${BACKUP_ENABLED:-1}
+          BACKUP_HOUR=${BACKUP_HOUR:-3}
+          BACKUP_KEEP=${BACKUP_KEEP:-7}
+          BACKUP_DIR=${BACKUP_DIR:-/app/data/backups}
           AGENT_CONTEXT_INSTRUCTIONS=${AGENT_CONTEXT_INSTRUCTIONS:-}
           MCP_API_KEY=${MCP_API_KEY:-}
           MCP_HTTP_TOKEN=${MCP_HTTP_TOKEN:-}
           ENVEOF
+
+          # Refuse to publish an unauthenticated instance. auth_enabled() is
+          # `AUTH_PASSWORD or AUTH_PROXY_HEADER` (app/routers/auth.py), and when it is
+          # false AuthMiddleware short-circuits and the whole internal /api is served to
+          # anyone. Both are empty-by-default so the app degrades open, which is right
+          # for `docker compose up` on a laptop and wrong for a public deploy. A missing
+          # Gitea secret is silent, so without this check the pipeline would go green
+          # having published an open instance.
+          if [ -z "${AUTH_PASSWORD:-}" ] && [ -z "${AUTH_PROXY_HEADER:-}" ]; then
+            echo "ERROR: neither AUTH_PASSWORD (secret) nor AUTH_PROXY_HEADER (var) is set."
+            echo "       Deploying now would publish an instance with no authentication."
+            echo "       Set the AUTH_PASSWORD secret, or AUTH_PROXY_HEADER if an SSO proxy fronts this origin (ADR-0030)."
+            exit 1
+          fi
+
+          # SECRET_KEY signs share-PIN sessions. Unset, share.py falls back to a random
+          # per-process secret (and warns), so every restart and every deploy silently
+          # invalidates every PIN session. Not fatal — the app works, guests just get
+          # asked for the PIN again — so this warns rather than blocks.
+          [ -n "${SECRET_KEY:-}" ] || echo "WARNING: SECRET_KEY is not set — share PIN sessions will not survive a restart or a deploy"
 
           # Whether this deployment serves remote MCP. The backend registers /mcp iff
           # MCP_HTTP_TOKEN is set (ADR-0080), so that secret alone decides — there is no

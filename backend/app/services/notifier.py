@@ -612,7 +612,9 @@ async def fire_test_notification(integration: Integration, db: Session | None = 
         recipients = [addr.strip() for addr in integration.email_to.split(",") if addr.strip()]
         prefix = integration.email_subject_prefix or "[Shard]"
         subject, html = build_notification_email("test", payload, prefix)
-        ok = send_email(recipients, subject, html)
+        # Reachable from a request handler, so keep the blocking SMTP call off the
+        # event loop — same as fire_notifications does above.
+        ok = await asyncio.to_thread(send_email, recipients, subject, html)
         return {"success": ok, "recipients": recipients} if ok else {"success": False, "error": "SMTP send failed"}
 
     if db:

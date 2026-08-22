@@ -7,6 +7,8 @@ import time
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.services.client_ip import client_ip
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Built-in shared-password auth (works standalone, no external dependency).
@@ -88,10 +90,11 @@ def is_authenticated(request: Request, token: str) -> bool:
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    # One resolver for every surface that throttles by caller (ADR-0109). This used
+    # to take the leftmost X-Forwarded-For entry, which the client writes — so a
+    # different value per attempt gave each one a fresh bucket and the lockout below
+    # could never fire.
+    return client_ip(request)
 
 
 def _throttle_ok(ip: str) -> bool:

@@ -65,6 +65,9 @@ docker compose -f docker-compose.ci.yml --profile integration up --build backend
 | `AUTH_MAX_ATTEMPTS` | Failed logins per IP before lockout (default `5`) |
 | `AUTH_LOCKOUT_SECONDS` | Login lockout window in seconds (default `300`) |
 | `AUTH_PROXY_HEADER` | Forward-auth: trust this header from an upstream SSO proxy (e.g. `Cf-Access-Authenticated-User-Email`). Only safe when the origin is reachable exclusively via that proxy — see ADR-0030 |
+| `TRUSTED_PROXY_HOPS` | How many reverse proxies sit in front (default `0` = trust no `X-Forwarded-For`). Decides how far the login throttle and share rate limiter read into it — ADR-0109. The generated production compose defaults it to `1` for its own nginx |
+| `SECRET_KEY` | Signs share-PIN sessions. Unset falls back to a random per-process secret, so PIN sessions do not survive a restart |
+| `CORS_ORIGINS` | Comma-separated allowed origins. Empty means none — correct for the same-origin production deploy behind nginx |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_USE_TLS` | Email notifications |
 | `LLM_PROVIDER` | `claude` \| `openai` \| `stub` (default `stub`) — a wire protocol, not a vendor. Overridable at runtime via Settings/`/api/settings/llm` (ADR-0096); this is just the fallback default |
 | `LLM_API_KEY` | API key for the chosen LLM provider. Same runtime-override rule as `LLM_PROVIDER` |
