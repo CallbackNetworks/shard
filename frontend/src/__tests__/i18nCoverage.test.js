@@ -36,6 +36,7 @@ const NO_PROSE = new Set([
   'components/settings/primitives.jsx',
   'components/overview/PinButton.jsx',
   'components/dashboard/TaskRow.jsx',
+  'components/dashboard/WidgetColumn.jsx',
   'components/TaskIcons.jsx',
   'App.jsx',
 ])

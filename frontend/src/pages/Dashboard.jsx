@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { Plus, FolderOpen, Archive, User, Activity, BarChart2, TrendingUp, Shield, ListChecks, GitCompare, Settings, Eye, EyeOff } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats, getGoals, getDecisions, getPreference, setPreference, getAncestry } from '../api/client'
 import AgentTasksPanel from '../components/AgentTasksPanel'
@@ -14,15 +15,18 @@ import StatCards from '../components/dashboard/StatCards'
 import DueSoonPanel from '../components/dashboard/DueSoonPanel'
 import MyWorkSection from '../components/dashboard/MyWorkSection'
 import GettingStarted from '../components/dashboard/GettingStarted'
+import WidgetColumn from '../components/dashboard/WidgetColumn'
 import { BRAND, DARK } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { deriveCommandCenter } from '../utils/commandCenter'
 import { groupProjectsByOwner } from '../utils/projectGroups'
+import { DEFAULT_WIDGET_ORDER, normalizeWidgetOrder, reorderWidgets } from '../utils/widgetLayout'
 import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Dashboard.module.css'
 
 const DEFAULT_WIDGETS = { 'stat-cards': true, 'command-hero': true, 'priority-wall': true, 'agent-tasks': true, 'due-soon': true, 'ops-sidebar': true, 'projects-grid': true }
+const WIDGET_CONFIG_IDS = ['stat-cards', 'command-hero', 'priority-wall', 'agent-tasks', 'due-soon', 'ops-sidebar', 'projects-grid']
 
 export default function Dashboard() {
   const { t } = useTranslation()
@@ -72,6 +76,25 @@ export default function Dashboard() {
     })
   }, [])
   const w = (id) => widgetVis[id] !== false
+
+  const { data: savedWidgetOrder } = useQuery({
+    queryKey: ['preference', 'dashboard-widget-order'],
+    queryFn: () => getPreference('dashboard-widget-order'),
+    staleTime: 60000,
+  })
+  const [widgetOrder, setWidgetOrder] = useState(DEFAULT_WIDGET_ORDER)
+  useEffect(() => {
+    setWidgetOrder(normalizeWidgetOrder(savedWidgetOrder?.value))
+  }, [savedWidgetOrder])
+  const widgetSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const handleWidgetDragEnd = useCallback((event) => {
+    const { active, over } = event
+    setWidgetOrder(prev => {
+      const next = reorderWidgets(prev, active.id, over?.id)
+      if (next !== prev) setPreference('dashboard-widget-order', next).catch(() => {})
+      return next
+    })
+  }, [])
   const [chartIdentityId, setChartIdentityId] = useState(null)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
@@ -120,6 +143,82 @@ export default function Dashboard() {
   const showGroups = projectGroups.length > 1
   const command = deriveCommandCenter(projects, activities, goals, decisions)
 
+  const widgetLabels = {
+    'stat-cards': t('dashboard.widgetStats'),
+    'command-hero': t('dashboard.widgetOverview'),
+    'priority-wall': t('dashboard.widgetPriorityLanes'),
+    'agent-tasks': t('dashboard.widgetAgentTasks'),
+    'due-soon': t('dashboard.widgetDueSoon'),
+    'ops-sidebar': t('dashboard.widgetSignalsBriefing'),
+    'projects-grid': t('dashboard.widgetProjects'),
+  }
+  // Only the widgets inside the two-column command layout are drag-reorderable; stat-cards
+  // (page header, spans full width above the tabs) and projects-grid (the tab's own content,
+  // tied to the filter buttons) stay fixed in position — still individually hide-able above.
+  const widgetsById = {
+    'command-hero': { label: widgetLabels['command-hero'], node: <CommandHero command={command} /> },
+    'priority-wall': { label: widgetLabels['priority-wall'], node: <PriorityWall command={command} /> },
+    'agent-tasks': { label: widgetLabels['agent-tasks'], node: <AgentTasksPanel /> },
+    'due-soon': { label: widgetLabels['due-soon'], node: <DueSoonPanel projects={projects} /> },
+    'ops-sidebar': { label: widgetLabels['ops-sidebar'], node: <OpsSidebar command={command} /> },
+  }
+
+  const projectsSection = w('projects-grid') && (
+    <>
+      {/* Filter buttons */}
+      <div className={s.filterRow}>
+        {[
+          { key: 'active',   label: t('active'),   icon: <FolderOpen size={11} />, count: active.length },
+          { key: 'archived', label: t('archived'), icon: <Archive size={11} />,    count: archived.length },
+          { key: 'all',      label: t('all'),      icon: null,                     count: projects.length },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={`${s.filterBtn} ${filter === f.key ? s.filterBtnActive : s.filterBtnInactive}`}>
+            {f.icon}{f.label}
+            <span className={s.filterCount}>{f.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {displayed.length === 0 ? (
+        <div className={s.emptyState}>
+          <FolderOpen size={36} className={s.emptyIcon} />
+          <p className={s.emptyTitle}>{focusTarget ? t('focus.empty') : t('dashboard.noProjectsEmpty')}</p>
+          <p className={s.emptySubtitle}>{focusTarget ? t('focus.focusedOn', { name: focusTarget.name }) : t('dashboard.createFirstProject')}</p>
+        </div>
+      ) : (
+        projectGroups.map(group => (
+          <div key={group.key} className={s.projectGroup}>
+            {showGroups && (
+              <div className={s.groupHeading}>
+                {group.owner?.color && (
+                  <span className={s.groupDot} style={{ background: group.owner.color }} />
+                )}
+                {group.above.length > 0 && (
+                  <span className={s.groupAbove}>{group.above.map(a => a.title).join(' › ')} ›</span>
+                )}
+                <span className={s.groupName}>{group.owner?.title || t('dashboard.unowned')}</span>
+                <span className={s.groupCount}>{group.projects.length}</span>
+                <span className={s.groupLine} />
+              </div>
+            )}
+            <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
+              {group.projects.map((p, i) => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  owners={ancestry[p.id]?.owners || []}
+                  index={i}
+                  onDelete={id => deleteMut.mutate(id)}
+                />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </>
+  )
+
   // Time-of-day greeting
   const hour = new Date().getHours()
   const greeting = hour < 12
@@ -164,7 +263,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             onClick={() => setShowWidgetConfig(v => !v)}
-            title="Configure widgets"
+            title={t('dashboard.configureWidgets')}
             style={{
               background: showWidgetConfig ? 'rgba(var(--kt-ink-rgb), 0.1)' : 'transparent',
               border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 8,
@@ -189,33 +288,28 @@ export default function Dashboard() {
       {showWidgetConfig && (
         <div style={{
           background: DARK.surface, border: `1px solid ${DARK.border}`, borderRadius: 10,
-          padding: '12px 16px', margin: '0 0 16px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+          padding: '12px 16px', margin: '0 0 16px',
         }}>
-          <span style={{ fontSize: 12, color: DARK.textMid, fontWeight: 600, marginRight: 8 }}>Widgets:</span>
-          {[
-            { id: 'stat-cards', label: 'Stats' },
-            { id: 'command-hero', label: 'Overview' },
-            { id: 'priority-wall', label: 'Priority Lanes' },
-            { id: 'agent-tasks', label: 'Agent Tasks' },
-            { id: 'due-soon', label: 'Due Soon' },
-            { id: 'ops-sidebar', label: 'Signals & Briefing' },
-            { id: 'projects-grid', label: 'Projects' },
-          ].map(item => (
-            <button
-              key={item.id}
-              onClick={() => toggleWidget(item.id)}
-              style={{
-                background: w(item.id) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.04)',
-                border: `1px solid ${w(item.id) ? 'rgba(250,204,21,0.3)' : 'rgba(var(--kt-ink-rgb), 0.1)'}`,
-                borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
-                fontSize: 11, color: w(item.id) ? BRAND : DARK.textDim,
-                display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
-              }}
-            >
-              {w(item.id) ? <Eye size={11} /> : <EyeOff size={11} />}
-              {item.label}
-            </button>
-          ))}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: DARK.textMid, fontWeight: 600, marginRight: 8 }}>{t('dashboard.widgetsLabel')}</span>
+            {WIDGET_CONFIG_IDS.map(id => (
+              <button
+                key={id}
+                onClick={() => toggleWidget(id)}
+                style={{
+                  background: w(id) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.04)',
+                  border: `1px solid ${w(id) ? 'rgba(250,204,21,0.3)' : 'rgba(var(--kt-ink-rgb), 0.1)'}`,
+                  borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                  fontSize: 11, color: w(id) ? BRAND : DARK.textDim,
+                  display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
+                }}
+              >
+                {w(id) ? <Eye size={11} /> : <EyeOff size={11} />}
+                {widgetLabels[id]}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: DARK.textDim, marginTop: 8 }}>{t('dashboard.widgetDragHint')}</div>
         </div>
       )}
 
@@ -310,68 +404,33 @@ export default function Dashboard() {
           <GettingStarted onNewProject={() => setShowForm(true)} isMobile={isMobile} />
         ) : (
           <div className={`${s.commandLayout} ${isMobile ? s.commandLayoutMobile : s.commandLayoutDesktop}`}>
-            <div className={s.commandMainColumn}>
-              {w('command-hero') && <CommandHero command={command} />}
-
-              {w('priority-wall') && <PriorityWall command={command} />}
-
-              {w('agent-tasks') && <AgentTasksPanel />}
-
-              {w('due-soon') && <DueSoonPanel projects={projects} />}
-
-              {/* Filter buttons */}
-              <div className={s.filterRow}>
-                {[
-                  { key: 'active',   label: t('active'),   icon: <FolderOpen size={11} />, count: active.length },
-                  { key: 'archived', label: t('archived'), icon: <Archive size={11} />,    count: archived.length },
-                  { key: 'all',      label: t('all'),      icon: null,                     count: projects.length },
-                ].map(f => (
-                  <button key={f.key} onClick={() => setFilter(f.key)}
-                    className={`${s.filterBtn} ${filter === f.key ? s.filterBtnActive : s.filterBtnInactive}`}>
-                    {f.icon}{f.label}
-                    <span className={s.filterCount}>{f.count}</span>
-                  </button>
-                ))}
-              </div>
-
-              {displayed.length === 0 ? (
-                <div className={s.emptyState}>
-                  <FolderOpen size={36} className={s.emptyIcon} />
-                  <p className={s.emptyTitle}>{focusTarget ? t('focus.empty') : t('dashboard.noProjectsEmpty')}</p>
-                  <p className={s.emptySubtitle}>{focusTarget ? t('focus.focusedOn', { name: focusTarget.name }) : t('dashboard.createFirstProject')}</p>
+            {showWidgetConfig ? (
+              <DndContext sensors={widgetSensors} collisionDetection={closestCenter} onDragEnd={handleWidgetDragEnd}>
+                <div className={s.commandMainColumn}>
+                  <WidgetColumn
+                    colKey="main" ids={widgetOrder.main.filter(w)} widgets={widgetsById}
+                    editing emptyLabel={t('dashboard.widgetColumnEmpty')}
+                  />
+                  {projectsSection}
                 </div>
-              ) : (
-                projectGroups.map(group => (
-                  <div key={group.key} className={s.projectGroup}>
-                    {showGroups && (
-                      <div className={s.groupHeading}>
-                        {group.owner?.color && (
-                          <span className={s.groupDot} style={{ background: group.owner.color }} />
-                        )}
-                        {group.above.length > 0 && (
-                          <span className={s.groupAbove}>{group.above.map(a => a.title).join(' › ')} ›</span>
-                        )}
-                        <span className={s.groupName}>{group.owner?.title || t('dashboard.unowned')}</span>
-                        <span className={s.groupCount}>{group.projects.length}</span>
-                        <span className={s.groupLine} />
-                      </div>
-                    )}
-                    <div className={`${s.projectGrid} ${isMobile ? s.projectGridMobile : s.projectGridDesktop}`}>
-                      {group.projects.map((p, i) => (
-                        <ProjectCard
-                          key={p.id}
-                          project={p}
-                          owners={ancestry[p.id]?.owners || []}
-                          index={i}
-                          onDelete={id => deleteMut.mutate(id)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {w('ops-sidebar') && <OpsSidebar command={command} />}
+                <div className={s.commandSidebarColumn}>
+                  <WidgetColumn
+                    colKey="sidebar" ids={widgetOrder.sidebar.filter(w)} widgets={widgetsById}
+                    editing emptyLabel={t('dashboard.widgetColumnEmpty')}
+                  />
+                </div>
+              </DndContext>
+            ) : (
+              <>
+                <div className={s.commandMainColumn}>
+                  <WidgetColumn colKey="main" ids={widgetOrder.main.filter(w)} widgets={widgetsById} editing={false} />
+                  {projectsSection}
+                </div>
+                <div className={s.commandSidebarColumn}>
+                  <WidgetColumn colKey="sidebar" ids={widgetOrder.sidebar.filter(w)} widgets={widgetsById} editing={false} />
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

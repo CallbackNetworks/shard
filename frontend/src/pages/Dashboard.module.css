@@ -877,6 +877,62 @@
   min-width: 0;
 }
 
+.commandSidebarColumn {
+  min-width: 0;
+}
+
+/* ── Draggable widget columns (reorder mode) ────────────────────────── */
+.widgetColumnDrop {
+  display: flex;
+  flex-direction: column;
+  min-height: 24px;
+  border-radius: 8px;
+  transition: background 0.15s, outline-color 0.15s;
+}
+
+.widgetColumnDropOver {
+  background: rgba(250, 204, 21, 0.05);
+  outline: 2px dashed rgba(250, 204, 21, 0.35);
+  outline-offset: 6px;
+}
+
+.widgetColumnEmpty {
+  border: 1px dashed rgba(var(--kt-ink-rgb), 0.12);
+  border-radius: 8px;
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(var(--kt-ink-rgb), 0.3);
+}
+
+.widgetSlot {
+  display: flex;
+  flex-direction: column;
+}
+
+.widgetDragHandle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border: 1px dashed rgba(var(--kt-ink-rgb), 0.15);
+  border-radius: 6px 6px 0 0;
+  background: rgba(250, 204, 21, 0.06);
+  color: rgba(var(--kt-ink-rgb), 0.4);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.widgetDragHandle:active {
+  cursor: grabbing;
+}
+
 .commandHero {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
