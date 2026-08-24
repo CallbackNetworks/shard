@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import logging
 import time
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
@@ -28,8 +29,14 @@ UNMAPPED_STATUS = "unmapped"
 MAX_TIMESTAMP_AGE_SECONDS = 300
 
 
-def _verify_signature(secret: str | None, request_body: bytes, headers: dict[str, str]) -> bool:
+def _verify_signature(secret: str | None, request_body: bytes, headers: dict[str, str]) -> tuple[bool, str | None]:
     """Prove the caller holds this node's signing key.
+
+    Returns ``(accepted, replay_key)``. ``replay_key`` is a digest of the signature and
+    is present only for schemes that sign the *body*: an identical replay then produces
+    an identical key, which is what :func:`_check_duplicate` keys on. GitLab's plain
+    token is deliberately excluded — it is the same constant on every request, so
+    deduplicating on it would reject every callback after the first.
 
     Supports GitHub HMAC-SHA256, GitLab's plain token, and a generic HMAC header.
 
@@ -42,7 +49,7 @@ def _verify_signature(secret: str | None, request_body: bytes, headers: dict[str
     missing secret there means nobody has configured it yet — same refusal applies.
     """
     if not secret:
-        return False
+        return False, None
 
     h = {k.lower(): v for k, v in headers.items()}
 
@@ -50,38 +57,86 @@ def _verify_signature(secret: str | None, request_body: bytes, headers: dict[str
     gh_sig = h.get("x-hub-signature-256", "")
     if gh_sig.startswith("sha256="):
         expected = hmac.new(secret.encode(), request_body, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(f"sha256={expected}", gh_sig)
+        ok = hmac.compare_digest(f"sha256={expected}", gh_sig)
+        return ok, (_replay_key(gh_sig) if ok else None)
 
     # GitLab-style secret token (X-Gitlab-Token: <token>)
     gl_token = h.get("x-gitlab-token", "")
     if gl_token:
-        return hmac.compare_digest(secret, gl_token)
+        # No replay key: this token does not vary with the body.
+        return hmac.compare_digest(secret, gl_token), None
 
     # Generic HMAC via X-Signature header
     generic_sig = h.get("x-signature", "")
     if generic_sig.startswith("sha256="):
         expected = hmac.new(secret.encode(), request_body, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(f"sha256={expected}", generic_sig)
+        ok = hmac.compare_digest(f"sha256={expected}", generic_sig)
+        return ok, (_replay_key(generic_sig) if ok else None)
 
     # If secret is set but no recognized signature header was provided, reject
-    return False
+    return False, None
+
+
+def _replay_key(signature: str) -> str:
+    """A storable stand-in for a signature.
+
+    The signature itself is an HMAC and does not disclose the key, but the delivery
+    log is a path out for credentials once already (ADR-0085), so nothing derived
+    from a secret is written to it in the clear.
+    """
+    return hashlib.sha256(signature.encode()).hexdigest()
 
 
 def _check_replay(headers: dict[str, str]) -> bool:
-    """
-    Check timestamp-based replay protection (optional).
-    If X-Webhook-Timestamp is present, reject if too old.
+    """Reject a request whose ``X-Webhook-Timestamp`` is stale or unreadable.
+
+    A missing header still passes: GitHub, GitLab, Jenkins, Drone and Bitbucket do not
+    send one, and requiring it would refuse every real CI integration. Body-bound
+    replay is caught by :func:`_check_duplicate` instead, which needs nothing of the
+    sender.
+
+    A *malformed* header no longer passes. It used to, which meant the check was
+    skippable by anyone who sent `X-Webhook-Timestamp: x` — the caller chose whether
+    the protection ran.
     """
     h = {k.lower(): v for k, v in headers.items()}
     ts_str = h.get("x-webhook-timestamp", "")
     if not ts_str:
-        return True  # No timestamp header = skip check
+        return True
 
     try:
         ts = int(ts_str)
-        return abs(time.time() - ts) <= MAX_TIMESTAMP_AGE_SECONDS
     except (ValueError, TypeError):
-        return True  # Malformed timestamp = skip check
+        return False
+    return abs(time.time() - ts) <= MAX_TIMESTAMP_AGE_SECONDS
+
+
+def _check_duplicate(db: Session, node_id: str, replay_key: str | None) -> bool:
+    """False if this exact signed body was already accepted for this node, recently.
+
+    Replay protection that does not depend on the sender: a replayed request carries a
+    byte-identical body and therefore an identical signature. Bounded to
+    ``MAX_TIMESTAMP_AGE_SECONDS`` so a provider legitimately re-sending the same
+    payload later is not refused forever, and so the lookup stays on a narrow index
+    range. Within that window two identical signed bodies are indistinguishable from a
+    replay, and treating them as one is the safer reading.
+
+    A delivery the handler *failed* leaves no row (the event is committed with the rest
+    of the work), so a provider's retry after an error is still accepted.
+    """
+    if not replay_key:
+        return True
+    cutoff = datetime.now(UTC) - timedelta(seconds=MAX_TIMESTAMP_AGE_SECONDS)
+    seen = (
+        db.query(WebhookEvent.id)
+        .filter(
+            WebhookEvent.task_id == node_id,
+            WebhookEvent.signature_digest == replay_key,
+            WebhookEvent.created_at >= cutoff,
+        )
+        .first()
+    )
+    return seen is None
 
 
 @router.post("/callback/{callback_token}")
@@ -123,12 +178,16 @@ async def webhook_callback(
     headers = dict(request.headers)
 
     # Signature verification
-    if not _verify_signature((node.data or {}).get("webhook_secret"), body_bytes, headers):
+    signature_ok, replay_key = _verify_signature((node.data or {}).get("webhook_secret"), body_bytes, headers)
+    if not signature_ok:
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
-    # Replay protection
+    # Replay protection, two layers: the sender's timestamp when it offers one, and
+    # the signature itself, which every body-signing provider gives us for free.
     if not _check_replay(headers):
         raise HTTPException(status_code=401, detail="Webhook request expired (replay protection)")
+    if not _check_duplicate(db, node.id, replay_key):
+        raise HTTPException(status_code=409, detail="Webhook already delivered (replay protection)")
 
     # Parse JSON body
     import json
@@ -156,6 +215,7 @@ async def webhook_callback(
         triggered_by=normalized.get("triggered_by"),
         test_summary=normalized.get("test_summary"),
         raw_payload=normalized.get("raw_payload"),
+        signature_digest=replay_key,
     )
     db.add(webhook_event)
 

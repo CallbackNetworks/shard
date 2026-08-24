@@ -21,7 +21,7 @@ from app.models import (
 from app.services import graph
 from app.services.activity import log_activity
 from app.services.llm import get_provider
-from app.services.pin_utils import check_pin
+from app.services.pin_utils import check_pin, hash_pin, needs_rehash
 from app.services.rate_limiter import share_chat_rate_limit, share_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -500,6 +500,18 @@ def verify_share_node_pin(token: str, body: PinVerifyRequest, response: Response
         raise HTTPException(status_code=400, detail="No PIN set for this share link")
     if not check_pin(body.pin, pin_hash):
         raise HTTPException(status_code=403, detail="Invalid PIN")
+
+    # Upgrade-on-use: this is the only moment the plaintext PIN is in hand, so it is
+    # the only moment a legacy single-round hash can be replaced without asking the
+    # owner to set a new one. Best-effort — a failure here must not cost the guest
+    # the unlock they just earned.
+    if needs_rehash(pin_hash):
+        try:
+            graph.update_node(db, node.id, share_pin_hash=hash_pin(body.pin))
+            db.commit()
+        except Exception:
+            logger.warning("Could not upgrade share PIN hash for node %s", node.id, exc_info=True)
+            db.rollback()
 
     ts = int(datetime.now(UTC).timestamp())
     response.set_cookie(

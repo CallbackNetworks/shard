@@ -111,3 +111,4 @@
 | [0107](0107-api-key-scope-is-a-container-not-a-project.md) | API 金鑰的範圍是一個 container，不只是一個 project | Accepted | 2026-08-21 |
 | [0108](0108-the-production-compose-is-generated-not-overridden.md) | 正式環境的 compose 是生成的，不是覆蓋出來的 | Accepted | 2026-08-22 |
 | [0109](0109-one-answer-to-who-is-calling.md) | 「誰在呼叫」只有一個答案，而信任多深是部署知識 | Accepted | 2026-08-22 |
+| [0110](0110-replay-protection-the-sender-does-not-opt-into.md) | 重播防護不能由寄件方決定要不要開 | Accepted | 2026-08-24 |

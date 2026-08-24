@@ -571,17 +571,41 @@ def parents_of(db: Session, node_id: str) -> list[Node]:
 
 
 def ancestors_of(db: Session, node_id: str) -> list[Node]:
-    """All transitive parents via ``contains``, breadth-first, de-duplicated."""
+    """All transitive parents via ``contains``, breadth-first, de-duplicated.
+
+    One query per *level*, the same shape as :func:`descendants_of` — this used to
+    call :func:`parents_of` once per node, which is fine for one lookup and ruinous
+    for a page of them: every v1 access check runs this walk, so a 2000-node
+    ``/graph/map`` cost 2000 walks of one query per ancestor. ``IN`` batches stay
+    chunked so a wide level cannot hit a driver's bind-parameter limit.
+
+    Order is breadth-first by level; within a level it follows the edge ordering
+    ``parents_of`` uses (``position`` then ``created_at``), so a caller reading only
+    the first entry — ``ancestry``'s root-first trails, ``nearest_ancestor_of_type``
+    — still gets the same answer it did before.
+    """
     seen: set[str] = set()
     ordered: list[Node] = []
-    queue: deque[str] = deque([node_id])
-    while queue:
-        current = queue.popleft()
-        for parent in parents_of(db, current):
+    frontier: list[str] = [node_id]
+    while frontier:
+        level: list[Node] = []
+        for start in range(0, len(frontier), _IN_CHUNK):
+            rows = db.execute(
+                select(Node)
+                .join(Edge, Edge.source_id == Node.id)
+                .where(
+                    Edge.rel_type == REL_CONTAINS,
+                    Edge.target_id.in_(frontier[start : start + _IN_CHUNK]),
+                )
+                .order_by(Edge.position, Edge.created_at)
+            ).scalars()
+            level.extend(rows)
+        frontier = []
+        for parent in level:
             if parent.id not in seen:
                 seen.add(parent.id)
                 ordered.append(parent)
-                queue.append(parent.id)
+                frontier.append(parent.id)
     return ordered
 
 

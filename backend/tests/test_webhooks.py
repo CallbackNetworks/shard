@@ -155,3 +155,72 @@ def test_callback_same_status_logs_no_activity(post_callback, db, sample_project
     assert resp.status_code == 200
     rows = db.query(ActivityLog).filter(ActivityLog.action == "task.status_changed").count()
     assert rows == 0
+
+
+class TestReplayProtection:
+    """A signed body must not be accepted twice.
+
+    The timestamp header cannot carry this on its own: none of the real providers
+    (GitHub, GitLab, Jenkins, Drone, Bitbucket) send one, so requiring it would refuse
+    every genuine integration. The signature is body-bound, so a replay presents an
+    identical one — which is protection the sender does not have to opt into.
+    """
+
+    def test_a_replayed_callback_is_refused(self, post_callback, db, sample_project):
+        task = _make_task(db, sample_project.id)
+        payload = {"status": "in_progress", "message": "build 41"}
+
+        first = post_callback(task, payload)
+        assert first.status_code == 200
+
+        replay = post_callback(task, payload)
+        assert replay.status_code == 409
+        assert "already delivered" in replay.json()["detail"]
+
+    def test_a_different_body_is_not_a_replay(self, post_callback, db, sample_project):
+        task = _make_task(db, sample_project.id)
+        assert post_callback(task, {"status": "in_progress", "message": "build 41"}).status_code == 200
+        assert post_callback(task, {"status": "done", "message": "build 42"}).status_code == 200
+
+    def test_the_same_body_to_a_different_task_is_not_a_replay(self, post_callback, db, sample_project):
+        payload = {"status": "done"}
+        one = _make_task(db, sample_project.id, title="One")
+        two = _make_task(db, sample_project.id, title="Two")
+        assert post_callback(one, payload).status_code == 200
+        assert post_callback(two, payload).status_code == 200
+
+    def test_a_rejected_delivery_leaves_no_replay_record(self, post_callback, db, sample_project):
+        """A provider retrying after a failure must still get through."""
+        task = _make_task(db, sample_project.id)
+        payload = {"status": "done"}
+
+        bad = post_callback(task, payload, secret="not-the-secret")
+        assert bad.status_code == 401
+
+        assert post_callback(task, payload).status_code == 200
+
+
+class TestTheTimestampCheckIsNotOptional:
+    def test_a_stale_timestamp_is_refused(self, post_callback, db, sample_project):
+        task = _make_task(db, sample_project.id)
+        resp = post_callback(task, {"status": "done"}, headers={"X-Webhook-Timestamp": "1000000000"})
+        assert resp.status_code == 401
+        assert "expired" in resp.json()["detail"]
+
+    def test_a_malformed_timestamp_is_refused_not_skipped(self, post_callback, db, sample_project):
+        """This used to return True, so the caller decided whether the check ran."""
+        task = _make_task(db, sample_project.id)
+        resp = post_callback(task, {"status": "done"}, headers={"X-Webhook-Timestamp": "not-a-number"})
+        assert resp.status_code == 401
+
+    def test_a_fresh_timestamp_passes(self, post_callback, db, sample_project):
+        import time
+
+        task = _make_task(db, sample_project.id)
+        resp = post_callback(task, {"status": "done"}, headers={"X-Webhook-Timestamp": str(int(time.time()))})
+        assert resp.status_code == 200
+
+    def test_no_timestamp_still_passes(self, post_callback, db, sample_project):
+        """Real providers do not send one; refusing them is not an option."""
+        task = _make_task(db, sample_project.id)
+        assert post_callback(task, {"status": "done"}).status_code == 200

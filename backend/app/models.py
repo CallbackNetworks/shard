@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -364,6 +364,10 @@ class WebhookEvent(Base):
     triggered_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     test_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     raw_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # SHA-256 of the inbound signature, for replay detection. Only body-bound schemes
+    # produce one (GitHub / generic HMAC), so GitLab-token and pre-existing rows are
+    # NULL and simply never match — absence must not look like a duplicate.
+    signature_digest: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
@@ -430,7 +434,16 @@ class Edge(Base):
     """
 
     __tablename__ = "edges"
-    __table_args__ = (UniqueConstraint("source_id", "target_id", "rel_type", name="uq_edge"),)
+    __table_args__ = (
+        UniqueConstraint("source_id", "target_id", "rel_type", name="uq_edge"),
+        # The two hottest queries in the system are "who contains this" (parents_of,
+        # ancestors_of, every access check) and "what does this contain"
+        # (descendants_of, every rollup). Both filter on a node id *and* rel_type.
+        # uq_edge leads with source_id so it cannot serve the target-side lookup at
+        # all, and neither single-column index can avoid re-filtering by rel_type.
+        Index("ix_edge_target_rel", "target_id", "rel_type"),
+        Index("ix_edge_source_rel", "source_id", "rel_type"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     source_id: Mapped[str] = mapped_column(

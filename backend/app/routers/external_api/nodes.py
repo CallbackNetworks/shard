@@ -21,8 +21,8 @@ from app.routers.external_api.auth import (
     _check_create_access,
     _check_node_access,
     _get_api_key,
-    _node_accessible,
     _require_scope,
+    _visible_node_ids,
 )
 from app.schemas import (
     AncestryOut,
@@ -85,7 +85,19 @@ def api_graph_map(
     if types:
         keys = [k.strip() for k in types.split(",") if k.strip()]
         q = q.filter(Node.type.in_(keys))
-    nodes = [n for n in q.order_by(Node.created_at).limit(limit).all() if _node_accessible(api_key, db, n)]
+    # Visibility is part of the query, not a filter over its result. Applied after
+    # .limit() — as it was — a container-scoped key silently received fewer rows than
+    # it asked for, with no way to tell a short page from the end of the graph, and
+    # paid one ancestor walk per candidate row (up to 5000 of them). A node is visible
+    # to a container-scoped key exactly when the key's container is that node or one
+    # of its `contains` ancestors, which is the same set as the container's own
+    # descendants — one walk, resolved once, then handed to SQL.
+    visible_ids = _visible_node_ids(db, api_key)
+    if visible_ids is not None:
+        if not visible_ids:
+            return {"nodes": [], "edges": []}
+        q = q.filter(Node.id.in_(visible_ids))
+    nodes = q.order_by(Node.created_at).limit(limit).all()
     ids = {n.id for n in nodes}
     edges = (
         db.query(Edge)
@@ -138,7 +150,11 @@ def api_graph_ancestry(
 ):
     _require_scope(api_key, "read")
     node_ids = [i.strip() for i in ids.split(",") if i.strip()][: ancestry.MAX_IDS]
-    return ancestry.ancestry_for(db, node_ids, visible=lambda n: _node_accessible(api_key, db, n))
+    # Resolve the key's reach once rather than per node walked — this endpoint is
+    # batched precisely because its caller is a page of nodes (ADR-0094).
+    visible_ids = _visible_node_ids(db, api_key)
+    visible = None if visible_ids is None else (lambda n: n.id in visible_ids)
+    return ancestry.ancestry_for(db, node_ids, visible=visible)
 
 
 @sub_router.get(
@@ -162,8 +178,14 @@ def api_list_nodes(
         q = q.filter(Node.type == type)
     if query:
         q = q.filter(Node.title.ilike(f"%{query}%"))
-    rows = q.order_by(Node.position, Node.created_at).limit(limit).all()
-    return [n for n in rows if _node_accessible(api_key, db, n)]
+    # Same rule as /graph/map: the key's scope narrows the query, not its result, so
+    # `limit` counts rows the caller may actually see.
+    visible_ids = _visible_node_ids(db, api_key)
+    if visible_ids is not None:
+        if not visible_ids:
+            return []
+        q = q.filter(Node.id.in_(visible_ids))
+    return q.order_by(Node.position, Node.created_at).limit(limit).all()
 
 
 @sub_router.post(
@@ -327,7 +349,9 @@ def api_node_subtree(
     _check_node_access(api_key, db, node)
     # A project-scoped key must not learn the titles of containers outside its project,
     # so the child list is filtered by the same access rule the node reads use.
-    return enrich_container_subtree(node, db, visible=lambda child: _node_accessible(api_key, db, child))
+    visible_ids = _visible_node_ids(db, api_key)
+    visible = None if visible_ids is None else (lambda child: child.id in visible_ids)
+    return enrich_container_subtree(node, db, visible=visible)
 
 
 # ── Edges ─────────────────────────────────────────────────────────

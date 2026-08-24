@@ -69,6 +69,25 @@ def _check_node_access(api_key: ApiKey, db: Session, node):
         raise HTTPException(status_code=403, detail="API key does not have access to this node")
 
 
+def _visible_node_ids(db: Session, api_key: ApiKey) -> set[str] | None:
+    """Every node id a container-scoped key may see; ``None`` means unrestricted.
+
+    The set-shaped twin of :func:`_node_accessible`, for endpoints that ask about a
+    *page* of nodes rather than one. Asking per node is one ancestor walk per row;
+    asking once is one descendant walk, and it can go into the SQL that selects the
+    page instead of filtering what the page already returned.
+
+    The two agree by construction: ``_node_accessible`` holds when the key's
+    container is the node or one of its ``contains`` ancestors, and that is exactly
+    the container's own ``contains`` descendants (plus itself).
+    """
+    from app.services import graph
+
+    if not api_key.container_id:
+        return None
+    return {api_key.container_id} | graph.descendants_of(db, api_key.container_id)
+
+
 def _project_ids_in_scope(db: Session, api_key: ApiKey) -> list[str] | None:
     """Every project id a container-scoped key may act on; ``None`` means unrestricted (ADR-0107).
 
