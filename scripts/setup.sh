@@ -165,7 +165,7 @@ bold "Setup complete."
 if is_tty && ask_yn "Start Shard now? (first build can take a few minutes)" y; then
   echo
   info "Running: docker compose up --build"
-  info "When it says the servers are ready, open http://localhost:5173/app"
+  info "When it says the servers are ready, open http://localhost:5173/"
   info "Press Ctrl+C to stop."
   echo
   exec docker compose up --build
@@ -173,5 +173,5 @@ else
   echo "When you're ready, start it with:"
   echo "  docker compose up --build     # first run"
   echo "  docker compose up             # afterwards"
-  echo "Then open http://localhost:5173/app"
+  echo "Then open http://localhost:5173/"
 fi

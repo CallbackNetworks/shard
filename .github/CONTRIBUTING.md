@@ -15,7 +15,7 @@ docker compose up             # subsequent runs
 ```
 
 - Backend API + Swagger UI: http://localhost:8000/docs
-- Frontend: http://localhost:5173/app
+- Frontend: http://localhost:5173/
 
 See `README.md` and `CLAUDE.md` for the full environment reference.
 

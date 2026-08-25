@@ -65,7 +65,7 @@ docker compose up
 
 `scripts/setup.sh --check` verifies your environment is ready without changing anything.
 
-- Management UI: http://localhost:5173/app
+- Management UI: http://localhost:5173/
 - Public status page: http://localhost:5173/
 - API docs (Swagger): http://localhost:8000/docs
 

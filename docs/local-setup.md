@@ -15,7 +15,7 @@ cp .env.example .env   # edit as needed
 docker compose up --build
 ```
 
-- Frontend: http://localhost:5173/app
+- Frontend: http://localhost:5173/
 - Backend API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 

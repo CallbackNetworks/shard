@@ -4,14 +4,14 @@ test.use(devices['iPhone 13'])
 
 test.describe('Mobile Layout', () => {
   test('hamburger menu is visible on mobile', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const hamburger = page.locator('.mobile-menu-btn')
     await expect(hamburger).toBeVisible()
   })
 
   test('sidebar opens when hamburger is clicked', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const hamburger = page.locator('.mobile-menu-btn')
     await hamburger.click()
@@ -20,7 +20,7 @@ test.describe('Mobile Layout', () => {
   })
 
   test('main content is full width on mobile', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const main = page.locator('main')
     const box = await main.boundingBox()
@@ -30,7 +30,7 @@ test.describe('Mobile Layout', () => {
   })
 
   test('notification center is positioned correctly', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const bell = page.locator('.kt-notification-center')
     const box = await bell.boundingBox()

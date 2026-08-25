@@ -219,6 +219,19 @@ jobs:
           docker cp docs/api.md "$CID:/tmp/api.md"
           docker exec "$CID" python /tmp/check_api_docs.py http://localhost:8000/openapi.json /tmp/api.md
 
+      # The other direction: a URL the project publishes has to be a route the app has.
+      # `/app` answered 200 for two months after the routes moved to `/` — nginx serves
+      # index.html for any SPA path, so the shell rendered and the content was blank,
+      # in every doc, the setup script, and every e2e test at once.
+      - name: Check the documented URLs against the route table
+        run: |
+          CID=$(docker compose -f docker-compose.ci.yml --profile integration ps -q backend-prod)
+          docker exec "$CID" mkdir -p /tmp/urlcheck
+          tar cf - scripts/check_documented_urls.py frontend/src/App.jsx e2e/tests \
+            README.md CLAUDE.md .github/CONTRIBUTING.md docs/local-setup.md docs/deployment.md scripts/setup.sh \
+            | docker exec -i "$CID" tar xf - -C /tmp/urlcheck
+          docker exec "$CID" python /tmp/urlcheck/scripts/check_documented_urls.py /tmp/urlcheck
+
       - name: Wait for frontend health
         run: |
           for i in $(seq 1 30); do

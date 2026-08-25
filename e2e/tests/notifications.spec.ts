@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Floating Panels', () => {
   test('notification bell is visible and clickable', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const bell = page.locator('.kt-notification-center button').first()
     await expect(bell).toBeVisible()
@@ -12,14 +12,14 @@ test.describe('Floating Panels', () => {
   })
 
   test('assistant FAB is visible', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const fab = page.locator('.kt-assistant-fab')
     await expect(fab).toBeVisible()
   })
 
   test('assistant panel opens on click', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const fab = page.locator('.kt-assistant-fab')
     await fab.click()
@@ -28,7 +28,7 @@ test.describe('Floating Panels', () => {
   })
 
   test('floating panels do not block main content', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
     const main = page.locator('main')
     const mainBox = await main.boundingBox()

@@ -44,24 +44,7 @@ test.afterAll(async ({ request }) => {
   if (projectId) await request.delete(`${API}/api/nodes/${projectId}`)
 })
 
-// BLOCKED, not flaky. Under Playwright the app renders its chrome — sidebar, ticker,
-// activity strip — and `.kt-route-shell` stays completely empty on *every* route,
-// dashboard included. No console error, no failed request, no pageerror, no Suspense
-// fallback: the routed component simply produces nothing. Confirmed against both the
-// Vite dev server and the built prod image, with `/api/auth/me` returning
-// `auth_required: false`, so it is neither a dev-server artifact nor the auth gate.
-//
-// Every assertion below is correct and the seeding works (the API returns 201 and the
-// activity ticker reports the writes). They cannot pass until the blank render is
-// understood, so they are marked rather than deleted — the seeding is the part that
-// was missing, and throwing it away would leave the next person to rediscover it.
-//
-// The same blankness is why the rest of this suite is green: all 11 other e2e tests
-// assert only on chrome (`.layout-sidebar` visible, `#main-content` visible, the search
-// button, zero pageerrors), every one of which holds on an empty page.
 test.describe('Project Detail', () => {
-  test.fixme(true, 'routed content renders nothing under Playwright — see the note above')
-
   // `.kt-route-shell` is the routed page, and the activity ticker is its sibling
   // inside <main> (App.jsx). Scoping matters more than it looks: every ticker entry
   // names both a task and the project it was created in, so an unscoped text locator
@@ -70,10 +53,15 @@ test.describe('Project Detail', () => {
   const content = (page) => page.locator('.kt-route-shell')
 
   test('the seeded project is reachable from the dashboard', async ({ page }) => {
-    await page.goto('/app')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
 
-    const card = content(page).getByText(projectTitle).first()
+    // The card element, not a text node that happens to contain the title: the
+    // dashboard also prints project names in its activity and "my work" panels, and
+    // clicking one of those does nothing. ProjectCard is a div with an onClick
+    // (frontend/src/components/dashboard/ProjectCard.jsx), so there is no link to
+    // target by role.
+    const card = content(page).locator('[class*="projectCard"]').filter({ hasText: projectTitle }).first()
     await expect(card).toBeVisible()
     await card.click()
 
@@ -83,7 +71,7 @@ test.describe('Project Detail', () => {
   })
 
   test('the project page lists the tasks it contains', async ({ page }) => {
-    await page.goto(`/app/projects/${projectId}`)
+    await page.goto(`/projects/${projectId}`)
     await page.waitForLoadState('networkidle')
 
     // The titles, not a status vocabulary: the old assertion looked for the strings
@@ -97,7 +85,7 @@ test.describe('Project Detail', () => {
     const errors: string[] = []
     page.on('pageerror', (err) => errors.push(err.message))
 
-    await page.goto(`/app/projects/${projectId}`)
+    await page.goto(`/projects/${projectId}`)
     await page.waitForLoadState('networkidle')
 
     expect(errors, `uncaught errors: ${errors.join(' | ')}`).toHaveLength(0)

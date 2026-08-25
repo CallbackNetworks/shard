@@ -20,7 +20,7 @@ docker compose --profile mysql up --build
 ```
 
 - Backend API + Swagger UI: http://localhost:8000/docs
-- Frontend: http://localhost:5173/app
+- Frontend: http://localhost:5173/
 
 Logs: `docker compose logs -f backend` / `docker compose logs -f frontend`
 

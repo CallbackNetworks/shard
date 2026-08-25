@@ -93,7 +93,7 @@ curl http://localhost:8000/health
 # → {"status":"ok","scheduler":{"alive":true,"last_tick_at":"..."}}
 ```
 
-Visit `http://your-server-ip:5173/` for the public status page and `http://your-server-ip:5173/app` for the management UI.
+Visit `http://your-server-ip:5173/` for the management UI. (It used to live under `/app`; the routes moved to the root in June 2026 and that path now renders an empty shell.)
 
 ---
 
