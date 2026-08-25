@@ -27,13 +27,29 @@ are gone.
 import re
 from pathlib import Path
 
+from tests.source_scan import function_calls
+
 APP_DIR = Path(__file__).resolve().parent.parent / "app"
 
-DIRECT_WRITE = re.compile(r"graph\.(create_task|update_task)\(")
-PIPELINE_CALL = re.compile(r"(finalize_task_create|apply_task_update)\(")
+# Matched per *function*, not per file. A module-wide check lets one correct call site
+# excuse every other write in the same file, which is not a hypothetical: the node
+# create endpoints wrote a `contains` edge and never dispatched it, and passed this
+# guard for as long as an unrelated endpoint further down the file did dispatch. So
+# `edge.added` never fired for the one moment a node is filed into a container.
+# Dotted where the call goes through the package, bare for a direct import. Both
+# spellings are listed so neither reaches the pipeline unnoticed — and the dotted
+# form is what keeps `asyncio.create_task` out of a guard about `graph.create_task`.
+DIRECT_WRITE = {"graph.create_task", "graph.update_task", "create_task", "update_task"}
+PIPELINE_CALL = {"finalize_task_create", "apply_task_update"}
 
-EDGE_WRITE = re.compile(r"graph\.(set_label|unset_label|add_to_cycle|remove_from_cycle|add_edge|remove_edge)\(")
-EDGE_DISPATCH = re.compile(r"dispatch_edge_(added|removed)\(")
+_EDGE_FUNCS = ("set_label", "unset_label", "add_to_cycle", "remove_from_cycle", "add_edge", "remove_edge")
+EDGE_WRITE = {f"graph.{n}" for n in _EDGE_FUNCS} | set(_EDGE_FUNCS)
+EDGE_DISPATCH = {"dispatch_edge_added", "dispatch_edge_removed"}
+
+# Kept as regexes for the staleness checks, which ask a whole-file question.
+DIRECT_WRITE_RE = re.compile(r"graph\.(create_task|update_task)\(")
+EDGE_WRITE_RE = re.compile(r"graph\.(set_label|unset_label|add_to_cycle|remove_from_cycle|add_edge|remove_edge)\(")
+EDGE_DISPATCH_RE = re.compile(r"dispatch_edge_(added|removed)\(")
 
 # Files that write edges but legitimately never dispatch, with the reason.
 EDGE_ALLOWED = {
@@ -47,6 +63,18 @@ EDGE_ALLOWED = {
     # Same shape: the clone is linked into its new cycle before finalize_task_create, so
     # cycle-scoped rules see it where it belongs (moved from routers/cycles.py, ADR-0092).
     "services/cycle_admin.py": "cycle clone joins the new cycle before finalize_task_create",
+    # Creation-time containment is an *input* to the node event, not a second event.
+    # The edge is written before dispatch precisely so the pipeline can resolve the
+    # node's project from it; dispatching it as well would log a membership *change*
+    # for a node that was created there, which `test_edge_dispatch` pins at exactly one
+    # entry. A rule wanting "work arrived in this container" keys on node.created.
+    #
+    # Function-scoped: both files dispatch edges correctly everywhere else, and a
+    # file-level exemption would excuse those too.
+    "routers/nodes.py::create_node": "creation-time containment is announced by dispatch_node_created",
+    "routers/external_api/nodes.py::api_create_node": (
+        "creation-time containment is announced by dispatch_node_created"
+    ),
 }
 
 # Files exempt from needing a pipeline call, with the reason they are exempt.
@@ -61,6 +89,12 @@ ALLOWED = {
     # internal node route and `/api/v1` share (ADR-0085), and this guard is what noticed.
     "routers/issue_sync.py": "external_* linkage (inbound events use the pipeline)",
     "routers/external_api/progress.py": "progress_pct/agent_notes only",
+    # Function-scoped: the rest of this module does use the pipeline, so a file-level
+    # exemption would excuse every other tool in it. Its reason lived only in a
+    # docstring until the guard became function-granular and asked.
+    "services/assistant_tools.py::_tool_report_progress": (
+        "progress_pct/agent_notes only — same intentional bypass as external_api/progress.py"
+    ),
 }
 
 
@@ -77,9 +111,14 @@ def test_direct_task_writes_are_paired_with_the_pipeline():
         rel = path.relative_to(APP_DIR).as_posix()
         if rel in ALLOWED:
             continue
-        text = path.read_text()
-        if DIRECT_WRITE.search(text) and not PIPELINE_CALL.search(text):
-            offenders.append(rel)
+        groups = function_calls(path.read_text(), {"write": DIRECT_WRITE, "pipeline": PIPELINE_CALL})
+        for func, calls in groups.items():
+            # ALLOWED keys are `file` or `file::function` — the line number in `func`
+            # is for the message only, so an exemption does not rot when code moves.
+            if f"{rel}::{func.rsplit(':', 1)[0]}" in ALLOWED:
+                continue
+            if calls["write"] and not calls["pipeline"]:
+                offenders.append(f"{rel}::{func}")
 
     assert not offenders, (
         "These modules write tasks directly without running the task pipeline, so "
@@ -91,7 +130,7 @@ def test_direct_task_writes_are_paired_with_the_pipeline():
 
 def test_allowed_entries_are_not_stale():
     """An exemption that no longer has a direct write is dead weight — drop it."""
-    stale = [rel for rel in ALLOWED if not DIRECT_WRITE.search((APP_DIR / rel).read_text())]
+    stale = [rel for rel in ALLOWED if not DIRECT_WRITE_RE.search((APP_DIR / rel.split("::")[0]).read_text())]
     assert not stale, f"ALLOWED lists files with no direct task write any more: {stale}"
 
 
@@ -101,9 +140,13 @@ def test_direct_edge_writes_are_paired_with_the_dispatcher():
         rel = path.relative_to(APP_DIR).as_posix()
         if rel in EDGE_ALLOWED:
             continue
-        text = path.read_text()
-        if EDGE_WRITE.search(text) and not EDGE_DISPATCH.search(text):
-            offenders.append(rel)
+        groups = function_calls(path.read_text(), {"write": EDGE_WRITE, "dispatch": EDGE_DISPATCH})
+        for func, calls in groups.items():
+            # Keys are `file` or `file::function`; the line number is message-only.
+            if f"{rel}::{func.rsplit(':', 1)[0]}" in EDGE_ALLOWED:
+                continue
+            if calls["write"] and not calls["dispatch"]:
+                offenders.append(f"{rel}::{func}")
 
     assert not offenders, (
         "These modules write relationship edges without dispatching them, so outbound "
@@ -117,8 +160,8 @@ def test_edge_allowed_entries_are_not_stale():
     """An exemption is dead weight once the file stops writing edges — or starts dispatching."""
     stale = []
     for rel in EDGE_ALLOWED:
-        text = (APP_DIR / rel).read_text()
-        if not EDGE_WRITE.search(text) or EDGE_DISPATCH.search(text):
+        text = (APP_DIR / rel.split("::")[0]).read_text()
+        if not EDGE_WRITE_RE.search(text):
             stale.append(rel)
     assert not stale, f"EDGE_ALLOWED lists files that no longer need the exemption: {stale}"
 

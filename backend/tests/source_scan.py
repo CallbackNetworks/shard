@@ -10,6 +10,7 @@ They all need the same thing: find the calls to a handful of functions, and pull
 argument out of each one. That is what lives here.
 """
 
+import ast
 import re
 from pathlib import Path
 
@@ -92,3 +93,73 @@ def calls_to(source: str, *names: str):
         if re.search(r"\bdef\s+$", source[line_start : match.start()]):
             continue
         yield call_args(source, match.start())
+
+
+def _dotted(node) -> str:
+    """`a.b.c` for a nested attribute chain, `a` for a name, `""` for anything else."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        base = _dotted(node.value)
+        return f"{base}.{node.attr}" if base else node.attr
+    return ""
+
+
+def function_calls(source: str, name_sets: dict[str, set[str]]) -> dict[str, dict[str, set[str]]]:
+    """For each function in ``source``, which of several named call groups it makes.
+
+    Returns ``{"name:line": {"group": {matched names}}}``, so a guard can ask "does the
+    function that writes also dispatch" in one pass over the module.
+
+    Parsed rather than regexed because the question is *which function* a call sits in,
+    and text has no answer to that. A file-granular guard reads a whole module as one
+    scope, so one correct call site anywhere in it excuses every other — which is how an
+    undispatched ``contains`` edge sat inside this very guard's blind spot for as long
+    as its file happened to contain an unrelated dispatch elsewhere.
+
+    Names match on the attribute or the bare name (``graph.add_edge`` matches
+    ``add_edge``), so a module that imports a helper directly is held to the same rule
+    as one that reaches it through a package.
+    """
+    tree = ast.parse(source)
+    out: dict[str, dict[str, set[str]]] = {}
+    local_calls: dict[str, set[str]] = {}
+    by_name: dict[str, list[str]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        called = set()
+        for inner in ast.walk(node):
+            if not isinstance(inner, ast.Call):
+                continue
+            func = inner.func
+            if isinstance(func, ast.Attribute):
+                # Dotted, so `graph.create_task` is not confused with
+                # `asyncio.create_task` — a collision that flagged seven innocent
+                # functions the first time this was written on the bare name alone.
+                called.add(f"{_dotted(func.value)}.{func.attr}" if _dotted(func.value) else func.attr)
+            elif isinstance(func, ast.Name):
+                # Bare only for a direct import (`from ...graph import create_task`).
+                called.add(func.id)
+        out[f"{node.name}:{node.lineno}"] = {group: called & names for group, names in name_sets.items()}
+        local_calls[f"{node.name}:{node.lineno}"] = called
+        by_name.setdefault(node.name, []).append(f"{node.name}:{node.lineno}")
+
+    # A function that delegates to a module-local helper inherits what the helper does.
+    # Without this, splitting a write and its dispatch across two functions in the same
+    # module reads as a bypass — which it is not: `import_trello` writes the task and
+    # hands off to `_attach_labels_and_finalize`, which runs the pipeline. Iterated to a
+    # fixpoint so a two-hop delegation counts as well.
+    changed = True
+    while changed:
+        changed = False
+        for key, calls in local_calls.items():
+            for callee_name in calls:
+                for callee_key in by_name.get(callee_name, ()):
+                    if callee_key == key:
+                        continue
+                    for group, matched in out[callee_key].items():
+                        if matched - out[key][group]:
+                            out[key][group] |= matched
+                            changed = True
+    return out
