@@ -127,6 +127,56 @@ def test_update_api_key_not_found(client):
     assert resp.status_code == 404
 
 
+def test_rotate_api_key(client):
+    create_resp = client.post("/api/api-keys", json={"name": "Rotate Key", "scopes": ["read"]})
+    key_id = create_resp.json()["id"]
+    old_key = create_resp.json()["key"]
+
+    resp = client.post(f"/api/api-keys/{key_id}/rotate")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == key_id
+    assert data["name"] == "Rotate Key"
+    assert data["key"].startswith("tdp_")
+    assert data["key"] != old_key
+
+
+def test_rotate_api_key_invalidates_old_value(client):
+    create_resp = client.post("/api/api-keys", json={"name": "Rotate Auth Key", "scopes": ["read"]})
+    key_id = create_resp.json()["id"]
+    old_key = create_resp.json()["key"]
+
+    rotate_resp = client.post(f"/api/api-keys/{key_id}/rotate")
+    new_key = rotate_resp.json()["key"]
+
+    old_auth_resp = client.get("/api/v1/projects", headers={"X-API-Key": old_key})
+    assert old_auth_resp.status_code == 401
+
+    new_auth_resp = client.get("/api/v1/projects", headers={"X-API-Key": new_key})
+    assert new_auth_resp.status_code == 200
+
+
+def test_rotate_api_key_resets_last_used(client, db):
+    from app.models import ApiKey as ApiKeyModel
+
+    create_resp = client.post("/api/api-keys", json={"name": "Freshness Key", "scopes": ["read"]})
+    key_id = create_resp.json()["id"]
+    old_key = create_resp.json()["key"]
+
+    client.get("/api/v1/projects", headers={"X-API-Key": old_key})
+    db.expire_all()
+    assert db.query(ApiKeyModel).filter(ApiKeyModel.id == key_id).first().last_used_at is not None
+
+    client.post(f"/api/api-keys/{key_id}/rotate")
+    db.expire_all()
+    assert db.query(ApiKeyModel).filter(ApiKeyModel.id == key_id).first().last_used_at is None
+
+
+def test_rotate_api_key_not_found(client):
+    resp = client.post("/api/api-keys/does-not-exist/rotate")
+    assert resp.status_code == 404
+
+
 def test_delete_api_key(client):
     create_resp = client.post("/api/api-keys", json={"name": "Doomed Key", "scopes": ["read"]})
     key_id = create_resp.json()["id"]

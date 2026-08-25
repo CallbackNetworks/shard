@@ -80,6 +80,23 @@ def update_api_key(key_id: str, body: ApiKeyUpdate, db: Session = Depends(get_db
     return ApiKeyOut.from_model(api_key)
 
 
+@router.post("/{key_id}/rotate", response_model=ApiKeyCreateOut)
+def rotate_api_key(key_id: str, db: Session = Depends(get_db)):
+    api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    raw_key = _generate_key()
+    api_key.key = None
+    api_key.key_hash = _hash_key(raw_key)
+    api_key.key_last4 = raw_key[-4:]
+    api_key.last_used_at = None  # a fresh secret has no usage history of its own
+    log_activity(db, "api_key.rotated", actor=None, detail=f'API key "{api_key.name}" rotated', meta={"key_id": api_key.id})
+    db.commit()
+    db.refresh(api_key)
+    out = ApiKeyOut.from_model(api_key)
+    return ApiKeyCreateOut(**out.model_dump(), key=raw_key)
+
+
 @router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_api_key(key_id: str, db: Session = Depends(get_db)):
     api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()

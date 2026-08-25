@@ -2,12 +2,21 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, AlertTriangle, X, Key } from 'lucide-react'
-import { getApiKeys, createApiKey, updateApiKey, deleteApiKey, getProjects, getIdentities } from '../api/client'
+import { getApiKeys, createApiKey, updateApiKey, rotateApiKey, deleteApiKey, getProjects, getIdentities } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 
 const SCOPES = ['read', 'write', 'admin']
+const STALE_DAYS = 30
+
+// Only flags a key that *was* used and has since gone quiet — a never-used key
+// (fresh, or just rotated) has no usage history to judge staleness from.
+function staleDays(ak) {
+  if (!ak.last_used_at) return null
+  const days = Math.floor((Date.now() - new Date(ak.last_used_at).getTime()) / 86400000)
+  return days >= STALE_DAYS ? days : null
+}
 
 const METHOD_STYLE = {
   GET:    { bg: 'rgba(96,165,250,0.15)',  color: '#60a5fa' },
@@ -27,7 +36,7 @@ export default function ApiKeys() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ name: '', container_id: '', scopes: ['read', 'write'] })
   const [copiedId, setCopiedId] = useState(null)
-  const [newKey, setNewKey] = useState(null)   // full key shown once after creation
+  const [newKey, setNewKey] = useState(null)   // { value, mode: 'created' | 'rotated' } shown once
   const [editingKey, setEditingKey] = useState(null)   // the ApiKey being edited, or null
   const [editForm, setEditForm] = useState({ name: '', container_id: '', scopes: [] })
 
@@ -40,7 +49,7 @@ export default function ApiKeys() {
       invalidate()
       setShowCreate(false)
       setForm({ name: '', container_id: '', scopes: ['read', 'write'] })
-      setNewKey(data.key)
+      setNewKey({ value: data.key, mode: 'created' })
       addToast(t('apiKeys.createdSuccess'), 'success')
     }
   })
@@ -48,6 +57,15 @@ export default function ApiKeys() {
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => updateApiKey(id, data),
     onSuccess: () => { invalidate(); addToast(t('apiKeys.updatedSuccess'), 'success') },
+  })
+
+  const rotateMut = useMutation({
+    mutationFn: rotateApiKey,
+    onSuccess: (data) => {
+      invalidate()
+      setNewKey({ value: data.key, mode: 'rotated' })
+      addToast(t('apiKeys.rotatedSuccess'), 'success')
+    },
   })
 
   const deleteMut = useMutation({
@@ -113,7 +131,7 @@ export default function ApiKeys() {
         <div className="kt-modal-backdrop">
           <div className="kt-modal">
             <div className="kt-modal-header">
-              <span className="kt-modal-title">{t('apiKeys.createdTitle')}</span>
+              <span className="kt-modal-title">{newKey.mode === 'rotated' ? t('apiKeys.rotatedTitle') : t('apiKeys.createdTitle')}</span>
               <button onClick={() => setNewKey(null)} className="kt-icon-btn">
                 <X size={16} />
               </button>
@@ -129,9 +147,9 @@ export default function ApiKeys() {
                 flex: 1, background: DARK.elevated, padding: '8px 12px', fontSize: 13,
                 fontFamily: 'monospace', color: BRAND, wordBreak: 'break-all', border: `1px solid ${DARK.border}`,
               }}>
-                {newKey}
+                {newKey.value}
               </code>
-              <button onClick={() => copyKey('new', newKey)} className="kt-icon-btn" style={{ color: copiedId === 'new' ? BRAND : '#9ca3af', flexShrink: 0 }}>
+              <button onClick={() => copyKey('new', newKey.value)} className="kt-icon-btn" style={{ color: copiedId === 'new' ? BRAND : '#9ca3af', flexShrink: 0 }}>
                 {copiedId === 'new' ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
@@ -290,6 +308,11 @@ export default function ApiKeys() {
                       color: ak.active ? '#facc15' : 'rgba(var(--kt-ink-rgb), 0.35)',
                       padding: '2px 8px', fontSize: 12, fontWeight: 600,
                     }}>{ak.active ? 'active' : 'inactive'}</span>
+                    {ak.active && staleDays(ak) !== null && (
+                      <span style={{ background: DARK.warningBg, color: DARK.warning, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>
+                        {t('apiKeys.staleBadge', { days: staleDays(ak) })}
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <code style={{
@@ -301,7 +324,10 @@ export default function ApiKeys() {
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                     {ak.scopes.map(s => (
-                      <span key={s} className="kt-chip" style={{ fontSize: 12, fontWeight: 600 }}>{s}</span>
+                      <span key={s} className="kt-chip" title={s === 'admin' ? t('apiKeys.adminScopeTitle') : undefined} style={{
+                        fontSize: 12, fontWeight: 600,
+                        ...(s === 'admin' ? { color: DARK.danger, border: `1px solid ${DARK.danger}`, background: DARK.dangerBg } : {}),
+                      }}>{s}</span>
                     ))}
                   </div>
                   <div style={{ fontSize: 12, color: 'rgba(var(--kt-ink-rgb), 0.25)' }}>
@@ -313,6 +339,10 @@ export default function ApiKeys() {
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={() => openEdit(ak)} className="kt-btn">
                     {t('apiKeys.edit')}
+                  </button>
+                  <button onClick={() => { if (confirm(t('apiKeys.rotateConfirm'))) rotateMut.mutate(ak.id) }}
+                    className="kt-btn">
+                    {t('apiKeys.rotate')}
                   </button>
                   <button onClick={() => updateMut.mutate({ id: ak.id, data: { active: !ak.active } })}
                     className="kt-btn">

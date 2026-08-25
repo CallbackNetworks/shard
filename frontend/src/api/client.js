@@ -192,6 +192,7 @@ export const testIntegration = (id) => api.post(`/integrations/${id}/test`).then
 export const getApiKeys = () => api.get('/api-keys').then(r => r.data)
 export const createApiKey = (data) => api.post('/api-keys', data).then(r => r.data)
 export const updateApiKey = (id, data) => api.patch(`/api-keys/${id}`, data).then(r => r.data)
+export const rotateApiKey = (id) => api.post(`/api-keys/${id}/rotate`).then(r => r.data)
 export const deleteApiKey = (id) => api.delete(`/api-keys/${id}`)
 export const getAgentSummary = () => api.get('/api-keys/agents/summary').then(r => r.data)
 
