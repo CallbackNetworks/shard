@@ -28,6 +28,8 @@ export default function ApiKeys() {
   const [form, setForm] = useState({ name: '', container_id: '', scopes: ['read', 'write'] })
   const [copiedId, setCopiedId] = useState(null)
   const [newKey, setNewKey] = useState(null)   // full key shown once after creation
+  const [editingKey, setEditingKey] = useState(null)   // the ApiKey being edited, or null
+  const [editForm, setEditForm] = useState({ name: '', container_id: '', scopes: [] })
 
   const { addToast } = useToast()
   const invalidate = () => qc.invalidateQueries({ queryKey: ['api-keys'] })
@@ -58,6 +60,26 @@ export default function ApiKeys() {
       ...f,
       scopes: f.scopes.includes(scope) ? f.scopes.filter(s => s !== scope) : [...f.scopes, scope]
     }))
+  }
+
+  const toggleEditScope = (scope) => {
+    setEditForm(f => ({
+      ...f,
+      scopes: f.scopes.includes(scope) ? f.scopes.filter(s => s !== scope) : [...f.scopes, scope]
+    }))
+  }
+
+  const openEdit = (ak) => {
+    setEditingKey(ak)
+    setEditForm({ name: ak.name, container_id: ak.container_id || '', scopes: ak.scopes })
+  }
+
+  const handleSaveEdit = () => {
+    updateMut.mutate({
+      id: editingKey.id,
+      data: { name: editForm.name, container_id: editForm.container_id || null, scopes: editForm.scopes },
+    })
+    setEditingKey(null)
   }
 
   const scopeLabel = (containerId) => {
@@ -119,6 +141,65 @@ export default function ApiKeys() {
           </div>
         </div>
       )}
+
+      {/* Edit modal for an existing key's name/scope/container */}
+      {editingKey && (
+        <div className="kt-modal-backdrop">
+          <div className="kt-modal">
+            <div className="kt-modal-header">
+              <span className="kt-modal-title">{t('apiKeys.editTitle')}</span>
+              <button onClick={() => setEditingKey(null)} className="kt-icon-btn">
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('name')} *
+                <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder={t('apiKeys.namePlaceholder')}
+                  className="kt-input" style={{ marginTop: 4 }} />
+              </label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('apiKeys.containerScope')}
+                <select value={editForm.container_id} onChange={e => setEditForm(f => ({ ...f, container_id: e.target.value }))}
+                  className="kt-input" style={{ marginTop: 4, cursor: 'pointer' }}>
+                  <option value="">{t('apiKeys.allContainers')}</option>
+                  {projects.length > 0 && (
+                    <optgroup label={t('apiKeys.scopeProjectsGroup')}>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </optgroup>
+                  )}
+                  {identities.length > 0 && (
+                    <optgroup label={t('apiKeys.scopePersonasGroup')}>
+                      {identities.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                    </optgroup>
+                  )}
+                </select>
+              </label>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--kt-ink)' }}>{t('apiKeys.scopes')}
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  {SCOPES.map(scope => (
+                    <label key={scope} style={{
+                      display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+                      background: editForm.scopes.includes(scope) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.05)',
+                      color: editForm.scopes.includes(scope) ? BRAND : 'rgba(var(--kt-ink-rgb), 0.4)',
+                      padding: '4px 12px', fontSize: 13,
+                      border: editForm.scopes.includes(scope) ? `1px solid rgba(250,204,21,0.3)` : '1px solid rgba(var(--kt-ink-rgb), 0.08)',
+                    }}>
+                      <input type="checkbox" checked={editForm.scopes.includes(scope)} onChange={() => toggleEditScope(scope)} style={{ cursor: 'pointer' }} />
+                      {scope}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button onClick={handleSaveEdit} disabled={!editForm.name || editForm.scopes.length === 0}
+                className="kt-btn kt-btn-primary" style={{ opacity: (!editForm.name || editForm.scopes.length === 0) ? 0.4 : 1 }}>{t('save')}</button>
+              <button onClick={() => setEditingKey(null)} className="kt-btn">{t('cancel')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="kt-page-header">
         <div className="kt-page-heading">
           <h1 className="kt-page-title">{t('apiKeys.title')}</h1>
@@ -230,6 +311,9 @@ export default function ApiKeys() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button onClick={() => openEdit(ak)} className="kt-btn">
+                    {t('apiKeys.edit')}
+                  </button>
                   <button onClick={() => updateMut.mutate({ id: ak.id, data: { active: !ak.active } })}
                     className="kt-btn">
                     {ak.active ? t('apiKeys.disable') : t('apiKeys.enable')}

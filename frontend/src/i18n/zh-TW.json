@@ -260,6 +260,8 @@
   "apiKeys.scopes": "範圍",
   "apiKeys.disable": "停用",
   "apiKeys.enable": "啟用",
+  "apiKeys.edit": "編輯",
+  "apiKeys.editTitle": "編輯 API 金鑰",
   "apiKeys.createdTitle": "API 金鑰已建立",
   "apiKeys.copyWarning": "請立即複製此金鑰，之後將無法再次查看。",
   "apiKeys.savedConfirm": "我已儲存此金鑰",

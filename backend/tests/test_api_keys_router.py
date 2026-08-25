@@ -80,6 +80,53 @@ def test_update_api_key_deactivate(client):
     assert resp.json()["active"] is False
 
 
+def test_update_api_key_renames(client):
+    create_resp = client.post("/api/api-keys", json={"name": "Old Name", "scopes": ["read"]})
+    key_id = create_resp.json()["id"]
+
+    resp = client.patch(f"/api/api-keys/{key_id}", json={"name": "New Name"})
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "New Name"
+
+    list_resp = client.get("/api/api-keys")
+    assert next(k for k in list_resp.json() if k["id"] == key_id)["name"] == "New Name"
+
+
+def test_update_api_key_scopes(client):
+    create_resp = client.post("/api/api-keys", json={"name": "Scoped Key", "scopes": ["read"]})
+    key_id = create_resp.json()["id"]
+
+    resp = client.patch(f"/api/api-keys/{key_id}", json={"scopes": ["read", "write", "admin"]})
+    assert resp.status_code == 200
+    assert set(resp.json()["scopes"]) == {"read", "write", "admin"}
+
+
+def test_update_api_key_container_scope(client, sample_project):
+    create_resp = client.post("/api/api-keys", json={"name": "Rescoped Key", "scopes": ["read"]})
+    key_id = create_resp.json()["id"]
+
+    resp = client.patch(f"/api/api-keys/{key_id}", json={"container_id": sample_project.id})
+    assert resp.status_code == 200
+    assert resp.json()["container_id"] == sample_project.id
+
+
+def test_update_api_key_rejects_non_container(client, db):
+    from app.services import graph
+
+    task = graph.create_task(db, title="Not a container")
+    db.commit()
+    create_resp = client.post("/api/api-keys", json={"name": "Key", "scopes": ["read"]})
+    key_id = create_resp.json()["id"]
+
+    resp = client.patch(f"/api/api-keys/{key_id}", json={"container_id": task.id})
+    assert resp.status_code == 422
+
+
+def test_update_api_key_not_found(client):
+    resp = client.patch("/api/api-keys/does-not-exist", json={"name": "Whatever"})
+    assert resp.status_code == 404
+
+
 def test_delete_api_key(client):
     create_resp = client.post("/api/api-keys", json={"name": "Doomed Key", "scopes": ["read"]})
     key_id = create_resp.json()["id"]

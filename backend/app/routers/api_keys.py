@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import ApiKey, Node
 from app.schemas import AgentTaskSummary, ApiKeyCreate, ApiKeyCreateOut, ApiKeyOut, ApiKeyUpdate, LabelOut, TaskOut
 from app.services import graph
+from app.services.activity import log_activity
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -49,6 +50,8 @@ def create_api_key(body: ApiKeyCreate, db: Session = Depends(get_db)):
         scopes=body.scopes,
     )
     db.add(api_key)
+    db.flush()
+    log_activity(db, "api_key.created", actor=None, detail=f'API key "{api_key.name}" created', meta={"key_id": api_key.id})
     db.commit()
     db.refresh(api_key)
     out = ApiKeyOut.from_model(api_key)
@@ -65,6 +68,13 @@ def update_api_key(key_id: str, body: ApiKeyUpdate, db: Session = Depends(get_db
         _validate_container(db, fields["container_id"])
     for field, value in fields.items():
         setattr(api_key, field, value)
+    log_activity(
+        db,
+        "api_key.updated",
+        actor=None,
+        detail=f'API key "{api_key.name}" updated',
+        meta={"key_id": api_key.id, "fields": sorted(fields)},
+    )
     db.commit()
     db.refresh(api_key)
     return ApiKeyOut.from_model(api_key)
@@ -75,6 +85,7 @@ def delete_api_key(key_id: str, db: Session = Depends(get_db)):
     api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
+    log_activity(db, "api_key.deleted", actor=None, detail=f'API key "{api_key.name}" deleted', meta={"key_id": api_key.id})
     db.delete(api_key)
     db.commit()
 
