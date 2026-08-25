@@ -11,6 +11,24 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
     css: true,
+    // The CI runner and every dev session share one small host (6 CPUs, 8GB) with
+    // however many other unrelated containers happen to be running at the moment.
+    // Vitest's default pool sizes itself off CPU count with no regard for free
+    // memory, so it can spin up more parallel workers than the host can actually
+    // back — each hits its own V8 heap ceiling and the whole run dies with
+    // "JavaScript heap out of memory". The crash point isn't tied to any one test
+    // file (verified: the suspected files pass individually every time); it drifts
+    // with whatever else the host is doing, which is the signature of contention,
+    // not a leak. Capping the worker count trades a slower run for one that
+    // doesn't depend on how quiet the host happens to be.
+    // One worker, not sized off CPU count: two still wasn't enough insulation
+    // (verified — see the NODE_OPTIONS comment in Dockerfile for why this host
+    // needs it). Slower, but the run no longer depends on how quiet the host
+    // happens to be at the moment it executes.
+    pool: 'forks',
+    poolOptions: {
+      forks: { maxForks: 1 },
+    },
   },
   plugins: [
     react(),

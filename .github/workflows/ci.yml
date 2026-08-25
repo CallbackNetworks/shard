@@ -118,8 +118,32 @@ jobs:
       - name: Lint
         run: docker compose -f docker-compose.ci.yml run --rm frontend npm run lint -- --max-warnings 10
 
+      # One `vitest run` process per file, not one process for the whole suite.
+      # A single long-lived worker running the whole suite eventually OOMs, and
+      # not because of a leak in the tests: a run using one fresh process *per
+      # file* - zero state carried from any prior file, so nothing to accumulate -
+      # still hit the same wall, on a file that had passed clean in isolation
+      # every time it was tested alone. The crash site also moves between runs
+      # with no fixed boundary. Both rule out the test suite: this is contention
+      # for the shared runner host's memory from whatever else is on it at the
+      # moment, not something a vitest/CI setting can fix away. Splitting the
+      # process per file keeps a bad moment's damage to one file - retry that
+      # file, not the whole suite - which is the most this can promise.
+      #
+      # The container is created once; each file gets its own `vitest run`
+      # invocation inside it, so steady-state cost is Node's startup time per
+      # file, not Docker's. One retry on a lone failing file absorbs a host
+      # squeezed at the wrong instant without masking a real test failure - a
+      # file with an actual assertion failure fails the same way twice.
       - name: Run tests
-        run: docker compose -f docker-compose.ci.yml run --rm frontend npx vitest run
+        run: |
+          docker compose -f docker-compose.ci.yml run --rm frontend sh -c '
+            set -e
+            for f in $(find src \( -name "*.test.js" -o -name "*.test.jsx" \)); do
+              echo "== $f =="
+              npx vitest run "$f" || { echo "-- retrying $f --"; npx vitest run "$f"; }
+            done
+          '
 
       - name: Security audit
         run: docker compose -f docker-compose.ci.yml run --rm frontend npm audit --audit-level=moderate
