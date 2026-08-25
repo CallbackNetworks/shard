@@ -194,7 +194,6 @@ class TestOwnerReadBothDoors:
         db.add(
             ApiKey(
                 name="share-chat-admin",
-                key=raw,
                 key_hash=hashlib.sha256(raw.encode()).hexdigest(),
                 key_last4=raw[-4:],
                 scopes=["read", "write", "admin"],
@@ -209,7 +208,6 @@ class TestOwnerReadBothDoors:
         db.add(
             ApiKey(
                 name="share-chat-read",
-                key=raw,
                 key_hash=hashlib.sha256(raw.encode()).hexdigest(),
                 key_last4=raw[-4:],
                 scopes=["read"],

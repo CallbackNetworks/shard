@@ -21,7 +21,6 @@ def read_key_header(db):
     db.add(
         ApiKey(
             name="Events Read Key",
-            key=raw,
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=["read"],

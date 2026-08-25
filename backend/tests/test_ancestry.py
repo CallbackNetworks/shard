@@ -39,7 +39,6 @@ def _read_key(db):
     db.add(
         ApiKey(
             name="anc_read",
-            key=raw,
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=["read"],
@@ -132,7 +131,6 @@ def test_a_project_scoped_key_is_not_told_what_is_above_its_project(client, db, 
     db.add(
         ApiKey(
             name="anc_scoped",
-            key=raw,
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=["read"],

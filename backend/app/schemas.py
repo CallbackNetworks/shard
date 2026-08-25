@@ -452,8 +452,9 @@ class ApiKeyOut(BaseModel):
     @classmethod
     def from_model(cls, m: object) -> "ApiKeyOut":
         last4 = getattr(m, "key_last4", None) or ""
-        prefix = (getattr(m, "key", None) or "tdp_")[:4]
-        preview = f"{prefix}_****{last4}" if last4 else "****"
+        # Every key is `tdp_` + token_hex by construction (routers/api_keys._generate_key),
+        # so the prefix is a constant rather than something to read back off the row.
+        preview = f"tdp_****{last4}" if last4 else "****"
         return cls(
             id=m.id,
             name=m.name,

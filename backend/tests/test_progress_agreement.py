@@ -30,7 +30,6 @@ def read_key(db):
     db.add(
         ApiKey(
             name="Read Key",
-            key=raw,
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=["read"],
@@ -169,7 +168,6 @@ def test_v1_subtree_hides_containers_outside_a_scoped_key(client, db, nested_pro
     db.add(
         ApiKey(
             name="Scoped",
-            key=raw,
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=["read"],

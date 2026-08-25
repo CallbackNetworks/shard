@@ -153,7 +153,11 @@ class ApiKey(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    # No plaintext column. Keys are matched by `key_hash` alone (external_api/auth.py),
+    # and the raw value is shown once at creation and never stored — the `key` column
+    # that used to sit here was already unused by every code path and NULL for every
+    # key issued since hashing landed, but a column that can hold a credential is a
+    # place one can come back.
     key_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     key_last4: Mapped[str | None] = mapped_column(String(8), nullable=True)
     container_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # null = access everything;

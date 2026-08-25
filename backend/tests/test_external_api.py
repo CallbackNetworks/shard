@@ -14,7 +14,6 @@ def api_key_read(db):
     raw_key = "tdp_test_read_key_123"
     key = ApiKey(
         name="Read Key",
-        key=raw_key,
         key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
         key_last4=raw_key[-4:],
         scopes=["read"],
@@ -30,7 +29,6 @@ def api_key_write(db):
     raw_key = "tdp_test_write_key_456"
     key = ApiKey(
         name="Write Key",
-        key=raw_key,
         key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
         key_last4=raw_key[-4:],
         scopes=["read", "write"],
@@ -46,7 +44,6 @@ def api_key_admin(db):
     raw_key = "tdp_test_admin_key_789"
     key = ApiKey(
         name="Admin Key",
-        key=raw_key,
         key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
         key_last4=raw_key[-4:],
         scopes=["admin"],
@@ -86,7 +83,6 @@ class TestApiKeyAuth:
         raw_key = "tdp_inactive_key"
         key = ApiKey(
             name="Inactive",
-            key=raw_key,
             key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
             key_last4=raw_key[-4:],
             scopes=["read"],
@@ -168,7 +164,6 @@ class TestProjectScoping:
         raw_key = "tdp_scoped_key"
         key = ApiKey(
             name="Scoped",
-            key=raw_key,
             key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
             key_last4=raw_key[-4:],
             scopes=["read"],
@@ -193,7 +188,6 @@ class TestProjectScoping:
         raw_key = "tdp_scoped_deny"
         key = ApiKey(
             name="Scoped",
-            key=raw_key,
             key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
             key_last4=raw_key[-4:],
             scopes=["read"],
@@ -222,7 +216,6 @@ class TestProjectScoping:
         raw_key = "tdp_identity_scoped"
         key = ApiKey(
             name="Identity Scoped",
-            key=raw_key,
             key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
             key_last4=raw_key[-4:],
             scopes=["read"],

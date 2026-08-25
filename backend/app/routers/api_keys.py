@@ -43,7 +43,6 @@ def create_api_key(body: ApiKeyCreate, db: Session = Depends(get_db)):
     raw_key = _generate_key()
     api_key = ApiKey(
         name=body.name,
-        key=None,
         key_hash=_hash_key(raw_key),
         key_last4=raw_key[-4:],
         container_id=body.container_id,

@@ -83,7 +83,6 @@ def test_task_view_assigned_agent(db, sample_project):
     raw = "tdp_agent_key_1"
     key = ApiKey(
         name="Agent",
-        key=raw,
         key_hash=hashlib.sha256(raw.encode()).hexdigest(),
         key_last4=raw[-4:],
         scopes=["read"],

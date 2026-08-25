@@ -28,7 +28,6 @@ def _key(db, name, scopes):
     db.add(
         ApiKey(
             name=name,
-            key=raw,
             key_hash=hashlib.sha256(raw.encode()).hexdigest(),
             key_last4=raw[-4:],
             scopes=scopes,
@@ -190,7 +189,6 @@ class TestWhoMayAsk:
         db.add(
             ApiKey(
                 name="wh_scoped",
-                key=raw,
                 key_hash=hashlib.sha256(raw.encode()).hexdigest(),
                 key_last4=raw[-4:],
                 scopes=["read", "write", "admin"],
