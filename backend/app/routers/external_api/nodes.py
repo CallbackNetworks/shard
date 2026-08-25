@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import ApiKey, Edge, EdgeType, GraphEvent, Node, NodeType
+from app.models import ApiKey, Edge, EdgeType, GraphEvent, Node
 from app.routers.external_api.auth import (
     _auth_errors,
     _build_actor,
@@ -37,12 +37,11 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import ancestry, graph, node_data, share_admin, webhook_credentials
+from app.services import ancestry, graph, node_admin, node_data, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
     dispatch_edge_removed,
-    dispatch_node_created,
     dispatch_node_deleted,
     dispatch_node_updated,
 )
@@ -57,13 +56,6 @@ def _load_node_or_404(node_id: str, db: Session) -> Node:
     if node is None:
         raise HTTPException(status_code=404, detail="node not found")
     return node
-
-
-def _node_write_out(db: Session, node: Node):
-    """Enriched ``TaskOut`` for task-role nodes, else ``NodeOut`` (parity with internal)."""
-    if node.type in graph.task_type_keys(db):
-        return enrich_task(graph.get_task(db, node.id), db)
-    return NodeOut.model_validate(node)
 
 
 @sub_router.get(
@@ -206,27 +198,14 @@ async def api_create_node(
     x_agent_id: str | None = Header(None, alias="X-Agent-Id"),
 ):
     _require_scope(api_key, "write")
-    if db.get(NodeType, body.type) is None:
-        raise HTTPException(status_code=422, detail=f"unknown node type '{body.type}'")
-    container_id, parent_id = body.container_id, body.parent_id
-    if container_id is not None and db.get(Node, container_id) is None:
-        raise HTTPException(status_code=404, detail="Container not found")
-    if parent_id is not None:
-        parent = graph.get_task(db, parent_id)
-        in_scope = container_id is None or parent_id in graph.contained_task_ids(db, container_id)
-        if parent is None or not in_scope:
-            raise HTTPException(status_code=404, detail="Parent task not found")
-    _check_create_access(api_key, db, container_id, parent_id)
-    fields = body.model_dump(exclude={"type", "title", "data", "container_id", "parent_id"}, exclude_none=True)
-    if body.data:
-        fields.update(body.data)
-    node = graph.create_node(db, body.type, title=body.title, **fields)
-    for edge_source in (container_id, parent_id):
-        if edge_source is not None:
-            graph.add_edge(db, edge_source, node.id, graph.REL_CONTAINS)
-    await dispatch_node_created(db, node, actor=_build_actor(api_key, x_agent_id), source="api")
-    db.refresh(node)
-    return _node_write_out(db, node)
+    # What differs between the doors is the permission, not the act. The containment
+    # hints are validated first so a key is not told "forbidden" about a container that
+    # does not exist — that ordering is the internal door's 404 contract too, which is
+    # why it lives in the service rather than being re-decided here.
+    node_admin.validate_containment(db, body.container_id, body.parent_id)
+    _check_create_access(api_key, db, body.container_id, body.parent_id)
+    node = await node_admin.create(db, body, actor=_build_actor(api_key, x_agent_id), source="api")
+    return node_admin.write_out(db, node)
 
 
 @sub_router.get(
@@ -283,7 +262,7 @@ async def api_update_node(
     except AgentKeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.refresh(node)
-    return _node_write_out(db, node)
+    return node_admin.write_out(db, node)
 
 
 @sub_router.delete(

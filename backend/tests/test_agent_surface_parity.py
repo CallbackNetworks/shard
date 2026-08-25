@@ -363,3 +363,62 @@ class TestCallbackAddressRotation:
         assert db.get(Node, task.id).data["callback_token"] != before
         # One act, so one kind of row — this route used to write its own.
         assert db.query(ActivityLog).filter(ActivityLog.action == "task.callback_token_rotated").count() == 1
+
+
+class TestNodeCreation:
+    """Both node-create doors run one service, so they refuse identically (ADR-0085).
+
+    They used to be two near-verbatim copies — same type lookup, same 404s, same
+    field merge, same create-then-link-then-dispatch order, and a `_node_write_out`
+    helper defined once per file. They had not drifted, which is luck rather than a
+    property: nothing made a validation fixed on one door reach the other.
+
+    Asserting the *detail* text, not just the status, is the point. Two doors that
+    both answer 404 with different wording are still two products to whoever is
+    reading the error — and an agent reads the error, not the docs (ADR-0078).
+    """
+
+    @pytest.mark.parametrize(
+        "case,body,expected_status",
+        [
+            ("unknown type", {"type": "definitely-not-a-type", "title": "x"}, 422),
+            ("missing container", {"type": "task", "title": "x", "container_id": "no-such-id"}, 404),
+            ("missing parent", {"type": "task", "title": "x", "parent_id": "no-such-id"}, 404),
+        ],
+    )
+    def test_both_doors_refuse_the_same_way(self, client, write_key, case, body, expected_status):
+        internal = client.post("/api/nodes", json=body)
+        external = client.post("/api/v1/nodes", json=body, headers=_hdr(write_key))
+
+        assert internal.status_code == expected_status, case
+        assert external.status_code == internal.status_code, case
+        assert external.json()["detail"] == internal.json()["detail"], case
+
+    def test_both_doors_accept_the_same_way(self, client, db, write_key):
+        """A successful create returns the same shape through either door."""
+        internal = client.post("/api/nodes", json={"type": "project", "title": "Via internal"})
+        external = client.post("/api/v1/nodes", json={"type": "project", "title": "Via v1"}, headers=_hdr(write_key))
+        assert internal.status_code == 201
+        assert external.status_code == 201
+        assert set(internal.json()) == set(external.json())
+
+    def test_a_task_comes_back_enriched_through_either_door(self, client, db, write_key, sample_project):
+        """`write_out` is shared, so neither door returns a bare node for a task."""
+        pid = sample_project.id
+        internal = client.post("/api/nodes", json={"type": "task", "title": "A", "container_id": pid}).json()
+        external = client.post(
+            "/api/v1/nodes",
+            json={"type": "task", "title": "B", "container_id": pid},
+            headers=_hdr(write_key),
+        ).json()
+        for body in (internal, external):
+            assert body["project_id"] == pid
+            assert "subtask_count" in body and "blocked_by" in body
+
+        # Not an equality: the v1 response passes through the credential redaction
+        # middleware, which strips `callback_token` for anything short of an admin key
+        # (ADR-0059/0084). That difference is the point of that middleware, so the
+        # assertion is that it is the *only* difference — a field going missing for any
+        # other reason means the two doors have diverged.
+        assert set(internal) - set(external) == {"callback_token"}
+        assert set(external) - set(internal) == set()

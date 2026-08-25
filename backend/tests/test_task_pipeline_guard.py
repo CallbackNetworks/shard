@@ -69,12 +69,11 @@ EDGE_ALLOWED = {
     # for a node that was created there, which `test_edge_dispatch` pins at exactly one
     # entry. A rule wanting "work arrived in this container" keys on node.created.
     #
-    # Function-scoped: both files dispatch edges correctly everywhere else, and a
-    # file-level exemption would excuse those too.
-    "routers/nodes.py::create_node": "creation-time containment is announced by dispatch_node_created",
-    "routers/external_api/nodes.py::api_create_node": (
-        "creation-time containment is announced by dispatch_node_created"
-    ),
+    # One entry, not two: both node-create doors used to hold their own copy of this
+    # code and their own copy of this exemption. Collapsing them onto
+    # `services/node_admin` collapsed the exemption too — which is the tell that they
+    # really were the same act.
+    "services/node_admin.py::create": "creation-time containment is announced by dispatch_node_created",
 }
 
 # Files exempt from needing a pipeline call, with the reason they are exempt.

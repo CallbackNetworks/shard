@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
+from app.models import Edge, EdgeType, GraphEvent, Node
 from app.schemas import (
     AncestryOut,
     ContainerSubtree,
@@ -30,12 +30,11 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import ancestry, graph, node_data, share_admin, webhook_credentials
+from app.services import ancestry, graph, node_admin, node_data, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
     dispatch_edge_removed,
-    dispatch_node_created,
     dispatch_node_deleted,
     dispatch_node_updated,
 )
@@ -133,47 +132,12 @@ def list_nodes(
     return q.order_by(Node.position, Node.created_at).limit(limit).all()
 
 
-def _node_write_out(db: Session, node: Node):
-    """Serialize a written node: enriched ``TaskOut`` for task-role nodes, else ``NodeOut``.
-
-    ADR-0040: the generic write surface returns the same rich shape the retired
-    ``/projects/{id}/tasks`` routes did, so callers get ``project_id`` / subtask &
-    comment counts / dependency lists without a second request.
-    """
-    if node.type in graph.task_type_keys(db):
-        return enrich_task(graph.get_task(db, node.id), db)
-    return NodeOut.model_validate(node)
-
-
 @router.post("", response_model=None, status_code=status.HTTP_201_CREATED)
 async def create_node(body: NodeCreate, db: Session = Depends(get_db)):
-    if db.get(NodeType, body.type) is None:
-        raise HTTPException(status_code=422, detail=f"unknown node type '{body.type}'")
-    container_id, parent_id = body.container_id, body.parent_id
-    # Validate containment hints before creating anything (a bogus id must not mint a
-    # phantom node / dangling edge). Mirrors the retired task route's 404 contract.
-    if container_id is not None and db.get(Node, container_id) is None:
-        raise HTTPException(status_code=404, detail="Container not found")
-    if parent_id is not None:
-        parent = graph.get_task(db, parent_id)
-        in_scope = container_id is None or parent_id in graph.contained_task_ids(db, container_id)
-        if parent is None or not in_scope:
-            raise HTTPException(status_code=404, detail="Parent task not found")
-    fields = body.model_dump(exclude={"type", "title", "data", "container_id", "parent_id"}, exclude_none=True)
-    if body.data:
-        fields.update(body.data)
-    node = graph.create_node(db, body.type, title=body.title, **fields)
-    # Establish containment before dispatch so the task pipeline can resolve the
-    # node's project (nearest container ancestor) for activity/notifications. A
-    # subtask gets both a container and a parent ``contains`` edge (ADR-0032).
-    for edge_source in (container_id, parent_id):
-        if edge_source is not None:
-            graph.add_edge(db, edge_source, node.id, graph.REL_CONTAINS)
-    # Role-driven reactions live below the endpoint now (ADR-0040): a task written
-    # here runs the same pipeline as one written via the retired /projects/{id}/tasks.
-    await dispatch_node_created(db, node)
-    db.refresh(node)
-    return _node_write_out(db, node)
+    # The act is `services/node_admin` so this door and `/api/v1/nodes` cannot drift;
+    # this one adds no permission check because the SPA is already behind the auth
+    # middleware (ADR-0085).
+    return node_admin.write_out(db, await node_admin.create(db, body))
 
 
 @router.get("/{node_id}", response_model=NodeOut)
@@ -210,7 +174,7 @@ async def update_node(node_id: str, body: NodeUpdate, db: Session = Depends(get_
     except AgentKeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.refresh(node)
-    return _node_write_out(db, node)
+    return node_admin.write_out(db, node)
 
 
 @router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
