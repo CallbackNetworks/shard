@@ -512,6 +512,16 @@ jobs:
           cat "$DEPLOY_DIR/.env" | docker run --rm -i -v "${DEPLOY_DIR}:/deploy" docker:27-cli sh -c 'cat > /deploy/.env'
           cat "$DEPLOY_DIR/docker-compose.yml" | docker run --rm -i -v "${DEPLOY_DIR}:/deploy" docker:27-cli sh -c 'cat > /deploy/docker-compose.yml'
 
+      # The backend image runs as uid 1000 now, and ./data is a host bind — so its
+      # ownership decides whether the app can write its own database. Every deploy
+      # before this one ran as root and left root-owned files there; without this the
+      # first non-root deploy comes up healthy (the health check only reads) and then
+      # fails on the first write. Idempotent, and cheap enough to keep running.
+      - name: Ensure the data directory is writable by the app user
+        run: |
+          docker run --rm -v "${DEPLOY_DIR}:/deploy" alpine:3.20 \
+            sh -c 'mkdir -p /deploy/data /deploy/uploads && chown -R 1000:1000 /deploy/data /deploy/uploads'
+
       - name: Pull images
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" pull
 

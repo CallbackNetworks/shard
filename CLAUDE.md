@@ -27,14 +27,39 @@ Logs: `docker compose logs -f backend` / `docker compose logs -f frontend`
 ### Dependency changes
 
 ```bash
-# Python: edit backend/requirements.txt then:
+# Python: edit backend/requirements.txt, then regenerate the lockfile and rebuild.
+# The image installs from requirements.lock, not requirements.txt — the .txt pins the
+# 15 direct packages, the .lock pins everything they pull in, with hashes.
+docker compose run --rm --no-deps -e UV_CACHE_DIR=/tmp/uvc backend \
+  uv pip compile requirements.txt --generate-hashes --output-file requirements.lock
 docker compose build backend && docker compose up
 
 # JS: edit frontend/package.json then remove the cached volume first:
 docker compose down
-docker volume rm 20260318_frontend_modules
+docker volume rm $(basename $PWD)_frontend_modules
 docker compose up --build
 ```
+
+### The containers run as uid 1000, not root
+
+Both backend images declare `USER app` (uid 1000). The uid matches the host user on
+purpose: this image bind-mounts the checkout and writes into `./data` and
+`./uploads`, and a container user that does not match the host owner cannot write to
+either — the failure then surfaces as a `PermissionError` inside a request rather
+than at startup.
+
+If you have artifacts left from before this change (`.ruff_cache`, `.pytest_cache`,
+`__pycache__`, `data/`, `backend/uploads/` — anything a root container created),
+fix them once:
+
+```bash
+docker run --rm -v "$PWD:/repo" alpine \
+  sh -c 'find /repo -user root -not -path "*/.git/*" -exec chown 1000:1000 {} +'
+```
+
+The deploy job does the equivalent for `$DEPLOY_DIR/data` on every run, because the
+health check only reads — a deploy that lost write access would come up green and
+fail on the first write.
 
 ### Production build
 
