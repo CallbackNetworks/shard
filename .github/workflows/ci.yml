@@ -252,6 +252,11 @@ jobs:
       - name: Build e2e image
         run: docker compose -f docker-compose.ci.yml --profile integration build e2e
 
+      # e2e/ was covered by neither audit: the backend job runs pip-audit and the
+      # frontend job runs npm audit, and this third package.json belonged to neither.
+      - name: Security audit (e2e)
+        run: docker compose -f docker-compose.ci.yml --profile integration run --rm --no-deps e2e npm audit --audit-level=moderate
+
       - name: Run Playwright e2e suite
         run: |
           docker compose -f docker-compose.ci.yml --profile integration \

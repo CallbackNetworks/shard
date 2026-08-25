@@ -1,5 +1,16 @@
+# Memory caps, for the same reason docker-compose.ci.yml has them (ADR-0111): this
+# host runs the CI runner, the dev stack and ~20 unrelated containers in 8GB, and an
+# unbounded container that over-asks does not fail — the kernel picks a victim by
+# score, which has included things with nothing to do with this project. Sized as a
+# cap, not to fit: measured, backend idles at ~140MB and the vite dev server at
+# ~220MB, and the backend suite peaks at 597MB.
+x-dev-limits: &dev-limits
+  mem_limit: 2g
+  memswap_limit: 2g # no swap headroom — swapping is what makes this host thrash
+
 services:
   backend:
+    <<: *dev-limits
     build: ./backend
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -55,6 +66,7 @@ services:
       - app-network
 
   frontend:
+    <<: *dev-limits
     build: ./frontend
     ports:
       - "${FRONTEND_DEV_PORT:-5173}:5173"
@@ -82,6 +94,7 @@ services:
       - app-network
 
   postgres:
+    <<: *dev-limits
     image: postgres:16-alpine
     profiles: ["postgres"]
     environment:
@@ -102,6 +115,7 @@ services:
       - app-network
 
   mysql:
+    <<: *dev-limits
     image: mysql:8.0
     profiles: ["mysql"]
     environment:
@@ -124,6 +138,9 @@ services:
       - app-network
 
   e2e:
+    # Higher than the shared cap: this one drives a real Chromium.
+    mem_limit: 3g
+    memswap_limit: 3g
     build: ./e2e
     profiles: ["e2e"]
     depends_on:

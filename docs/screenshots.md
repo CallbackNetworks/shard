@@ -129,3 +129,20 @@ A few settings shown before / after — every change applies live.
 **Accent color** — picking an accent swatch recolors the entire app (logo, stat
 numbers, buttons, tickers), not just the Settings page. Interface scale and
 reduced motion apply globally the same way.
+
+---
+
+## Adding a screenshot
+
+Optimise it **before** the first commit — `oxipng -o4` or `pngquant` typically takes a
+full-page capture from ~300KB to under 100KB with no visible loss.
+
+This has to happen up front because git keeps every version of a blob forever:
+recompressing an image that is already committed *grows* the repository rather than
+shrinking it, since the original stays in the pack. The 20 images here total 4.1MB
+and are deliberately left as they are for that reason — the saving is only available
+on the way in.
+
+Name the file for what it shows (`08-structure-map.png`), not whatever the capture
+tool called it, and reference it from this page. An unreferenced screenshot is dead
+weight nobody will dare delete later.
