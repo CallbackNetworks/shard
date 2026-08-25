@@ -37,6 +37,7 @@ services:
       - BACKUP_HOUR=${BACKUP_HOUR:-3}
       - BACKUP_KEEP=${BACKUP_KEEP:-7}
       - BACKUP_DIR=${BACKUP_DIR:-/app/data/backups}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/app/uploads}
       # Remote MCP, served by this process (ADR-0080). No token, no /mcp route.
       # API_BASE_URL points at this same process on purpose: the tools stay
       # ``/api/v1`` clients, so the API key's scope is what bounds the endpoint.

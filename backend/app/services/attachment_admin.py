@@ -21,8 +21,13 @@ from app.models import Attachment
 from app.services import graph
 from app.services.errors import Invalid, NotFound
 
-UPLOAD_DIR = Path("/app/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# Where attachments live. Configurable because the default is a *container* path:
+# importing this module used to call `mkdir("/app/uploads")` at import time, so on any
+# machine where that path is not writable — which is every non-root, non-Docker one —
+# `import app.main` raised PermissionError and the test suite could not collect a
+# single test. The suite is otherwise Docker-independent (conftest defaults to an
+# in-memory SQLite), and CI only ever runs in Docker, so nothing ever noticed.
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/app/uploads"))
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
@@ -63,6 +68,9 @@ def store(
     if len(content) > MAX_FILE_SIZE:
         raise Invalid("File too large (max 20MB)")
 
+    # Created on first write rather than on import: a module that has been loaded but
+    # never used should not have touched the filesystem.
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     storage_path = UPLOAD_DIR / f"{uuid.uuid4()}{Path(filename or 'file').suffix}"
     try:
         storage_path.write_bytes(content)

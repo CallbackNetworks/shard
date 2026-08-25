@@ -18,12 +18,15 @@ from sqlalchemy import DateTime
 from sqlalchemy.orm import Session
 
 from app.database import Base
+from app.services import attachment_admin
 
 logger = logging.getLogger(__name__)
 
 BACKUP_FORMAT_VERSION = 1
 BACKUP_PREFIX = "shard-backup-"
-UPLOAD_DIR = Path("/app/uploads")
+# Same directory the attachment service writes to — imported rather than repeated, so
+# pointing UPLOAD_DIR somewhere else cannot leave backups reading the old location.
+UPLOAD_DIR = attachment_admin.UPLOAD_DIR
 
 
 class RestoreError(Exception):

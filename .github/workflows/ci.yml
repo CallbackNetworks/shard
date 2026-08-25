@@ -72,7 +72,7 @@ jobs:
         run: |
           docker compose -f docker-compose.ci.yml run --rm --no-deps \
             -e TEST_DATABASE_URL=sqlite:///:memory: \
-            backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=78
+            backend pytest tests/ -v --tb=short --cov --cov-report=term-missing
 
       - name: Cleanup
         if: always()
@@ -110,7 +110,7 @@ jobs:
         run: |
           docker compose -f docker-compose.ci.yml --profile pgtest run --rm --no-deps \
             -e TEST_DATABASE_URL=postgresql+psycopg://todo:todo_dev@postgres:5432/shard_test \
-            backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=78
+            backend pytest tests/ -v --tb=short --cov --cov-report=term-missing
 
       - name: Cleanup
         if: always()

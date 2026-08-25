@@ -6,6 +6,16 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+# The floor lived only in .github/workflows/ci.yml, written out twice — once for the
+# SQLite job and once for PostgreSQL. So a local `pytest --cov` enforced nothing, and
+# the two copies could drift from each other without anything noticing. Here it is one
+# value that both jobs and every local run read.
+fail_under = 78
+
 [tool.ruff]
 target-version = "py311"
 line-length = 120

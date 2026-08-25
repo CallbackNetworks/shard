@@ -78,6 +78,7 @@ docker compose -f docker-compose.ci.yml --profile integration up --build backend
 | `BACKUP_HOUR` | Hour (UTC) for the daily backup (default `3`; runtime-adjustable) |
 | `BACKUP_KEEP` | How many backup archives to retain (default `7`; runtime-adjustable) |
 | `BACKUP_DIR` | Where backup archives are written (default `/app/data/backups`) |
+| `UPLOAD_DIR` | Where task attachments are written (default `/app/uploads`). Read by both the attachment service and the backup archive |
 | `AGENT_CONTEXT_INSTRUCTIONS` | Global instructions for AI agents (shown in `/api/v1/agent-context`) |
 | `MCP_HTTP_TOKEN` | Bearer token for `/mcp`. Also the switch: **no token, no route** (ADR-0080). Standalone, the server refuses to start without one (ADR-0076) |
 | `MCP_API_KEY` | API key the MCP tools act with against `/api/v1`. Its scope is what bounds the endpoint |
@@ -91,7 +92,7 @@ docker compose -f docker-compose.ci.yml --profile integration up --build backend
 
 ```bash
 # All tests with coverage
-docker compose exec backend pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+docker compose exec backend pytest tests/ -v --tb=short --cov --cov-report=term-missing
 
 # Single test file
 docker compose exec backend pytest tests/test_tasks.py -v
@@ -109,7 +110,9 @@ scripts/test.sh postgres     # PostgreSQL only (isolated shard_test DB, never ap
 scripts/test.sh both -k foo  # extra args after the target pass through to pytest
 ```
 
-`conftest.py` provides `db`, `client`, `sample_identity`, and `sample_project` fixtures. Auth middleware is disabled in tests (`AUTH_PASSWORD=""`). Both databases enforce `--cov-fail-under=78` in CI. Some tests are dialect-aware (e.g. skip under enforced foreign keys) — see ADR-0018.
+`conftest.py` provides `db`, `client`, `sample_identity`, and `sample_project` fixtures. Auth middleware is disabled in tests (`AUTH_PASSWORD=""`). The 78% coverage floor lives in `pyproject.toml` (`[tool.coverage.report] fail_under`), so a local `--cov` run enforces the same gate both CI database jobs do. Some tests are dialect-aware (e.g. skip under enforced foreign keys) — see ADR-0018.
+
+The suite does not require Docker: `conftest.py` defaults to in-memory SQLite, and `UPLOAD_DIR` keeps the one module that touched a container path out of import time. `pip install -r requirements.txt && pytest` works in a plain virtualenv.
 
 ### Frontend (vitest)
 
