@@ -26,3 +26,23 @@ data/
 *.swp
 .env
 backend/uploads/
+
+# Crash artifacts. Node OOMs on this host have left multi-GB core dumps in
+# frontend/ more than once (2.2GB and 4.3GB at last count), and nothing was
+# stopping them being committed.
+core
+core.*
+
+# Secrets that are not the single .env above — a .env.production or .env.local
+# would otherwise be tracked.
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Test tooling output
+.ruff_cache/
+.pytest_cache/
+playwright-report/
+test-results/
