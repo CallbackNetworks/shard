@@ -83,8 +83,14 @@ export default function Dashboard() {
     staleTime: 60000,
   })
   const [widgetOrder, setWidgetOrder] = useState(DEFAULT_WIDGET_ORDER)
+  // Guarded like the visibility effect above, and for a sharper reason than symmetry:
+  // unguarded, this runs on every identity change of the query result and always sets
+  // a freshly-built object, so any consumer that hands back a new reference per render
+  // turns it into a render loop. React Query's structural sharing usually hides that;
+  // the page's own test mock does not, and the loop spun at 100% CPU until it was
+  // killed. Absent value means "no saved order" — the default is already in state.
   useEffect(() => {
-    setWidgetOrder(normalizeWidgetOrder(savedWidgetOrder?.value))
+    if (savedWidgetOrder?.value) setWidgetOrder(normalizeWidgetOrder(savedWidgetOrder.value))
   }, [savedWidgetOrder])
   const widgetSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const handleWidgetDragEnd = useCallback((event) => {

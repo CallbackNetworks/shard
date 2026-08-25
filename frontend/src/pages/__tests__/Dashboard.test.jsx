@@ -78,14 +78,22 @@ const activities = [
 
 function setup({ projectData = projects, activityData = activities } = {}) {
   mockUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
-  mockUseQuery.mockImplementation(({ queryKey }) => {
-    if (queryKey[0] === 'projects') return { data: projectData, isLoading: false }
-    if (queryKey[0] === 'activity') return { data: activityData, isLoading: false }
-    if (queryKey[0] === 'goals') return { data: [{ id: 'g1', title: 'Grow system', status: 'active' }], isLoading: false }
-    if (queryKey[0] === 'decisions') return { data: [{ id: 'd1', name: 'Pick layout', decision_status: 'proposed' }], isLoading: false }
-    if (queryKey[0] === 'identity-hub-stats') return { data: null, isLoading: false }
-    return { data: [], isLoading: false }
-  })
+
+  // One stable result object per query key, built once per setup(). React Query gives
+  // a caller the same reference back while the data is unchanged (structural sharing),
+  // and any effect keyed on a query result depends on that. A mock returning a fresh
+  // object literal per call does not merely differ from the real thing — it turns
+  // `useEffect(..., [result])` into an infinite render loop, which is exactly what it
+  // did here: this file spun at 100% CPU for 40 minutes in CI and never finished.
+  const results = {
+    projects: { data: projectData, isLoading: false },
+    activity: { data: activityData, isLoading: false },
+    goals: { data: [{ id: 'g1', title: 'Grow system', status: 'active' }], isLoading: false },
+    decisions: { data: [{ id: 'd1', name: 'Pick layout', decision_status: 'proposed' }], isLoading: false },
+    'identity-hub-stats': { data: null, isLoading: false },
+  }
+  const fallback = { data: [], isLoading: false }
+  mockUseQuery.mockImplementation(({ queryKey }) => results[queryKey[0]] ?? fallback)
 
   return render(
     <MemoryRouter>
