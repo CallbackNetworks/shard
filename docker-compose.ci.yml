@@ -1,8 +1,26 @@
 # Standalone compose for CI — no host bind mounts (safe for Docker-in-Docker).
+#
+# Every service here declares a memory limit. The runner shares one small host
+# (6 CPUs / 8GB) with dev sessions and ~20 unrelated containers, and act_runner
+# starts job containers as *siblings* through the Docker socket — so they are not
+# bounded by the runner's own limit and default to the whole host. Unbounded, a
+# job that asks for more than is free does not fail: the kernel picks a victim by
+# score, and the victim is whatever happens to be biggest at that instant, which
+# has included containers that had nothing to do with CI.
+#
+# The limits are not sized to what the work needs — measured, the frontend suite
+# peaks around 260MB for 25 files in one process, and the ceiling it runs under
+# makes no difference to that. They are sized as a cap: generous enough that
+# normal work never touches them, tight enough that a runaway is killed here,
+# named, instead of the kernel choosing something else on the host.
+x-ci-limits: &ci-limits
+  mem_limit: 2g
+  memswap_limit: 2g # no swap headroom: swapping is what makes the host thrash
 
 services:
   # ---------- lint / test / audit ----------
   backend:
+    <<: *ci-limits
     build: ./backend
     environment:
       - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
@@ -12,6 +30,7 @@ services:
       - ci-network
 
   frontend:
+    <<: *ci-limits
     build: ./frontend
     networks:
       - ci-network
@@ -23,6 +42,7 @@ services:
 
   # ---------- PostgreSQL test target (co-equal with SQLite, see ADR-0020) ----------
   postgres:
+    <<: *ci-limits
     profiles: [pgtest]
     image: postgres:16-alpine
     environment:
@@ -40,6 +60,7 @@ services:
 
   # ---------- integration smoke test (prod images) ----------
   backend-prod:
+    <<: *ci-limits
     profiles: [integration]
     build:
       context: ./backend
@@ -62,6 +83,7 @@ services:
           - backend
 
   frontend-prod:
+    <<: *ci-limits
     profiles: [integration]
     build:
       context: ./frontend
@@ -83,6 +105,11 @@ services:
   # Runs against the prod images above rather than a stack of its own, so the
   # integration job pays for one build instead of two.
   e2e:
+    # Not the shared cap: this one drives a real Chromium, which is heavier than
+    # anything else here by a wide margin. Measured basis for the others — backend
+    # suite 597MB, frontend 264MB — does not transfer to a browser.
+    mem_limit: 3g
+    memswap_limit: 3g
     profiles: [integration]
     build: ./e2e
     depends_on:

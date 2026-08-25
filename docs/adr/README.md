@@ -112,3 +112,4 @@
 | [0108](0108-the-production-compose-is-generated-not-overridden.md) | 正式環境的 compose 是生成的，不是覆蓋出來的 | Accepted | 2026-08-22 |
 | [0109](0109-one-answer-to-who-is-calling.md) | 「誰在呼叫」只有一個答案，而信任多深是部署知識 | Accepted | 2026-08-22 |
 | [0110](0110-replay-protection-the-sender-does-not-opt-into.md) | 重播防護不能由寄件方決定要不要開 | Accepted | 2026-08-24 |
+| [0111](0111-the-runner-shares-a-host-so-ci-declares-its-limits.md) | Runner 跟別人共用主機，所以 CI 要自己宣告上限 | Accepted | 2026-08-24 |

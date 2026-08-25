@@ -6,6 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+# One run at a time per ref. Without this, pushes stack: every superseded run keeps
+# building images and holding containers on a host with 6 CPUs and 8GB shared with
+# dev sessions and ~20 unrelated containers, which is the contention the frontend
+# job's per-file loop exists to survive. Two orphaned postgres containers from runs
+# 436 and 440 were still up seven days later — a cancelled run's `if: always()`
+# cleanup does not run when the runner itself is stopped, so overlap leaks resources
+# as well as consuming them.
+#
+# Deploys are not cancelled mid-flight: `cancel-in-progress` is false on main, so a
+# run that has begun swapping production containers is allowed to finish and reach
+# its health gate rather than being killed between `up -d` and the check.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   # DB-independent backend checks — run once, not per database.
   backend-checks:
@@ -477,8 +492,43 @@ jobs:
       # its backend stopped. A step that can fail must not be the one holding production
       # open. Leaving the old container running costs a few seconds of old code against a
       # new schema; getting it wrong costs an outage that lasts until a human notices.
+      # A migration is the one step here that cannot be undone by re-pulling an older
+      # image. Alembic gets no snapshot from anywhere else — the app's own daily backup
+      # (ADR-0013) runs on the scheduler's clock, not the deploy's — so a revision that
+      # half-applies leaves nothing to go back to. Copying the data directory takes a
+      # second and is the difference between a bad revision costing a restore and
+      # costing the database.
+      #
+      # Never fails the deploy: if there is nothing to copy (a fresh host, or an
+      # external DATABASE_URL where ./data holds no database) that is not a reason to
+      # refuse to deploy. It reports what it did and moves on.
+      - name: Snapshot the data directory before migrating
+        run: |
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          SNAP="$DEPLOY_DIR/pre-deploy-backups/$STAMP-${GITHUB_SHA}"
+          if [ -d "$DEPLOY_DIR/data" ]; then
+            mkdir -p "$SNAP"
+            cp -a "$DEPLOY_DIR/data/." "$SNAP/" 2>/dev/null || true
+            echo "Snapshot: $SNAP"
+            # Keep the last 5. A snapshot per deploy fills a small host otherwise.
+            ls -1dt "$DEPLOY_DIR"/pre-deploy-backups/*/ 2>/dev/null | tail -n +6 | xargs -r rm -rf
+          else
+            echo "No $DEPLOY_DIR/data to snapshot (external database, or first deploy) — skipping."
+          fi
+
       - name: Apply database migrations
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" run --rm --no-deps backend python -m app.db_schema
+
+      # Record what is serving *now*, before it is replaced. Read from the running
+      # container rather than assumed, so a rollback returns to what was actually up
+      # even if a previous deploy failed partway.
+      - name: Note the currently deployed image
+        run: |
+          PREV=$(docker inspect --format='{{.Config.Image}}' "$REPO_NAME-backend" 2>/dev/null || echo "")
+          PREV_FE=$(docker inspect --format='{{.Config.Image}}' "$REPO_NAME-frontend" 2>/dev/null || echo "")
+          echo "PREV_BACKEND_IMAGE=$PREV" >> $GITHUB_ENV
+          echo "PREV_FRONTEND_IMAGE=$PREV_FE" >> $GITHUB_ENV
+          echo "Currently serving: backend=${PREV:-none} frontend=${PREV_FE:-none}"
 
       - name: Deploy services
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" up -d --remove-orphans
@@ -530,5 +580,51 @@ jobs:
           docker logs $REPO_NAME-backend --tail 50
           exit 1
 
+      # Every check above this point runs *after* `up -d` has already replaced the
+      # running containers, so failing them means production is down right now. The
+      # job used to simply exit 1 there and leave it down until somebody noticed.
+      # Images are tagged by sha, so the previous version is still on this host.
+      #
+      # This does not undo the migration. A revision that the old code cannot read is
+      # exactly the case the pre-deploy snapshot exists for, and restoring a database
+      # is not something to do unattended — so this reports loudly rather than
+      # guessing. Rolling the images back is still right: a backend that starts is a
+      # better place to debug from than one that does not.
+      - name: Roll back to the previous images
+        if: failure()
+        run: |
+          if [ -z "${PREV_BACKEND_IMAGE:-}" ]; then
+            echo "No previous image recorded — nothing to roll back to (first deploy?)."
+            echo "Production may be down. Check the logs above."
+            exit 1
+          fi
+
+          echo "Deploy failed. Rolling back to:"
+          echo "  backend=$PREV_BACKEND_IMAGE"
+          echo "  frontend=$PREV_FRONTEND_IMAGE"
+
+          sed -i \
+            -e "s|image: $IMAGE_PREFIX/backend:.*|image: $PREV_BACKEND_IMAGE|" \
+            -e "s|image: $IMAGE_PREFIX/frontend:.*|image: $PREV_FRONTEND_IMAGE|" \
+            "$DEPLOY_DIR/docker-compose.yml"
+          docker compose -f "$DEPLOY_DIR/docker-compose.yml" up -d --remove-orphans
+
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' $REPO_NAME-backend 2>/dev/null || echo "not found")
+            echo "Rollback attempt $i: backend health=$status"
+            if [ "$status" = "healthy" ]; then
+              echo "Rolled back and healthy."
+              echo "NOTE: the schema was migrated and has NOT been reverted. If the old"
+              echo "      code cannot read it, restore from $DEPLOY_DIR/pre-deploy-backups."
+              exit 1
+            fi
+            sleep 2
+          done
+
+          echo "Rollback did not become healthy either — production is down."
+          docker logs $REPO_NAME-backend --tail 50
+          exit 1
+
       - name: Show deployment status
+        if: always()
         run: docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps -a
