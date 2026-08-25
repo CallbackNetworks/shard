@@ -51,7 +51,9 @@ def create_api_key(body: ApiKeyCreate, db: Session = Depends(get_db)):
     )
     db.add(api_key)
     db.flush()
-    log_activity(db, "api_key.created", actor=None, detail=f'API key "{api_key.name}" created', meta={"key_id": api_key.id})
+    log_activity(
+        db, "api_key.created", actor=None, detail=f'API key "{api_key.name}" created', meta={"key_id": api_key.id}
+    )
     db.commit()
     db.refresh(api_key)
     out = ApiKeyOut.from_model(api_key)
@@ -90,7 +92,9 @@ def rotate_api_key(key_id: str, db: Session = Depends(get_db)):
     api_key.key_hash = _hash_key(raw_key)
     api_key.key_last4 = raw_key[-4:]
     api_key.last_used_at = None  # a fresh secret has no usage history of its own
-    log_activity(db, "api_key.rotated", actor=None, detail=f'API key "{api_key.name}" rotated', meta={"key_id": api_key.id})
+    log_activity(
+        db, "api_key.rotated", actor=None, detail=f'API key "{api_key.name}" rotated', meta={"key_id": api_key.id}
+    )
     db.commit()
     db.refresh(api_key)
     out = ApiKeyOut.from_model(api_key)
@@ -102,7 +106,9 @@ def delete_api_key(key_id: str, db: Session = Depends(get_db)):
     api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
-    log_activity(db, "api_key.deleted", actor=None, detail=f'API key "{api_key.name}" deleted', meta={"key_id": api_key.id})
+    log_activity(
+        db, "api_key.deleted", actor=None, detail=f'API key "{api_key.name}" deleted', meta={"key_id": api_key.id}
+    )
     db.delete(api_key)
     db.commit()
 
