@@ -199,6 +199,26 @@ jobs:
           docker compose -f docker-compose.ci.yml --profile integration logs backend-prod
           exit 1
 
+      # scripts/check_api_docs.py compares docs/api.md against the *running* app's
+      # OpenAPI spec in both directions. It was written, works, and was wired to
+      # nothing — 99 of 320 live routes had no entry by the time anyone ran it, and
+      # four documented routes no longer existed. This job already has a healthy
+      # backend, so the check costs one step.
+      #
+      # It ratchets rather than gates on the whole debt: the known-undocumented set is
+      # frozen in the script, and the check fails on anything outside it — new drift,
+      # a documented route that stopped existing, or a baseline entry that got written
+      # up without being removed from the list.
+      # Runs inside backend-prod, not on the runner: the runner has no Python of its
+      # own and the project rule is that every step runs in a container. The image
+      # carries the app but not the repo's docs/, so the two inputs are copied in.
+      - name: Check the API docs against the running app
+        run: |
+          CID=$(docker compose -f docker-compose.ci.yml --profile integration ps -q backend-prod)
+          docker cp scripts/check_api_docs.py "$CID:/tmp/check_api_docs.py"
+          docker cp docs/api.md "$CID:/tmp/api.md"
+          docker exec "$CID" python /tmp/check_api_docs.py http://localhost:8000/openapi.json /tmp/api.md
+
       - name: Wait for frontend health
         run: |
           for i in $(seq 1 30); do

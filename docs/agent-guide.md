@@ -14,11 +14,13 @@ This document describes how external AI agents (Claude Code, OpenCode, Hermes, e
 
 ### MCP (stdio)
 
-No authentication needed — the MCP server runs locally and authenticates to the backend using its own API key (`MCP_API_KEY` env var).
+No authentication needed — the client owns the process, and it authenticates to the backend using its own API key (`MCP_API_KEY` env var).
 
 ### MCP (HTTP)
 
-Set `MCP_TRANSPORT=http` and `MCP_HTTP_TOKEN=<your-token>` on the MCP server. Clients connect to `http://<host>:8001/mcp` with:
+Remote MCP is a route on the backend, reached through the frontend's nginx (ADR-0080) — there is no separate service and no separate port. Set `MCP_HTTP_TOKEN` on the deployment; that variable is also the switch, since without it the route is not registered at all and `/mcp` answers 404.
+
+Clients connect to `https://<host>/mcp` with:
 
 ```
 Authorization: Bearer <MCP_HTTP_TOKEN>
@@ -355,7 +357,11 @@ Add to your MCP settings (e.g., `~/.claude/mcp.json` or project `.mcp.json`):
   "mcpServers": {
     "shard": {
       "command": "docker",
-      "args": ["compose", "-f", "/path/to/project/docker-compose.yml", "run", "--rm", "mcp"],
+      "args": [
+        "compose", "-f", "/path/to/project/docker-compose.yml",
+        "run", "--rm", "--no-deps", "-T",
+        "backend", "python", "-m", "app.mcp_server.server"
+      ],
       "env": {
         "API_BASE_URL": "http://backend:8000",
         "API_KEY": "your-mcp-api-key"
@@ -371,7 +377,7 @@ Or for remote HTTP MCP:
 {
   "mcpServers": {
     "shard": {
-      "url": "http://your-server:8001/mcp",
+      "url": "https://your-server/mcp",
       "headers": {
         "Authorization": "Bearer your-mcp-http-token"
       }
@@ -388,7 +394,7 @@ Create `.opencode.yaml` in your project root:
 mcpServers:
   shard:
     type: http
-    url: http://your-server:8001/mcp
+    url: https://your-server/mcp
     headers:
       Authorization: "Bearer your-mcp-http-token"
 ```
@@ -406,7 +412,12 @@ mcpServers:
       - /path/to/project/docker-compose.yml
       - run
       - --rm
-      - mcp
+      - --no-deps
+      - -T
+      - backend
+      - python
+      - -m
+      - app.mcp_server.server
     env:
       API_BASE_URL: http://backend:8000
       API_KEY: your-mcp-api-key

@@ -349,8 +349,11 @@ Ownership is an `owns` edge **from the identity to the project** — source is t
 #### `GET /identities/{id}/projects`
 Returns projects linked to the identity (used by the public status page).
 
-#### `GET /identities/{id}/share-views`
-Share-page access audit for the identity (ADR-0025).
+#### `GET /nodes/{id}/share-views`
+Share-page access audit (ADR-0025). One endpoint for every shareable-role node — the
+identity- and project-specific routes were collapsed onto it by ADR-0070 → ADR-0073.
+The view count matches rows written under any of the older subject columns, so
+retiring those routes did not retire their history.
 
 ---
 
@@ -1222,12 +1225,8 @@ Set an expiration date for the share link.
 
 400 if the node's type does not carry the `shareable` role.
 
-#### `GET /identities/{id}/share-views` · `GET /projects/{id}/share-views`
-Share-page access audit (ADR-0025).
-
-#### `POST /projects/{id}/set-expiry`
-Legacy project-only alias for `POST /nodes/{id}/share/set-expiry`. Prefer the node form —
-it works for every shareable-role node, not just projects.
+#### `GET /nodes/{id}/share-views`
+Share-page access audit (ADR-0025), for any shareable-role node.
 
 ---
 
@@ -1303,13 +1302,17 @@ headers, or can be forced with `?provider=github|gitlab|jenkins|drone|bitbucket`
 outcome this system can map — an unknown string, a provider status outside its documented
 vocabulary, or no status at all — the task is **left unchanged** and the response is its
 current state. Two records are written: a build-history row with `status: "unmapped"`
-(visible via `GET /webhook/events/{task_id}`) and a `webhook.unmapped_status` activity
+(visible via `GET /nodes/{id}/webhook-events`) and a `webhook.unmapped_status` activity
 entry carrying the raw status that arrived.
 
-#### `GET /webhook/events/{task_id}`
-Build history for a task — every inbound CI/CD event received, newest first. Each row
+#### `GET /nodes/{id}/webhook-events`
+Build history for a node — every inbound CI/CD event received, newest first. Each row
 carries `raw_payload`, the body as it arrived; for a `status: "unmapped"` row that is the
 only record of what the CI system actually sent (ADR-0052).
+
+This used to be `GET /webhook/events/{task_id}`, which sat under the credential-free
+`/webhook/` prefix and was therefore readable off production by anyone holding a node id.
+It was moved behind auth by ADR-0085; `/webhook/` now carries only what a runner POSTs to.
 
 #### `POST /webhook/issues/{project_id}`
 Inbound issue/PR sync from GitHub, Gitea, or GitLab (ADR-0014/0017). The provider is

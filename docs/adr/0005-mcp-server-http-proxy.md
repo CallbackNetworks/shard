@@ -1,7 +1,12 @@
 # ADR-0005: MCP Server HTTP Proxy Architecture
 
 ## Status
-Accepted
+Superseded by ADR-0080
+
+(Only the separate-container half is superseded. The decision that matters — that MCP
+proxies every operation through `/api/v1` over httpx rather than importing services or
+touching the database — is still in force; ADR-0080 changed where the process lives, not
+the data path.)
 
 ## Date
 2026-05-29

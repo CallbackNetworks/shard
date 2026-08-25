@@ -1,7 +1,11 @@
 # ADR-0076: 遠端 MCP 走既有那扇門，而且那扇門一定上鎖
 
 ## Status
-Accepted
+Superseded by ADR-0080
+
+（只有獨立的 `mcp` 容器被取代，連同為了它可能不存在而生的 nginx `resolver` 變數技巧和
+compose 的雙 secret 閘門。門本身沒有變——`https://<host>/mcp`、走 frontend 的 nginx、
+bearer token 是必要條件、沒有 token 就沒有這條路由——那正是 ADR-0080 保留下來的部分。）
 
 ## Date
 2026-08-14
