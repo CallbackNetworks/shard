@@ -29,117 +29,14 @@ RETIRED = {
     ("GET", "/webhook/events/{}"),
 }
 
-# Routes that were already undocumented when this check was first wired into CI.
+# Routes that were undocumented when this check was first wired into CI.
 #
-# A ratchet, not an exemption: the check fails if anything NOT in this set is
-# undocumented, so new drift is refused from today. It also fails if an entry here
-# becomes documented without being removed, so the list cannot quietly rot into a
-# permanent excuse — documenting a route means deleting its line, and the number
-# below only goes down.
-#
-# This existed because the checker was written and then wired to nothing: 99 of 320
-# live routes had no entry in docs/api.md by the time anyone ran it.
-UNDOCUMENTED_BASELINE = {
-    ("DELETE", "/api/activity-watches/{}"),
-    ("DELETE", "/api/v1/deliveries"),
-    ("DELETE", "/api/v1/edge-types/{}"),
-    ("DELETE", "/api/v1/integrations/{}"),
-    ("DELETE", "/api/v1/notifications/{}"),
-    ("DELETE", "/api/v1/projects/{}/tasks/{}/attachments/{}"),
-    ("DELETE", "/api/v1/projects/{}/tasks/{}/recurrence"),
-    ("DELETE", "/api/v1/templates/{}"),
-    ("DELETE", "/api/v1/workflow-rules/{}"),
-    ("GET", "/api/activity-watches"),
-    ("GET", "/api/focus-targets"),
-    ("GET", "/api/graph/ancestry"),
-    ("GET", "/api/graph-types/data-keys/managed"),
-    ("GET", "/api/nodes/{}/share-chat-log"),
-    ("GET", "/api/nodes/{}/subtree"),
-    ("GET", "/api/settings/bounds"),
-    ("GET", "/api/v1/analytics/burndown"),
-    ("GET", "/api/v1/analytics/critical-path/{}"),
-    ("GET", "/api/v1/analytics/cycle-burndown"),
-    ("GET", "/api/v1/analytics/estimate-suggestion"),
-    ("GET", "/api/v1/analytics/estimation-calibration"),
-    ("GET", "/api/v1/backup/download/{}"),
-    ("GET", "/api/v1/backup/export"),
-    ("GET", "/api/v1/backup/status"),
-    ("GET", "/api/v1/decisions"),
-    ("GET", "/api/v1/decisions/{}"),
-    ("GET", "/api/v1/decisions/{}/export"),
-    ("GET", "/api/v1/deliveries"),
-    ("GET", "/api/v1/deliveries/{}"),
-    ("GET", "/api/v1/edge-types/registry"),
-    ("GET", "/api/v1/graph/ancestry"),
-    ("GET", "/api/v1/integrations"),
-    ("GET", "/api/v1/integrations/events"),
-    ("GET", "/api/v1/integrations/{}/health"),
-    ("GET", "/api/v1/integrations/sources"),
-    ("GET", "/api/v1/integrations/templates"),
-    ("GET", "/api/v1/integrations/templates/{}"),
-    ("GET", "/api/v1/nodes/{}/share-chat-log"),
-    ("GET", "/api/v1/nodes/{}/share-views"),
-    ("GET", "/api/v1/nodes/{}/subtree"),
-    ("GET", "/api/v1/nodes/{}/webhook"),
-    ("GET", "/api/v1/nodes/{}/webhook-events"),
-    ("GET", "/api/v1/projects/{}/cycles"),
-    ("GET", "/api/v1/projects/{}/cycles/{}"),
-    ("GET", "/api/v1/projects/{}/cycles/{}/compare"),
-    ("GET", "/api/v1/projects/{}/tasks/{}/attachments"),
-    ("GET", "/api/v1/projects/{}/tasks/{}/attachments/{}/download"),
-    ("GET", "/api/v1/projects/{}/tasks/export"),
-    ("GET", "/api/v1/projects/{}/tasks/{}/recurrence"),
-    ("GET", "/api/v1/settings"),
-    ("GET", "/api/v1/settings/bounds"),
-    ("GET", "/api/v1/settings/ical-token"),
-    ("GET", "/api/v1/tasks/unfiled"),
-    ("GET", "/api/v1/templates"),
-    ("GET", "/api/v1/workflow-rules"),
-    ("GET", "/api/v1/workflow-rules/{}"),
-    ("GET", "/api/v1/workflow-rules/vocabulary"),
-    ("PATCH", "/api/v1/edge-types/{}"),
-    ("PATCH", "/api/v1/integrations/{}"),
-    ("PATCH", "/api/v1/projects/{}/tasks/{}/recurrence"),
-    ("PATCH", "/api/v1/templates/{}"),
-    ("PATCH", "/api/v1/workflow-rules/{}"),
-    ("POST", "/api/activity-watches"),
-    ("POST", "/api/api-keys/{}/rotate"),
-    ("POST", "/api/nodes/{}/share/set-guest-notes"),
-    ("POST", "/api/nodes/{}/webhook/rotate-token"),
-    ("POST", "/api/v1/backup/restore"),
-    ("POST", "/api/v1/backup/restore/{}"),
-    ("POST", "/api/v1/backup/run"),
-    ("POST", "/api/v1/cicd/trigger/generic"),
-    ("POST", "/api/v1/cicd/trigger/github"),
-    ("POST", "/api/v1/cicd/trigger/gitlab"),
-    ("POST", "/api/v1/cicd/trigger/jenkins"),
-    ("POST", "/api/v1/deliveries/{}/retry"),
-    ("POST", "/api/v1/edge-types"),
-    ("POST", "/api/v1/integrations"),
-    ("POST", "/api/v1/integrations/{}/retry-all"),
-    ("POST", "/api/v1/integrations/{}/test"),
-    ("POST", "/api/v1/nodes/{}/share/set-guest-notes"),
-    ("POST", "/api/v1/nodes/{}/webhook/rotate-secret"),
-    ("POST", "/api/v1/nodes/{}/webhook/rotate-token"),
-    ("POST", "/api/v1/notifications/mark-all-read"),
-    ("POST", "/api/v1/projects/{}/cycles/{}/duplicate"),
-    ("POST", "/api/v1/projects/{}/import/github"),
-    ("POST", "/api/v1/projects/{}/import/linear"),
-    ("POST", "/api/v1/projects/{}/import/trello"),
-    ("POST", "/api/v1/projects/{}/tasks/{}/attachments"),
-    ("POST", "/api/v1/projects/{}/tasks/{}/create-external-issue"),
-    ("POST", "/api/v1/projects/{}/tasks/import"),
-    ("POST", "/api/v1/projects/{}/tasks/{}/recurrence"),
-    ("POST", "/api/v1/settings/ical-token/rotate"),
-    ("POST", "/api/v1/tasks/{}/memberships/{}"),
-    ("POST", "/api/v1/templates"),
-    ("POST", "/api/v1/workflow-rules"),
-    ("POST", "/api/v1/workflow-rules/{}/test"),
-    ("POST", "/share/node/{}/chat"),
-    ("PUT", "/api/settings/llm"),
-    ("PUT", "/api/v1/settings/llm"),
-    ("PUT", "/api/v1/settings/system"),
-}
+# Empty, and that is the end state the ratchet existed to reach: it started at 99 of
+# 320 live routes and the check refused any addition to it, so the number could only
+# go down. It stays here rather than being deleted with its last entry — an empty set
+# is the assertion that there is nothing outstanding, and a future gap has to be added
+# on purpose rather than inherited.
+UNDOCUMENTED_BASELINE: set[tuple[str, str]] = set()
 
 
 def normalize(path: str) -> str:

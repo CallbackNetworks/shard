@@ -368,7 +368,14 @@ retiring those routes did not retire their history.
   "scopes": ["read", "write", "admin"]
 }
 ```
-The `key` field (`tdp_...`) is only returned on creation. Store it securely.
+The `key` field (`tdp_...`) is only returned on creation. Store it securely — only its
+SHA-256 hash and last four characters are kept, so a lost key can be rotated but never
+recovered.
+
+#### `POST /api-keys/{id}/rotate`
+Issue a new secret for an existing key, keeping its name, scopes and container. The previous
+secret stops working immediately and `last_used_at` resets — a fresh secret has no usage
+history of its own. The new value is returned once, like creation.
 
 #### `PATCH /api-keys/{id}`
 ```json
@@ -382,6 +389,20 @@ Per-agent-key activity summary: what each agent key has been assigned and touche
 ---
 
 ### Activity
+
+#### `GET /activity-watches` · `POST /activity-watches` · `DELETE /activity-watches/{id}`
+Curves a user registered on the activity ticker (ADR-0105). A watch is either one node
+(`kind="node"`, `target_id`) or every node of a type (`kind="node_type"`, `target_type`).
+No column is added to `activity_logs` — matching resolves against the live `nodes` table at
+read time.
+
+```json
+{ "kind": "node_type", "target_type": "task", "label": "Tasks", "color": "#hex" }
+```
+
+#### `GET /focus-targets`
+Everything the sidebar's Focus control can narrow to. Registry-driven rather than
+identity-only, so a user-defined container layer above identity is offered too (ADR-0081).
 
 #### `GET /activity`
 Query parameters:
@@ -1061,6 +1082,22 @@ which one. Rate-limited.
 
 ---
 
+#### `POST /share/node/{token}/chat`
+Ask the public read-only assistant a question about the shared page (ADR-0098). Its entire
+context is the return value of the same call that renders the page, so it can answer nothing
+the visitor could not already read. Rate-limited per share token rather than per IP — the
+token is the scarce resource an LLM call costs money against, and reaching this endpoint
+directly rather than through the page widget is a supported use, not a bypass.
+
+```json
+// Request
+{ "question": "string" }
+```
+
+Answers stream as SSE. A PIN-protected page requires the PIN session first.
+
+---
+
 ### iCal Feeds (Public)
 
 Read-only, unauthenticated at the middleware layer — each is gated by an unguessable token
@@ -1167,6 +1204,16 @@ Runtime-adjustable scheduler settings — persisted, no restart needed (ADR-0011
 { "backup_enabled": true, "backup_hour": 3, "backup_keep": 7 }
 ```
 
+#### `GET /settings/bounds`
+The accepted range for every field `PUT /settings/system` enforces. The write path reads the
+same table, so a client cannot offer a value the server will silently clamp (ADR-0091).
+
+#### `PUT /settings/llm`
+The assistant's provider, model, API key and base URL, as a runtime setting rather than a
+deploy secret (ADR-0096/0097). Takes effect on the next message; no restart. Saving a model
+triggers a best-effort check against the provider's own list — a failure degrades to
+"unverified", never to a rejected write.
+
 #### `GET /settings/ical-token` · `POST /settings/ical-token/rotate`
 #### `POST /settings/change-password`
 #### `GET /settings/dashboard-widgets`
@@ -1225,8 +1272,26 @@ Set an expiration date for the share link.
 
 400 if the node's type does not carry the `shareable` role.
 
+#### `POST /nodes/{id}/share/set-guest-notes`
+Allow or forbid notes from guests on the public page (ADR-0016). The guest-note gate uses
+the same PIN hash as the page gate, so it cannot become a way around it (ADR-0072).
+
+```json
+{ "allow_guest_notes": true }
+```
+
 #### `GET /nodes/{id}/share-views`
 Share-page access audit (ADR-0025), for any shareable-role node.
+
+#### `GET /nodes/{id}/share-chat-log`
+Questions asked of the public read-only assistant on this node's share page, newest first
+(ADR-0098/0099). The assistant is given only what the page already shows, so this is a log
+of what visitors asked, not of anything they could reach beyond it.
+
+#### `POST /nodes/{id}/webhook/rotate-token`
+Mint a new inbound callback address for the node. **The old callback URL stops working** —
+any CI job still posting to it starts failing silently from the runner's point of view
+(ADR-0084).
 
 ---
 
@@ -1239,6 +1304,21 @@ One-shot `{nodes, edges}` slice of the whole graph (ADR-0037), used by the struc
 #### `GET /nodes/{id}/edges` · `GET /nodes/{id}/contained-tasks`
 #### `GET /nodes/{id}/events`
 Provenance: every graph event touching this node, newest first (ADR-0033).
+
+#### `GET /nodes/{id}/subtree`
+A container's child containers, each with its own rollup. The other half of its children —
+the tasks — come from `contained-tasks`; the frontend never re-derives a rollup from the
+tasks on screen (ADR-0065).
+
+#### `GET /graph/ancestry?ids=a,b,c`
+Where nodes live and whose they are: `contains` trails walked upward (root-first, one per
+parent — a node may have several) plus `owns` owners, which are never folded into a trail
+(ADR-0094). Batched because every caller is a list. Caps at `MAX_TRAILS`/`MAX_DEPTH`/
+`MAX_IDS` and reports `truncated` rather than presenting a partial trail as a whole one.
+
+#### `GET /graph-types/data-keys/managed`
+The `data` keys a node type may never declare editable — feature machinery like
+`share_token` and `callback_token` (ADR-0074). Served rather than mirrored in the client.
 
 #### `GET /graph-types/nodes` · `POST /graph-types/nodes`
 #### `PATCH /graph-types/nodes/{key}` · `DELETE /graph-types/nodes/{key}`
@@ -1583,16 +1663,209 @@ Manage outbound webhook/email subscriptions programmatically.
 
 #### `GET /api/v1/notifications` · `GET /api/v1/notifications/unread-count`
 #### `PATCH /api/v1/notifications/{id}/read`
+#### `POST /api/v1/notifications/mark-all-read` · `DELETE /api/v1/notifications/{id}` (`write`)
+Clearing is a write. `get_notifications` could see a notification and nothing could clear
+it until ADR-0093.
 
 ---
 
 ### Search & Analytics (External API)
+
+Every analytics report takes `read`.
 
 #### `GET /api/v1/search?q=`
 #### `GET /api/v1/analytics/overview`
 #### `GET /api/v1/analytics/velocity`
 #### `GET /api/v1/analytics/heatmap`
 #### `GET /api/v1/analytics/status-trend`
+
+The planning half — what will happen rather than what did (ADR-0086):
+
+#### `GET /api/v1/analytics/burndown?project_id=&days=`
+#### `GET /api/v1/analytics/cycle-burndown?cycle_id=`
+#### `GET /api/v1/analytics/critical-path/{project_id}`
+The longest dependency chain to completion, so an agent can tell which task is actually
+blocking a date rather than guessing from priority.
+
+#### `GET /api/v1/analytics/estimate-suggestion?raw_estimate=`
+#### `GET /api/v1/analytics/estimation-calibration`
+How this project's estimates have historically compared to reality, and a correction
+derived from it (ADR-0028).
+
+---
+
+### Work in and out (External API)
+
+Intake and export. The most agent-shaped acts in the product, and the ones only a file
+picker could start until ADR-0092.
+
+#### `POST /api/v1/projects/{pid}/tasks/import` (`write`)
+#### `POST /api/v1/projects/{pid}/import/trello` (`write`)
+#### `POST /api/v1/projects/{pid}/import/linear` (`write`)
+#### `POST /api/v1/projects/{pid}/import/github` (`write`)
+The contract is **partial success**, not all-or-nothing: one malformed row does not abandon
+the batch.
+
+```json
+{ "imported": 12, "skipped": 2, "errors": ["row 7: missing title"] }
+```
+
+The provider payloads are passed through as the source produced them — normalising before
+sending would be a second mapping to keep in step with the importer's own.
+
+#### `GET /api/v1/projects/{pid}/tasks/export` (`read`)
+The other half of the round trip: what `tasks/import` accepts.
+
+#### `GET /api/v1/tasks/unfiled` (`read`)
+Tasks belonging to no container. The `triage-inbox` MCP prompt existed with no endpoint
+behind it until ADR-0092.
+
+#### `POST /api/v1/tasks/{task_id}/memberships/{project_id}` (`write`)
+File a task into an additional container. A task may belong to several; `contains` is where
+it lives, and it can live in more than one place (ADR-0032).
+
+#### `POST /api/v1/projects/{pid}/tasks/{tid}/create-external-issue` (`write`)
+Publish a task outward as a GitHub/Gitea/GitLab issue and link the two (ADR-0026). Inbound
+sync was always agent-reachable; the act that *starts* the relationship was not.
+
+---
+
+### Attachments & Recurrence (External API)
+
+#### `GET`/`POST /api/v1/projects/{pid}/tasks/{tid}/attachments`
+#### `DELETE /api/v1/projects/{pid}/tasks/{tid}/attachments/{aid}`
+#### `GET /api/v1/projects/{pid}/tasks/{tid}/attachments/{aid}/download` (`read`)
+An agent's output is mostly files, and they had nowhere to go (ADR-0086). Upload takes
+base64 JSON here — the SPA's multipart door and this one land in one `store`, so the 20MB
+limit exists once rather than per door.
+
+```json
+{ "filename": "build.log", "content_type": "text/plain", "content_base64": "..." }
+```
+
+#### `GET`/`POST`/`PATCH`/`DELETE /api/v1/projects/{pid}/tasks/{tid}/recurrence`
+`recurrence` rode on every `TaskOut` with no v1 write path until ADR-0086 — a field you can
+read and never write describes a capability the API does not offer.
+
+---
+
+### Cycles (External API)
+
+#### `GET /api/v1/projects/{pid}/cycles` · `GET /api/v1/projects/{pid}/cycles/{cid}` (`read`)
+#### `GET /api/v1/projects/{pid}/cycles/{cid}/compare` (`read`)
+#### `POST /api/v1/projects/{pid}/cycles/{cid}/duplicate` (`write`)
+A cycle could be written *into* (`in_cycle` is an edge) and never read back until ADR-0086.
+Duplication broadcasts and runs the mutation pipeline, which describes where the code lived,
+not who may call it (ADR-0092).
+
+---
+
+### Decisions (External API)
+
+#### `GET /api/v1/decisions` · `GET /api/v1/decisions/{id}` · `GET /api/v1/decisions/{id}/export` (`read`)
+Read-only on purpose: writing a decision is `POST /api/v1/nodes` with `type="decision"`, and
+a second write path would be the duplicate ADR-0087 exists to prevent.
+
+---
+
+### Automation & Integrations (External API)
+
+Everything here was reachable only from a browser before ADR-0084/0085, which in production
+means reachable only by a person holding the `AUTH_PASSWORD` — an API key cannot present one.
+
+#### `GET`/`POST /api/v1/workflow-rules` · `GET`/`PATCH`/`DELETE /api/v1/workflow-rules/{id}`
+#### `GET /api/v1/workflow-rules/vocabulary` (`read`)
+#### `POST /api/v1/workflow-rules/{id}/test` (`read`)
+The whole rules engine. Without it an agent could perform every write forever and never
+automate one. `test` is a dry run and takes `read` because it changes nothing — it reports
+what the rule *would* do, computed by the same code that would do it (ADR-0054).
+
+#### `GET`/`POST /api/v1/integrations` · `PATCH`/`DELETE /api/v1/integrations/{id}`
+#### `GET /api/v1/integrations/events` (`read`)
+#### `GET /api/v1/integrations/sources` (`read`)
+#### `GET /api/v1/integrations/templates` · `GET /api/v1/integrations/templates/{id}` (`read`)
+#### `GET /api/v1/integrations/{id}/health` (`read`)
+#### `POST /api/v1/integrations/{id}/test` (`write`)
+#### `POST /api/v1/integrations/{id}/retry-all` (`write`)
+Outbound targets. `/api/v1/subscriptions` is this same service with the type, name and
+credentials nailed shut. Credentials are withheld on read and `null` on write means
+"unchanged" (ADR-0063), so a client can GET, edit one field and PATCH back without
+destroying a secret it was never shown.
+
+#### `GET /api/v1/deliveries` · `GET /api/v1/deliveries/{id}` (`read`)
+#### `POST /api/v1/deliveries/{id}/retry` (`write`) · `DELETE /api/v1/deliveries` (`admin`)
+The delivery log — a webhook's failure mode is silence, so this is how an agent learns one
+failed. Secret header names are derived from the integration and redacted on read as well as
+write: a log is written once and read forever (ADR-0085).
+
+#### `POST /api/v1/cicd/trigger/github` (`write`)
+#### `POST /api/v1/cicd/trigger/gitlab` (`write`)
+#### `POST /api/v1/cicd/trigger/jenkins` (`write`)
+#### `POST /api/v1/cicd/trigger/generic` (`write`)
+Start a pipeline (ADR-0085).
+
+#### `GET /api/v1/nodes/{id}/webhook` (`admin`)
+#### `POST /api/v1/nodes/{id}/webhook/rotate-token` (`admin`)
+#### `POST /api/v1/nodes/{id}/webhook/rotate-secret` (`admin`)
+#### `GET /api/v1/nodes/{id}/webhook-events` (`read`)
+Inbound CI/CD credentials and build history. `admin` rather than `write` because the
+redaction middleware would strip `callback_token` from a lesser key's response and hand back
+a config with the address silently missing (ADR-0084). `webhook-events` used to sit under
+the credential-free `/webhook/` prefix and was readable by anyone holding a node id
+(ADR-0085).
+
+---
+
+### Templates (External API)
+
+#### `GET`/`POST /api/v1/templates` · `PATCH`/`DELETE /api/v1/templates/{id}`
+
+---
+
+### Instance configuration (External API)
+
+Configuring the instance was browser-only until ADR-0091. Scope follows what the response
+*carries*: `read` for state, `admin` for every write and for any read that hands over a copy
+of the database.
+
+#### `GET /api/v1/settings` (`read`) · `PUT /api/v1/settings/system` (`admin`)
+#### `GET /api/v1/settings/bounds` (`read`)
+The accepted range for every field the write path enforces, served from the same table the
+write path reads. Out-of-range is a 422 and an unknown key is refused — `{"backup_hour": 99}`
+used to answer `200 {"backup_hour": 23}`, and a misspelled key used to answer `200` having
+changed nothing.
+
+#### `PUT /api/v1/settings/llm` (`admin`)
+#### `GET /api/v1/settings/ical-token` · `POST /api/v1/settings/ical-token/rotate` (`admin`)
+App-level rather than a node's, which is why the ADR-0070→0073 share collapse never reached
+it.
+
+#### `GET /api/v1/backup/status` (`read`)
+#### `POST /api/v1/backup/run` (`admin`)
+#### `GET /api/v1/backup/export` · `GET /api/v1/backup/download/{filename}` (`admin`)
+#### `POST /api/v1/backup/restore` · `POST /api/v1/backup/restore/{filename}` (`admin`)
+An export **is** the data, tokens and all — hence `admin` on a read. Restore replaces
+everything and takes a `confirm="replace"` gate. Downloading a backup is deliberately not an
+MCP tool.
+
+---
+
+### Graph vocabulary (External API)
+
+#### `GET /api/v1/graph/ancestry?ids=` (`read`)
+The v1 twin of the internal ancestry walk (ADR-0094).
+
+#### `GET /api/v1/nodes/{id}/subtree` (`read`)
+#### `GET /api/v1/nodes/{id}/share-views` (`read`)
+#### `GET /api/v1/nodes/{id}/share-chat-log` (`read`)
+#### `POST /api/v1/nodes/{id}/share/set-guest-notes` (`write`)
+
+#### `GET /api/v1/edge-types/registry` (`read`)
+#### `POST /api/v1/edge-types` · `PATCH`/`DELETE /api/v1/edge-types/{key}` (`admin`)
+Edge types were read-only on v1 for a reason that did not hold: the internal door could
+always create a relation with both endpoint declarations NULL, so the restriction never
+prevented the bad state — only agents reaching one the UI reaches in two clicks (ADR-0086).
+A relation declares what may sit at each end, and `add_edge` enforces it (ADR-0078).
 
 ---
 
