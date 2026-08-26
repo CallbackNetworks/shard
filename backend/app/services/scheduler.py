@@ -7,7 +7,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.models import ActivityLog, Integration, Node, RecurrenceRule, UserPrefe
 from app.services import backup as backup_service
 from app.services import email_sender, graph
 from app.services.activity import log_activity
+from app.services.datetimes import ensure_aware
 from app.services.notifier import fire_notifications, retry_delivery
 from app.services.runtime_settings import get_system_settings
 from app.services.task_mutations import finalize_task_create
@@ -25,13 +26,8 @@ logger = logging.getLogger(__name__)
 CHECK_INTERVAL_SECONDS = 3600  # every hour
 
 
-def _ensure_aware(dt: datetime) -> datetime:
-    """Normalize a DB-loaded datetime to aware UTC.
-
-    SQLite returns naive datetimes while PostgreSQL returns aware ones for
-    the same timezone-aware column, so Python-side comparisons must normalize.
-    """
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+# Shared with issue_sync and analytics_admin — see services/datetimes.
+_ensure_aware = ensure_aware
 
 
 # Once-per-day/week dedup markers, persisted in the user_preferences KV table

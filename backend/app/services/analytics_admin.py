@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.models import Node
 from app.services import graph
 from app.services.critical_path import compute_critical_path
+from app.services.datetimes import ensure_aware
 
 # Estimate size buckets, in minutes: (label, low, high-inclusive or None for open-ended).
 ESTIMATE_BUCKETS = [
@@ -44,8 +45,8 @@ def burndown(db: Session, cycle_id: str) -> list[dict]:
     if not cycle:
         return []
 
-    start = cycle.start_date or cycle.created_at
-    end = cycle.end_date or datetime.now(UTC)
+    start = ensure_aware(cycle.start_date) or ensure_aware(cycle.created_at)
+    end = ensure_aware(cycle.end_date) or datetime.now(UTC)
     if not start:
         return []
 
@@ -90,8 +91,13 @@ def cycle_burndown(db: Session, cycle_id: str) -> list[dict]:
     tasks = db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(cycle_task_ids)).all()
     total = len(tasks)
 
-    start = cycle.start_date or min((t.created_at for t in tasks), default=datetime.now(UTC))
-    end = cycle.end_date or datetime.now(UTC)
+    # SQLite hands these back naive for the same column PostgreSQL makes aware, and both
+    # are compared against `now` below — so a cycle *with* an end date raised TypeError
+    # and a cycle without one worked. See services/datetimes.
+    start = ensure_aware(cycle.start_date) or min(
+        (ensure_aware(t.created_at) for t in tasks), default=datetime.now(UTC)
+    )
+    end = ensure_aware(cycle.end_date) or datetime.now(UTC)
 
     result = []
     current = start.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -102,7 +108,9 @@ def cycle_burndown(db: Session, cycle_id: str) -> list[dict]:
 
     while current <= end_day:
         day_end = current.replace(hour=23, minute=59, second=59)
-        done_by_day = sum(1 for t in tasks if t.status == "done" and t.updated_at and t.updated_at <= day_end)
+        done_by_day = sum(
+            1 for t in tasks if t.status == "done" and t.updated_at and ensure_aware(t.updated_at) <= day_end
+        )
         result.append(
             {
                 "date": current.strftime("%Y-%m-%d"),

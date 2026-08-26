@@ -15,6 +15,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.services.datetimes import ensure_aware
+
 logger = logging.getLogger(__name__)
 
 GITHUB_API_BASE = "https://api.github.com"
@@ -38,7 +40,7 @@ def parse_due_date(value) -> datetime | None:
             dt = datetime.strptime(text, "%Y-%m-%d")
         except ValueError:
             return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    return ensure_aware(dt)
 
 
 def format_due_date_gitlab(due: datetime | None) -> str:
