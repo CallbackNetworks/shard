@@ -39,13 +39,24 @@ class SQLiteSearchBackend(SearchBackend):
             existing_tables = set(inspect(engine).get_table_names())
             if "tasks_fts" not in existing_tables:
                 conn.execute(text("CREATE VIRTUAL TABLE tasks_fts USING fts5(task_id UNINDEXED, title, description)"))
-                conn.execute(
-                    text(
-                        "INSERT INTO tasks_fts(task_id, title, description) "
-                        "SELECT id, title, COALESCE(json_extract(data, '$.description'), '') "
-                        "FROM nodes WHERE type = 'task'"
-                    )
+            # Reconcile on every startup, not only on creation. The triggers below live
+            # on `nodes`, so anything that *recreates* that table drops them while the
+            # FTS table — which SQLAlchemy does not manage — survives. SQLite's
+            # `batch_alter_table` rebuilds the table, so any migration touching `nodes`
+            # leaves exactly that state: triggers gone, index intact, and every task
+            # written before the next restart silently absent from search. Backfilling
+            # only when the table is missing never noticed, because the table was there.
+            conn.execute(
+                text(
+                    "INSERT INTO tasks_fts(task_id, title, description) "
+                    "SELECT id, title, COALESCE(json_extract(data, '$.description'), '') "
+                    "FROM nodes WHERE type = 'task' "
+                    "AND id NOT IN (SELECT task_id FROM tasks_fts)"
                 )
+            )
+            # And drop rows for tasks that no longer exist, for the same reason in
+            # reverse: a delete that happened while the triggers were absent.
+            conn.execute(text("DELETE FROM tasks_fts WHERE task_id NOT IN (SELECT id FROM nodes WHERE type = 'task')"))
             for trig in ("tasks_fts_insert", "tasks_fts_update", "tasks_fts_delete"):
                 conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
             conn.execute(
