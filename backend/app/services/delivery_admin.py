@@ -197,5 +197,10 @@ def purge(db: Session, *, older_than_days: int = 30, status: str | None = None) 
     q = db.query(WebhookDelivery).filter(WebhookDelivery.created_at < cutoff)
     if status:
         q = q.filter(WebhookDelivery.status == status)
-    q.delete()
+    # `synchronize_session=False` because this is a bulk delete and the caller has no
+    # use for the session afterwards. The default tries to evaluate the criteria in
+    # Python against whatever is already loaded, and `created_at` is stored naive on
+    # SQLite while `cutoff` is timezone-aware — so purging raised TypeError whenever a
+    # delivery happened to be in the session, and worked fine when none was.
+    q.delete(synchronize_session=False)
     db.commit()
