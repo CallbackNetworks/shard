@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Share2, RefreshCw, Copy, Check, Rss, Lock, Clock, MessageSquare, Eye, Bot, ChevronDown, ChevronUp } from 'lucide-react'
@@ -74,13 +75,13 @@ export default function NodeShareFacet({ node, subscribable, invalidateKeys }) {
   })
 
   const { data: views } = useQuery({
-    queryKey: ['node-share-views', node.id],
+    queryKey: qk.nodeShareViews(node.id),
     queryFn: () => getNodeShareViews(node.id),
     enabled: !!token,
   })
 
   const { data: chatLog } = useQuery({
-    queryKey: ['node-share-chat-log', node.id],
+    queryKey: qk.nodeShareChatLog(node.id),
     queryFn: () => getNodeShareChatLog(node.id),
     enabled: !!token && chatLogOpen,
   })

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart2, TrendingUp, Activity, Flame, Download, Crosshair } from 'lucide-react'
 import { getProjects, getCycles, getAnalyticsOverview, getAnalyticsHeatmap, getAnalyticsBurndown, getAnalyticsVelocity, getAnalyticsStatusTrend, getEstimationCalibration } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { BRAND, STATUS_COLOR, STATUS_MAP } from '../constants/theme'
 import SvgTooltip from '../components/charts/SvgTooltip'
 import ActivityHeatmap from '../components/charts/ActivityHeatmap'
@@ -331,18 +332,18 @@ export default function Analytics() {
   const [selectedCycleId, setSelectedCycleId] = useState('')
   const [trendDays, setTrendDays] = useState(30)
 
-  const { data: overview } = useQuery({ queryKey: ['analytics-overview'], queryFn: getAnalyticsOverview, staleTime: 60000 })
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects, staleTime: 30000 })
+  const { data: overview } = useQuery({ queryKey: qk.analyticsOverview(), queryFn: getAnalyticsOverview, staleTime: 60000 })
+  const { data: projects = [] } = useQuery({ queryKey: qk.projects(), queryFn: getProjects, staleTime: 30000 })
   const { data: cycles = [] } = useQuery({
-    queryKey: ['cycles-all', selectedProjectId],
+    queryKey: qk.cyclesAll(selectedProjectId),
     queryFn: () => getCycles(selectedProjectId),
     enabled: !!selectedProjectId,
   })
-  const { data: heatmap = [] } = useQuery({ queryKey: ['analytics-heatmap', selectedProjectId], queryFn: () => getAnalyticsHeatmap(selectedProjectId ? { project_id: selectedProjectId } : {}), staleTime: 60000 })
-  const { data: burndown = [] } = useQuery({ queryKey: ['analytics-burndown', selectedCycleId], queryFn: () => getAnalyticsBurndown(selectedCycleId), enabled: !!selectedCycleId, staleTime: 30000 })
-  const { data: velocity = [] } = useQuery({ queryKey: ['analytics-velocity', selectedProjectId], queryFn: () => getAnalyticsVelocity(selectedProjectId), enabled: !!selectedProjectId, staleTime: 30000 })
-  const { data: trend = [] } = useQuery({ queryKey: ['analytics-trend', selectedProjectId, trendDays], queryFn: () => getAnalyticsStatusTrend(selectedProjectId || undefined, trendDays), staleTime: 30000 })
-  const { data: calibration } = useQuery({ queryKey: ['analytics-calibration', selectedProjectId], queryFn: () => getEstimationCalibration(selectedProjectId ? { project_id: selectedProjectId } : {}), staleTime: 60000 })
+  const { data: heatmap = [] } = useQuery({ queryKey: qk.analyticsHeatmap(selectedProjectId), queryFn: () => getAnalyticsHeatmap(selectedProjectId ? { project_id: selectedProjectId } : {}), staleTime: 60000 })
+  const { data: burndown = [] } = useQuery({ queryKey: qk.analyticsBurndown(selectedCycleId), queryFn: () => getAnalyticsBurndown(selectedCycleId), enabled: !!selectedCycleId, staleTime: 30000 })
+  const { data: velocity = [] } = useQuery({ queryKey: qk.analyticsVelocity(selectedProjectId), queryFn: () => getAnalyticsVelocity(selectedProjectId), enabled: !!selectedProjectId, staleTime: 30000 })
+  const { data: trend = [] } = useQuery({ queryKey: qk.analyticsTrend(selectedProjectId, trendDays), queryFn: () => getAnalyticsStatusTrend(selectedProjectId || undefined, trendDays), staleTime: 30000 })
+  const { data: calibration } = useQuery({ queryKey: qk.analyticsCalibration(selectedProjectId), queryFn: () => getEstimationCalibration(selectedProjectId ? { project_id: selectedProjectId } : {}), staleTime: 60000 })
 
   const exportHeatmap = useCallback(() => {
     if (heatmap.length === 0) return

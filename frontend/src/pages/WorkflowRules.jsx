@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Play, X, GitMerge, AlertTriangle } from 'lucide-react'
 import { getWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule, testWorkflowRule, search } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import FormField from '../components/shared/FormField'
@@ -135,7 +136,7 @@ function ActionRow({ action, types, specs, onChange, onRemove, t }) {
 function SubjectPicker({ selected, onPick, t }) {
   const [term, setTerm] = useState('')
   const { data } = useQuery({
-    queryKey: ['rule-subject-search', term],
+    queryKey: qk.ruleSubjectSearch(term),
     queryFn: () => search(term),
     enabled: term.trim().length >= 2,
     staleTime: 30_000,
@@ -311,7 +312,7 @@ function RuleModal({ initial, onSave, onClose, t }) {
 
 export default function WorkflowRules() {
   const { t } = useTranslation()
-  const { data: rules = [], isLoading } = useQuery({ queryKey: ['workflow-rules'], queryFn: getWorkflowRules })
+  const { data: rules = [], isLoading } = useQuery({ queryKey: qk.workflowRules(), queryFn: getWorkflowRules })
   // The cards read a saved rule back in words, which needs the same vocabulary the editor
   // writes it with — unscoped here, because the list mixes rules from every project.
   const vocabulary = useRuleVocabulary()

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { getGoals, createGoal, updateGoal, deleteGoal, getProjects, getContainedTasks, createTask } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { BRAND, DARK, GOAL_STATUS_COLORS as STATUS_COLORS, STATUS_COLOR } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import EmptyState from '../components/shared/EmptyState'
@@ -14,7 +15,7 @@ function GoalTasks({ goalId }) {
   const { t } = useTranslation()
   const [title, setTitle] = useState('')
   const { data: tasks = [] } = useQuery({
-    queryKey: ['contained-tasks', goalId],
+    queryKey: qk.containedTasks(goalId),
     queryFn: () => getContainedTasks(goalId),
   })
 
@@ -369,18 +370,18 @@ export default function Goals() {
   const [statusFilter, setStatusFilter] = useState('')
 
   const { data: goals = [], isLoading } = useQuery({
-    queryKey: ['goals', statusFilter],
+    queryKey: qk.goals(statusFilter),
     queryFn: () => getGoals(statusFilter ? { status: statusFilter } : {}),
   })
 
   const { data: projects = [] } = useQuery({
-    queryKey: ['projects'],
+    queryKey: qk.projects(),
     queryFn: getProjects,
   })
 
   // Compute counts across all goals (unfiltered) for tab badges
   const { data: allGoals = [] } = useQuery({
-    queryKey: ['goals'],
+    queryKey: qk.goals(),
     queryFn: () => getGoals(),
     staleTime: 30000,
   })

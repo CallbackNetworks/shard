@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FolderOpen, Search, ArrowRight, Hash, Boxes } from 'lucide-react'
 import { getProjects, search, getNodes, getNodeTypes } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { NAV_GROUPS } from '../constants/nav'
 import { BRAND, DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
@@ -121,7 +122,7 @@ export default function CommandPalette({ open, onClose, mode = 'all', intent = n
   const currentProjectId = pathname.startsWith('/projects/') ? pathname.slice('/projects/'.length) : null
 
   const { data: allProjects = [] } = useQuery({
-    queryKey: ['projects'],
+    queryKey: qk.projects(),
     queryFn: getProjects,
     staleTime: 30000,
     enabled: open,
@@ -132,7 +133,7 @@ export default function CommandPalette({ open, onClose, mode = 'all', intent = n
   const projects = useMemo(() => filterProjects(allProjects), [filterProjects, allProjects])
 
   const { data: searchResults } = useQuery({
-    queryKey: ['palette-search', debouncedQ],
+    queryKey: qk.paletteSearch(debouncedQ),
     queryFn: () => search(debouncedQ),
     enabled: open && debouncedQ.trim().length >= 2,
     staleTime: 5000,
@@ -141,10 +142,10 @@ export default function CommandPalette({ open, onClose, mode = 'all', intent = n
   // Custom graph nodes (ADR-0037): searched via the generic /nodes API; builtin
   // entities are already covered by the search endpoint above.
   const { data: nodeTypes = [] } = useQuery({
-    queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000, enabled: open,
+    queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000, enabled: open,
   })
   const { data: nodeHits = [] } = useQuery({
-    queryKey: ['palette-nodes', debouncedQ],
+    queryKey: qk.paletteNodes(debouncedQ),
     queryFn: () => getNodes(null, debouncedQ),
     enabled: open && debouncedQ.trim().length >= 2,
     staleTime: 5000,

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { getNodeTypes } from '../api/client'
+import { qk } from '../api/queryKeys'
 import NodeCombobox from './shared/NodeCombobox'
 
 // The "+" affordance on the activity ticker's bottom bar (ADR-0105): pick a node to
@@ -15,7 +16,7 @@ export default function ActivityWatchPicker({ onAddNode, onAddType, excludeNodeI
   const [typePick, setTypePick] = useState('')
   const rootRef = useRef(null)
 
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
 
   useEffect(() => {
     if (!open) return

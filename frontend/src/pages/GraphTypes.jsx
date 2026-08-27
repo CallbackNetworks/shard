@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Shapes, Spline, Plus, Trash2, Lock, Pencil, Check, X } from 'lucide-react'
@@ -139,8 +140,8 @@ export default function GraphTypes() {
   const { t } = useTranslation()
   const qc = useQueryClient()
 
-  const { data: nodeTypes = [], isLoading: nodeLoading } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes })
-  const { data: edgeTypes = [], isLoading: edgeLoading } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes })
+  const { data: nodeTypes = [], isLoading: nodeLoading } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes })
+  const { data: edgeTypes = [], isLoading: edgeLoading } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes })
 
   const emptyNodeForm = { key: '', label: '', color: '#818cf8', roles: [] }
   const [nodeForm, setNodeForm] = useState(emptyNodeForm)
@@ -149,23 +150,23 @@ export default function GraphTypes() {
 
   const nodeCreate = useMutation({
     mutationFn: createNodeType,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setNodeForm(emptyNodeForm) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.nodeTypes() }); setNodeForm(emptyNodeForm) },
   })
   const nodeDelete = useMutation({
     mutationFn: deleteNodeType,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['node-types'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodeTypes() }),
   })
   const nodeUpdate = useMutation({
     mutationFn: ({ key, data }) => updateNodeType(key, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-types'] }); setEditingKey(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.nodeTypes() }); setEditingKey(null) },
   })
   const edgeCreate = useMutation({
     mutationFn: createEdgeType,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['edge-types'] }); setEdgeForm({ key: '', label: '', is_containment: false }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.edgeTypes() }); setEdgeForm({ key: '', label: '', is_containment: false }) },
   })
   const edgeDelete = useMutation({
     mutationFn: deleteEdgeType,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['edge-types'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.edgeTypes() }),
   })
 
   const confirmDelete = (mut, key) => { if (window.confirm(t('graphTypes.deleteConfirm', { key }))) mut.mutate(key) }

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { addDependency, removeDependency } from '../api/client'
+import { qk } from '../api/queryKeys'
 
 export default function DependenciesPanel({ projectId, task, allTasks, depth }) {
   const { t } = useTranslation()
@@ -14,12 +15,12 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
     if (!targetId) return
     await addDependency(projectId, task.id, targetId)
     setDepInput('')
-    qc.invalidateQueries({ queryKey: ['project', projectId] })
+    qc.invalidateQueries({ queryKey: qk.project(projectId) })
   }
 
   const handleRemove = async (dependsOnId) => {
     await removeDependency(projectId, task.id, dependsOnId)
-    qc.invalidateQueries({ queryKey: ['project', projectId] })
+    qc.invalidateQueries({ queryKey: qk.project(projectId) })
   }
 
   const blockedBy = task.blocked_by || []

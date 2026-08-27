@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useDeferredValue } from 'react'
+import { qk } from '../api/queryKeys'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation, Trans } from 'react-i18next'
@@ -100,7 +101,7 @@ export default function ProjectDetail() {
   const [cicdOpen, setCicdOpen] = useState(false)
 
   const { data: project, isLoading } = useQuery({
-    queryKey: ['project', id],
+    queryKey: qk.project(id),
     queryFn: () => getProject(id),
   })
 
@@ -114,8 +115,8 @@ export default function ProjectDetail() {
   const topTasks = tasks.filter(t => t.parent_id == null)
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['project', id] })
-    qc.invalidateQueries({ queryKey: ['projects'] })
+    qc.invalidateQueries({ queryKey: qk.project(id) })
+    qc.invalidateQueries({ queryKey: qk.projects() })
   }
 
   const createMut = useMutation({
@@ -217,13 +218,13 @@ export default function ProjectDetail() {
   })
 
   const { data: savedFilters = [] } = useQuery({
-    queryKey: ['saved-filters', id],
+    queryKey: qk.savedFilters(id),
     queryFn: () => getSavedFilters(id),
   })
 
   const saveFilterMut = useMutation({
     mutationFn: (data) => createSavedFilter(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-filters', id] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.savedFilters(id) }),
   })
 
   const handleUpdate = (taskId, data) => updateMut.mutate({ taskId, data })
@@ -713,7 +714,7 @@ export default function ProjectDetail() {
             onDeleteCycle={(cycleId) => deleteCycleMut.mutate(cycleId)}
             onAddTask={(cycleId, taskId) => addTaskToCycleMut.mutate({ cycleId, taskId })}
             onRemoveTask={(cycleId, taskId) => removeTaskFromCycleMut.mutate({ cycleId, taskId })}
-            onCyclesMutated={() => qc.invalidateQueries({ queryKey: ['project', id] })}
+            onCyclesMutated={() => qc.invalidateQueries({ queryKey: qk.project(id) })}
           />
         )}
       </div>

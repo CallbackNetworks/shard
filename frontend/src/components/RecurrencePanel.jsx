@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { setRecurrence, updateRecurrence, removeRecurrence } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 
 export default function RecurrencePanel({ projectId, task, depth }) {
@@ -19,7 +20,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
       ...recurForm,
       next_run_at: new Date(recurForm.next_run_at).toISOString(),
     })
-    qc.invalidateQueries({ queryKey: ['project', projectId] })
+    qc.invalidateQueries({ queryKey: qk.project(projectId) })
   }
 
   const padLeft = 16 + depth * 20 + 36
@@ -57,7 +58,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
             <button
               onClick={async () => {
                 await updateRecurrence(projectId, task.id, { active: !task.recurrence.active })
-                qc.invalidateQueries({ queryKey: ['project', projectId] })
+                qc.invalidateQueries({ queryKey: qk.project(projectId) })
               }}
               style={{ padding: '4px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.success, textTransform: 'uppercase', letterSpacing: '1px' }}
             >
@@ -67,7 +68,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
               onClick={async () => {
                 if (!confirm('Remove recurrence rule?')) return
                 await removeRecurrence(projectId, task.id)
-                qc.invalidateQueries({ queryKey: ['project', projectId] })
+                qc.invalidateQueries({ queryKey: qk.project(projectId) })
               }}
               style={{ padding: '4px 14px', border: '1px solid rgba(250,204,21,0.4)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.danger, textTransform: 'uppercase', letterSpacing: '1px' }}
             >

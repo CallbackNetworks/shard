@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Settings2, Shield, SlidersHorizontal, PanelLeft, ChevronUp, ChevronDown, Eye, EyeOff, Check, Bell, Clock, CalendarClock, RefreshCw } from 'lucide-react'
 import { getSettings, setPreference, updateSystemSettings, getIcalToken, rotateGlobalIcalToken } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 import { ControlRow, InfoRow, SectionTitle, Segmented, StatusBadge } from '../components/settings/primitives'
 import BackupPanel from '../components/settings/BackupPanel'
@@ -57,24 +58,24 @@ export default function Settings() {
   }
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['settings'],
+    queryKey: qk.settings(),
     queryFn: getSettings,
   })
 
   const systemMut = useMutation({
     mutationFn: updateSystemSettings,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.settings() }),
   })
 
   const { data: icalToken } = useQuery({
-    queryKey: ['ical-token'],
+    queryKey: qk.icalToken(),
     queryFn: getIcalToken,
     staleTime: 60000,
   })
   const [copiedIcal, setCopiedIcal] = useState(false)
   const rotateIcalMut = useMutation({
     mutationFn: rotateGlobalIcalToken,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['ical-token'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.icalToken() }),
   })
   const icalUrl = icalToken?.token ? `${window.location.origin}/ical/all/${icalToken.token}.ics` : ''
 

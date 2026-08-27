@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Link2, Search } from 'lucide-react'
 import { getNode, getNodeTypes, getContainedTasks, getContainerSubtree, updateTask, deleteTask } from '../api/client'
+import { qk } from '../api/queryKeys'
 import NodeShareFacet from '../components/NodeShareFacet'
 import ChildContainersPanel from '../components/ChildContainersPanel'
 import { DARK } from '../constants/theme'
@@ -25,18 +26,18 @@ export default function ContainerView() {
   const { t } = useTranslation()
   const qc = useQueryClient()
 
-  const { data: node, isLoading, isError } = useQuery({ queryKey: ['node', id], queryFn: () => getNode(id) })
+  const { data: node, isLoading, isError } = useQuery({ queryKey: qk.node(id), queryFn: () => getNode(id) })
   const { data: tasks = [] } = useQuery({
-    queryKey: ['contained-tasks', id],
+    queryKey: qk.containedTasks(id),
     queryFn: () => getContainedTasks(id),
     enabled: !!node,
   })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   // Subtree rollup (ADR-0065): the board below shows this container's direct tasks,
   // the header counts everything it transitively contains. Server-computed — the
   // difference between the two numbers is exactly what used to go missing.
   const { data: subtree } = useQuery({
-    queryKey: ['container-subtree', id],
+    queryKey: qk.containerSubtree(id),
     queryFn: () => getContainerSubtree(id),
     enabled: !!node,
   })
@@ -53,8 +54,8 @@ export default function ContainerView() {
   const updateMut = useMutation({
     mutationFn: ({ projectId, taskId, data }) => updateTask(projectId, taskId, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contained-tasks', id] })
-      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: qk.containedTasks(id) })
+      qc.invalidateQueries({ queryKey: qk.projects() })
     },
   })
   const handleUpdate = (taskId, data) => {
@@ -64,8 +65,8 @@ export default function ContainerView() {
   const deleteMut = useMutation({
     mutationFn: ({ projectId, taskId }) => deleteTask(projectId, taskId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contained-tasks', id] })
-      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: qk.containedTasks(id) })
+      qc.invalidateQueries({ queryKey: qk.projects() })
     },
   })
   const handleDelete = (taskId) => {

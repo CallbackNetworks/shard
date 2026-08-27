@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { PRIORITY, STATUS_COLOR } from '../constants/theme'
 import { alpha } from '../utils/color'
 import { getNodeTypes } from '../api/client'
+import { qk } from '../api/queryKeys'
 
 // Badge for a user-defined task-like type (ADR-0035). Built-in "task" nodes show
 // nothing; a custom type renders its registry label/color (falls back to the key).
 export const TypeBadge = memo(function TypeBadge({ type }) {
   const { data: nodeTypes = [] } = useQuery({
-    queryKey: ['node-types'], queryFn: getNodeTypes,
+    queryKey: qk.nodeTypes(), queryFn: getNodeTypes,
     enabled: !!type && type !== 'task', staleTime: 300000,
   })
   if (!type || type === 'task') return null

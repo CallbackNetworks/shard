@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { Plus, FolderOpen, Archive, User, Activity, BarChart2, TrendingUp, Shield, ListChecks, GitCompare, Settings, Eye, EyeOff } from 'lucide-react'
 import { getProjects, createProject, deleteProject, getActivity, getIdentityHubStats, getGoals, getDecisions, getPreference, setPreference, getAncestry } from '../api/client'
+import { qk } from '../api/queryKeys'
 import AgentTasksPanel from '../components/AgentTasksPanel'
 import IdentityChartsView from '../components/IdentityChartsView'
 import { ViewProgress, ViewHealth, ViewTasks, ViewCompare, getPinnedIds, togglePin } from '../components/OverviewViews'
@@ -36,30 +37,30 @@ export default function Dashboard() {
   const qc = useQueryClient()
   useUiPrefs() // re-render on list-density / timestamp preference changes
   const { focusTarget, filterProjects, clearFocus } = useIdentityFocus()
-  const { data: allProjects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const { data: allProjects = [], isLoading } = useQuery({ queryKey: qk.projects(), queryFn: getProjects })
   const projects = filterProjects(allProjects)
   const { data: activities = [] } = useQuery({
-    queryKey: ['activity'],
+    queryKey: qk.activity(),
     queryFn: () => getActivity({ limit: 50 }),
     staleTime: 10000,
   })
   const { data: goals = [] } = useQuery({
-    queryKey: ['goals', 'command-center'],
+    queryKey: qk.goals('command-center'),
     queryFn: () => getGoals(),
     staleTime: 30000,
   })
   const { data: decisions = [] } = useQuery({
-    queryKey: ['decisions', 'command-center'],
+    queryKey: qk.decisions('command-center'),
     queryFn: () => getDecisions(),
     staleTime: 30000,
   })
   const { data: hubStats } = useQuery({
-    queryKey: ['identity-hub-stats'],
+    queryKey: qk.identityHubStats(),
     queryFn: getIdentityHubStats,
     staleTime: 60000,
   })
   const { data: savedWidgets } = useQuery({
-    queryKey: ['preference', 'dashboard-widgets'],
+    queryKey: qk.preference('dashboard-widgets'),
     queryFn: () => getPreference('dashboard-widgets'),
     staleTime: 60000,
   })
@@ -78,7 +79,7 @@ export default function Dashboard() {
   const w = (id) => widgetVis[id] !== false
 
   const { data: savedWidgetOrder } = useQuery({
-    queryKey: ['preference', 'dashboard-widget-order'],
+    queryKey: qk.preference('dashboard-widget-order'),
     queryFn: () => getPreference('dashboard-widget-order'),
     staleTime: 60000,
   })
@@ -124,12 +125,12 @@ export default function Dashboard() {
 
   const createMut = useMutation({
     mutationFn: () => createProject({ name: name.trim(), description: desc.trim() || undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); setName(''); setDesc(''); setShowForm(false) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.projects() }); setName(''); setDesc(''); setShowForm(false) },
   })
 
   const deleteMut = useMutation({
     mutationFn: deleteProject,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.projects() }),
   })
 
   const active = projects.filter(p => p.status === 'active')
@@ -138,7 +139,7 @@ export default function Dashboard() {
   // One request for every card on screen (ADR-0094) — asked per project this would be a
   // request per card, which is how a page ends up not asking at all.
   const { data: ancestry = {} } = useQuery({
-    queryKey: ['ancestry', 'projects', allProjects.map(p => p.id).join(',')],
+    queryKey: qk.ancestry('projects', allProjects.map(p => p.id).join(',')),
     queryFn: () => getAncestry(allProjects.map(p => p.id)),
     enabled: allProjects.length > 0,
     staleTime: 60000,

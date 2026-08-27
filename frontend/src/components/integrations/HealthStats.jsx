@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Activity } from 'lucide-react'
 import { getIntegrationHealth } from '../../api/client'
+import { qk } from '../../api/queryKeys'
 import { BRAND } from '../../constants/theme'
 import s from './HealthStats.module.css'
 
@@ -9,7 +10,7 @@ import s from './HealthStats.module.css'
 export default function HealthStats({ integrationId }) {
   const { t } = useTranslation()
   const { data: health } = useQuery({
-    queryKey: ['integration-health', integrationId],
+    queryKey: qk.integrationHealth(integrationId),
     queryFn: () => getIntegrationHealth(integrationId),
     staleTime: 60000,
   })

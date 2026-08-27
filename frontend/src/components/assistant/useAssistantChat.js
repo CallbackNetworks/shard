@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { qk } from '../../api/queryKeys'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getAssistantConversations, getAssistantConversation,
@@ -25,14 +26,14 @@ export default function useAssistantChat({ enabled = true } = {}) {
   const endRef = useRef(null)
 
   const { data: conversations = [] } = useQuery({
-    queryKey: ['assistant-conversations', search],
+    queryKey: qk.assistantConversations(search),
     queryFn: () => getAssistantConversations(search || undefined),
     enabled,
     staleTime: 5000,
   })
 
   const { data: conversation } = useQuery({
-    queryKey: ['assistant-conv', convId],
+    queryKey: qk.assistantConv(convId),
     queryFn: () => getAssistantConversation(convId),
     enabled: !!convId,
     staleTime: 0,
@@ -41,7 +42,7 @@ export default function useAssistantChat({ enabled = true } = {}) {
   const createMut = useMutation({
     mutationFn: createAssistantConversation,
     onSuccess: (conv) => {
-      qc.invalidateQueries({ queryKey: ['assistant-conversations'] })
+      qc.invalidateQueries({ queryKey: qk.assistantConversations() })
       setConvId(conv.id)
     },
   })
@@ -49,7 +50,7 @@ export default function useAssistantChat({ enabled = true } = {}) {
   const deleteMut = useMutation({
     mutationFn: deleteAssistantConversation,
     onSuccess: (_, id) => {
-      qc.invalidateQueries({ queryKey: ['assistant-conversations'] })
+      qc.invalidateQueries({ queryKey: qk.assistantConversations() })
       setConvId(current => (current === id ? null : current))
     },
   })
@@ -69,8 +70,8 @@ export default function useAssistantChat({ enabled = true } = {}) {
       await streamAssistantMessage(cid, message, (event) => {
         setStreamEvents(prev => [...prev, event])
         if (event.type === 'done') {
-          qc.invalidateQueries({ queryKey: ['assistant-conv', cid] })
-          qc.invalidateQueries({ queryKey: ['assistant-conversations'] })
+          qc.invalidateQueries({ queryKey: qk.assistantConv(cid) })
+          qc.invalidateQueries({ queryKey: qk.assistantConversations() })
         }
       })
     } catch (err) {
@@ -84,7 +85,7 @@ export default function useAssistantChat({ enabled = true } = {}) {
   const startWith = useCallback(async (text) => {
     if (streaming) return null
     const conv = await createAssistantConversation()
-    qc.invalidateQueries({ queryKey: ['assistant-conversations'] })
+    qc.invalidateQueries({ queryKey: qk.assistantConversations() })
     setConvId(conv.id)
     send(text, conv.id)
     return conv

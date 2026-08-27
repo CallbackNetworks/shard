@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { getShareData } from '../api/client'
+import { qk } from '../api/queryKeys'
 
 import ShareHero from '../components/share/ShareHero'
 import ShareStats from '../components/share/ShareStats'
@@ -29,7 +30,7 @@ export default function ShareView() {
   }, [])
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['share', token],
+    queryKey: qk.share(token),
     queryFn: () => getShareData(token),
     refetchInterval: pinData ? false : 30000,
     retry: false,

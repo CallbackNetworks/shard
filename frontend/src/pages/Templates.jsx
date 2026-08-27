@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { BRAND, DARK } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import EmptyState from '../components/shared/EmptyState'
@@ -195,7 +196,7 @@ export default function Templates() {
   const [search, setSearch] = useState('')
 
   const { data: templates = [], isLoading } = useQuery({
-    queryKey: ['templates'],
+    queryKey: qk.templates(),
     queryFn: () => getTemplates(),
   })
 

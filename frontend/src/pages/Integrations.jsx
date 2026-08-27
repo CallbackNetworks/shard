@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { X, Zap, Plus, Trash2, BookOpen } from 'lucide-react'
@@ -40,7 +41,7 @@ function groupEvents(events) {
 function TemplatePicker({ onSelect, onClose }) {
   const { t } = useTranslation()
   const { data: templates = [] } = useQuery({
-    queryKey: ['integration-templates'],
+    queryKey: qk.integrationTemplates(),
     queryFn: getIntegrationTemplates,
   })
 
@@ -73,7 +74,7 @@ function TemplatePicker({ onSelect, onClose }) {
 function SetupModal({ templateId, onClose }) {
   const { t } = useTranslation()
   const { data: template } = useQuery({
-    queryKey: ['integration-template', templateId],
+    queryKey: qk.integrationTemplate(templateId),
     queryFn: () => getIntegrationTemplate(templateId),
     enabled: !!templateId,
   })
@@ -163,11 +164,11 @@ function IntegrationModal({ initial, onSave, onClose }) {
   })
   const [showSetup, setShowSetup] = useState(null)
   const { data: allEvents = [] } = useQuery({
-    queryKey: ['integration-events'],
+    queryKey: qk.integrationEvents(),
     queryFn: getIntegrationEvents,
   })
   const { data: allSources = [] } = useQuery({
-    queryKey: ['integration-sources'],
+    queryKey: qk.integrationSources(),
     queryFn: getIntegrationSources,
   })
 
@@ -377,7 +378,7 @@ export default function Integrations() {
   const { t } = useTranslation()
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
-  const { data: integrations = [], isLoading } = useQuery({ queryKey: ['integrations'], queryFn: getIntegrations })
+  const { data: integrations = [], isLoading } = useQuery({ queryKey: qk.integrations(), queryFn: getIntegrations })
   const [modal, setModal] = useState(null)
   const [templatePicker, setTemplatePicker] = useState(false)
   const [testResults, setTestResults] = useState({})

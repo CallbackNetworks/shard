@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, AlertTriangle, X, Key } from 'lucide-react'
 import { getApiKeys, createApiKey, updateApiKey, rotateApiKey, deleteApiKey, getProjects, getIdentities } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { useToast } from '../context/ToastContext'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -30,9 +31,9 @@ export default function ApiKeys() {
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
-  const { data: apiKeys = [], isLoading } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys })
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
-  const { data: identities = [] } = useQuery({ queryKey: ['identities'], queryFn: getIdentities })
+  const { data: apiKeys = [], isLoading } = useQuery({ queryKey: qk.apiKeys(), queryFn: getApiKeys })
+  const { data: projects = [] } = useQuery({ queryKey: qk.projects(), queryFn: getProjects })
+  const { data: identities = [] } = useQuery({ queryKey: qk.identities(), queryFn: getIdentities })
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ name: '', container_id: '', scopes: ['read', 'write'] })
   const [copiedId, setCopiedId] = useState(null)
@@ -41,7 +42,7 @@ export default function ApiKeys() {
   const [editForm, setEditForm] = useState({ name: '', container_id: '', scopes: [] })
 
   const { addToast } = useToast()
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['api-keys'] })
+  const invalidate = () => qc.invalidateQueries({ queryKey: qk.apiKeys() })
 
   const createMut = useMutation({
     mutationFn: createApiKey,

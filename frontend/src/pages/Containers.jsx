@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Boxes, Layers, Shapes } from 'lucide-react'
 import { getNodeTypes } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { hasNodeRole } from '../constants/nodeRoles'
 import EmptyState from '../components/shared/EmptyState'
 import s from './Containers.module.css'
@@ -13,7 +14,7 @@ import s from './Containers.module.css'
 export default function Containers() {
   const { t } = useTranslation()
   const { data: nodeTypes = [], isLoading } = useQuery({
-    queryKey: ['node-types'],
+    queryKey: qk.nodeTypes(),
     queryFn: getNodeTypes,
     staleTime: 300000,
   })

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -48,14 +49,14 @@ export default function Unfiled() {
   const { t } = useTranslation()
   const qc = useQueryClient()
 
-  const { data: tasks = [], isLoading } = useQuery({ queryKey: ['unfiled-tasks'], queryFn: getUnfiledTasks })
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const { data: tasks = [], isLoading } = useQuery({ queryKey: qk.unfiledTasks(), queryFn: getUnfiledTasks })
+  const { data: projects = [] } = useQuery({ queryKey: qk.projects(), queryFn: getProjects })
 
   const fileMut = useMutation({
     mutationFn: ({ taskId, projectId }) => fileTaskIntoProject(taskId, projectId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['unfiled-tasks'] })
-      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: qk.unfiledTasks() })
+      qc.invalidateQueries({ queryKey: qk.projects() })
     },
   })
 
@@ -63,11 +64,11 @@ export default function Unfiled() {
 
   // Unfiled custom nodes (ADR-0037): custom-type nodes with no incoming
   // containment edge, derived client-side from the /graph/map slice.
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
-  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
   const customTypes = nodeTypes.filter(nt => !nt.is_builtin)
   const { data: graphMap } = useQuery({
-    queryKey: ['graph-map', 'unfiled'],
+    queryKey: qk.graphMap('unfiled'),
     queryFn: () => getGraphMap(),
     enabled: customTypes.length > 0,
   })

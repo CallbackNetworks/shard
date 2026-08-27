@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, X } from 'lucide-react'
 import { getActivity, getProjects, getActivityWatches, createActivityWatch, deleteActivityWatch } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
 import { countOverdue } from '../utils/overdue'
 import ActivityWatchPicker from './ActivityWatchPicker'
@@ -174,32 +175,32 @@ export default function GlobalActivityTicker() {
   // Enough entries for a busy watch curve to read as more than a couple of dots;
   // the scrolling ticker text above only ever shows the newest handful anyway.
   const { data: activities = [] } = useQuery({
-    queryKey: ['global-activity-ticker'],
+    queryKey: qk.globalActivityTicker(),
     queryFn: () => getActivity({ limit: 200 }),
     refetchInterval: refreshInterval(45000, prefs),
     staleTime: 30000,
   })
 
   const { data: projects = [] } = useQuery({
-    queryKey: ['projects'],
+    queryKey: qk.projects(),
     queryFn: getProjects,
     refetchInterval: 60000,
     staleTime: 30000,
   })
 
   const { data: watches = [] } = useQuery({
-    queryKey: ['activity-watches'],
+    queryKey: qk.activityWatches(),
     queryFn: getActivityWatches,
     staleTime: 60000,
   })
 
   const addWatch = useMutation({
     mutationFn: createActivityWatch,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['activity-watches'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.activityWatches() }),
   })
   const removeWatch = useMutation({
     mutationFn: deleteActivityWatch,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['activity-watches'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.activityWatches() }),
   })
 
   const handleAddNode = (node) => addWatch.mutate({ kind: 'node', target_id: node.id, label: node.title })

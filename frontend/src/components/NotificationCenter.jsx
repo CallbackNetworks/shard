@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { qk } from '../api/queryKeys'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { useTranslation } from 'react-i18next'
@@ -36,13 +37,13 @@ export default function NotificationCenter() {
   const prefs = useUiPrefs()
 
   const { data: countData } = useQuery({
-    queryKey: ['notification-count'],
+    queryKey: qk.notificationCount(),
     queryFn: getUnreadCount,
     refetchInterval: refreshInterval(60000, prefs),
   })
 
   const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: qk.notifications(),
     queryFn: () => getNotifications({ limit: 30 }),
     enabled: open,
   })
@@ -52,24 +53,24 @@ export default function NotificationCenter() {
   const markRead = useMutation({
     mutationFn: markNotificationRead,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications'] })
-      qc.invalidateQueries({ queryKey: ['notification-count'] })
+      qc.invalidateQueries({ queryKey: qk.notifications() })
+      qc.invalidateQueries({ queryKey: qk.notificationCount() })
     },
   })
 
   const markAll = useMutation({
     mutationFn: markAllNotificationsRead,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications'] })
-      qc.invalidateQueries({ queryKey: ['notification-count'] })
+      qc.invalidateQueries({ queryKey: qk.notifications() })
+      qc.invalidateQueries({ queryKey: qk.notificationCount() })
     },
   })
 
   const dismiss = useMutation({
     mutationFn: dismissNotification,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications'] })
-      qc.invalidateQueries({ queryKey: ['notification-count'] })
+      qc.invalidateQueries({ queryKey: qk.notifications() })
+      qc.invalidateQueries({ queryKey: qk.notificationCount() })
     },
   })
 

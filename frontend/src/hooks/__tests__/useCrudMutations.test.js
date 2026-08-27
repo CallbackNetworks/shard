@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { qk } from '../../api/queryKeys'
 
 const mockInvalidateQueries = vi.fn()
 const mockAddToast = vi.fn()
@@ -32,8 +33,8 @@ describe('useInvalidatingMutation', () => {
       onSuccess,
     })
     capturedConfig.onSuccess('result')
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['goals'] })
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['projects'] })
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: qk.goals() })
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: qk.projects() })
     expect(mockAddToast).toHaveBeenCalledWith('Saved', 'success')
     expect(onSuccess).toHaveBeenCalledWith('result')
   })

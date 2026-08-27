@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getWorkflowRuleVocabulary } from '../api/client'
+import { qk } from '../api/queryKeys'
 
 /**
  * Everything the rule surface needs to render itself, from the one place that defines it.
@@ -14,7 +15,7 @@ import { getWorkflowRuleVocabulary } from '../api/client'
  */
 export function useRuleVocabulary(projectId) {
   const { data } = useQuery({
-    queryKey: ['workflow-rule-vocabulary', projectId || null],
+    queryKey: qk.workflowRuleVocabulary(projectId || null),
     queryFn: () => getWorkflowRuleVocabulary(projectId),
     // Not cached forever: labels, events and subscriber counts all change on other pages
     // while this one is open.

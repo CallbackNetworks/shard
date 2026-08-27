@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getTemplates, getApiKeys } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { BRAND, DARK, FORM_INPUT } from '../constants/theme'
 import MarkdownEditor from './MarkdownEditor'
 
@@ -9,11 +10,11 @@ const input = FORM_INPUT
 export default function TaskCreateForm({ showForm, newTask, setNewTask, createMut, labels, onCancel, projectId }) {
   const { t } = useTranslation()
   const { data: templates = [] } = useQuery({
-    queryKey: ['templates', projectId],
+    queryKey: qk.templates(projectId),
     queryFn: () => getTemplates(projectId),
     enabled: showForm,
   })
-  const { data: apiKeys = [] } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys, enabled: showForm })
+  const { data: apiKeys = [] } = useQuery({ queryKey: qk.apiKeys(), queryFn: getApiKeys, enabled: showForm })
   const activeKeys = apiKeys.filter(k => k.active)
 
   const applyTemplate = (tplId) => {

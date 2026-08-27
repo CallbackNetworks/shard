@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { useNavigate, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -80,7 +81,7 @@ function NeighborRow({ edge, refNode, outgoing, onOpen, onDetach, detaching }) {
 }
 
 function NeighborBadge({ type }) {
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const nt = nodeTypes.find(x => x.key === type)
   return <TypeChip typeMeta={nt} typeKey={type} />
 }
@@ -91,11 +92,11 @@ export default function NodePage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
 
-  const { data: node, isLoading, isError } = useQuery({ queryKey: ['node', id], queryFn: () => getNode(id) })
-  const { data: edges = [] } = useQuery({ queryKey: ['node-edges', id], queryFn: () => getNodeEdges(id), enabled: !!node })
-  const { data: events = [] } = useQuery({ queryKey: ['node-events', id], queryFn: () => getNodeEvents(id), enabled: !!node })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
-  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes, staleTime: 300000 })
+  const { data: node, isLoading, isError } = useQuery({ queryKey: qk.node(id), queryFn: () => getNode(id) })
+  const { data: edges = [] } = useQuery({ queryKey: qk.nodeEdges(id), queryFn: () => getNodeEdges(id), enabled: !!node })
+  const { data: events = [] } = useQuery({ queryKey: qk.nodeEvents(id), queryFn: () => getNodeEvents(id), enabled: !!node })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -107,9 +108,9 @@ export default function NodePage() {
   const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['node', id] })
-    qc.invalidateQueries({ queryKey: ['node-edges', id] })
-    qc.invalidateQueries({ queryKey: ['node-events', id] })
+    qc.invalidateQueries({ queryKey: qk.node(id) })
+    qc.invalidateQueries({ queryKey: qk.nodeEdges(id) })
+    qc.invalidateQueries({ queryKey: qk.nodeEvents(id) })
   }
 
   const renameMut = useMutation({

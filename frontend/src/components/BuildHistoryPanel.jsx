@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, ExternalLink, GitCommit, GitBranch, Clock, User } from 'lucide-react'
 import { getWebhookEvents } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK, STATUS_COLOR } from '../constants/theme'
 
 const STATUS_COLORS = {
@@ -57,7 +58,7 @@ export default function BuildHistoryPanel({ taskId }) {
   const [selectedEvent, setSelectedEvent] = useState(null)
 
   const { data: events = [] } = useQuery({
-    queryKey: ['webhook-events', taskId],
+    queryKey: qk.webhookEvents(taskId),
     queryFn: () => getWebhookEvents(taskId),
     enabled: expanded,
     staleTime: 15000,

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit3, Trash2, Link2, Unlink, Shield } from 'lucide-react'
@@ -17,8 +18,8 @@ import EmptyState from '../components/shared/EmptyState'
 // than the enriched IdentityOut — a column field's value lives on the node.
 function IdentityFields({ identityId, onDone }) {
   const { t } = useTranslation()
-  const { data: node } = useQuery({ queryKey: ['node', identityId], queryFn: () => getNode(identityId) })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: node } = useQuery({ queryKey: qk.node(identityId), queryFn: () => getNode(identityId) })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const typeMeta = nodeTypes.find(nt => nt.key === 'identity')
 
   if (!node) return <p className="kt-muted" style={{ padding: 12 }}>{t('loading')}</p>
@@ -57,16 +58,16 @@ function NewIdentity({ onCreate, onCancel, pending }) {
 export default function Identities() {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const { data: identities = [], isLoading } = useQuery({ queryKey: ['identities'], queryFn: getIdentities })
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const { data: identities = [], isLoading } = useQuery({ queryKey: qk.identities(), queryFn: getIdentities })
+  const { data: projects = [] } = useQuery({ queryKey: qk.projects(), queryFn: getProjects })
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [linkingId, setLinkingId] = useState(null)
   const [settingsId, setSettingsId] = useState(null)
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['identities'] })
-    qc.invalidateQueries({ queryKey: ['projects'] })
+    qc.invalidateQueries({ queryKey: qk.identities() })
+    qc.invalidateQueries({ queryKey: qk.projects() })
   }
 
   const createMut = useMutation({

@@ -7,12 +7,13 @@ import MarkdownEditor from './MarkdownEditor'
 import { LabelChip } from './project/LabelManager'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import { getApiKeys, getEstimateSuggestion, addLabelToTask, removeLabelFromTask } from '../api/client'
+import { qk } from '../api/queryKeys'
 
 const darkInput = FORM_INPUT
 
 export default function TaskEditForm({ task, depth, projectId, projectLabels = [], onSave, onCancel }) {
   const { t } = useTranslation()
-  const { data: apiKeys = [] } = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys })
+  const { data: apiKeys = [] } = useQuery({ queryKey: qk.apiKeys(), queryFn: getApiKeys })
   const activeKeys = apiKeys.filter(k => k.active)
 
   const [editData, setEditData] = useState({

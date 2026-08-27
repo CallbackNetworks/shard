@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -13,8 +14,8 @@ export default function NodeExplorer() {
   const { t } = useTranslation()
   const qc = useQueryClient()
 
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes })
-  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes })
+  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes })
 
   const [selectedType, setSelectedType] = useState('')
   const [selectedId, setSelectedId] = useState(null)
@@ -27,39 +28,39 @@ export default function NodeExplorer() {
   const readOnly = !!typeMeta?.is_builtin // entity-backed builtins reject generic create/delete
 
   const { data: nodes = [], isLoading: nodesLoading } = useQuery({
-    queryKey: ['nodes', effectiveType],
+    queryKey: qk.nodes(effectiveType),
     queryFn: () => getNodes(effectiveType),
     enabled: !!effectiveType,
   })
   const { data: edges = [] } = useQuery({
-    queryKey: ['node-edges', selectedId],
+    queryKey: qk.nodeEdges(selectedId),
     queryFn: () => getNodeEdges(selectedId),
     enabled: !!selectedId,
   })
   const { data: targetNodes = [] } = useQuery({
-    queryKey: ['nodes', attach.targetType],
+    queryKey: qk.nodes(attach.targetType),
     queryFn: () => getNodes(attach.targetType),
     enabled: !!attach.targetType,
   })
 
   const createMut = useMutation({
     mutationFn: createNode,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['nodes', effectiveType] }); setNewTitle('') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.nodes(effectiveType) }); setNewTitle('') },
   })
   const deleteMut = useMutation({
     mutationFn: deleteNode,
     onSuccess: (_d, id) => {
-      qc.invalidateQueries({ queryKey: ['nodes', effectiveType] })
+      qc.invalidateQueries({ queryKey: qk.nodes(effectiveType) })
       if (id === selectedId) setSelectedId(null)
     },
   })
   const attachMut = useMutation({
     mutationFn: ({ id, body }) => attachNodeEdge(id, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['node-edges', selectedId] }); setAttach(a => ({ ...a, targetId: '' })) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.nodeEdges(selectedId) }); setAttach(a => ({ ...a, targetId: '' })) },
   })
   const detachMut = useMutation({
     mutationFn: ({ id, targetId, relType }) => detachNodeEdge(id, targetId, relType),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['node-edges', selectedId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodeEdges(selectedId) }),
   })
 
   const selectedNode = nodes.find(n => n.id === selectedId)

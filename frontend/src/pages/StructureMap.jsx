@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Maximize2, Minus, Plus, Search } from 'lucide-react'
 import { getGraphMap, getNodeTypes, getEdgeTypes } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { STATUS_COLOR } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { dependencyNeighborhood } from '../utils/structureMap'
@@ -50,11 +51,11 @@ export default function StructureMap() {
   // task roles, ownership, dependencies, custom types — from nodes + edges
   // plus the type registries. Roles come from the registry, not entity kinds.
   const { data: slice, isLoading } = useQuery({
-    queryKey: ['graph-map', 'structure'],
+    queryKey: qk.graphMap('structure'),
     queryFn: () => getGraphMap({ includeData: true }),
   })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
-  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
 
   const fullGraph = useMemo(
     () => deriveGraphStructure(slice, nodeTypes, edgeTypes),

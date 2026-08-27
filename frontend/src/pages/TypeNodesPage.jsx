@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Plus } from 'lucide-react'
 import { getNodes, getNodeTypes, createNode } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
 import EmptyState from '../components/shared/EmptyState'
@@ -16,8 +17,8 @@ export default function TypeNodesPage() {
   const qc = useQueryClient()
   const [newTitle, setNewTitle] = useState('')
 
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
-  const { data: nodes = [], isLoading } = useQuery({ queryKey: ['nodes', typeKey], queryFn: () => getNodes(typeKey) })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: nodes = [], isLoading } = useQuery({ queryKey: qk.nodes(typeKey), queryFn: () => getNodes(typeKey) })
 
   const typeMeta = nodeTypes.find(nt => nt.key === typeKey)
   const color = typeMeta?.color || '#818cf8'
@@ -25,7 +26,7 @@ export default function TypeNodesPage() {
 
   const createMut = useMutation({
     mutationFn: () => createNode({ type: typeKey, title: newTitle.trim() }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['nodes', typeKey] }); setNewTitle('') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.nodes(typeKey) }); setNewTitle('') },
   })
 
   return (

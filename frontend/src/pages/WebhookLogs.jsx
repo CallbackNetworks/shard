@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { RefreshCw, ChevronDown, ChevronUp, ScrollText, Trash2 } from 'lucide-react'
 import { getAllDeliveries, getIntegrations, retryDelivery, purgeDeliveries } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK, DELIVERY_STATUS_TEXT as STATUS_COLORS } from '../constants/theme'
 import { alpha } from '../utils/color'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -117,14 +118,14 @@ export default function WebhookLogs() {
   const limit = 50
 
   const { data: integrations = [] } = useQuery({
-    queryKey: ['integrations'],
+    queryKey: qk.integrations(),
     queryFn: getIntegrations,
   })
 
   const integrationMap = Object.fromEntries(integrations.map(i => [i.id, i]))
 
   const { data: deliveries = [], isLoading, refetch } = useQuery({
-    queryKey: ['all-deliveries', statusFilter, integrationFilter, offset],
+    queryKey: qk.allDeliveries(statusFilter, integrationFilter, offset),
     queryFn: () => getAllDeliveries({
       ...(statusFilter && { status: statusFilter }),
       ...(integrationFilter && { integration_id: integrationFilter }),

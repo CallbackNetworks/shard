@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
+import { qk } from '../../api/queryKeys'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import NodeShareFacet from '../NodeShareFacet'
 
@@ -91,7 +92,7 @@ describe('NodeShareFacet', () => {
 
     fireEvent.click(screen.getByLabelText('nodeShare.guestNotes'))
 
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['identities'] })
-    expect(mocks.invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ['node', 'n1'] })
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: qk.identities() })
+    expect(mocks.invalidateQueries).not.toHaveBeenCalledWith({ queryKey: qk.node('n1') })
   })
 })

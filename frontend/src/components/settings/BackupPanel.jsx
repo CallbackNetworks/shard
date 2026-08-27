@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DatabaseBackup, Download, RotateCcw, Upload } from 'lucide-react'
 import { getBackupStatus, runBackup, exportBackup, downloadBackupFile, restoreBackupFile, restoreServerBackup } from '../../api/client'
+import { qk } from '../../api/queryKeys'
 import { DARK } from '../../constants/theme'
 import { ControlRow, SectionTitle, Segmented } from './primitives'
 import s from './BackupPanel.module.css'
@@ -31,14 +32,14 @@ export default function BackupPanel({ settings, onUpdateSystem }) {
   const qc = useQueryClient()
 
   const { data: backupStatus } = useQuery({
-    queryKey: ['backup-status'],
+    queryKey: qk.backupStatus(),
     queryFn: getBackupStatus,
     staleTime: 30000,
   })
 
   const backupMut = useMutation({
     mutationFn: runBackup,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['backup-status'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.backupStatus() }),
   })
 
   const [exporting, setExporting] = useState(false)

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Bot, Eye, EyeOff } from 'lucide-react'
 import { updateLlmSettings } from '../../api/client'
+import { qk } from '../../api/queryKeys'
 import { DARK } from '../../constants/theme'
 import { ControlRow, InfoRow, SectionTitle, Segmented, StatusBadge } from './primitives'
 
@@ -34,7 +35,7 @@ export default function LlmSettingsPanel({ settings }) {
   const mut = useMutation({
     mutationFn: updateLlmSettings,
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: qk.settings() })
       setApiKeyDraft('')
       setClearKey(false)
       setDirty(false)

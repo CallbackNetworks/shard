@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { X, Paperclip, Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getAttachments, uploadAttachment, deleteAttachment, getAttachmentUrl } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 
 function formatSize(bytes) {
@@ -33,7 +34,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
     try {
       const att = await uploadAttachment(projectId, taskId, file)
       setFiles(prev => [att, ...prev])
-      qc.invalidateQueries({ queryKey: ['project', projectId] })
+      qc.invalidateQueries({ queryKey: qk.project(projectId) })
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''

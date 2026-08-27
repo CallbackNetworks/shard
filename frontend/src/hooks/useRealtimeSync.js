@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { qk } from '../api/queryKeys'
 import { useQueryClient } from '@tanstack/react-query'
 
 // Events that mean the graph changed. Everything the backend broadcasts today is one of
@@ -57,8 +58,8 @@ export default function useRealtimeSync() {
           } else if (event === 'notification.new') {
             // Narrow on purpose: a notification changes the bell, not the graph, and these
             // arrive alongside the mutation that caused them.
-            qc.invalidateQueries({ queryKey: ['notifications'] })
-            qc.invalidateQueries({ queryKey: ['notification-count'] })
+            qc.invalidateQueries({ queryKey: qk.notifications() })
+            qc.invalidateQueries({ queryKey: qk.notificationCount() })
           }
         } catch { /* ignore malformed messages */ }
       }

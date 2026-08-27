@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Activity as ActivityIcon, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getActivity, getProjects } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { BRAND, DARK, STATUS_COLOR } from '../constants/theme'
 import { actionGroup, buildActivitySignals, bucketActivitySignals, summarizeActivitySignals } from '../utils/activitySignals'
 import RuleOutcomeChips from '../components/shared/RuleOutcomeChips'
@@ -173,7 +174,7 @@ export default function Activity() {
   const [page, setPage] = useState(0)
 
   const { data: projects = [] } = useQuery({
-    queryKey: ['projects'],
+    queryKey: qk.projects(),
     queryFn: getProjects,
   })
 
@@ -181,7 +182,7 @@ export default function Activity() {
   if (projectFilter) params.project_id = projectFilter
 
   const { data: activities = [], isLoading } = useQuery({
-    queryKey: ['activity', projectFilter, page],
+    queryKey: qk.activity(projectFilter, page),
     queryFn: () => getActivity(params),
     keepPreviousData: true,
   })

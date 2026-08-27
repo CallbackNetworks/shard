@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { qk } from '../../api/queryKeys'
 import { renderHook, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import useRealtimeSync from '../useRealtimeSync'
@@ -91,7 +92,7 @@ describe('useRealtimeSync', () => {
     act(() => socket.deliver({ event: 'notification.new', data: {} }))
     settle()
 
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['notification-count'] })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: qk.notificationCount() })
     expect(invalidate.mock.calls.filter(c => c.length === 0)).toHaveLength(0)
   })
 

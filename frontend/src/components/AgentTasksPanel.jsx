@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Bot, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { getAgentSummary, getActivity } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK, STATUS_MAP } from '../constants/theme'
 import { PriorityChip } from './TaskIcons'
 import ActivityFeed from './dashboard/ActivityFeed'
@@ -35,7 +36,7 @@ function AgentCard({ agent, index }) {
     : null
 
   const { data: recentActivity = [] } = useQuery({
-    queryKey: ['agent-activity', agent.agent_name],
+    queryKey: qk.agentActivity(agent.agent_name),
     queryFn: () => getActivity({ actor: `api:${agent.agent_name}`, limit: 10 }),
     enabled: expanded,
   })
@@ -148,7 +149,7 @@ function AgentCard({ agent, index }) {
 export default function AgentTasksPanel() {
   const { t } = useTranslation()
   const { data: agents = [], isLoading, isError } = useQuery({
-    queryKey: ['agent-summary'],
+    queryKey: qk.agentSummary(),
     queryFn: getAgentSummary,
   })
 

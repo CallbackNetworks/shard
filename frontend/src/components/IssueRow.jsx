@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link2, Pencil, Trash2, ChevronDown, ChevronRight, Plus, RefreshCw, FileText, MessageSquare, GitBranch, Repeat2, Paperclip, Bot, Activity, Pin, ExternalLink, GitPullRequestArrow, Boxes } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { regenerateToken, createExternalIssue } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 import { PriorityIcon, PriorityChip, StatusIcon, LabelChip, PrBadge, TypeBadge } from './TaskIcons'
 import TaskEditForm from './TaskEditForm'
@@ -105,11 +106,11 @@ export default memo(function IssueRow({
   const qc = useQueryClient()
   const regenMut = useMutation({
     mutationFn: () => regenerateToken(projectId, task.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['project', projectId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.project(projectId) }),
   })
   const createIssueMut = useMutation({
     mutationFn: () => createExternalIssue(projectId, task.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['project', projectId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.project(projectId) }),
     onError: (e) => window.alert(e?.response?.data?.detail || 'Could not create external issue'),
   })
 

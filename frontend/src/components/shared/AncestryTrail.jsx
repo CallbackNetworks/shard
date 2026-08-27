@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { getAncestry, getNodeTypes } from '../../api/client'
+import { qk } from '../../api/queryKeys'
 import { nodeHref } from '../../utils/nodeHref'
 import s from './AncestryTrail.module.css'
 
@@ -19,12 +20,12 @@ const MAX_TRAILS_SHOWN = 2
 export default function AncestryTrail({ nodeId, className }) {
   const { t } = useTranslation()
   const { data: ancestry } = useQuery({
-    queryKey: ['ancestry', nodeId],
+    queryKey: qk.ancestry(nodeId),
     queryFn: () => getAncestry([nodeId]),
     enabled: !!nodeId,
     staleTime: 30000,
   })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
 
   const entry = ancestry?.[nodeId]

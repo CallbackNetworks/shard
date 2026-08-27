@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { qk } from '../api/queryKeys'
 import { Link } from 'react-router'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
@@ -24,12 +25,12 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
   const qc = useQueryClient()
   const [pick, setPick] = useState('')
 
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: projects = [] } = useQuery({ queryKey: qk.projects(), queryFn: getProjects })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const nameOf = (id) => projects.find(p => p.id === id)?.name || id.slice(-8)
 
   const memberships = task.project_ids || []
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['project', projectId] })
+  const invalidate = () => qc.invalidateQueries({ queryKey: qk.project(projectId) })
 
   // Custom containers: container_ids minus project memberships (ADR-0034 keeps
   // compat project fields literal-project; custom containers only appear here).
@@ -37,29 +38,29 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
   const containerTypeKeys = new Set(containerTypes.map(nt => nt.key))
   const extraContainers = (task.container_ids || []).filter(cid => !memberships.includes(cid))
   const containerNodes = useQueries({
-    queries: extraContainers.map(cid => ({ queryKey: ['node', cid], queryFn: () => getNode(cid), staleTime: 60000 })),
+    queries: extraContainers.map(cid => ({ queryKey: qk.node(cid), queryFn: () => getNode(cid), staleTime: 60000 })),
   })
 
   const handleLinkContainer = async (node) => {
     await attachNodeEdge(node.id, { target_id: task.id, rel_type: 'contains' })
     invalidate()
-    qc.invalidateQueries({ queryKey: ['contained-tasks', node.id] })
+    qc.invalidateQueries({ queryKey: qk.containedTasks(node.id) })
   }
   const handleUnlinkContainer = async (cid) => {
     await detachNodeEdge(cid, task.id, 'contains')
     invalidate()
-    qc.invalidateQueries({ queryKey: ['contained-tasks', cid] })
+    qc.invalidateQueries({ queryKey: qk.containedTasks(cid) })
   }
 
   // Other relations: custom edge types on this task (ADR-0037 proposal 5).
-  const { data: edgeTypes = [] } = useQuery({ queryKey: ['edge-types'], queryFn: getEdgeTypes, staleTime: 300000 })
-  const { data: taskEdges = [] } = useQuery({ queryKey: ['node-edges', task.id], queryFn: () => getNodeEdges(task.id) })
+  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
+  const { data: taskEdges = [] } = useQuery({ queryKey: qk.nodeEdges(task.id), queryFn: () => getNodeEdges(task.id) })
   const customEdgeTypes = edgeTypes.filter(et => !et.is_builtin)
   const otherEdges = taskEdges.filter(e => !CORE_RELS.has(e.rel_type))
   const [relPick, setRelPick] = useState('')
   const relLabel = (key) => edgeTypes.find(et => et.key === key)?.label || key
 
-  const invalidateEdges = () => qc.invalidateQueries({ queryKey: ['node-edges', task.id] })
+  const invalidateEdges = () => qc.invalidateQueries({ queryKey: qk.nodeEdges(task.id) })
   const handleLinkRelation = async (node) => {
     await attachNodeEdge(task.id, { target_id: node.id, rel_type: relPick })
     invalidateEdges()

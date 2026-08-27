@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { GitFork, Plus, Trash2, Edit2, Download, Check, XCircle, Bot, User } from 'lucide-react'
 import { getDecisions, getProjects, createLabel, updateLabel, deleteLabel, exportDecision } from '../api/client'
+import { qk } from '../api/queryKeys'
 import MarkdownEditor from '../components/MarkdownEditor'
 import MarkdownPreview from '../components/MarkdownPreview'
 import { BRAND, DARK, DECISION_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
@@ -172,7 +173,7 @@ export default function Decisions() {
   const [filterStatus, setFilterStatus] = useState('')
 
   const { data: decisions = [], isLoading } = useQuery({
-    queryKey: ['decisions', filterProject, filterStatus],
+    queryKey: qk.decisions(filterProject, filterStatus),
     queryFn: () => getDecisions({
       ...(filterProject ? { project_id: filterProject } : {}),
       ...(filterStatus ? { status: filterStatus } : {}),
@@ -180,7 +181,7 @@ export default function Decisions() {
   })
 
   const { data: projects = [] } = useQuery({
-    queryKey: ['projects'],
+    queryKey: qk.projects(),
     queryFn: getProjects,
   })
 

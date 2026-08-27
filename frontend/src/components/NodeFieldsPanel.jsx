@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { SlidersHorizontal, Check } from 'lucide-react'
 import { updateNode, getManagedDataKeys } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 
 // The one editor for a node's own fields (ADR-0074). It draws whatever the type
@@ -104,7 +105,7 @@ export default function NodeFieldsPanel({ node, typeMeta, invalidateKeys }) {
   useEffect(() => { setDraft({}); setSaved(false) }, [node?.id])
 
   const { data: managed } = useQuery({
-    queryKey: ['managed-data-keys'],
+    queryKey: qk.managedDataKeys(),
     queryFn: getManagedDataKeys,
     staleTime: 600000,
   })

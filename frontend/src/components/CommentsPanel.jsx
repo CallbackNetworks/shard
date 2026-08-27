@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getComments, createComment, deleteComment, getIdentities } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 
 function renderMentions(text) {
@@ -23,12 +24,12 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
   const qc = useQueryClient()
 
   const { data: comments = [], isLoading: loading } = useQuery({
-    queryKey: ['comments', projectId, taskId],
+    queryKey: qk.comments(projectId, taskId),
     queryFn: () => getComments(projectId, taskId),
   })
 
   const { data: identities = [] } = useQuery({
-    queryKey: ['identities'],
+    queryKey: qk.identities(),
     queryFn: getIdentities,
     staleTime: 30000,
   })
@@ -36,8 +37,8 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
   const addMut = useMutation({
     mutationFn: (data) => createComment(projectId, taskId, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['comments', projectId, taskId] })
-      qc.invalidateQueries({ queryKey: ['project', projectId] })
+      qc.invalidateQueries({ queryKey: qk.comments(projectId, taskId) })
+      qc.invalidateQueries({ queryKey: qk.project(projectId) })
       setBody('')
     },
   })
@@ -45,8 +46,8 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
   const deleteMut = useMutation({
     mutationFn: (commentId) => deleteComment(projectId, taskId, commentId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['comments', projectId, taskId] })
-      qc.invalidateQueries({ queryKey: ['project', projectId] })
+      qc.invalidateQueries({ queryKey: qk.comments(projectId, taskId) })
+      qc.invalidateQueries({ queryKey: qk.project(projectId) })
     },
   })
 

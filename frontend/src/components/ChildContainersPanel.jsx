@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Boxes, ChevronRight } from 'lucide-react'
 import { getContainerSubtree, getNodeTypes } from '../api/client'
+import { qk } from '../api/queryKeys'
 import { containerRoute } from '../utils/containerRoute'
 import ProgressBar from './ProgressBar'
 import s from './ChildContainersPanel.module.css'
@@ -14,11 +15,11 @@ import s from './ChildContainersPanel.module.css'
 export default function ChildContainersPanel({ nodeId }) {
   const { t } = useTranslation()
   const { data: subtree } = useQuery({
-    queryKey: ['container-subtree', nodeId],
+    queryKey: qk.containerSubtree(nodeId),
     queryFn: () => getContainerSubtree(nodeId),
     enabled: !!nodeId,
   })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
 
   const children = subtree?.children || []
   if (children.length === 0) return null

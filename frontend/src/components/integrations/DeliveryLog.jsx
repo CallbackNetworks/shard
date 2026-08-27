@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, RefreshCw, RotateCcw } from 'lucide-react'
 import { getDeliveries, getIntegrationEvents, retryDelivery, bulkRetryDeliveries } from '../../api/client'
+import { qk } from '../../api/queryKeys'
 import { globalAddToast } from '../../context/ToastContext'
 import { BRAND, DELIVERY_STATUS_COLORS } from '../../constants/theme'
 import { useInvalidatingMutation } from '../../hooks/useCrudMutations'
@@ -21,14 +22,14 @@ export default function DeliveryLog({ integrationId }) {
   // which drifts by construction: the served list also carries the custom events a
   // rule's fire_event emits (ADR-0048), so a subscribable event was unfilterable here.
   const { data: filterEvents = [] } = useQuery({
-    queryKey: ['integration-events'],
+    queryKey: qk.integrationEvents(),
     queryFn: getIntegrationEvents,
     enabled: expanded,
     staleTime: Infinity,
   })
 
   const { data: deliveries = [], refetch } = useQuery({
-    queryKey: ['deliveries', integrationId, filterEvent, filterStatus],
+    queryKey: qk.deliveries(integrationId, filterEvent, filterStatus),
     queryFn: () => getDeliveries(integrationId, {
       ...(filterEvent ? { event: filterEvent } : {}),
       ...(filterStatus ? { status: filterStatus } : {}),

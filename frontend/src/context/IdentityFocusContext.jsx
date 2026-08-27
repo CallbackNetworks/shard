@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getFocusTargets, getPreference, setPreference } from '../api/client'
+import { qk } from '../api/queryKeys'
 
 const IdentityFocusContext = createContext(null)
 
@@ -14,13 +15,13 @@ export function IdentityFocusProvider({ children }) {
   const [focusId, setFocusIdState] = useState(null)
 
   const { data: focusTargets = [] } = useQuery({
-    queryKey: ['focus-targets'],
+    queryKey: qk.focusTargets(),
     queryFn: getFocusTargets,
     staleTime: 60000,
   })
 
   const { data: savedFocus } = useQuery({
-    queryKey: ['preference', PREF_KEY],
+    queryKey: qk.preference(PREF_KEY),
     queryFn: () => getPreference(PREF_KEY),
     staleTime: 60000,
     retry: false,

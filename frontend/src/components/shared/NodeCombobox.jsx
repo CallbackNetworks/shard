@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import { getNodes, getNodeTypes } from '../../api/client'
+import { qk } from '../../api/queryKeys'
 import { DARK } from '../../constants/theme'
 
 // Debounced-search node picker (ADR-0037). Backed by GET /nodes?query=&type=.
@@ -22,11 +23,11 @@ export default function NodeCombobox({ type = null, filter = null, excludeIds = 
     return () => clearTimeout(id)
   }, [text])
 
-  const { data: nodeTypes = [] } = useQuery({ queryKey: ['node-types'], queryFn: getNodeTypes, staleTime: 300000 })
+  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
 
   const { data: hits = [], isFetching } = useQuery({
-    queryKey: ['node-search', type, debounced],
+    queryKey: qk.nodeSearch(type, debounced),
     queryFn: () => getNodes(type, debounced),
     enabled: open,
     staleTime: 30000,

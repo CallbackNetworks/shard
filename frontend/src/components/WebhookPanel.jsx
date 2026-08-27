@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, Eye, EyeOff, RefreshCw, Link2, KeyRound } from 'lucide-react'
 import { getWebhookConfig, rotateWebhookSecret } from '../api/client'
+import { qk } from '../api/queryKeys'
 import s from './WebhookPanel.module.css'
 
 /**
@@ -25,7 +26,7 @@ export default function WebhookPanel({ taskId }) {
   const [copied, setCopied] = useState(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['webhook-config', taskId],
+    queryKey: qk.webhookConfig(taskId),
     queryFn: () => getWebhookConfig(taskId),
     // Never stale while the panel is open, dropped the moment it closes. The realtime
     // sync invalidates every query on any graph change (ADR-0059), and reading this one
@@ -39,7 +40,7 @@ export default function WebhookPanel({ taskId }) {
 
   const rotate = useMutation({
     mutationFn: () => rotateWebhookSecret(taskId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-config', taskId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.webhookConfig(taskId) }),
   })
 
   const copy = (what, text) => {
