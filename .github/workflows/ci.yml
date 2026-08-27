@@ -22,9 +22,53 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # The runner's own housekeeping, before anything asks it for a container.
+  #
+  # A job's `if: always()` teardown does not run when the runner itself is stopped, so
+  # this workflow's cleanup can never be its only one — the header comment above already
+  # recorded two orphans surviving a week, and runs 478-483 then leaked a postgres
+  # container each. Docker's default address pool is about 31 bridge networks; the ten
+  # leaked ones exhausted it, and from then on every job died at `create network` before
+  # a single test ran, with a message about subnets that names nothing to do with CI.
+  #
+  # Its own job, not a step repeated four times, because the four check jobs start in
+  # parallel: a sweep inside one of them runs after the other three have already failed
+  # to get a network. Everything it touches is age-bounded, so a sweep can never take a
+  # live run's resources with it — these jobs finish in minutes, not hours.
+  preflight:
+    name: Reclaim leaked CI resources
+    runs-on: ci-builder
+    steps:
+      - name: Remove containers and networks left by earlier runs
+        run: |
+          set -u
+          cutoff=$(date -u -d '3 hours ago' +%s)
+          older() { [ "$(date -u -d "$1" +%s)" -lt "$cutoff" ]; }
+
+          for c in $(docker ps -aq --filter 'name=^ci-'); do
+            name=$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')
+            # The runner itself is named ci-builder-01 and must survive its own sweep.
+            case "$name" in ci-builder*) continue ;; esac
+            if older "$(docker inspect -f '{{.State.StartedAt}}' "$c")"; then
+              echo "removing stale container $name"
+              docker rm -fv "$c" >/dev/null
+            fi
+          done
+
+          # Named rather than `network prune`: this host runs a dozen unrelated stacks
+          # whose idle networks are not this workflow's to reclaim.
+          for n in $(docker network ls --format '{{.Name}}' | grep -E '^ci-' || true); do
+            if older "$(docker network inspect -f '{{.Created}}' "$n")"; then
+              docker network rm "$n" >/dev/null 2>&1 && echo "removed stale network $n" || true
+            fi
+          done
+
+          echo "networks in use: $(docker network ls -q | wc -l)"
+
   # DB-independent backend checks — run once, not per database.
   backend-checks:
     name: Backend checks
+    needs: [preflight]
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +102,7 @@ jobs:
   # same coverage gate. Neither is primary. See ADR-0018 / ADR-0020.
   backend-sqlite:
     name: Backend tests (SQLite)
+    needs: [preflight]
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
@@ -82,6 +127,7 @@ jobs:
 
   backend-postgres:
     name: Backend tests (PostgreSQL)
+    needs: [preflight]
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +166,7 @@ jobs:
 
   frontend:
     name: Frontend tests
+    needs: [preflight]
     runs-on: ci-builder
     steps:
       - uses: actions/checkout@v4
