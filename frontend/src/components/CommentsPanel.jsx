@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import Button from './shared/Button'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -164,7 +165,7 @@ export default function CommentsPanel({ projectId, taskId, depth }) {
                   </div>
                 )}
               </div>
-              <button onClick={handleAdd} disabled={!body.trim()} style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, alignSelf: 'flex-end', opacity: body.trim() ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('comments.post')}</button>
+              <Button onClick={handleAdd} disabled={!body.trim()} style={{ alignSelf: 'flex-end' }}>{t('comments.post')}</Button>
             </div>
           </div>
         </>

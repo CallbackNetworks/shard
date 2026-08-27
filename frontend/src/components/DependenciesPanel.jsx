@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { addDependency, removeDependency } from '../api/client'
 import { qk } from '../api/queryKeys'
+import Button from './shared/Button'
 
 export default function DependenciesPanel({ projectId, task, allTasks, depth }) {
   const { t } = useTranslation()
@@ -64,7 +65,7 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
             <option key={t.id} value={t.id}>{t.title}</option>
           ))}
         </select>
-        <button onClick={handleAdd} disabled={!depInput} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: '#ffa42b', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: depInput ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('deps.block')}</button>
+        <Button onClick={handleAdd} disabled={!depInput} tone="#ffa42b">{t('deps.block')}</Button>
       </div>
     </div>
   )

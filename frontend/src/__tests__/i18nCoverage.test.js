@@ -30,6 +30,7 @@ function walk(dir) {
 const NO_PROSE = new Set([
   'components/ProgressBar.jsx',
   'components/MarkdownPreview.jsx',
+  'components/shared/Button.jsx',
   'components/shared/EmptyState.jsx',
   'components/shared/FormField.jsx',
   'components/shared/TabBar.jsx',

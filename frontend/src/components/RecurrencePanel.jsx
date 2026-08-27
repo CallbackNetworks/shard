@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { setRecurrence, updateRecurrence, removeRecurrence } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
+import Button from './shared/Button'
 
 export default function RecurrencePanel({ projectId, task, depth }) {
   const { t } = useTranslation()
@@ -104,12 +105,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
               style={inputStyle}
             />
           </div>
-          <button
-            onClick={handleCreate}
-            style={{ padding: '4px 16px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}
-          >
-            {t('recurrence.setRecurrence')}
-          </button>
+          <Button onClick={handleCreate}>{t('recurrence.setRecurrence')}</Button>
         </div>
       )}
     </div>

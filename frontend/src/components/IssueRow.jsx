@@ -8,6 +8,7 @@ import { DARK } from '../constants/theme'
 import { PriorityIcon, PriorityChip, StatusIcon, LabelChip, PrBadge, TypeBadge } from './TaskIcons'
 import TaskEditForm from './TaskEditForm'
 import CommentsPanel from './CommentsPanel'
+import Button from './shared/Button'
 import DependenciesPanel from './DependenciesPanel'
 import MembershipPanel from './MembershipPanel'
 import RecurrencePanel from './RecurrencePanel'
@@ -531,8 +532,8 @@ export default memo(function IssueRow({
             placeholder={t('issue.subtaskTitlePlaceholder')}
             style={{ flex: 1, padding: '4px 10px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 12, outline: 'none', background: DARK.hover, color: DARK.text }}
           />
-          <button onClick={handleCreateSubtask} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('add')}</button>
-          <button onClick={() => setShowSubtaskForm(false)} style={{ padding: '4px 12px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
+          <Button onClick={handleCreateSubtask}>{t('add')}</Button>
+          <Button variant="cancel" onClick={() => setShowSubtaskForm(false)}>{t('cancel')}</Button>
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Button from './shared/Button'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { Sparkles } from 'lucide-react'
@@ -165,8 +166,8 @@ export default function TaskEditForm({ task, depth, projectId, projectLabels = [
           />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button onClick={onCancel} style={{ padding: '5px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: DARK.text, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('cancel')}</button>
-          <button onClick={handleSave} style={{ padding: '5px 16px', border: 'none', borderRadius: 9999, background: DARK.success, color: '#000', fontSize: 12, cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('save')}</button>
+          <Button variant="cancel" onClick={onCancel}>{t('cancel')}</Button>
+          <Button onClick={handleSave}>{t('save')}</Button>
         </div>
       </div>
     </div>

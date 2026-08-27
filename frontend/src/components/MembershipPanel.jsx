@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { qk } from '../api/queryKeys'
+import Button from './shared/Button'
 import { Link } from 'react-router'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
@@ -127,7 +128,7 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <button onClick={handleAdd} disabled={!pick} style={{ padding: '4px 14px', border: 'none', borderRadius: 9999, background: '#818cf8', color: '#000', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: pick ? 1 : 0.4, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('membership.link')}</button>
+        <Button onClick={handleAdd} disabled={!pick} tone="#818cf8">{t('membership.link')}</Button>
       </div>
 
       {(containerTypeKeys.size > 0 || extraContainers.length > 0) && (
