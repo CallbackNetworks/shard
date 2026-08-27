@@ -1,0 +1,119 @@
+# Self-hosting Shard: one file, one command, no registry account.
+#
+#   git clone <this repo> && cd shard
+#   docker compose -f docker-compose.selfhost.yml up -d
+#   open http://127.0.0.1:8090/
+#
+# This is NOT the file the CD pipeline deploys (ADR-0108: that one is *generated*
+# on the deploy host from published images, and stays generated). This one is for
+# somebody who is not us: it builds the same `Dockerfile.prod` images from the
+# checkout, so it needs no `docker login` and no `.env` to start. See ADR-0117.
+#
+# Every value below has a working default, so a bare clone boots. Put overrides in
+# a `.env` beside this file — `cp .env.example .env` — and Compose picks them up.
+
+# Its own project name, so bringing this up never reconciles — i.e. never stops and
+# replaces — the containers of the dev stack in the same checkout.
+name: shard-selfhost
+
+services:
+  backend:
+    # The service MUST be named `backend`: frontend/nginx.conf proxies to the
+    # literal host `backend:8000`, so renaming this breaks every API call.
+    #
+    # `image` + `build` together: Compose builds from source when the tag is not
+    # present locally, and `docker compose pull` uses it if these images are ever
+    # published. A self-hoster needs neither a registry nor an account.
+    image: ${SHARD_IMAGE_PREFIX:-shard}/backend:${SHARD_TAG:-selfhost}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    expose:
+      - "8000"
+    volumes:
+      # Both are bind mounts on purpose: the database and the attachments are the
+      # only state worth keeping, and a self-hoster must be able to see, copy and
+      # back them up without knowing what a named volume is.
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - DB_SSL_MODE=${DB_SSL_MODE:-}
+      # Empty means no login gate at all. That is only safe because the frontend
+      # binds to loopback by default below; set both together, never one.
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - AUTH_TOKEN_TTL=${AUTH_TOKEN_TTL:-604800}
+      - AUTH_MAX_ATTEMPTS=${AUTH_MAX_ATTEMPTS:-5}
+      - AUTH_LOCKOUT_SECONDS=${AUTH_LOCKOUT_SECONDS:-300}
+      - AUTH_PROXY_HEADER=${AUTH_PROXY_HEADER:-}
+      # This topology always has the frontend's nginx in front of the backend, so
+      # one hop is the floor (ADR-0109). Raise to 2 only if a CDN fronts that nginx.
+      - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-1}
+      # Unset means a random per-process secret, so share-PIN sessions do not
+      # survive a restart. Set it to any long random string to keep them.
+      - SECRET_KEY=${SECRET_KEY:-}
+      # Same-origin behind this nginx, so no cross-origin caller is expected.
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      # `stub` answers without calling anyone, so the assistant is present and
+      # harmless until a key is supplied. Provider/model/key are also runtime
+      # settings (ADR-0096) — this is only the fallback default.
+      - LLM_PROVIDER=${LLM_PROVIDER:-stub}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - SUMMARY_HOUR=${SUMMARY_HOUR:-8}
+      - DIGEST_DAY=${DIGEST_DAY:-1}
+      - BACKUP_ENABLED=${BACKUP_ENABLED:-1}
+      - BACKUP_HOUR=${BACKUP_HOUR:-3}
+      - BACKUP_KEEP=${BACKUP_KEEP:-7}
+      - BACKUP_DIR=${BACKUP_DIR:-/app/data/backups}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/app/uploads}
+      - AGENT_CONTEXT_INSTRUCTIONS=${AGENT_CONTEXT_INSTRUCTIONS:-}
+      # Remote MCP is a route on this process (ADR-0080). No token, no /mcp route —
+      # so the default here is "absent", not "open". MCP_API_KEY is what its tools
+      # act with against /api/v1; mint one in Settings, then set both.
+      - MCP_HTTP_TOKEN=${MCP_HTTP_TOKEN:-}
+      - API_BASE_URL=${MCP_API_BASE_URL:-http://localhost:8000}
+      - API_KEY=${MCP_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-network
+
+  frontend:
+    image: ${SHARD_IMAGE_PREFIX:-shard}/frontend:${SHARD_TAG:-selfhost}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      # Loopback by default, because AUTH_PASSWORD defaults to empty: a fresh
+      # instance must not be an open instance. Set SHARD_BIND=0.0.0.0 to reach it
+      # from the network — and set AUTH_PASSWORD in the same edit.
+      #
+      # 8090, not 8080: the first machine this was tried on already had 8080 taken,
+      # and a port clash is an ugly daemon error on the very first command. Override
+      # with FRONTEND_PORT if 8090 is busy too.
+      - "${SHARD_BIND:-127.0.0.1}:${FRONTEND_PORT:-8090}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:

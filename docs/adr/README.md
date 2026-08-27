@@ -118,3 +118,4 @@
 | [0114](0114-a-relation-names-both-of-its-ends.md) | 關係要說得出自己兩端是誰 | Accepted | 2026-08-27 |
 | [0115](0115-a-download-names-its-file-after-a-person.md) | 一個下載，檔名是人寫的字 | Accepted | 2026-08-27 |
 | [0116](0116-ci-reclaims-what-earlier-runs-leaked.md) | CI 開跑前先收回前幾次跑漏掉的東西 | Accepted | 2026-08-27 |
+| [0117](0117-someone-who-is-not-us-can-run-this.md) | 不是我們的人，也要跑得起來 | Accepted | 2026-08-27 |
