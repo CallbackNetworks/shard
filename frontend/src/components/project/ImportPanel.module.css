@@ -1,0 +1,43 @@
+.panel {
+  padding: 16px;
+  background: rgba(var(--kt-ink-rgb), 0.02);
+  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
+}
+
+.title {
+  font-size: 12px;
+  color: var(--kt-ink);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 100px;
+  background: var(--kt-elev);
+  color: var(--kt-ink);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 12px;
+  font-family: monospace;
+  resize: vertical;
+}
+
+/* The box carries the parse failure, so the message underneath is not the only
+   thing pointing at it. */
+.textarea[data-invalid='true'] {
+  border-color: var(--kt-status-failed);
+}
+
+.error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--kt-status-failed);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

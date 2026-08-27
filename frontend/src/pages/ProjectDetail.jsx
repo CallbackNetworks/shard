@@ -8,7 +8,7 @@ import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
   reorderTasks,
-  bulkUpdateTasks, exportTasks, importTasks,
+  bulkUpdateTasks, exportTasks,
   getSavedFilters, createSavedFilter,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
@@ -27,6 +27,7 @@ import TableView from '../components/TableView'
 import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
 import AgentInstructionsPanel from '../components/project/AgentInstructionsPanel'
+import ImportPanel from '../components/project/ImportPanel'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { getUiPrefs } from '../utils/uiPrefs'
@@ -90,8 +91,6 @@ export default function ProjectDetail() {
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedTasks, setSelectedTasks] = useState(new Set())
   const [showImport, setShowImport] = useState(false)
-  const [importJson, setImportJson] = useState('')
-  const [importError, setImportError] = useState('')
   const [shareSettingsOpen, setShareSettingsOpen] = useState(false)
   const [cicdOpen, setCicdOpen] = useState(false)
 
@@ -175,11 +174,6 @@ export default function ProjectDetail() {
   const bulkUpdateMut = useMutation({
     mutationFn: (data) => bulkUpdateTasks(id, data),
     onSuccess: () => { invalidate(); setSelectedTasks(new Set()); setBulkMode(false) },
-  })
-
-  const importMut = useMutation({
-    mutationFn: (data) => importTasks(id, data),
-    onSuccess: () => { invalidate(); setShowImport(false); setImportJson('') },
   })
 
   const { data: savedFilters = [] } = useQuery({
@@ -506,40 +500,8 @@ export default function ProjectDetail() {
               />
             )}
 
-            {/* Import modal */}
             {showImport && (
-              <div style={{ padding: 16, background: 'rgba(var(--kt-ink-rgb), 0.02)', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)' }}>
-                <div style={{ fontSize: 12, color: DARK.text, fontWeight: 600, marginBottom: 8 }}>{t('project.importTasks')}</div>
-                <textarea
-                  value={importJson}
-                  onChange={e => { setImportJson(e.target.value); if (importError) setImportError('') }}
-                  placeholder={'[\n  { "title": "Task 1", "priority": "high" },\n  { "title": "Task 2", "subtasks": [{ "title": "Sub 1" }] }\n]'}
-                  style={{ width: '100%', minHeight: 100, background: DARK.elevated, color: DARK.text, border: `1px solid ${importError ? DARK.danger : 'rgba(var(--kt-ink-rgb), 0.1)'}`, borderRadius: 6, padding: 10, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
-                />
-                {importError && (
-                  <div role="alert" style={{ marginTop: 6, fontSize: 11, color: DARK.danger }}>{importError}</div>
-                )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button
-                    onClick={() => {
-                      try {
-                        const parsed = JSON.parse(importJson)
-                        setImportError('')
-                        importMut.mutate({ tasks: Array.isArray(parsed) ? parsed : [parsed] })
-                      } catch (err) {
-                        // Inline and specific: a blocking alert() saying only
-                        // "Invalid JSON" does not say where the problem is.
-                        setImportError(err.message)
-                      }
-                    }}
-                    disabled={!importJson.trim() || importMut.isPending}
-                    style={{ padding: '5px 14px', border: 'none', borderRadius: 9999, background: DARK.info, color: '#fff', fontSize: 11, cursor: 'pointer', fontWeight: 700, opacity: importJson.trim() ? 1 : 0.5 }}
-                  >
-                    {importMut.isPending ? t('project.importing') : t('project.importAction')}
-                  </button>
-                  <button onClick={() => setShowImport(false)} style={{ padding: '5px 14px', border: '1px solid rgba(var(--kt-ink-rgb), 0.15)', borderRadius: 9999, background: 'transparent', fontSize: 11, cursor: 'pointer', color: DARK.text }}>{t('cancel')}</button>
-                </div>
-              </div>
+              <ImportPanel projectId={id} onClose={() => setShowImport(false)} />
             )}
 
             {filteredTopTasks.length > 0 && (
