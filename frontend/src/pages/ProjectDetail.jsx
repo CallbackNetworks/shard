@@ -7,7 +7,6 @@ import { ArrowLeft, Plus, Zap, Bot, Share2, Webhook } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
-  createCycle, updateCycle, deleteCycle, addTaskToCycle, removeTaskFromCycle,
   reorderTasks,
   bulkUpdateTasks, exportTasks, importTasks,
   getSavedFilters, createSavedFilter,
@@ -86,8 +85,6 @@ export default function ProjectDetail() {
     title: '', description: '', priority: uiPrefs.defaultPriority, status: 'todo', assignee: '', start_date: '', due_date: '',
     selectedLabels: [],
   })
-  const [showCycleForm, setShowCycleForm] = useState(false)
-  const [newCycle, setNewCycle] = useState({ name: '', description: '', status: 'draft', start_date: '', end_date: '' })
   const [showAgentInstr, setShowAgentInstr] = useState(false)
   const [agentInstr, setAgentInstr] = useState('')
   const [repoUrl, setRepoUrl] = useState('')
@@ -174,31 +171,6 @@ export default function ProjectDetail() {
 
   const deleteLabelMut = useMutation({
     mutationFn: (labelId) => deleteLabel(id, labelId),
-    onSuccess: invalidate,
-  })
-
-  const createCycleMut = useMutation({
-    mutationFn: (data) => createCycle(id, data),
-    onSuccess: () => { invalidate(); setShowCycleForm(false); setNewCycle({ name: '', description: '', status: 'draft', start_date: '', end_date: '' }) },
-  })
-
-  const updateCycleMut = useMutation({
-    mutationFn: ({ cycleId, data }) => updateCycle(id, cycleId, data),
-    onSuccess: invalidate,
-  })
-
-  const deleteCycleMut = useMutation({
-    mutationFn: (cycleId) => deleteCycle(id, cycleId),
-    onSuccess: invalidate,
-  })
-
-  const addTaskToCycleMut = useMutation({
-    mutationFn: ({ cycleId, taskId }) => addTaskToCycle(id, cycleId, taskId),
-    onSuccess: invalidate,
-  })
-
-  const removeTaskFromCycleMut = useMutation({
-    mutationFn: ({ cycleId, taskId }) => removeTaskFromCycle(id, cycleId, taskId),
     onSuccess: invalidate,
   })
 
@@ -701,21 +673,7 @@ export default function ProjectDetail() {
 
         {/* Cycles */}
         {tab === 'cycles' && (
-          <CyclePanel
-            cycles={cycles}
-            tasks={tasks}
-            projectId={id}
-            showCycleForm={showCycleForm}
-            setShowCycleForm={setShowCycleForm}
-            newCycle={newCycle}
-            setNewCycle={setNewCycle}
-            createCycleMut={createCycleMut}
-            onUpdateCycle={(cycleId, data) => updateCycleMut.mutate({ cycleId, data })}
-            onDeleteCycle={(cycleId) => deleteCycleMut.mutate(cycleId)}
-            onAddTask={(cycleId, taskId) => addTaskToCycleMut.mutate({ cycleId, taskId })}
-            onRemoveTask={(cycleId, taskId) => removeTaskFromCycleMut.mutate({ cycleId, taskId })}
-            onCyclesMutated={() => qc.invalidateQueries({ queryKey: qk.project(id) })}
-          />
+          <CyclePanel cycles={cycles} tasks={tasks} projectId={id} />
         )}
       </div>
 

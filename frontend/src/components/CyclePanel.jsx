@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, X, BarChart3, Copy, GitCompareArrows } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DARK, BRAND, STATUS_MAP } from '../constants/theme'
-import { duplicateCycle, compareCycles, getCycleBurndown } from '../api/client'
+import {
+  duplicateCycle, compareCycles, getCycleBurndown,
+  createCycle, updateCycle, deleteCycle, addTaskToCycle, removeTaskFromCycle,
+} from '../api/client'
+import { qk } from '../api/queryKeys'
 
 function BurndownChart({ cycleId }) {
   const { t } = useTranslation()
@@ -319,16 +324,57 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
   )
 }
 
-export default function CyclePanel({
-  cycles, tasks, projectId,
-  showCycleForm, setShowCycleForm, newCycle, setNewCycle,
-  createCycleMut, onUpdateCycle, onDeleteCycle, onAddTask, onRemoveTask,
-  onCyclesMutated,
-}) {
+const EMPTY_CYCLE = { name: '', description: '', status: 'draft', start_date: '', end_date: '' }
+
+/**
+ * A cycle is only ever created, edited or filled from this panel, so its writes
+ * live here rather than being handed down from the project page. They used to be
+ * five mutations and two pieces of form state declared in `ProjectDetail`, passed
+ * back down as thirteen props — a component that already called the API itself for
+ * duplicate, compare and burndown, and only for these five asked its parent to.
+ */
+export default function CyclePanel({ cycles, tasks, projectId }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [showCycleForm, setShowCycleForm] = useState(false)
+  const [newCycle, setNewCycle] = useState(EMPTY_CYCLE)
+
+  // Cycles arrive inside the project payload, and the project list shows cycle
+  // counts, so both are stale after any of these — the same pair the project page
+  // invalidates on every other write.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: qk.project(projectId) })
+    qc.invalidateQueries({ queryKey: qk.projects() })
+  }
+
+  const createCycleMut = useMutation({
+    mutationFn: (data) => createCycle(projectId, data),
+    onSuccess: () => { invalidate(); setShowCycleForm(false); setNewCycle(EMPTY_CYCLE) },
+  })
+
+  const updateCycleMut = useMutation({
+    mutationFn: ({ cycleId, data }) => updateCycle(projectId, cycleId, data),
+    onSuccess: invalidate,
+  })
+
+  const deleteCycleMut = useMutation({
+    mutationFn: (cycleId) => deleteCycle(projectId, cycleId),
+    onSuccess: invalidate,
+  })
+
+  const addTaskToCycleMut = useMutation({
+    mutationFn: ({ cycleId, taskId }) => addTaskToCycle(projectId, cycleId, taskId),
+    onSuccess: invalidate,
+  })
+
+  const removeTaskFromCycleMut = useMutation({
+    mutationFn: ({ cycleId, taskId }) => removeTaskFromCycle(projectId, cycleId, taskId),
+    onSuccess: invalidate,
+  })
+
   const handleDuplicate = async (cycleId) => {
     await duplicateCycle(projectId, cycleId)
-    onCyclesMutated && onCyclesMutated()
+    invalidate()
   }
 
   return (
@@ -416,10 +462,10 @@ export default function CyclePanel({
               key={cycle.id}
               cycle={cycle}
               tasks={tasks}
-              onUpdate={onUpdateCycle}
-              onDelete={onDeleteCycle}
-              onAddTask={onAddTask}
-              onRemoveTask={onRemoveTask}
+              onUpdate={(cycleId, data) => updateCycleMut.mutate({ cycleId, data })}
+              onDelete={(cycleId) => deleteCycleMut.mutate(cycleId)}
+              onAddTask={(cycleId, taskId) => addTaskToCycleMut.mutate({ cycleId, taskId })}
+              onRemoveTask={(cycleId, taskId) => removeTaskFromCycleMut.mutate({ cycleId, taskId })}
               onDuplicate={handleDuplicate}
               allCycles={cycles}
               projectId={projectId}
