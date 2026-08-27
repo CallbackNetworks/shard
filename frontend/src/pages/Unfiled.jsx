@@ -11,7 +11,36 @@ import {
 import { DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
 
-function TaskRow({ task, projects, onFile, filing }) {
+// What this node *is* attached to, even though nothing contains it. The page's whole
+// premise is an empty containment trail, so a breadcrumb here would always be blank —
+// the useful question is whether the node is connected to the graph at all, and by what.
+// Counts rather than a list of neighbours: a row is one line, and the node page is one
+// click away for the detail.
+function RelationChips({ counts, edgeTypeByKey }) {
+  const { t } = useTranslation()
+  const entries = Object.entries(counts || {})
+  if (entries.length === 0) {
+    return <span style={{ fontSize: 11, color: DARK.textDim }}>{t('unfiled.noRelations')}</span>
+  }
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+      {entries.sort((a, b) => b[1] - a[1]).map(([rel, n]) => (
+        <span
+          key={rel}
+          style={{
+            fontSize: 10, padding: '1px 6px', borderRadius: 9999,
+            border: '1px solid rgba(var(--kt-ink-rgb), 0.12)',
+            color: 'rgba(var(--kt-ink-rgb), 0.55)',
+          }}
+        >
+          {edgeTypeByKey.get(rel)?.label || rel} {n}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function TaskRow({ task, projects, onFile, filing, relations, edgeTypeByKey }) {
   const { t } = useTranslation()
   const [projectId, setProjectId] = useState('')
   return (
@@ -19,7 +48,10 @@ function TaskRow({ task, projects, onFile, filing }) {
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '10px 0', borderBottom: `1px solid ${DARK.border}`,
     }}>
-      <span style={{ flex: 1, fontSize: 13, color: DARK.text }}>{task.title}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 13, color: DARK.text }}>{task.title}</span>
+        <RelationChips counts={relations} edgeTypeByKey={edgeTypeByKey} />
+      </span>
       <span style={{
         fontSize: 10, fontWeight: 700, padding: '1px 6px', textTransform: 'uppercase',
         background: 'rgba(var(--kt-ink-rgb), 0.06)', color: DARK.textDim,
@@ -67,11 +99,20 @@ export default function Unfiled() {
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
   const customTypes = nodeTypes.filter(nt => !nt.is_builtin)
+  // Fetched unconditionally now: the slice is what tells each row which relations it
+  // does have, and that is the point of the page whether or not custom types exist.
   const { data: graphMap } = useQuery({
     queryKey: qk.graphMap('unfiled'),
     queryFn: () => getGraphMap(),
-    enabled: customTypes.length > 0,
   })
+  const edgeTypeByKey = new Map(edgeTypes.map(et => [et.key, et]))
+  const relationsByNode = {}
+  for (const e of graphMap?.edges || []) {
+    for (const id of [e.source_id, e.target_id]) {
+      const counts = relationsByNode[id] || (relationsByNode[id] = {})
+      counts[e.rel_type] = (counts[e.rel_type] || 0) + 1
+    }
+  }
   const containmentRels = new Set(edgeTypes.filter(et => et.is_containment).map(et => et.key))
   const containedIds = new Set(
     (graphMap?.edges || []).filter(e => containmentRels.has(e.rel_type)).map(e => e.target_id)
@@ -107,6 +148,8 @@ export default function Unfiled() {
               task={task}
               projects={activeProjects}
               filing={fileMut.isPending}
+              relations={relationsByNode[task.id]}
+              edgeTypeByKey={edgeTypeByKey}
               onFile={(taskId, projectId) => fileMut.mutate({ taskId, projectId })}
             />
           ))
@@ -140,8 +183,11 @@ export default function Unfiled() {
                 }}>
                   {nt?.label || n.type}
                 </span>
-                <span style={{ flex: 1, fontSize: 13, color: DARK.text }}>
-                  {n.title || <em style={{ color: DARK.textDim }}>{t('nodePage.untitled')}</em>}
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, color: DARK.text }}>
+                    {n.title || <em style={{ color: DARK.textDim }}>{t('nodePage.untitled')}</em>}
+                  </span>
+                  <RelationChips counts={relationsByNode[n.id]} edgeTypeByKey={edgeTypeByKey} />
                 </span>
               </Link>
             )

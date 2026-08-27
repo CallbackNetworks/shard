@@ -19,11 +19,13 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 
 vi.mock('../../api/client', () => ({
-  getNodeTypes: vi.fn(), getEdgeTypes: vi.fn(), getNodes: vi.fn(), createNode: vi.fn(),
+  getNodeTypes: vi.fn(), getEdgeTypes: vi.fn(), getNodes: vi.fn(), getNode: vi.fn(), createNode: vi.fn(),
   deleteNode: vi.fn(), getNodeEdges: vi.fn(), attachNodeEdge: vi.fn(), detachNodeEdge: vi.fn(),
+  getGraphMap: vi.fn(), getAncestry: vi.fn(),
 }))
 
 import NodeExplorer from '../NodeExplorer'
+import { qk } from '../../api/queryKeys'
 
 const nodeTypes = [
   { key: 'topic', label: 'Topic', is_builtin: false, roles: [] },
@@ -34,16 +36,31 @@ const topicNodes = [
   { id: 'n1', type: 'topic', title: 'Roadmap' },
   { id: 'n2', type: 'topic', title: 'Backlog' },
 ]
-const edges = [{ id: 'e1', source_id: 'n1', target_id: 'p1', rel_type: 'contains' }]
+// `EdgeOut` embeds each endpoint (`source`/`target`) precisely so a client need not
+// resolve the id it is handed. This panel printed the id anyway.
+const edges = [{
+  id: 'e1', source_id: 'n1', target_id: 'p1', rel_type: 'contains',
+  source: { id: 'n1', type: 'topic', title: 'Roadmap' },
+  target: { id: 'p1', type: 'project', title: 'Shard' },
+}]
 
 const last = {}
+
+// A row is a title plus the strip saying where the node lives, so the title and its
+// wrapper both carry the same text; the assertions want the title.
+const row = (text) => screen.getAllByText(text).find(el => el.tagName === 'SPAN' && el.children.length === 0)
 
 function setup() {
   mockUseQuery.mockImplementation(({ queryKey }) => {
     if (queryKey[0] === 'node-types') return { data: nodeTypes }
     if (queryKey[0] === 'edge-types') return { data: edgeTypes }
     if (queryKey[0] === 'nodes') return { data: topicNodes, isLoading: false }
+    // Keyed on the id so nothing is "selected" before a row is clicked. The selection
+    // is fetched rather than found in the list because the graph re-centres onto
+    // neighbours, which are usually of another type.
+    if (queryKey[0] === 'node') return { data: queryKey[1] ? topicNodes.find(n => n.id === queryKey[1]) : undefined }
     if (queryKey[0] === 'node-edges') return { data: edges }
+    if (queryKey[0] === 'ancestry') return { data: {} }
     return { data: [] }
   })
   mockUseMutation.mockImplementation(({ mutationFn, onSuccess }) => ({
@@ -57,8 +74,8 @@ describe('NodeExplorer', () => {
   it('renders title and node list for the default type', () => {
     setup()
     expect(screen.getByText('nodeExplorer.title')).toBeTruthy()
-    expect(screen.getByText('Roadmap')).toBeTruthy()
-    expect(screen.getByText('Backlog')).toBeTruthy()
+    expect(row('Roadmap')).toBeTruthy()
+    expect(row('Backlog')).toBeTruthy()
   })
 
   it('shows a create form for a custom (non-builtin) type', () => {
@@ -83,8 +100,25 @@ describe('NodeExplorer', () => {
 
   it('selecting a node reveals its edges', () => {
     setup()
-    fireEvent.click(screen.getByText('Roadmap'))
+    fireEvent.click(row('Roadmap'))
     expect(screen.getByText('nodeExplorer.edges')).toBeTruthy()
-    expect(screen.getByText('contains')).toBeTruthy()
+    // The relation's own label, not its engine key (ADR-0058) — 'Contains' is also an
+    // <option> in the attach picker, so the row is the SPAN one.
+    expect(screen.getAllByText('Contains').some(el => el.tagName === 'SPAN')).toBe(true)
+  })
+
+  it('names the node at the other end of an edge instead of printing its id', () => {
+    setup()
+    fireEvent.click(row('Roadmap'))
+    expect(screen.getByText('Shard')).toBeTruthy()
+    expect(screen.queryByText('p1')).toBeNull()
+  })
+
+  it('re-centres on the neighbour when its name is clicked', () => {
+    setup()
+    fireEvent.click(row('Roadmap'))
+    fireEvent.click(screen.getByText('Shard'))
+    // The selection followed the edge even though 'p1' is not in the listed type.
+    expect(mockUseQuery).toHaveBeenCalledWith(expect.objectContaining({ queryKey: qk.node('p1') }))
   })
 })

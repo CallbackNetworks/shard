@@ -8,6 +8,8 @@ import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
 import EmptyState from '../components/shared/EmptyState'
+import AncestryTrail from '../components/shared/AncestryTrail'
+import useAncestry from '../hooks/useAncestry'
 
 // Thin per-type node listing (ADR-0037): the sidebar entry for a user-defined
 // container type lands here; each row opens the container view.
@@ -19,6 +21,11 @@ export default function TypeNodesPage() {
 
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const { data: nodes = [], isLoading } = useQuery({ queryKey: qk.nodes(typeKey), queryFn: () => getNodes(typeKey) })
+
+  // One request for the whole page (ADR-0094): the listing said what each node is
+  // called and nothing about where it sits, which for a container type is most of
+  // what distinguishes two rows with similar names.
+  const ancestry = useAncestry(nodes.map(n => n.id), `type:${typeKey}`)
 
   const typeMeta = nodeTypes.find(nt => nt.key === typeKey)
   const color = typeMeta?.color || '#818cf8'
@@ -63,19 +70,23 @@ export default function TypeNodesPage() {
       ) : (
         <div className="kt-card" style={{ padding: '4px 16px' }}>
           {nodes.map(n => (
-            <Link
+            <div
               key={n.id}
-              to={href(n)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px',
-                borderBottom: `1px solid ${DARK.border}`, textDecoration: 'none',
+                borderBottom: `1px solid ${DARK.border}`,
               }}
             >
               <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 13, color: DARK.text }}>
-                {n.title || <em style={{ color: DARK.textDim }}>{t('nodePage.untitled')}</em>}
+              {/* The row is no longer one link: the ancestry chips are links of their
+                  own, and an anchor may not nest inside another anchor. */}
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <Link to={href(n)} style={{ fontSize: 13, color: DARK.text, textDecoration: 'none' }}>
+                  {n.title || <em style={{ color: DARK.textDim }}>{t('nodePage.untitled')}</em>}
+                </Link>
+                <AncestryTrail nodeId={n.id} entry={ancestry[n.id]} maxTrails={1} />
               </span>
-            </Link>
+            </div>
           ))}
         </div>
       )}

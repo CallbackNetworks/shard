@@ -1130,5 +1130,17 @@
   "board.partOf": "Part of: {{title}}",
   "table.partOf": "Part of: {{title}}",
   "issue.partOf": "Part of: {{title}}",
-  "dashboard.unowned": "No owner"
+  "dashboard.unowned": "No owner",
+  "nodeExplorer.viewList": "List",
+  "nodeExplorer.viewGraph": "Graph",
+  "egoNetwork.title": "Neighbourhood graph",
+  "egoNetwork.empty": "Select a node to draw its neighbourhood.",
+  "egoNetwork.isolated": "Nothing is linked to this node yet.",
+  "egoNetwork.truncated": "Showing part of the neighbourhood — this node has more neighbours than fit.",
+  "unfiled.noRelations": "No relations at all",
+  "graphTypes.anyNode": "any node",
+  "graphTypes.anyWithRole": "any {{role}}",
+  "graphTypes.endpointOr": " or ",
+  "graphTypes.containmentRule": "container or task → anything it may hold",
+  "graphTypes.endpointHint": "What may sit at each end of this relation."
 }

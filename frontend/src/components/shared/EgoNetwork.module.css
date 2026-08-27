@@ -1,0 +1,66 @@
+/* The ego network draws over the page background, so every colour resolves
+   through the theme tokens rather than a dark-mode literal (ADR-0088). */
+
+.wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  max-width: none;
+}
+
+.node {
+  cursor: pointer;
+}
+
+.node[role='button']:hover circle,
+.node[role='button']:focus-visible circle {
+  fill-opacity: 0.4;
+}
+
+.node:focus-visible {
+  outline: none;
+}
+
+.node:focus-visible circle {
+  stroke-width: 2.5;
+}
+
+/* Labels sit on top of the links, so they punch a hole in whatever they cross
+   instead of being read through it. */
+.nodeLabel,
+.centerLabel,
+.relLabel {
+  paint-order: stroke;
+  stroke: var(--kt-bg, #171717);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.nodeLabel {
+  font-size: 10px;
+  fill: var(--kt-muted, #9ca3af);
+}
+
+.centerLabel {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--kt-ink, #ffffff);
+}
+
+.relLabel {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  fill: var(--kt-faint, #6b7280);
+}
+
+.empty,
+.note {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 12px;
+  color: var(--kt-faint, #6b7280);
+}

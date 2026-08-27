@@ -1130,5 +1130,17 @@
   "board.partOf": "隸屬於：{{title}}",
   "table.partOf": "隸屬於：{{title}}",
   "issue.partOf": "隸屬於：{{title}}",
-  "dashboard.unowned": "未歸屬"
+  "dashboard.unowned": "未歸屬",
+  "nodeExplorer.viewList": "清單",
+  "nodeExplorer.viewGraph": "關係圖",
+  "egoNetwork.title": "鄰近關係圖",
+  "egoNetwork.empty": "選一個節點來繪製它的鄰近關係。",
+  "egoNetwork.isolated": "這個節點還沒有連到任何東西。",
+  "egoNetwork.truncated": "只畫出部分鄰居——這個節點的鄰居超過可顯示的數量。",
+  "unfiled.noRelations": "完全沒有關係",
+  "graphTypes.anyNode": "任何節點",
+  "graphTypes.anyWithRole": "任何具備 {{role}} 角色者",
+  "graphTypes.endpointOr": " 或 ",
+  "graphTypes.containmentRule": "容器或任務 → 它可以容納的對象",
+  "graphTypes.endpointHint": "這個關係的兩端各自允許什麼。"
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { qk } from '../api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -33,12 +33,45 @@ function RoleBadge({ label }) {
   )
 }
 
-function TypeRow({ item, onDelete, deleting, onEdit, children }) {
+// A relation declares what may sit at each end (ADR-0078) and the registry serves
+// those declarations, but this page listed relation names only — so the one screen
+// that describes the vocabulary said nothing about which types it connects, and the
+// rule was discoverable only by attempting an edge and reading the refusal.
+function EndpointSpec({ spec, typeByKey }) {
+  const { t } = useTranslation()
+  const parts = [
+    ...(spec?.types || []).map(k => typeByKey.get(k)?.label || k),
+    ...(spec?.roles || []).map(r => t('graphTypes.anyWithRole', { role: r })),
+  ]
+  return (
+    <span style={{ color: parts.length ? 'rgba(var(--kt-ink-rgb), 0.62)' : DARK.textDim }}>
+      {parts.length ? parts.join(t('graphTypes.endpointOr')) : t('graphTypes.anyNode')}
+    </span>
+  )
+}
+
+function EdgeEndpoints({ item, typeByKey }) {
+  const { t } = useTranslation()
+  // Containment is bound by the role rule rather than an allow-list, so saying
+  // "any → any" here would be a lie in the one place it matters most.
+  if (item.is_containment) {
+    return <span style={{ color: DARK.textDim }}>{t('graphTypes.containmentRule')}</span>
+  }
+  return (
+    <>
+      <EndpointSpec spec={item.allowed_source} typeByKey={typeByKey} />
+      <span style={{ color: DARK.textDim, margin: '0 6px' }}>→</span>
+      <EndpointSpec spec={item.allowed_target} typeByKey={typeByKey} />
+    </>
+  )
+}
+
+function TypeRow({ item, onDelete, deleting, onEdit, sub, children }) {
   const { t } = useTranslation()
   return (
+    <div style={{ borderBottom: `1px solid ${DARK.border}`, padding: '9px 0' }}>
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '9px 0', borderBottom: `1px solid ${DARK.border}`,
     }}>
       {item.color && (
         <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
@@ -76,6 +109,8 @@ function TypeRow({ item, onDelete, deleting, onEdit, children }) {
           </>
         )}
       </div>
+    </div>
+    {sub && <div style={{ fontSize: 11, marginTop: 3 }}>{sub}</div>}
     </div>
   )
 }
@@ -142,6 +177,7 @@ export default function GraphTypes() {
 
   const { data: nodeTypes = [], isLoading: nodeLoading } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes })
   const { data: edgeTypes = [], isLoading: edgeLoading } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes })
+  const nodeTypeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
 
   const emptyNodeForm = { key: '', label: '', color: '#818cf8', roles: [] }
   const [nodeForm, setNodeForm] = useState(emptyNodeForm)
@@ -255,7 +291,17 @@ export default function GraphTypes() {
             <div style={{ fontSize: 12, color: DARK.textDim }}>{t('loading')}</div>
           ) : (
             edgeTypes.map(item => (
-              <TypeRow key={item.key} item={item} onDelete={(k) => confirmDelete(edgeDelete, k)} deleting={edgeDelete.isPending}>
+              <TypeRow
+                key={item.key}
+                item={item}
+                onDelete={(k) => confirmDelete(edgeDelete, k)}
+                deleting={edgeDelete.isPending}
+                sub={(
+                  <span title={item.description || t('graphTypes.endpointHint')}>
+                    <EdgeEndpoints item={item} typeByKey={nodeTypeByKey} />
+                  </span>
+                )}
+              >
                 {item.is_containment && <RoleBadge label={t('graphTypes.roleContainment')} />}
                 {item.is_symmetric && <RoleBadge label={t('graphTypes.roleSymmetric')} />}
               </TypeRow>

@@ -17,24 +17,28 @@ import s from './AncestryTrail.module.css'
 
 const MAX_TRAILS_SHOWN = 2
 
-export default function AncestryTrail({ nodeId, className }) {
+// A page showing one node fetches its own trail; a page showing a *list* fetches the
+// whole list in one request (`useAncestry`) and hands each row its entry, because one
+// request per row is how a list ends up not asking at all — the reason the endpoint is
+// batched in the first place.
+export default function AncestryTrail({ nodeId, entry: given, className, maxTrails = MAX_TRAILS_SHOWN }) {
   const { t } = useTranslation()
   const { data: ancestry } = useQuery({
     queryKey: qk.ancestry(nodeId),
     queryFn: () => getAncestry([nodeId]),
-    enabled: !!nodeId,
+    enabled: !!nodeId && !given,
     staleTime: 30000,
   })
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
 
-  const entry = ancestry?.[nodeId]
+  const entry = given || ancestry?.[nodeId]
   const trails = entry?.trails || []
   const owners = entry?.owners || []
   if (trails.length === 0 && owners.length === 0) return null
 
-  const shown = trails.slice(0, MAX_TRAILS_SHOWN)
-  const hidden = trails.slice(MAX_TRAILS_SHOWN)
+  const shown = trails.slice(0, maxTrails)
+  const hidden = trails.slice(maxTrails)
 
   const chip = (ref) => (
     <Link
