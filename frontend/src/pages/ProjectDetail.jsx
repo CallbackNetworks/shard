@@ -6,7 +6,6 @@ import { useTranslation, Trans } from 'react-i18next'
 import { ArrowLeft, Plus, Zap, Bot, Share2, Webhook } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
-  createLabel, deleteLabel,
   reorderTasks,
   exportTasks,
 } from '../api/client'
@@ -125,16 +124,6 @@ export default function ProjectDetail() {
 
   const archiveMut = useMutation({
     mutationFn: () => updateProject(id, { status: project.status === 'archived' ? 'active' : 'archived' }),
-    onSuccess: invalidate,
-  })
-
-  const createLabelMut = useMutation({
-    mutationFn: (data) => createLabel(id, data),
-    onSuccess: invalidate,
-  })
-
-  const deleteLabelMut = useMutation({
-    mutationFn: (labelId) => deleteLabel(id, labelId),
     onSuccess: invalidate,
   })
 
@@ -291,11 +280,7 @@ export default function ProjectDetail() {
               <Webhook size={12} />
               {t('project.cicd')}
             </button>
-            <LabelManager
-              labels={labels}
-              onCreateLabel={data => createLabelMut.mutate(data)}
-              onDeleteLabel={labelId => deleteLabelMut.mutate(labelId)}
-            />
+            <LabelManager labels={labels} projectId={id} />
             <button
               onClick={() => setShowAgentInstr(v => !v)}
               className={`${s.agentBtn} ${showAgentInstr ? s.agentBtnActive : s.agentBtnInactive}`}
