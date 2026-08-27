@@ -8,7 +8,7 @@ import {
   getProject, createTask, updateTask, deleteTask, updateProject,
   createLabel, deleteLabel, addLabelToTask,
   reorderTasks,
-  bulkUpdateTasks, exportTasks,
+  exportTasks,
   getSavedFilters, createSavedFilter,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
@@ -30,6 +30,7 @@ import AgentInstructionsPanel from '../components/project/AgentInstructionsPanel
 import ImportPanel from '../components/project/ImportPanel'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
+import useBulkSelection from '../hooks/useBulkSelection'
 import { getUiPrefs } from '../utils/uiPrefs'
 import { touchProject } from '../utils/recentProjects'
 import { filterTasks } from '../utils/taskFilters'
@@ -88,9 +89,8 @@ export default function ProjectDetail() {
     selectedLabels: [],
   })
   const [showAgentInstr, setShowAgentInstr] = useState(false)
-  const [bulkMode, setBulkMode] = useState(false)
-  const [selectedTasks, setSelectedTasks] = useState(new Set())
   const [showImport, setShowImport] = useState(false)
+  const bulk = useBulkSelection(id)
   const [shareSettingsOpen, setShareSettingsOpen] = useState(false)
   const [cicdOpen, setCicdOpen] = useState(false)
 
@@ -169,11 +169,6 @@ export default function ProjectDetail() {
   const reorderMut = useMutation({
     mutationFn: (taskIds) => reorderTasks(id, taskIds),
     onSuccess: invalidate,
-  })
-
-  const bulkUpdateMut = useMutation({
-    mutationFn: (data) => bulkUpdateTasks(id, data),
-    onSuccess: () => { invalidate(); setSelectedTasks(new Set()); setBulkMode(false) },
   })
 
   const { data: savedFilters = [] } = useQuery({
@@ -475,8 +470,8 @@ export default function ProjectDetail() {
             savedFilters={savedFilters}
             onApplySavedFilter={applySavedFilter}
             onSaveFilter={saveCurrentFilter}
-            bulkMode={bulkMode}
-            onToggleBulk={() => { setBulkMode(v => !v); setSelectedTasks(new Set()) }}
+            bulkMode={bulk.active}
+            onToggleBulk={bulk.toggleActive}
             // Bulk selection needs the checkbox column, which only the Issues
             // list draws — offering the toggle elsewhere would do nothing.
             showBulk={tab === 'issues'}
@@ -490,13 +485,13 @@ export default function ProjectDetail() {
         {tab === 'issues' && (
           <div>
             {/* Bulk action bar */}
-            {bulkMode && selectedTasks.size > 0 && (
+            {bulk.active && bulk.count > 0 && (
               <BulkToolbar
-                selectedCount={selectedTasks.size}
-                onSetStatus={(status) => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], status })}
-                onSetPriority={(priority) => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], priority })}
-                onPin={() => bulkUpdateMut.mutate({ task_ids: [...selectedTasks], is_pinned: true })}
-                onClear={() => setSelectedTasks(new Set())}
+                selectedCount={bulk.count}
+                onSetStatus={(status) => bulk.apply({ status })}
+                onSetPriority={(priority) => bulk.apply({ priority })}
+                onPin={() => bulk.apply({ is_pinned: true })}
+                onClear={bulk.clear}
               />
             )}
 
@@ -524,16 +519,12 @@ export default function ProjectDetail() {
             ) : (
               filteredTopTasks.map(task => (
                 <div key={task.id} style={{ display: 'flex', alignItems: 'stretch' }}>
-                  {bulkMode && (
+                  {bulk.active && (
                     <label style={{ display: 'flex', alignItems: 'center', paddingLeft: 12, cursor: 'pointer' }}>
                       <input
                         type="checkbox"
-                        checked={selectedTasks.has(task.id)}
-                        onChange={e => {
-                          const next = new Set(selectedTasks)
-                          e.target.checked ? next.add(task.id) : next.delete(task.id)
-                          setSelectedTasks(next)
-                        }}
+                        checked={bulk.isSelected(task.id)}
+                        onChange={e => bulk.toggleTask(task.id, e.target.checked)}
                         style={{ accentColor: DARK.info }}
                       />
                     </label>
