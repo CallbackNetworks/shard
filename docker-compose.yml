@@ -18,6 +18,11 @@ services:
       - ./backend:/app            # host source → container (hot-reload)
       - backend_venv:/app/.venv   # named volume protects the installed venv
       - ./data:/app/data           # persist SQLite database
+      # No ./uploads mount here on purpose: this stack binds ./backend over /app,
+      # so UPLOAD_DIR=/app/uploads already lands in ./backend/uploads on the host.
+      # Adding one would move the dev attachment store and orphan what is there.
+      # The production compose has no source mount and therefore needs its own —
+      # it is generated in .github/workflows/ci.yml.
     environment:
       - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}

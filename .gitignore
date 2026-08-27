@@ -26,6 +26,7 @@ data/
 *.swp
 .env
 backend/uploads/
+/uploads/
 
 # Crash artifacts. Node OOMs on this host have left multi-GB core dumps in
 # frontend/ more than once (2.2GB and 4.3GB at last count), and nothing was

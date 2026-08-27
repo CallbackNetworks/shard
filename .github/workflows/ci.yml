@@ -518,6 +518,12 @@ jobs:
                 - "8000"
               volumes:
                 - ./data:/app/data
+                # Attachments are state too. Without this, UPLOAD_DIR defaults to
+                # /app/uploads *inside* the container and every deploy silently threw
+                # the files away — the dev stack only kept them because it binds the
+                # source over /app, which this image deliberately does not. The chown
+                # step below has been creating this directory on the host all along.
+                - ./uploads:/app/uploads
               environment:
                 # Remote MCP is served by this process (ADR-0080). MCP_HTTP_TOKEN comes
                 # from .env below and decides whether /mcp exists at all; these two are
