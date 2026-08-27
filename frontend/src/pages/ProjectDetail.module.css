@@ -222,15 +222,7 @@
 }
 
 /* ── Agent Instructions panel ── */
-.agentInstrPanel {
-  background: rgba(250,204,21,0.06);
-  border: 1px solid rgba(250,204,21,0.2);
-  border-radius: 0;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.agentInstrTitle {
+.cicdTitle {
   font-size: 12px;
   font-weight: 700;
   color: var(--kt-hit);
@@ -239,51 +231,10 @@
   letter-spacing: 0;
 }
 
-.agentInstrDesc {
+.cicdDesc {
   font-size: 11px;
   color: rgba(var(--kt-ink-rgb), 0.4);
   margin-bottom: 8px;
-}
-
-.agentInstrTextarea {
-  width: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--kt-ink);
-  border: 1px solid var(--kt-line);
-  border-radius: 0;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-family: monospace;
-  resize: vertical;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.agentInstrActions {
-  margin-top: 8px;
-  display: flex;
-  gap: 8px;
-}
-
-.agentInstrSaveBtn {
-  padding: 5px 14px;
-  border-radius: 0;
-  border: none;
-  background: var(--kt-hit);
-  color: var(--kt-bg);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.agentInstrCancelBtn {
-  padding: 5px 14px;
-  border-radius: 0;
-  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: transparent;
-  color: #fff;
-  font-size: 12px;
-  cursor: pointer;
 }
 
 /* Sub-container panel sits between the header block and the issue list. */

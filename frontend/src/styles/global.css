@@ -127,6 +127,16 @@ body::before {
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 [data-theme="light"] ::selection { background: rgba(250,204,21,0.38); color: #000000; }
 input, select, button, textarea { font-family: inherit; }
+/* The amber-bordered strip that opens under a project header: agent
+   instructions and the CI/CD block are two of them, so the shell is shared
+   rather than declared once per panel. */
+.kt-inline-panel {
+  background: rgba(250,204,21,0.06);
+  border: 1px solid rgba(250,204,21,0.2);
+  border-radius: 0;
+  padding: 16px;
+  margin-bottom: 16px;
+}
 .kt-sr-only {
   position: absolute;
   width: 1px;

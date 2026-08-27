@@ -26,6 +26,7 @@ import CalendarView from '../components/CalendarView'
 import TableView from '../components/TableView'
 import TaskCreateForm from '../components/TaskCreateForm'
 import CyclePanel from '../components/CyclePanel'
+import AgentInstructionsPanel from '../components/project/AgentInstructionsPanel'
 import { BRAND, DARK } from '../constants/theme'
 import useBreakpoint from '../hooks/useBreakpoint'
 import { getUiPrefs } from '../utils/uiPrefs'
@@ -86,9 +87,6 @@ export default function ProjectDetail() {
     selectedLabels: [],
   })
   const [showAgentInstr, setShowAgentInstr] = useState(false)
-  const [agentInstr, setAgentInstr] = useState('')
-  const [repoUrl, setRepoUrl] = useState('')
-  const [agentInstrDirty, setAgentInstrDirty] = useState(false)
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedTasks, setSelectedTasks] = useState(new Set())
   const [showImport, setShowImport] = useState(false)
@@ -157,11 +155,6 @@ export default function ProjectDetail() {
   const archiveMut = useMutation({
     mutationFn: () => updateProject(id, { status: project.status === 'archived' ? 'active' : 'archived' }),
     onSuccess: invalidate,
-  })
-
-  const saveAgentInstrMut = useMutation({
-    mutationFn: () => updateProject(id, { agent_instructions: agentInstr || null, repo_url: repoUrl || null }),
-    onSuccess: () => { invalidate(); setAgentInstrDirty(false) },
   })
 
   const createLabelMut = useMutation({
@@ -388,7 +381,7 @@ export default function ProjectDetail() {
               onDeleteLabel={labelId => deleteLabelMut.mutate(labelId)}
             />
             <button
-              onClick={() => { setShowAgentInstr(v => !v); if (!agentInstrDirty) { setAgentInstr(project.agent_instructions || ''); setRepoUrl(project.repo_url || '') } }}
+              onClick={() => setShowAgentInstr(v => !v)}
               className={`${s.agentBtn} ${showAgentInstr ? s.agentBtnActive : s.agentBtnInactive}`}
             >
               <Bot size={12} /> {t('project.agent')}
@@ -413,9 +406,9 @@ export default function ProjectDetail() {
         )}
 
         {cicdOpen && (
-          <div className={s.agentInstrPanel}>
-            <div className={s.agentInstrTitle}>{t('project.cicd')}</div>
-            <div className={s.agentInstrDesc}>{t('project.cicdHint')}</div>
+          <div className="kt-inline-panel">
+            <div className={s.cicdTitle}>{t('project.cicd')}</div>
+            <div className={s.cicdDesc}>{t('project.cicdHint')}</div>
             <WebhookPanel taskId={project.id} />
             <div style={{ marginTop: 12 }}>
               <BuildHistoryPanel taskId={project.id} />
@@ -423,44 +416,7 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        {showAgentInstr && (
-          <div className={s.agentInstrPanel}>
-            <div className={s.agentInstrTitle}>{t('project.agentInstructions')}</div>
-            <div className={s.agentInstrDesc}>{t('project.agentInstructionsHint')}</div>
-            <input
-              type="text"
-              value={repoUrl}
-              onChange={e => { setRepoUrl(e.target.value); setAgentInstrDirty(true) }}
-              placeholder={t('project.repoUrlPlaceholder')}
-              className={s.agentInstrTextarea}
-              style={{ marginBottom: 8, height: 'auto', minHeight: 'unset', padding: '8px 10px' }}
-            />
-            <textarea
-              value={agentInstr}
-              onChange={e => { setAgentInstr(e.target.value); setAgentInstrDirty(true) }}
-              placeholder={t('project.agentInstrPlaceholder')}
-              rows={4}
-              className={s.agentInstrTextarea}
-            />
-            {agentInstrDirty && (
-              <div className={s.agentInstrActions}>
-                <button
-                  onClick={() => saveAgentInstrMut.mutate()}
-                  disabled={saveAgentInstrMut.isPending}
-                  className={s.agentInstrSaveBtn}
-                >
-                  {saveAgentInstrMut.isPending ? t('saving') : t('save')}
-                </button>
-                <button
-                  onClick={() => { setAgentInstr(project.agent_instructions || ''); setRepoUrl(project.repo_url || ''); setAgentInstrDirty(false) }}
-                  className={s.agentInstrCancelBtn}
-                >
-                  {t('cancel')}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        <AgentInstructionsPanel open={showAgentInstr} project={project} />
 
         {/* Tabs */}
         <div className={s.tabRow}>

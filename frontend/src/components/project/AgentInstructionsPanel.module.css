@@ -1,0 +1,62 @@
+.title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--kt-hit);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.desc {
+  font-size: 11px;
+  color: rgba(var(--kt-ink-rgb), 0.4);
+  margin-bottom: 8px;
+}
+
+.textarea {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--kt-ink);
+  border: 1px solid var(--kt-line);
+  border-radius: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: monospace;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* The repo URL is one line, so it drops the textarea's height rules. */
+.repoInput {
+  margin-bottom: 8px;
+  height: auto;
+  min-height: unset;
+}
+
+.actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.saveBtn {
+  padding: 5px 14px;
+  border-radius: 0;
+  border: none;
+  background: var(--kt-hit);
+  color: var(--kt-bg);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelBtn {
+  padding: 5px 14px;
+  border-radius: 0;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
