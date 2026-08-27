@@ -1,14 +1,58 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getTemplates, getApiKeys } from '../api/client'
+import { getTemplates, getApiKeys, createTask, addLabelToTask } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { BRAND, DARK, FORM_INPUT } from '../constants/theme'
+import { getUiPrefs } from '../utils/uiPrefs'
 import MarkdownEditor from './MarkdownEditor'
 
 const input = FORM_INPUT
 
-export default function TaskCreateForm({ showForm, newTask, setNewTask, createMut, labels, onCancel, projectId }) {
+// Read fresh each time rather than captured once: the default priority is a
+// setting, and a form emptied after a create should honour the current one.
+const emptyTask = () => ({
+  title: '', description: '', priority: getUiPrefs().defaultPriority, status: 'todo',
+  assignee: '', start_date: '', due_date: '', selectedLabels: [],
+})
+
+/**
+ * The new-task form owns its draft and the create itself. Both used to sit on
+ * the project page and be handed straight back down — the page never read either,
+ * and the create's own shape (dates to ISO, empty strings dropped, labels
+ * attached one call at a time after the task exists) belongs with the fields it
+ * normalises.
+ */
+export default function TaskCreateForm({ showForm, labels, onCancel, projectId }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [newTask, setNewTask] = useState(emptyTask)
+
+  const createMut = useMutation({
+    mutationFn: async (data) => {
+      const { selectedLabels, ...rest } = data
+      const payload = { ...rest }
+      if (!payload.start_date) delete payload.start_date
+      else payload.start_date = new Date(payload.start_date).toISOString()
+      if (!payload.due_date) delete payload.due_date
+      else payload.due_date = new Date(payload.due_date).toISOString()
+      if (!payload.description) delete payload.description
+      if (!payload.assignee) delete payload.assignee
+      const task = await createTask(projectId, payload)
+      // A label is its own edge, so it is attached after the task exists rather
+      // than travelling in the create payload.
+      for (const labelId of (selectedLabels || [])) {
+        await addLabelToTask(projectId, task.id, labelId)
+      }
+      return task
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.project(projectId) })
+      qc.invalidateQueries({ queryKey: qk.projects() })
+      setNewTask(emptyTask())
+      onCancel()
+    },
+  })
   const { data: templates = [] } = useQuery({
     queryKey: qk.templates(projectId),
     queryFn: () => getTemplates(projectId),

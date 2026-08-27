@@ -6,7 +6,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import { ArrowLeft, Plus, Zap, Bot, Share2, Webhook } from 'lucide-react'
 import {
   getProject, createTask, updateTask, deleteTask, updateProject,
-  createLabel, deleteLabel, addLabelToTask,
+  createLabel, deleteLabel,
   reorderTasks,
   exportTasks,
   getSavedFilters, createSavedFilter,
@@ -84,10 +84,6 @@ export default function ProjectDetail() {
 
   const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [newTask, setNewTask] = useState({
-    title: '', description: '', priority: uiPrefs.defaultPriority, status: 'todo', assignee: '', start_date: '', due_date: '',
-    selectedLabels: [],
-  })
   const [showAgentInstr, setShowAgentInstr] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const bulk = useBulkSelection(id)
@@ -112,29 +108,6 @@ export default function ProjectDetail() {
     qc.invalidateQueries({ queryKey: qk.project(id) })
     qc.invalidateQueries({ queryKey: qk.projects() })
   }
-
-  const createMut = useMutation({
-    mutationFn: async (data) => {
-      const { selectedLabels, ...rest } = data
-      const payload = { ...rest }
-      if (!payload.start_date) delete payload.start_date
-      else payload.start_date = new Date(payload.start_date).toISOString()
-      if (!payload.due_date) delete payload.due_date
-      else payload.due_date = new Date(payload.due_date).toISOString()
-      if (!payload.description) delete payload.description
-      if (!payload.assignee) delete payload.assignee
-      const task = await createTask(id, payload)
-      for (const labelId of (selectedLabels || [])) {
-        await addLabelToTask(id, task.id, labelId)
-      }
-      return task
-    },
-    onSuccess: () => {
-      invalidate()
-      setShowForm(false)
-      setNewTask({ title: '', description: '', priority: getUiPrefs().defaultPriority, status: 'todo', assignee: '', start_date: '', due_date: '', selectedLabels: [] })
-    },
-  })
 
   const createSubtaskMut = useMutation({
     mutationFn: ({ parentId, title }) => createTask(id, { title, priority: 'medium', parent_id: parentId }),
@@ -436,9 +409,6 @@ export default function ProjectDetail() {
       {/* New issue form */}
       <TaskCreateForm
         showForm={showForm}
-        newTask={newTask}
-        setNewTask={setNewTask}
-        createMut={createMut}
         labels={labels}
         onCancel={() => setShowForm(false)}
         projectId={id}
