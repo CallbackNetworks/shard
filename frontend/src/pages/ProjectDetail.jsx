@@ -9,7 +9,6 @@ import {
   createLabel, deleteLabel,
   reorderTasks,
   exportTasks,
-  getSavedFilters, createSavedFilter,
 } from '../api/client'
 import IssueRow from '../components/IssueRow'
 import AncestryTrail from '../components/shared/AncestryTrail'
@@ -144,16 +143,6 @@ export default function ProjectDetail() {
     onSuccess: invalidate,
   })
 
-  const { data: savedFilters = [] } = useQuery({
-    queryKey: qk.savedFilters(id),
-    queryFn: () => getSavedFilters(id),
-  })
-
-  const saveFilterMut = useMutation({
-    mutationFn: (data) => createSavedFilter(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.savedFilters(id) }),
-  })
-
   const handleUpdate = (taskId, data) => updateMut.mutate({ taskId, data })
   const handleDelete = (taskId) => deleteMut.mutate(taskId)
   const handleCreateSubtask = (parentId, title) => createSubtaskMut.mutate({ parentId, title })
@@ -176,41 +165,6 @@ export default function ProjectDetail() {
   const activeFilterCount = [filterPriority, filterLabel, filterAssignee, filterDue, filterAgent].filter(f => f !== 'all').length
 
   const applyFilterPatch = (patch) => patchParams(patch)
-
-  const applySavedFilter = (filterId) => {
-    const sf = savedFilters.find(f => f.id === filterId)
-    if (!sf) return
-    const fl = sf.filters || {}
-    // Every axis is written, including the ones the saved view leaves empty, so
-    // applying a view replaces the current filter rather than merging into it.
-    patchParams({
-      status: fl.status || 'all',
-      priority: fl.priority || 'all',
-      label: fl.label_id || 'all',
-      assignee: fl.assignee || 'all',
-      due: fl.due || 'all',
-      agent: fl.agent || 'all',
-    })
-    setShowFilters(true)
-  }
-
-  const saveCurrentFilter = (name) => {
-    if (!name) return
-    saveFilterMut.mutate({
-      name,
-      project_id: id,
-      filters: {
-        status: filter !== 'all' ? filter : undefined,
-        priority: filterPriority !== 'all' ? filterPriority : undefined,
-        label_id: filterLabel !== 'all' ? filterLabel : undefined,
-        assignee: filterAssignee !== 'all' ? filterAssignee : undefined,
-        due: filterDue !== 'all' ? filterDue : undefined,
-        // `agent` was offered as a filter but neither saved nor restored, so a
-        // saved view silently dropped it.
-        agent: filterAgent !== 'all' ? filterAgent : undefined,
-      },
-    })
-  }
 
   const exportTasksToFile = async () => {
     const data = await exportTasks(id, 'json')
@@ -422,6 +376,7 @@ export default function ProjectDetail() {
             never silently drop the filter you set. Cycles are not tasks. */}
         {tab !== 'cycles' && (
           <TaskFiltersPanel
+            projectId={id}
             filters={{ status: filter, priority: filterPriority, label: filterLabel, assignee: filterAssignee, due: filterDue, agent: filterAgent }}
             setFilters={applyFilterPatch}
             searchQ={searchQ}
@@ -437,9 +392,6 @@ export default function ProjectDetail() {
             labels={labels}
             assignees={assignees}
             agentNames={agentNames}
-            savedFilters={savedFilters}
-            onApplySavedFilter={applySavedFilter}
-            onSaveFilter={saveCurrentFilter}
             bulkMode={bulk.active}
             onToggleBulk={bulk.toggleActive}
             // Bulk selection needs the checkbox column, which only the Issues

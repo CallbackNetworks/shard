@@ -1,15 +1,25 @@
 import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Bookmark, CheckSquare, Download, SlidersHorizontal, Upload } from 'lucide-react'
+import { getSavedFilters, createSavedFilter } from '../../api/client'
+import { qk } from '../../api/queryKeys'
 import { DARK } from '../../constants/theme'
 import s from './TaskFiltersPanel.module.css'
 
 /**
  * Issues-tab filter strip: status tabs, saved views, bulk/export/import
- * toggles, search box, and the advanced filter row. Dumb component — all
- * state and mutations stay in ProjectDetail.
+ * toggles, search box, and the advanced filter row.
+ *
+ * The filter values themselves live in the URL and belong to the page
+ * (ADR-0083), so they arrive as `filters` and leave through `setFilters`. Saved
+ * views are the strip's own: a saved view is only ever written from here and
+ * read back into these same controls, and the two halves of that mapping — the
+ * stored shape says `label_id`, the URL says `label` — have to be read together
+ * to be checked at all.
  */
 export default function TaskFiltersPanel({
+  projectId,
   filters,          // { status, priority, label, assignee, due, agent }
   setFilters,       // (patch) => void
   searchQ,
@@ -22,9 +32,6 @@ export default function TaskFiltersPanel({
   labels,
   assignees,
   agentNames,
-  savedFilters,
-  onApplySavedFilter,
-  onSaveFilter,
   bulkMode,
   onToggleBulk,
   showBulk = true,
@@ -33,14 +40,55 @@ export default function TaskFiltersPanel({
   onToggleImport,
 }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const { status, priority, label, assignee, due, agent } = filters
   const [naming, setNaming] = useState(false)
   const [viewName, setViewName] = useState('')
 
+  const { data: savedFilters = [] } = useQuery({
+    queryKey: qk.savedFilters(projectId),
+    queryFn: () => getSavedFilters(projectId),
+  })
+
+  const saveFilterMut = useMutation({
+    mutationFn: (data) => createSavedFilter(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.savedFilters(projectId) }),
+  })
+
+  const applySavedFilter = (filterId) => {
+    const sf = savedFilters.find(f => f.id === filterId)
+    if (!sf) return
+    const fl = sf.filters || {}
+    // Every axis is written, including the ones the saved view leaves empty, so
+    // applying a view replaces the current filter rather than merging into it.
+    setFilters({
+      status: fl.status || 'all',
+      priority: fl.priority || 'all',
+      label: fl.label_id || 'all',
+      assignee: fl.assignee || 'all',
+      due: fl.due || 'all',
+      agent: fl.agent || 'all',
+    })
+    setShowFilters(true)
+  }
+
   const commitSavedView = () => {
     const name = viewName.trim()
     if (!name) return
-    onSaveFilter(name)
+    saveFilterMut.mutate({
+      name,
+      project_id: projectId,
+      filters: {
+        status: status !== 'all' ? status : undefined,
+        priority: priority !== 'all' ? priority : undefined,
+        label_id: label !== 'all' ? label : undefined,
+        assignee: assignee !== 'all' ? assignee : undefined,
+        due: due !== 'all' ? due : undefined,
+        // `agent` was offered as a filter but neither saved nor restored, so a
+        // saved view silently dropped it.
+        agent: agent !== 'all' ? agent : undefined,
+      },
+    })
     setViewName('')
     setNaming(false)
   }
@@ -58,7 +106,7 @@ export default function TaskFiltersPanel({
           {/* Saved filters dropdown */}
           {savedFilters.length > 0 && (
             <select
-              onChange={e => onApplySavedFilter(e.target.value)}
+              onChange={e => applySavedFilter(e.target.value)}
               style={{ fontSize: 11, background: DARK.elevated, color: DARK.textMid, border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
               value=""
             >
