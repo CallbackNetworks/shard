@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas import LabelOut
-from app.services import decision_admin
+from app.services import decision_admin, downloads
 
 router = APIRouter(prefix="/decisions", tags=["decisions"])
 
@@ -31,5 +31,5 @@ def export_decision(decision_id: str, db: Session = Depends(get_db)):
     return PlainTextResponse(
         content=md,
         media_type="text/markdown",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers=downloads.attachment_headers(filename),
     )

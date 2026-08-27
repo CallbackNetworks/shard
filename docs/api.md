@@ -1763,7 +1763,9 @@ not who may call it (ADR-0092).
 ### Decisions (External API)
 
 #### `GET /api/v1/decisions` · `GET /api/v1/decisions/{id}` · `GET /api/v1/decisions/{id}/export` (`read`)
-Read-only on purpose: writing a decision is `POST /api/v1/nodes` with `type="decision"`, and
+Read-only on purpose: writing a decision is `POST /api/v1/nodes` with `type="label"` and
+`data={"type": "decision", "decision_status": "proposed"}` (a decision record is a label —
+ADR-0004; there is no `decision` node type and `type="decision"` answers 422), and
 a second write path would be the duplicate ADR-0087 exists to prevent.
 
 ---

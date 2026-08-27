@@ -1322,7 +1322,9 @@ async def manage_unfiled(action: UnfiledAction, task_id: str | None = None, proj
     description=(
         "List decision records — what was decided about the work, and its status "
         "(proposed/accepted/superseded/deprecated). Read this before proposing a decision "
-        "somebody already made. Writing one is create_node with type='decision'."
+        "somebody already made. Writing one is create_node with type='label' and "
+        "data={'type': 'decision', 'decision_status': 'proposed'} — there is no 'decision' "
+        "node type; a decision record is a label (ADR-0004)."
     )
 )
 async def list_decisions(project_id: str | None = None, status: str | None = None) -> str:

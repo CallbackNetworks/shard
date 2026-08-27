@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
-from app.services import backup_admin, settings_admin
+from app.services import backup_admin, downloads, settings_admin
 from app.services.errors import Invalid
 from app.services.settings_admin import LLMSettingsUpdate, SystemSettingsUpdate
 
@@ -199,7 +199,7 @@ def api_backup_export(db: Session = Depends(get_db), api_key: ApiKey = Depends(_
     return Response(
         content=data,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers=downloads.attachment_headers(name),
     )
 
 
@@ -220,7 +220,7 @@ def api_backup_download(filename: str, api_key: ApiKey = Depends(_get_api_key)):
     return Response(
         content=path.read_bytes(),
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers=downloads.attachment_headers(filename),
     )
 
 

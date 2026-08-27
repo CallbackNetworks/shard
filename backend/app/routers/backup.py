@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.services import backup_admin
+from app.services import backup_admin, downloads
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -30,7 +30,7 @@ def export_backup(db: Session = Depends(get_db)):
     return Response(
         content=data,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers=downloads.attachment_headers(name),
     )
 
 

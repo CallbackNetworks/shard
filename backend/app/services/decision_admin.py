@@ -1,14 +1,19 @@
 """Decision records, for both doors (ADR-0092).
 
-A decision is a label-shaped node with ``type="decision"`` and a status of its own. The
-assistant is told, in its own prompt template, to write one when a decision gets made — and
+A decision is a **label** node carrying ``data.type="decision"`` and a status of its own.
+The assistant is told, in its own prompt template, to write one when a decision gets made — and
 then could not read any of them back, because the only route was the internal ``/api``. An
 agent that writes a record it can never consult is keeping a diary for somebody else.
 
 Read-only on purpose. Writing a decision already has a door: it is a node, so
-``POST /api/v1/nodes`` with ``type="decision"`` creates one through the single write surface
-(ADR-0040→0043). Adding a bespoke write here would be the duplicate ADR-0087 spent its
-existence removing.
+``POST /api/v1/nodes`` with ``type="label"`` and ``data={"type": "decision", ...}`` creates one
+through the single write surface (ADR-0040→0043). Adding a bespoke write here would be the
+duplicate ADR-0087 spent its existence removing.
+
+That sentence used to say ``type="decision"``, which is not a node type and never was — the
+registry holds no such key, so the one write this module points at answered
+422 ``unknown node type 'decision'``. ADR-0004 stores a decision as a *label*; the argument
+for staying read-only was right and the address it gave was wrong.
 """
 
 from sqlalchemy.orm import Session

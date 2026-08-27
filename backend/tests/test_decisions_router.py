@@ -108,3 +108,65 @@ def test_export_decision(client, db, sample_project):
     assert "## Status" in body
     assert "Accepted" in body
     assert "We chose PostgreSQL for reliability." in body
+
+
+class TestTheDocumentedWayToWriteADecision:
+    """The address the read surface points at (ADR-0115).
+
+    ``decision_admin`` is read-only on purpose, and said so while naming a write that
+    does not exist: ``POST /nodes`` with ``type="decision"``. There is no such node
+    type, so the one instruction an agent gets — the MCP tool description, the v1
+    endpoint description, the module docstring and `docs/api.md` all carried it —
+    answered 422. A decision is a *label* (ADR-0004).
+    """
+
+    def test_the_type_the_old_instruction_named_is_not_a_node_type(self, client):
+        r = client.post("/api/nodes", json={"type": "decision", "title": "Adopt the graph model"})
+        assert r.status_code == 422
+        assert "decision" in r.json()["detail"]
+
+    def test_a_label_carrying_the_decision_kind_becomes_a_decision_record(self, client, sample_project):
+        r = client.post(
+            "/api/nodes",
+            json={
+                "type": "label",
+                "title": "Adopt the graph model",
+                "container_id": sample_project.id,
+                "data": {"type": "decision", "decision_status": "accepted", "description": "## Context\n"},
+            },
+        )
+        assert r.status_code == 201, r.text
+
+        listed = client.get("/api/decisions").json()
+        assert [d["name"] for d in listed] == ["Adopt the graph model"]
+        assert listed[0]["decision_status"] == "accepted"
+
+    def test_the_same_write_reaches_the_v1_read_surface(self, client, db, sample_project):
+        import hashlib
+
+        from app.models import ApiKey
+
+        raw = "tdp_test_decision_read"
+        db.add(
+            ApiKey(
+                name="decision_read",
+                key_hash=hashlib.sha256(raw.encode()).hexdigest(),
+                key_last4=raw[-4:],
+                scopes=["read"],
+                active=True,
+            )
+        )
+        db.commit()
+
+        client.post(
+            "/api/nodes",
+            json={
+                "type": "label",
+                "title": "Adopt the graph model",
+                "container_id": sample_project.id,
+                "data": {"type": "decision", "decision_status": "accepted"},
+            },
+        )
+        r = client.get("/api/v1/decisions", headers={"X-API-Key": raw})
+        assert r.status_code == 200
+        assert [d["name"] for d in r.json()] == ["Adopt the graph model"]

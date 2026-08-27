@@ -31,7 +31,7 @@ from app.schemas import (
     TaskTemplateOut,
     TaskTemplateUpdate,
 )
-from app.services import task_transfer
+from app.services import downloads, task_transfer
 from app.services.ws_manager import ws_manager
 
 sub_router = APIRouter()
@@ -172,7 +172,7 @@ def api_export_tasks(
         return Response(
             content=buf.getvalue(),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=tasks-{project_id}.csv"},
+            headers=downloads.attachment_headers(f"tasks-{project_id}.csv"),
         )
     return rows
 

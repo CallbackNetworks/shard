@@ -20,7 +20,7 @@ from app.database import get_db
 from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _project_ids_in_scope, _require_scope
 from app.schemas import CycleOut, LabelOut, TaskOut
-from app.services import cycle_admin, decision_admin, issue_sync_admin, task_filing, task_import
+from app.services import cycle_admin, decision_admin, downloads, issue_sync_admin, task_filing, task_import
 from app.services.task_import import GitHubImport, ImportResult, LinearImport, TrelloImport
 
 sub_router = APIRouter()
@@ -182,7 +182,8 @@ async def api_file_task(
         "Decisions recorded against the work, optionally narrowed by `project_id` or "
         "`status` (proposed/accepted/superseded/deprecated). The assistant is told to write "
         "one when a decision gets made, and this is how it — or any other agent — reads back "
-        'what was already decided. Writing one is `POST /nodes` with `type="decision"`, '
+        'what was already decided. Writing one is `POST /nodes` with `type="label"` and '
+        '`data={"type": "decision"}` — a decision record is a label (ADR-0004), '
         "through the single node write surface. Requires `read` scope."
     ),
     responses=_auth_errors,
@@ -233,7 +234,7 @@ def api_export_decision(decision_id: str, db: Session = Depends(get_db), api_key
     return PlainTextResponse(
         content=md,
         media_type="text/markdown",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers=downloads.attachment_headers(filename),
     )
 
 

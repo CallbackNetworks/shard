@@ -16,7 +16,7 @@ from app.schemas import (
     TaskImportRequest,
     TaskImportResult,
 )
-from app.services import graph, task_transfer
+from app.services import downloads, graph, task_transfer
 from app.services.activity import log_activity
 from app.services.graph_dispatch import dispatch_edge_added, dispatch_edge_removed
 from app.services.ical_token import verify_global_ical_token
@@ -191,7 +191,7 @@ def export_tasks(
         return Response(
             content=buf.getvalue(),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=tasks-{project_id}.csv"},
+            headers=downloads.attachment_headers(f"tasks-{project_id}.csv"),
         )
     return rows
 

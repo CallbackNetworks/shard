@@ -37,7 +37,7 @@ from app.schemas import (
     RecurrenceRuleOut,
     RecurrenceRuleUpdate,
 )
-from app.services import attachment_admin, cycle_admin, recurrence_admin
+from app.services import attachment_admin, cycle_admin, downloads, recurrence_admin
 
 sub_router = APIRouter()
 
@@ -202,7 +202,7 @@ def api_download_attachment(
         return Response(
             content=handle.read(),
             media_type=att.content_type,
-            headers={"Content-Disposition": f'attachment; filename="{att.filename}"'},
+            headers=downloads.attachment_headers(att.filename),
         )
 
 
