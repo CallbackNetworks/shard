@@ -51,6 +51,14 @@
   --kt-warning-bg: rgba(245, 158, 11, 0.12);
   --kt-info: #60a5fa;
   --kt-info-bg: rgba(96, 165, 250, 0.12);
+  /* Ink for text sitting *on* one of the filled colours above. Every meaning
+     colour is light in this theme and dark in the light one, so a hardcoded
+     #fff or #000 is unreadable in exactly one of them — white on --kt-info
+     (#60a5fa) is 2.2:1 here, black on it (#1d4ed8) is 2.4:1 there. This is not
+     an alias for --kt-bg: it happens to hold the same value today because the
+     page ground is the far end of the same ramp, and it must keep tracking the
+     fills if the ground ever moves. */
+  --kt-on-fill: #171717;
 }
 /* Light mode palette: must come after :root so equal-specificity override wins.
    --kt-hit falls back to a dark amber because #facc15 is illegible on white. */
@@ -88,6 +96,7 @@
   --kt-warning-bg: rgba(180, 83, 9, 0.10);
   --kt-info: #1d4ed8;
   --kt-info-bg: rgba(29, 78, 216, 0.10);
+  --kt-on-fill: #ffffff;
 }
 html { background: var(--kt-bg); }
 body {

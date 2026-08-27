@@ -65,7 +65,7 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
             <option key={t.id} value={t.id}>{t.title}</option>
           ))}
         </select>
-        <Button onClick={handleAdd} disabled={!depInput} tone="#ffa42b">{t('deps.block')}</Button>
+        <Button onClick={handleAdd} disabled={!depInput} tone="#ffa42b" ink="#171717">{t('deps.block')}</Button>
       </div>
     </div>
   )

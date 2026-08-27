@@ -28,8 +28,9 @@ const BASE = {
 }
 
 const VARIANTS = {
-  // The affirmative action of an inline panel: post, save, add.
-  confirm: { ...BASE, color: '#000' },
+  // The affirmative action of an inline panel: post, save, add. Its ink comes
+  // from the theme, not from this file — see the `ink` prop.
+  confirm: { ...BASE },
   // Its neighbour. Bordered rather than filled so the pair reads as one decision
   // with a default, not two equal options.
   cancel: {
@@ -43,6 +44,12 @@ const VARIANTS = {
 export default function Button({
   variant = 'confirm',
   tone = DARK.success,
+  // Ink for text on the filled tone. The default is right for any tone that is
+  // a theme token, because every one of those is light in the dark theme and
+  // dark in the light theme — so a fixed #000 or #fff would be unreadable in
+  // exactly one of them. A caller whose tone is a raw hex has to say what its
+  // ink is, since a fixed fill cannot take a flipping ink.
+  ink = 'var(--kt-on-fill)',
   disabled = false,
   style,
   children,
@@ -54,7 +61,7 @@ export default function Button({
       disabled={disabled}
       style={{
         ...base,
-        ...(variant === 'confirm' ? { background: tone } : null),
+        ...(variant === 'confirm' ? { background: tone, color: ink } : null),
         // Disabled is dimmed rather than recoloured, so the button keeps its meaning
         // while it is unavailable.
         ...(disabled ? { opacity: 0.4, cursor: 'not-allowed' } : null),

@@ -114,3 +114,4 @@
 | [0110](0110-replay-protection-the-sender-does-not-opt-into.md) | 重播防護不能由寄件方決定要不要開 | Accepted | 2026-08-24 |
 | [0111](0111-the-runner-shares-a-host-so-ci-declares-its-limits.md) | Runner 跟別人共用主機，所以 CI 要自己宣告上限 | Accepted | 2026-08-24 |
 | [0112](0112-the-build-is-reproducible-and-does-not-run-as-root.md) | 建置要可重現，而且不以 root 執行 | Accepted | 2026-08-25 |
+| [0113](0113-ink-on-a-fill-is-a-token.md) | 填色上的墨色是一個 token，不是寫死的黑或白 | Accepted | 2026-08-27 |

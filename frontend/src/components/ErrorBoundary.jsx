@@ -42,7 +42,7 @@ export default class ErrorBoundary extends Component {
               marginTop: 8,
               padding: '8px 20px',
               background: DARK.info,
-              color: '#fff',
+              color: 'var(--kt-on-fill)',
               border: 'none',
               borderRadius: 6,
               cursor: 'pointer',

@@ -395,7 +395,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
             gap: 10, marginBottom: 24,
           }}>
-            <StatCard compact label={t('hub.totalTasks')} value={selectedIdent ? selectedIdent.total_tasks : totals.total_tasks} color="#fff" delay={0} />
+            <StatCard compact label={t('hub.totalTasks')} value={selectedIdent ? selectedIdent.total_tasks : totals.total_tasks} delay={0} />
             <StatCard compact label={t('hub.completed')} value={selectedIdent ? selectedIdent.done : totals.done} color={STATUS_COLOR.done} delay={0.06} />
             <StatCard compact label={t('hub.inProgress')} value={selectedIdent ? selectedIdent.in_progress : totals.in_progress} color={STATUS_COLOR.in_progress} delay={0.12} />
             <StatCard compact label={t('hub.overdueCount')} value={selectedIdent ? selectedIdent.overdue : totals.overdue} color={(selectedIdent ? selectedIdent.overdue : totals.overdue) > 0 ? STATUS_COLOR.failed : 'var(--kt-ink)'} delay={0.18} />

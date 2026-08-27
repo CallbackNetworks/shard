@@ -10,7 +10,7 @@ export default function StatCard({ icon, label, value, sub, color, delay = 0, co
     return (
       <div className={s.compactCard} style={{ animationDelay: `${delay}s` }}>
         <div className={s.compactLabel}>{label}</div>
-        <div className={s.compactValue} style={{ color }}>{value}</div>
+        <div className={s.compactValue} style={{ color: color || 'var(--kt-ink)' }}>{value}</div>
       </div>
     )
   }

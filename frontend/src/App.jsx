@@ -134,7 +134,7 @@ function Layout() {
           position: 'absolute', left: -9999, top: 'auto', width: 1, height: 1,
           overflow: 'hidden', zIndex: 9999,
         }}
-        onFocus={e => Object.assign(e.target.style, { left: 8, top: 8, width: 'auto', height: 'auto', padding: '8px 16px', background: BRAND, color: '#000', borderRadius: 6, fontWeight: 700, fontSize: 13 })}
+        onFocus={e => Object.assign(e.target.style, { left: 8, top: 8, width: 'auto', height: 'auto', padding: '8px 16px', background: BRAND, color: 'var(--kt-on-fill)', borderRadius: 6, fontWeight: 700, fontSize: 13 })}
         onBlur={e => Object.assign(e.target.style, { left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' })}
       >
         Skip to content

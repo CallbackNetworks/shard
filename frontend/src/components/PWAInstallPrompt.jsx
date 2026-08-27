@@ -61,7 +61,7 @@ export default function PWAInstallPrompt() {
         onClick={handleInstall}
         style={{
           background: DARK.info,
-          color: '#fff',
+          color: 'var(--kt-on-fill)',
           border: 'none',
           borderRadius: 6,
           padding: '6px 14px',

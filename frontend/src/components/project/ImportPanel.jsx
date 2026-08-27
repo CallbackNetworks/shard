@@ -59,9 +59,6 @@ export default function ImportPanel({ projectId, onClose }) {
           onClick={submit}
           disabled={!json.trim() || importMut.isPending}
           tone={DARK.info}
-          // The info tone is light in the dark theme and dark in the light one,
-          // so its ink is the caller's until the palette carries one.
-          style={{ color: '#fff' }}
         >
           {importMut.isPending ? t('project.importing') : t('project.importAction')}
         </Button>

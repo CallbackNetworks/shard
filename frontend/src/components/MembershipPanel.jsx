@@ -128,7 +128,7 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <Button onClick={handleAdd} disabled={!pick} tone="#818cf8">{t('membership.link')}</Button>
+        <Button onClick={handleAdd} disabled={!pick} tone="#818cf8" ink="#171717">{t('membership.link')}</Button>
       </div>
 
       {(containerTypeKeys.size > 0 || extraContainers.length > 0) && (

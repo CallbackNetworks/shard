@@ -252,7 +252,7 @@ function CycleCard({ cycle, tasks, onUpdate, onDelete, onAddTask, onRemoveTask, 
                 <select
                   value={compareTarget}
                   onChange={e => { setCompareTarget(e.target.value); setCompareData(null) }}
-                  style={{ padding: '4px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 6, fontSize: 11, background: DARK.surface, color: '#fff' }}
+                  style={{ padding: '4px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 6, fontSize: 11, background: DARK.surface, color: DARK.text }}
                 >
                   <option value="">{t('cycle.selectCycle')}</option>
                   {allCycles.filter(c => c.id !== cycle.id).map(c => (
