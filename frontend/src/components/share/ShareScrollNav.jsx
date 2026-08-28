@@ -3,11 +3,12 @@ import { useState, useEffect, useRef } from 'react'
 const SECTIONS = [
   { key: 'overview', label: 'OVERVIEW' },
   { key: 'projects', label: 'PROJECTS' },
+  { key: 'decisions', label: 'DECISIONS' },
   { key: 'ask', label: 'ASK' },
   { key: 'activity', label: 'ACTIVITY' },
 ]
 
-export default function ShareScrollNav({ activeSection, color }) {
+export default function ShareScrollNav({ activeSection, color, sections = SECTIONS }) {
   const [stuck, setStuck] = useState(false)
   const sentinelRef = useRef(null)
 
@@ -31,7 +32,7 @@ export default function ShareScrollNav({ activeSection, color }) {
     <>
       <div ref={sentinelRef} className="kt-share-nav-sentinel" />
       <div className={stuck ? 'kt-share-nav is-stuck' : 'kt-share-nav'} style={{ '--share-accent': color }}>
-        {SECTIONS.map(s => {
+        {sections.map(s => {
           const active = activeSection === s.key
           return (
             <button

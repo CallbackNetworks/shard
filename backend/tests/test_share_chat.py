@@ -252,3 +252,24 @@ class TestMissingProviderPackage:
             resp = _chat(client, sample_identity.share_token)
         assert resp.status_code == 200
         assert "openai package not installed" in resp.text
+
+
+class TestDecisionsReachTheVisitorsAssistant:
+    """ADR-0120 put decisions on the share page; ADR-0098 means the assistant gets them free.
+
+    Worth asserting anyway rather than resting on ``TestScopedContext``: that test proves
+    the prompt equals the payload, and this one proves the payload is worth having — a
+    visitor asking "why is it built this way" now has something to be answered from.
+    """
+
+    def test_a_decision_is_in_the_prompt_the_visitor_is_answered_from(self, client, db, sample_project):
+        from app.services import graph
+
+        graph.create_decision(db, sample_project.id, name="Use PostgreSQL", decision_status="accepted")
+        db.commit()
+
+        fake = _RecordingProvider()
+        with patch("app.routers.share.get_provider", return_value=fake):
+            resp = _chat(client, sample_project.share_token, "why postgres?")
+        assert resp.status_code == 200
+        assert "Use PostgreSQL" in fake.calls[0]["system"]

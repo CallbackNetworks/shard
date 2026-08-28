@@ -8,6 +8,7 @@ import ShareHero from '../components/share/ShareHero'
 import ShareStats from '../components/share/ShareStats'
 import ShareScrollNav, { SECTIONS } from '../components/share/ShareScrollNav'
 import ShareProjectCard from '../components/share/ShareProjectCard'
+import ShareDecisions from '../components/share/ShareDecisions'
 import ShareActivityFeed from '../components/share/ShareActivityFeed'
 import SharePinGate from '../components/share/SharePinGate'
 import ShareChatWidget from '../components/share/ShareChatWidget'
@@ -36,7 +37,11 @@ export default function ShareView() {
     retry: false,
   })
 
-  // Section tracking via IntersectionObserver
+  // Section tracking via IntersectionObserver.
+  //
+  // Keyed on the payload, not on mount: the first render is the loading state, so at mount
+  // none of the `share-section-*` elements exist and every `getElementById` below missed.
+  // No section was ever observed and the nav's highlight never left "overview".
   useEffect(() => {
     const observers = []
     SECTIONS.forEach(s => {
@@ -52,7 +57,7 @@ export default function ShareView() {
       observers.push(obs)
     })
     return () => observers.forEach(o => o.disconnect())
-  }, [])
+  }, [data, pinData])
 
   // Check if PIN required
   const requiresPin = data?.meta?.requires_pin === true && !pinData
@@ -64,11 +69,13 @@ export default function ShareView() {
   const projects = (effectiveData?.projects || []).filter(p => p.status === 'active')
   const summary = effectiveData?.summary || {
     total_projects: 0, total_tasks: 0, done_tasks: 0,
-    overdue_tasks: 0, overall_progress: 0,
+    overdue_tasks: 0, overall_progress: 0, total_decisions: 0, accepted_decisions: 0,
   }
   const recentActivity = effectiveData?.recent_activity || []
   const meta = effectiveData?.meta || {}
   const color = identity?.color || '#facc15'
+  // A nav entry whose section is not rendered is a button that does nothing when clicked.
+  const navSections = SECTIONS.filter(s => s.key !== 'decisions' || summary.total_decisions > 0)
 
   // Error state
   if (isError) {
@@ -123,7 +130,7 @@ export default function ShareView() {
         </div>
 
         {/* Scroll navigation */}
-        <ShareScrollNav activeSection={activeSection} color={color} />
+        <ShareScrollNav activeSection={activeSection} color={color} sections={navSections} />
 
         {/* Section: Projects */}
         <div id="share-section-projects" style={{ paddingTop: 8 }}>
@@ -141,6 +148,13 @@ export default function ShareView() {
             />
           ))}
         </div>
+
+        {/* Section: Decisions (ADR-0120) — the page carried the work and never said why */}
+        {summary.total_decisions > 0 && (
+          <div id="share-section-decisions" style={{ paddingTop: 24 }}>
+            <ShareDecisions projects={projects} />
+          </div>
+        )}
 
         {/* Section: Ask (public read-only Q&A assistant, ADR-0098) */}
         <div id="share-section-ask" style={{ paddingTop: 24 }}>

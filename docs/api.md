@@ -1037,17 +1037,31 @@ If the share link has expired, returns `410 Gone`.
       "tasks": [
         { "id": "uuid", "title": "string", "status": "todo", "priority": "high", "assignee": "string",
           "due_date": "ISO 8601", "labels": [...], "subtask_count": 2, "comment_count": 1 }
+      ],
+      "decisions": [
+        { "id": "uuid", "name": "string", "decision_status": "accepted", "description": "markdown",
+          "supersedes": [{ "id": "uuid", "title": "string" }],
+          "superseded_by": [...], "governs": [...] }
       ]
     }
   ],
   "recent_activity": [...],
   "summary": {
     "total_projects": 3, "total_tasks": 25, "done_tasks": 18,
-    "overdue_tasks": 1, "overall_progress": 72.0
+    "overdue_tasks": 1, "overall_progress": 72.0,
+    "total_decisions": 4, "accepted_decisions": 3
   },
   "meta": { "generated_at": "ISO 8601", "requires_pin": false }
 }
 ```
+
+`decisions` carries the project's decision records with their supersession chain and the
+work each governs (ADR-0120). The share assistant (ADR-0098) is fed this payload verbatim,
+so a visitor can ask *why* something is built the way it is and be answered from the same
+data the page shows — no separate scope decision.
+
+`overdue_tasks` follows the one definition (ADR-0089): past due **and still open**, where
+open excludes `failed` as well as `done`.
 
 A PIN set through `/api/nodes/{id}/share/set-pin` is honoured for every type, projects
 included (ADR-0072); unlock at `POST /share/node/{token}/verify`.

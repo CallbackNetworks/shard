@@ -194,6 +194,27 @@ def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
             }
         )
 
+    # The decisions this project holds (ADR-0118, ADR-0120). The public page carried the
+    # work and said nothing about why any of it was decided — on the one surface facing
+    # people who are not the owner, where "why" is most of what a reader needs. Names,
+    # status and the supersession chain, at the same exposure level as the task
+    # descriptions already here.
+    project_decisions = [
+        {
+            "id": d.id,
+            "name": d.name,
+            # ``decision_status``, not ``status``: every other decision surface in the app
+            # spells it that way, and a public payload is not a reason to invent a second
+            # name for the same field.
+            "decision_status": d.decision_status,
+            "description": d.description,
+            "supersedes": [{"id": n.id, "title": n.title} for n in d.supersedes],
+            "superseded_by": [{"id": n.id, "title": n.title} for n in d.superseded_by],
+            "governs": [{"id": n.id, "title": n.title} for n in d.governs],
+        }
+        for d in graph.decisions(db, project_id=p.id)
+    ]
+
     project_notes = []
     if include_notes:
         note_rows = (
@@ -218,6 +239,7 @@ def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
         "comment_count": comment_count,
         "notes": project_notes,
         "tasks": task_list,
+        "decisions": project_decisions,
     }
 
 
@@ -263,8 +285,14 @@ def _build_payload(
     total_tasks = sum(p["total_tasks"] for p in projects)
     done_tasks = sum(p["done_tasks"] for p in projects)
     now = datetime.now(UTC)
+    # "Overdue" has one definition (ADR-0089): past due and *still open*, where open
+    # excludes failed as well as done. This counted `status != "done"`, the rule ADR-0089
+    # replaced — so a failed, past-due task was overdue here and nowhere else, on the only
+    # page the owner does not read. `test_overdue_agreement` now asks this surface too.
     overdue_tasks = sum(
-        1 for t in all_tasks_flat if t["status"] != "done" and (due := _as_utc(t["due_date"])) and due < now
+        1
+        for t in all_tasks_flat
+        if t["status"] not in graph.CLOSED_STATUSES and (due := _as_utc(t["due_date"])) and due < now
     )
 
     return {
@@ -279,6 +307,12 @@ def _build_payload(
             "done_tasks": done_tasks,
             "overdue_tasks": overdue_tasks,
             "overall_progress": round(done_tasks / total_tasks * 100, 1) if total_tasks > 0 else 0.0,
+            # Counted here rather than in the client so the page and the share assistant
+            # (ADR-0098) read the same number from the same place.
+            "total_decisions": sum(len(p["decisions"]) for p in projects),
+            "accepted_decisions": sum(
+                1 for p in projects for d in p["decisions"] if d["decision_status"] == "accepted"
+            ),
         },
         "meta": {
             "generated_at": datetime.now(UTC).isoformat(),

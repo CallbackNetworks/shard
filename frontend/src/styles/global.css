@@ -644,7 +644,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   top: 28px;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Row count follows the item count. A fixed 3 already wrapped the fourth section onto
+     a row of its own; adding Decisions (ADR-0120) made it 3 + 2. */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 4px;
   margin: 0 0 12px;
   padding: 6px;

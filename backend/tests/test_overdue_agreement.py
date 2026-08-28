@@ -134,3 +134,21 @@ def test_external_summary_agrees(client, dated_project, read_key):
     body = client.get("/api/v1/summary", headers=read_key).json()
     project = next(p for p in body["projects"] if p["id"] == str(dated_project.id))
     assert project["overdue"] == EXPECTED_OVERDUE
+
+
+def test_the_public_share_page_agrees(client, db, dated_project):
+    """The surface the owner never reads, and the last one still on the old rule.
+
+    ``share.py`` counted ``status != "done"``, which ADR-0089 replaced — so a failed,
+    past-due task was overdue on the public page and nowhere else. Every other reporting
+    surface was asked this question when ADR-0089 shipped; this one was not, which is the
+    only reason it kept the old answer (ADR-0120).
+    """
+    from app.models import Node
+
+    node = db.get(Node, dated_project.id)
+    token = (node.data or {}).get("share_token")
+    assert token, "a project is seeded with a share token at creation (ADR-0041)"
+
+    body = client.get(f"/share/node/{token}").json()
+    assert body["summary"]["overdue_tasks"] == EXPECTED_OVERDUE

@@ -565,3 +565,58 @@ def test_share_node_verify_without_pin_400(client, db):
     graph.create_node(db, "topic", title="Open", status="active", share_token="tok-nopin")
     db.commit()
     assert client.post("/share/node/tok-nopin/verify", json={"pin": "1234"}).status_code == 400
+
+
+class TestASharedProjectSaysWhyTheWorkExists:
+    """ADR-0120: the public page carried the work and none of the decisions.
+
+    A share link is the one surface read by somebody who was not in the room when any of
+    this was decided, which is exactly the reader for whom "why" is most of the value.
+    The payload listed tasks, labels, cycles, comments and dependencies, and `decision`
+    appeared nowhere in it or in the page that renders it.
+    """
+
+    def _decide(self, db, project_id, name, **kw):
+        d = graph.create_decision(db, project_id, name=name, **kw)
+        db.commit()
+        return d
+
+    def test_a_shared_project_carries_its_decisions(self, client, db, sample_project):
+        self._decide(
+            db, sample_project.id, "Use PostgreSQL", decision_status="accepted", description="## Context\nLocks.\n"
+        )
+        body = client.get(f"/share/node/{sample_project.share_token}").json()
+
+        project = body["projects"][0]
+        assert [d["name"] for d in project["decisions"]] == ["Use PostgreSQL"]
+        assert project["decisions"][0]["decision_status"] == "accepted"
+        assert body["summary"]["total_decisions"] == 1
+        assert body["summary"]["accepted_decisions"] == 1
+
+    def test_the_supersession_chain_travels_with_it(self, client, db, sample_project):
+        """A visitor reading a replaced decision has to be able to see it was replaced."""
+        old = self._decide(db, sample_project.id, "Use MySQL", decision_status="accepted")
+        new = self._decide(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+        graph.supersede(db, new.id, old.id)
+        db.commit()
+
+        by_name = {
+            d["name"]: d
+            for d in client.get(f"/share/node/{sample_project.share_token}").json()["projects"][0]["decisions"]
+        }
+        assert [n["title"] for n in by_name["Use PostgreSQL"]["supersedes"]] == ["Use MySQL"]
+        assert [n["title"] for n in by_name["Use MySQL"]["superseded_by"]] == ["Use PostgreSQL"]
+        assert by_name["Use MySQL"]["decision_status"] == "superseded"
+
+    def test_the_work_a_decision_governs_is_named(self, client, db, sample_project):
+        from tests.factories import make_task
+
+        task = make_task(db, project_id=sample_project.id, title="Migrate the schema")
+        db.add(task)
+        db.commit()
+        d = self._decide(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+        graph.add_edge(db, d.id, task.id, graph.REL_GOVERNS)
+        db.commit()
+
+        project = client.get(f"/share/node/{sample_project.share_token}").json()["projects"][0]
+        assert [n["title"] for n in project["decisions"][0]["governs"]] == ["Migrate the schema"]
