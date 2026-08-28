@@ -1168,7 +1168,7 @@ An unknown `status` is a 400, not an empty list.
 Plain-text export of the decision record, under the ADR headings. A superseded record's
 `Status` line names what replaced it.
 
-#### `POST /decisions/{id}/supersedes/{superseded_id}` · `DELETE` the same path
+#### `POST`/`DELETE /decisions/{id}/supersedes/{superseded_id}`
 Records (or withdraws) a supersession. This is the one decision write that is *not* a plain
 node/edge call, because it is an edge **and** a status change on the far end: split across
 two client calls, the half that can fail on its own is the one that leaves a record saying
@@ -1797,7 +1797,7 @@ not who may call it (ADR-0092).
 #### `GET /api/v1/nodes/{id}/decisions` (`read`)
 The decisions governing a task or container.
 
-#### `POST /api/v1/decisions/{id}/supersedes/{superseded_id}` · `DELETE` the same path (`write`)
+#### `POST`/`DELETE /api/v1/decisions/{id}/supersedes/{superseded_id}` (`write`)
 Records or withdraws a supersession — an edge plus the far end's status, as one act.
 
 Otherwise read-only on purpose: writing a decision is `POST /api/v1/nodes` with
