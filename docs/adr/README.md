@@ -122,3 +122,4 @@
 | [0118](0118-a-decision-is-its-own-node-type.md) | 決策是一種節點型別，不是穿著標籤外衣的東西 | Accepted | 2026-08-28 |
 | [0119](0119-a-builtin-declaration-change-ships-with-a-backfill.md) | 改了內建型別的宣告，就要附一支 backfill | Accepted | 2026-08-28 |
 | [0120](0120-a-shared-page-says-why-the-work-exists.md) | 公開分享頁要說得出這些工作是依什麼決定的 | Accepted | 2026-08-28 |
+| [0121](0121-a-builtin-declaration-is-code-not-a-row.md) | 內建型別宣告的來源是程式碼，不是可改的資料列 | Accepted | 2026-08-28 |

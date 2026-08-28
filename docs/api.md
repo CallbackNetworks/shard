@@ -1371,6 +1371,12 @@ The node-type vocabulary. A type carries a `roles` set — `container`, `task`, 
 `subscribable` (ADR-0040) — and that set is what drives write dispatch. Granting a capability
 is a data edit, not a schema change. Built-in types cannot be deleted.
 
+On a **built-in** type, `label` / `icon` / `color` and the non-frozen roles are yours to
+edit; `fields` is not (ADR-0121). A field declaration decides what the generic editor
+draws and writes, it is declared in code, and a resync revision (ADR-0119) would revert an
+edit made here — weeks later, from an unrelated deploy, with no notice. A type you created
+has no such second copy and declares whatever it likes.
+
 ```json
 { "key": "topic", "label": "Topic", "icon": "◆", "color": "#hex",
   "roles": ["container", "shareable"] }
@@ -1510,12 +1516,18 @@ must be a key from here.
 { "key": "organization", "label": "Organization", "roles": ["container"] }
 ```
 `PATCH /api/v1/node-types/{key}` and `DELETE /api/v1/node-types/{key}` also require
-`admin`. A built-in type refuses role changes and deletion; a type still used by nodes
-refuses deletion (ADR-0079).
+`admin`. A built-in type refuses role changes, `fields` changes (ADR-0121) and deletion; a
+type still used by nodes refuses deletion (ADR-0079). Both doors give the identical
+refusal — same status, same detail.
 
 #### `GET /api/v1/edge-types` — requires `read`
-The relation vocabulary with what may sit at each end (ADR-0078). Read-only: creating a
-relation would mean declaring its endpoint rules, which is not an external contract yet.
+#### `POST /api/v1/edge-types` · `PATCH`/`DELETE /api/v1/edge-types/{key}` — require `admin`
+The relation vocabulary with what may sit at each end (ADR-0078); writable since ADR-0086.
+On a **built-in** relation, `description`, `allowed_source` and `allowed_target` are frozen
+(ADR-0121): the endpoint rules are enforced by `graph.add_edge` on every write and declared
+in code, so an edit here would change real behaviour and then be silently reverted by the
+next declaration resync. Structural flags (`is_containment`, `is_symmetric`) were already
+frozen. A relation you created is entirely yours.
 
 #### `POST /api/v1/nodes/{id}/edges` — requires `write`
 ```json

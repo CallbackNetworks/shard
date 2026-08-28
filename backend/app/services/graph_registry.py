@@ -301,6 +301,31 @@ BUILTIN_EDGE_TYPES: list[dict] = [
 # or task's ``task`` role would collapse the compat/enrichment pipeline (ADR-0034/0035).
 IMMUTABLE_BUILTIN_ROLES = {graph.ROLE_CONTAINER, graph.ROLE_TASK}
 
+# What a built-in type *declares* is code, and code is the only place it can change
+# (ADR-0121). These are not documentation: ``allowed_source``/``allowed_target`` are
+# enforced by ``graph.add_edge`` on every write, and ``fields`` decides what the generic
+# editor draws and writes. Editing them here changed real behaviour and then had it
+# reverted, without warning, by the next revision that resynced the declarations
+# (ADR-0119) — a revision shipped for an unrelated reason, weeks later, with no
+# connection to the edit. A rule the code enforces cannot also be a row the API rewrites.
+#
+# Everything else stays editable: label, icon, colour, and any role outside
+# ``IMMUTABLE_BUILTIN_ROLES``. Those are yours, nothing resyncs them, and the UI has
+# buttons for them.
+FROZEN_BUILTIN_NODE_DECLARATIONS = ("fields",)
+FROZEN_BUILTIN_EDGE_DECLARATIONS = ("description", "allowed_source", "allowed_target")
+
+
+def _refuse_builtin_declaration_change(kind: str, frozen: tuple[str, ...], patch: dict) -> None:
+    named = sorted(f for f in frozen if f in patch)
+    if not named:
+        return
+    raise TypeRegistryError(
+        400,
+        f"cannot change {', '.join(named)} on a built-in {kind} type: it is declared in code "
+        "and would be reverted by the next declaration resync",
+    )
+
 
 class TypeRegistryError(Exception):
     """A refusal that both registry doors must report identically."""
@@ -352,6 +377,8 @@ def update_node_type(db: Session, key: str, body) -> NodeType:
         raise TypeRegistryError(404, "node type not found")
     # Named ``patch``, not ``fields``: ``fields`` is now a column of its own (ADR-0074).
     patch = body.model_dump(exclude_unset=True, exclude_none=False)
+    if nt.is_builtin:
+        _refuse_builtin_declaration_change("node", FROZEN_BUILTIN_NODE_DECLARATIONS, patch)
     if "roles" in patch:
         new_roles = set(patch.pop("roles") or [])
         if nt.is_builtin and (
@@ -508,6 +535,8 @@ def update_edge_type(db: Session, key: str, body) -> EdgeType:
     # (project/task membership, structure map, unfiled detection).
     if et.is_builtin and ("is_containment" in fields or "is_symmetric" in fields):
         raise TypeRegistryError(400, "cannot change structural flags of a built-in edge type")
+    if et.is_builtin:
+        _refuse_builtin_declaration_change("edge", FROZEN_BUILTIN_EDGE_DECLARATIONS, fields)
     for field, value in fields.items():
         setattr(et, field, value)
     db.commit()

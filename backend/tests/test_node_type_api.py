@@ -156,6 +156,90 @@ class TestBothDoorsRefuseTheSameThings:
         assert a.json()["detail"] == b.json()["detail"]
         assert graph.has_role(db, "project", graph.ROLE_CONTAINER)
 
+    def test_a_builtin_field_declaration_is_frozen_at_both_doors(self, client, db, admin_key):
+        """ADR-0121: what a built-in declares is code, so the API cannot rewrite it.
+
+        ``fields`` is not documentation — it decides what the generic editor draws and
+        writes. Editing it here changed real behaviour and then had it silently reverted
+        by the next declaration resync (ADR-0119), a revision shipped weeks later for an
+        unrelated reason.
+        """
+        before = db.get(NodeType, "task").fields
+        a, b = self._both(
+            client,
+            admin_key,
+            "patch",
+            "/api/graph-types/nodes/task",
+            "/api/v1/node-types/task",
+            payload={"fields": [{"key": "title", "label": "Renamed", "kind": "text", "store": "column"}]},
+        )
+
+        assert a.status_code == b.status_code == 400
+        assert a.json()["detail"] == b.json()["detail"]
+        assert "fields" in a.json()["detail"]
+        db.expire_all()
+        assert db.get(NodeType, "task").fields == before
+
+    def test_a_builtin_endpoint_rule_is_frozen_at_both_doors(self, client, db, admin_key):
+        """The sharp case: `allowed_target` is enforced by `graph.add_edge` on every write."""
+        from app.models import EdgeType
+
+        before = db.get(EdgeType, "governs").allowed_target
+        a, b = self._both(
+            client,
+            admin_key,
+            "patch",
+            "/api/graph-types/edges/governs",
+            "/api/v1/edge-types/governs",
+            payload={"allowed_target": None},
+        )
+
+        assert a.status_code == b.status_code == 400
+        assert a.json()["detail"] == b.json()["detail"]
+        db.expire_all()
+        assert db.get(EdgeType, "governs").allowed_target == before
+
+    def test_a_builtin_description_is_frozen_at_both_doors(self, client, db, admin_key):
+        """The one that actually drifted: production told agents the opposite of the rule."""
+        from app.models import EdgeType
+
+        a, b = self._both(
+            client,
+            admin_key,
+            "patch",
+            "/api/graph-types/edges/contains",
+            "/api/v1/edge-types/contains",
+            payload={"description": "anything at all"},
+        )
+
+        assert a.status_code == b.status_code == 400
+        db.expire_all()
+        assert db.get(EdgeType, "contains").description != "anything at all"
+
+    def test_what_is_yours_on_a_builtin_stays_editable(self, client, db, admin_key):
+        """The line is declarations, not the whole row: presentation is still a preference."""
+        resp = client.patch("/api/graph-types/nodes/task", json={"label": "Ticket", "color": "#ff0000"})
+        assert resp.status_code == 200, resp.text
+        db.expire_all()
+        nt = db.get(NodeType, "task")
+        assert nt.label == "Ticket"
+        assert nt.color == "#ff0000"
+
+    def test_a_custom_type_declares_whatever_it_likes(self, client, db, admin_key):
+        """Nothing here touches a type you made: it has no second copy to drift from."""
+        client.post(
+            "/api/v1/node-types",
+            json={"key": "memo", "label": "Memo", "fields": [{"key": "body", "label": "Body", "kind": "longtext"}]},
+            headers={"X-API-Key": admin_key},
+        )
+        resp = client.patch(
+            "/api/graph-types/nodes/memo",
+            json={"fields": [{"key": "body", "label": "Text", "kind": "longtext"}]},
+        )
+        assert resp.status_code == 200, resp.text
+        db.expire_all()
+        assert db.get(NodeType, "memo").fields[0]["label"] == "Text"
+
     def test_a_type_in_use_cannot_be_deleted_through_either(self, client, db, admin_key):
         db.add(NodeType(key="area", label="Area", roles=[graph.ROLE_CONTAINER]))
         db.flush()
