@@ -108,6 +108,18 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("Could not seed built-in graph types: %s", exc)
 
+    # An instance with neither gate configured serves /app to anyone who can reach
+    # the port. That is the right default for a laptop and the wrong one the moment
+    # the port is published, and nothing else says so out loud: the app comes up
+    # perfectly healthy either way. The self-host stack binds to loopback for this
+    # reason (ADR-0117); this is what a person sees when they change that.
+    if not os.environ.get("AUTH_PASSWORD") and not os.environ.get("AUTH_PROXY_HEADER"):
+        logger.warning(
+            "No login gate: AUTH_PASSWORD and AUTH_PROXY_HEADER are both unset, so anyone "
+            "who can reach this port has full access to /app. Fine on a private machine; "
+            "set AUTH_PASSWORD before publishing the port."
+        )
+
     search_backend = get_search_backend()
     search_backend.ensure_index(engine)
     app.state.search_backend = search_backend

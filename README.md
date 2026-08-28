@@ -8,7 +8,7 @@ A personal multi-identity task management platform with CI/CD integration, AI ag
 
 - **GitHub / GitLab Issue Sync** — Bidirectional: inbound webhooks create tasks from issues, completing a task closes the external issue via API
 - **GitHub PR Linking** — Parse `Fixes #N` refs in PR body, auto-close linked tasks on merge
-- **AI Agent Platform** — MCP server (20 tools), External API v1, event subscriptions, agent identity tracking, and tools-schema auto-discovery
+- **AI Agent Platform** — MCP server (51 tools, local stdio or remote HTTP), External API v1, event subscriptions, agent identity tracking, and tools-schema auto-discovery
 - **Multi-Identity** — Manage separate personas (work, open source, freelance) with independent projects, share pages, and analytics
 - **CI/CD Webhooks** — Auto-detect GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket from headers; build history with commit/branch/duration tracking
 - **Workflow Automation** — Rules engine with triggers, conditions, and actions; chain rules up to depth 2
@@ -69,6 +69,35 @@ docker compose up
 - Public status page: http://localhost:5173/
 - API docs (Swagger): http://localhost:8000/docs
 
+### Running it for real (self-hosting)
+
+Everything above starts the **development** stack: source mounted into the containers,
+Vite with hot reload on 5173. It is not what you leave running.
+
+To run Shard as an app — production images, one nginx in front, no source mount:
+
+```bash
+docker compose -f docker-compose.selfhost.yml up -d
+```
+
+That is the whole install. It builds the production images from this checkout, so it
+needs no registry account, and every setting has a working default, so it needs no
+`.env`. Open **http://127.0.0.1:8090/**.
+
+It binds to loopback on purpose, because `AUTH_PASSWORD` is empty by default and an
+empty password means no login gate at all. To reach it from elsewhere on your network,
+set both together in `.env`:
+
+```bash
+SHARD_BIND=0.0.0.0
+AUTH_PASSWORD=something-long
+```
+
+Your data is two directories beside the compose file — `./data` (the SQLite database
+and its backups) and `./uploads` (task attachments). Copy those two and you have
+copied the instance. See [ADR-0117](docs/adr/0117-someone-who-is-not-us-can-run-this.md)
+for why this file exists separately from the one CD deploys.
+
 ## Routes
 
 | Path | Description | Auth |
@@ -90,6 +119,8 @@ docker compose up
 ## Authentication
 
 Set `AUTH_PASSWORD` in your environment to enable the login gate. Leave it empty to disable auth (default for local development).
+
+Empty means *no gate*, not *a weak gate*: anyone who can reach the port has full access to `/app`. The backend logs a warning at startup when neither `AUTH_PASSWORD` nor `AUTH_PROXY_HEADER` is set, and the self-host stack binds to loopback until you change both together.
 
 ```bash
 AUTH_PASSWORD=mypassword docker compose up
