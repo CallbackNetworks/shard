@@ -12,6 +12,9 @@ probe this module replaced looked for `tasks`, gone since the graph migration, a
 called every existing database new.
 """
 
+from datetime import UTC, datetime
+from pathlib import Path
+
 from sqlalchemy import create_engine, text
 
 from app import db_schema
@@ -92,3 +95,68 @@ def test_current_revision_reads_what_the_database_records(tmp_path):
     _create_schema(engine)
     _create_version_table(engine, "c2e4a6b8d0f1")
     assert db_schema.current_revision(engine) == "c2e4a6b8d0f1"
+
+
+class TestAMigrationRunsAgainstTheStrictSchema:
+    """A revision has to survive the schema ``create_all`` builds, not just the local one.
+
+    ADR-0118's revision inserted two ``edge_types`` rows without ``is_symmetric``. A Core
+    insert runs no ORM-level default, so the value went in as NULL — which the developer's
+    own database accepted, because its ``edge_types`` was created by an old revision where
+    the column was nullable, and which production refused with ``NOT NULL constraint
+    failed``. Every test passed, both database targets passed, and the deploy died on the
+    migration step.
+
+    The asymmetry is the whole point: a migration is exercised locally against whatever
+    shape history left behind, and in production against a different one. ``create_all``
+    builds the strictest version — every ``nullable=False`` the models declare — so
+    running the chain against it is the closest a test gets to the target that matters.
+    """
+
+    def _fresh_strict_db(self, tmp_path):
+        """A database with today's tables and yesterday's alembic version."""
+        from app.models import Base
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'strict.db'}")
+        Base.metadata.create_all(engine)
+        return engine
+
+    def _upgrade(self, engine, revision, monkeypatch):
+        from alembic import command
+        from alembic.config import Config
+
+        # ``migrations/env.py`` lets ``DATABASE_URL`` win over ``sqlalchemy.url``, so
+        # without this the upgrade would run against the container's real database —
+        # which is already at head, so it would quietly do nothing and the test would
+        # assert against a database the migration never touched.
+        monkeypatch.setenv("DATABASE_URL", str(engine.url))
+        cfg = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+        cfg.set_main_option("sqlalchemy.url", str(engine.url))
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM alembic_version"))
+            conn.execute(text("INSERT INTO alembic_version (version_num) VALUES (:r)"), {"r": revision})
+        command.upgrade(cfg, "head")
+
+    def test_the_decision_revision_applies_to_a_create_all_schema(self, tmp_path, monkeypatch):
+        engine = self._fresh_strict_db(tmp_path)
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)"))
+            # A label-shaped decision record, the row this revision exists to move.
+            conn.execute(
+                text(
+                    "INSERT INTO nodes (id, type, title, position, is_pinned, created_at, updated_at, data) "
+                    "VALUES ('d1', 'label', 'Use PG', 0, 0, :t, :t, :d)"
+                ),
+                {"t": datetime.now(UTC), "d": '{"type": "decision", "color": "#818cf8"}'},
+            )
+
+        self._upgrade(engine, "d601757ef2ef", monkeypatch)
+
+        with engine.begin() as conn:
+            assert conn.execute(text("SELECT type FROM nodes WHERE id='d1'")).scalar() == "decision"
+            # The columns an ORM default would have filled, which a Core insert does not.
+            row = conn.execute(
+                text("SELECT is_symmetric, is_containment, is_builtin, created_at FROM edge_types WHERE key='governs'")
+            ).one()
+            assert row[0] == 0 and row[1] == 0 and row[2] == 1 and row[3] is not None
+            assert conn.execute(text("SELECT created_at FROM node_types WHERE key='decision'")).scalar() is not None

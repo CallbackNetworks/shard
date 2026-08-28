@@ -68,6 +68,7 @@ _EDGE_TYPES = sa.table(
     sa.column("description", sa.Text),
     sa.column("is_builtin", sa.Boolean),
     sa.column("is_containment", sa.Boolean),
+    sa.column("is_symmetric", sa.Boolean),
     sa.column("allowed_source", sa.JSON),
     sa.column("allowed_target", sa.JSON),
     sa.column("created_at", sa.DateTime(timezone=True)),
@@ -83,8 +84,12 @@ def upgrade() -> None:
     from app.services.graph_registry import BUILTIN_EDGE_TYPES, BUILTIN_NODE_TYPES
 
     conn = op.get_bind()
-    # A Core insert does not run the ORM's ``default=now_utc``, and these columns are
-    # nullable, so leaving them out writes a row with no timestamps rather than failing.
+    # A Core insert runs **no** ORM-level default: not ``default=now_utc`` on the
+    # timestamps and not ``default=False`` on the boolean flags. Every column the ORM
+    # would have filled in has to be spelled out here. Where the column is nullable that
+    # only writes a wrong row; where it is ``NOT NULL`` the migration dies — and which of
+    # the two you get depends on how old the target database's table is, so the local one
+    # passing says nothing about production's.
     now = datetime.now(UTC)
 
     # 1. Vocabulary.
@@ -107,6 +112,7 @@ def upgrade() -> None:
                 description=spec.get("description"),
                 is_builtin=True,
                 is_containment=False,
+                is_symmetric=False,
                 allowed_source=spec.get("allowed_source"),
                 allowed_target=spec.get("allowed_target"),
                 created_at=now,
