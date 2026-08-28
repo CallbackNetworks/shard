@@ -1,0 +1,207 @@
+/* Decision lineage + relation chrome (ADR-0118). The room's frame still lives in
+   global.css as `kt-decision-*`; everything the relations added is scoped here. */
+
+.lineages {
+  display: grid;
+  gap: 12px;
+  padding: 10px;
+}
+
+.lineage {
+  display: grid;
+  gap: 6px;
+}
+
+/* A chain rail: the indent is the history, so it needs a line to read as one. */
+.chainRow {
+  position: relative;
+  display: grid;
+}
+
+.chainRow[data-depth='0'] {
+  margin-left: 0;
+}
+
+/* One step per generation, capped so a long chain does not walk off the column. */
+.chainRow:not([data-depth='0']) {
+  margin-left: calc(min(var(--depth), 3) * 16px);
+  padding-left: 14px;
+  border-left: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+}
+
+.chainRow:not([data-depth='0'])::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22px;
+  width: 13px;
+  height: 1px;
+  background: rgba(var(--kt-ink-rgb), 0.14);
+}
+
+.replacedBy {
+  color: var(--kt-faint);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-left: 32px;
+}
+
+.card {
+  min-height: 74px;
+}
+
+/* The action row wraps below the title rather than squeezing it: this column is 320px
+   at its narrowest and a card carries up to six controls, which turned the title into
+   one word per line. */
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.body {
+  flex: 1 1 190px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.retired {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.source {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--kt-faint);
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--kt-faint);
+  margin-top: 4px;
+}
+
+.excerpt {
+  margin-left: 8px;
+  color: var(--kt-muted);
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.actionsMobile {
+  margin-top: 8px;
+}
+
+/* Relations, stated on the card. Before this the only place an edge appeared was the raw
+   node explorer, which the decisions page had no link to either. */
+.relations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.relation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  background: rgba(var(--kt-ink-rgb), 0.02);
+  color: var(--kt-muted);
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.relation:hover {
+  border-color: rgba(var(--kt-ink-rgb), 0.22);
+  color: var(--kt-ink);
+}
+
+.governs {
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
+}
+
+.governsHead {
+  color: var(--kt-faint);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.governsItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--kt-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.governsItem:hover {
+  color: var(--kt-ink);
+}
+
+.governsType {
+  color: var(--kt-faint);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.supersedeList {
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.supersedeOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  background: rgba(var(--kt-ink-rgb), 0.02);
+  color: var(--kt-ink);
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+
+.supersedeOption:hover {
+  border-color: var(--accent);
+}
+
+.supersedeOption em {
+  color: var(--kt-faint);
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+}
