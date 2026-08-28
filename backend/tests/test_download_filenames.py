@@ -59,7 +59,7 @@ class TestTheHeaderBuilder:
 
 
 def _decision(db, project_id, name):
-    label = graph.create_label(db, project_id, name=name, color="#5e6ad2", type="decision")
+    label = graph.create_decision(db, project_id, name=name, color="#5e6ad2")
     db.commit()
     return label
 

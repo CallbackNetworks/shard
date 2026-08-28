@@ -60,6 +60,13 @@ MANAGED_DATA_KEYS = (
     "external_repo",
 )
 
+# The states a decision record moves through (ADR-0118). ``deprecated`` is in the set
+# because the UI has always offered it and the old declaration did not — a filter you can
+# select and an editor you cannot set it from are the declared/actual drift ADR-0074 exists
+# to stop. ``superseded`` is what a ``supersedes`` edge sets on the far end, never a state
+# somebody types on its own.
+DECISION_STATUSES = ("proposed", "accepted", "deprecated", "superseded")
+
 # Built-in node types. Kept in sync with the ``graph.NODE_*`` constants.
 # ``roles`` seeds each type's capability set (ADR-0040, replacing the four booleans):
 # ``container``/``task`` are the traversal roles (ADR-0033 A5 — project is the
@@ -166,20 +173,37 @@ BUILTIN_NODE_TYPES: list[dict] = [
         "label": "Label",
         "icon": "tag",
         "color": "#a78bfa",
-        # ``type``/``decision_status`` carry the decisions-as-labels convention
-        # (ADR-0004). Both are closed sets in the live data, so they are pickers, not
-        # free text. ``source`` (manual/frontend/assistant) is *not* declared: it records
-        # which surface created the row, which is the system's note to itself.
+        # A label is a label again (ADR-0118). ``type``/``decision_status`` used to be
+        # declared here because ADR-0004 stored a decision as a label wearing a data key;
+        # a decision is its own type now, so declaring them would offer every label a
+        # picker that turns it into something the decision surfaces would then not find.
         "fields": [
             _name(),
             {"key": "color", "label": "Colour", "kind": "color"},
             _DESCRIPTION,
-            {"key": "type", "label": "Kind", "kind": "enum", "options": ["label", "decision"]},
+        ],
+    },
+    {
+        "key": graph.NODE_DECISION,
+        "label": "Decision",
+        "icon": "git-fork",
+        "color": "#818cf8",
+        # No roles: a decision is neither a place work lives nor a piece of work. It is
+        # generic, so ``contains`` may file it under a project the same way a label is
+        # filed — and, carrying no ``task`` role, it stays out of every size and progress
+        # rollup (ADR-0068) exactly as it did while it was a label.
+        #
+        # ``source`` (manual/frontend/ai) stays undeclared: it records which surface wrote
+        # the row, which is the system's note to itself, not a field to hand a user.
+        "fields": [
+            _name("Title"),
+            {"key": "color", "label": "Colour", "kind": "color"},
+            _DESCRIPTION,
             {
                 "key": "decision_status",
-                "label": "Decision status",
+                "label": "Status",
                 "kind": "enum",
-                "options": ["proposed", "accepted", "superseded"],
+                "options": list(DECISION_STATUSES),
             },
         ],
     },
@@ -230,7 +254,7 @@ BUILTIN_EDGE_TYPES: list[dict] = [
     {
         "key": graph.REL_LABELED,
         "label": "Labeled",
-        "description": "Node -> label. Also how a decision record (a label with data.type='decision') attaches.",
+        "description": "Node -> label. Reach for 'governs' to attach a decision record to work instead.",
         "allowed_target": {"types": [graph.NODE_LABEL]},
     },
     {
@@ -239,6 +263,29 @@ BUILTIN_EDGE_TYPES: list[dict] = [
         "description": "Task -> the cycle/sprint it belongs to.",
         "allowed_source": {"roles": [graph.ROLE_TASK]},
         "allowed_target": {"types": [graph.NODE_CYCLE]},
+    },
+    {
+        "key": graph.REL_SUPERSEDES,
+        "label": "Supersedes",
+        "description": (
+            "Newer decision -> the decision it replaces. The spine a decision record's "
+            "history hangs on: the 'superseded' status says a decision was replaced and "
+            "nothing else says by what, so record the relation and the status on the far "
+            "end follows from it."
+        ),
+        "allowed_source": {"types": [graph.NODE_DECISION]},
+        "allowed_target": {"types": [graph.NODE_DECISION]},
+    },
+    {
+        "key": graph.REL_GOVERNS,
+        "label": "Governs",
+        "description": (
+            "Decision -> the work it decides: a task, a project or any other container. "
+            "This is what makes a decision answerable about its own reach — without it a "
+            "record states a conclusion and names nothing it applies to."
+        ),
+        "allowed_source": {"types": [graph.NODE_DECISION]},
+        "allowed_target": {"roles": [graph.ROLE_TASK, graph.ROLE_CONTAINER]},
     },
 ]
 

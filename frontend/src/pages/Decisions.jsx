@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { GitFork, Plus, Trash2, Edit2, Download, Check, XCircle, Bot, User } from 'lucide-react'
-import { getDecisions, getProjects, createLabel, updateLabel, deleteLabel, exportDecision } from '../api/client'
+import { getDecisions, getProjects, createDecision, updateDecision, deleteDecision, exportDecision } from '../api/client'
 import { qk } from '../api/queryKeys'
 import MarkdownEditor from '../components/MarkdownEditor'
 import MarkdownPreview from '../components/MarkdownPreview'
@@ -190,11 +190,10 @@ export default function Decisions() {
   const room = deriveDecisionRoom(decisions)
   const pendingCount = room.counts.proposed
 
-  const createDecision = useInvalidatingMutation({
-    mutationFn: (form) => createLabel(form.project_id, {
+  const createDecisionMut = useInvalidatingMutation({
+    mutationFn: (form) => createDecision(form.project_id, {
       name: form.name,
       color: form.color || BRAND,
-      type: 'decision',
       description: form.description,
       decision_status: 'proposed',
       source: 'manual',
@@ -204,31 +203,32 @@ export default function Decisions() {
   })
 
   const editDecision = useInvalidatingMutation({
-    mutationFn: ({ projectId, id, data }) => updateLabel(projectId, id, data),
+    mutationFn: ({ id, data }) => updateDecision(id, data),
     invalidateKeys: [['decisions']],
     onSuccess: () => setEditTarget(null),
   })
 
   const removeDecision = useInvalidatingMutation({
-    mutationFn: ({ projectId, id }) => deleteLabel(projectId, id),
+    mutationFn: ({ id }) => deleteDecision(id),
     invalidateKeys: [['decisions']],
   })
 
   const handleAccept = (d) => {
-    editDecision.mutate({ projectId: d.project_id, id: d.id, data: { decision_status: 'accepted' } })
+    editDecision.mutate({ id: d.id, data: { decision_status: 'accepted' } })
   }
 
+  // Rejecting records the outcome; it does not erase the record. This used to call delete,
+  // so a decision that was considered and turned down took its history with it — and
+  // `deprecated` was a status the filter offered and nothing could ever set.
   const handleReject = (d) => {
-    if (window.confirm(t('issue.deleteConfirm', { title: d.name }))) {
-      removeDecision.mutate({ projectId: d.project_id, id: d.id })
-    }
+    editDecision.mutate({ id: d.id, data: { decision_status: 'deprecated' } })
   }
 
   const handleEdit = (d) => setEditTarget(d)
 
   const handleDelete = (d) => {
     if (window.confirm(t('issue.deleteConfirm', { title: d.name }))) {
-      removeDecision.mutate({ projectId: d.project_id, id: d.id })
+      removeDecision.mutate({ id: d.id })
     }
   }
 
@@ -386,12 +386,11 @@ export default function Decisions() {
           onSave={(form) => {
             if (editTarget) {
               editDecision.mutate({
-                projectId: editTarget.project_id,
                 id: editTarget.id,
                 data: { name: form.name, description: form.description, color: form.color },
               })
             } else {
-              createDecision.mutate(form)
+              createDecisionMut.mutate(form)
             }
           }}
           onClose={() => { setShowForm(false); setEditTarget(null) }}

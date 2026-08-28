@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _project_ids_in_scope, _require_scope
-from app.schemas import CycleOut, LabelOut, TaskOut
+from app.schemas import CycleOut, DecisionOut, TaskOut
 from app.services import cycle_admin, decision_admin, downloads, issue_sync_admin, task_filing, task_import
 from app.services.task_import import GitHubImport, ImportResult, LinearImport, TrelloImport
 
@@ -176,15 +176,16 @@ async def api_file_task(
 
 @sub_router.get(
     "/decisions",
-    response_model=list[LabelOut],
+    response_model=list[DecisionOut],
     summary="Decision records",
     description=(
         "Decisions recorded against the work, optionally narrowed by `project_id` or "
-        "`status` (proposed/accepted/superseded/deprecated). The assistant is told to write "
+        "`status` (proposed/accepted/deprecated/superseded). The assistant is told to write "
         "one when a decision gets made, and this is how it — or any other agent — reads back "
-        'what was already decided. Writing one is `POST /nodes` with `type="label"` and '
-        '`data={"type": "decision"}` — a decision record is a label (ADR-0004), '
-        "through the single node write surface. Requires `read` scope."
+        "what was already decided. Each record carries its own relations: `supersedes` / "
+        "`superseded_by` (how the thinking evolved) and `governs` (the work it decides). "
+        'Writing one is `POST /nodes` with `type="decision"` through the single node write '
+        "surface (ADR-0118 — it used to be a label). Requires `read` scope."
     ),
     responses=_auth_errors,
 )
@@ -209,7 +210,7 @@ def api_list_decisions(
 
 @sub_router.get(
     "/decisions/{decision_id}",
-    response_model=LabelOut,
+    response_model=DecisionOut,
     summary="One decision record",
     responses=_auth_errors,
 )
@@ -236,6 +237,66 @@ def api_export_decision(decision_id: str, db: Session = Depends(get_db), api_key
         media_type="text/markdown",
         headers=downloads.attachment_headers(filename),
     )
+
+
+@sub_router.get(
+    "/nodes/{node_id}/decisions",
+    response_model=list[DecisionOut],
+    summary="Decisions governing a node",
+    description=(
+        "The decisions attached to this task or container by a `governs` edge — "
+        '"what was decided about this?", asked from the work\'s side. The mirror of this '
+        "read did not exist before ADR-0118: labels could be listed for a task and the work "
+        "could never be listed for a decision. Requires `read` scope."
+    ),
+    responses=_auth_errors,
+)
+def api_decisions_governing(node_id: str, db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
+    _require_scope(api_key, "read")
+    return decision_admin.governing(db, node_id)
+
+
+@sub_router.post(
+    "/decisions/{decision_id}/supersedes/{superseded_id}",
+    response_model=DecisionOut,
+    summary="Record that one decision replaces another",
+    description=(
+        "Adds the `supersedes` edge and sets the replaced record to `superseded`. One act "
+        "rather than two calls, because the half that can fail on its own is the one that "
+        "leaves a record saying it was replaced with nothing naming the replacement — which "
+        "is the state every superseded decision in production was in before ADR-0118. "
+        "Requires `write` scope."
+    ),
+    responses=_auth_errors,
+)
+def api_supersede_decision(
+    decision_id: str,
+    superseded_id: str,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "write")
+    return decision_admin.supersede(db, decision_id, superseded_id, actor=f"api_key:{api_key.name}")
+
+
+@sub_router.delete(
+    "/decisions/{decision_id}/supersedes/{superseded_id}",
+    response_model=DecisionOut,
+    summary="Withdraw a supersession",
+    description=(
+        "Removes the `supersedes` edge; the replaced record returns to `accepted` once "
+        "nothing else supersedes it. Requires `write` scope."
+    ),
+    responses=_auth_errors,
+)
+def api_unsupersede_decision(
+    decision_id: str,
+    superseded_id: str,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "write")
+    return decision_admin.unsupersede(db, decision_id, superseded_id, actor=f"api_key:{api_key.name}")
 
 
 # ── Rolling a cycle over ────────────────────────────────────────────

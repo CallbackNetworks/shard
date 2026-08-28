@@ -23,6 +23,12 @@ NODE_IDENTITY = "identity"
 NODE_GOAL = "goal"
 NODE_CYCLE = "cycle"
 NODE_LABEL = "label"
+# A decision record is its own type since ADR-0118. ADR-0004 stored it as a label
+# carrying ``data.type="decision"``, which was right while a decision was a tag you
+# stuck on a task; it stopped being right the moment a decision needed relations of
+# its own, because ADR-0078's endpoint declarations name node *types* — "label ->
+# label" is the strongest rule that shape can express, and it constrains nothing.
+NODE_DECISION = "decision"
 
 # Edge relationship types (canonical direction: source -> target). What may sit at
 # each end is declared on ``edge_types`` and enforced below (ADR-0078).
@@ -31,6 +37,8 @@ REL_OWNS = "owns"  # identity -> container it owns (whose work this is, not wher
 REL_DEPENDS_ON = "depends_on"  # blocked task -> prerequisite task
 REL_LABELED = "labeled"  # task -> label
 REL_IN_CYCLE = "in_cycle"  # task -> cycle
+REL_SUPERSEDES = "supersedes"  # newer decision -> the decision it replaces
+REL_GOVERNS = "governs"  # decision -> the work it decides (task or container)
 
 # A task is overdue when it is past its due date and still open. "Still open"
 # excludes ``failed`` as well as ``done`` (ADR-0089): a failed task is not late,

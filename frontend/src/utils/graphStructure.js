@@ -13,6 +13,11 @@ import { hasNodeRole } from '../constants/nodeRoles'
 // Map-role `type` stays 'project'/'task'/… for the renderers; the real type
 // key travels alongside as `typeKey`/`typeLabel`/`typeColor`.
 
+// Relations the map draws itself, in a lane or a shape of their own. Everything else —
+// user-defined *and* built-in — falls through to the generic link path below. That
+// predicate used to be `!is_builtin`, which was standing in for "has no dedicated
+// rendering"; when `supersedes` and `governs` arrived as built-ins (ADR-0118) the map
+// silently drew neither, which is the failure mode this file exists to avoid.
 const KNOWN_RELS = new Set(['owns', 'depends_on', 'labeled', 'in_cycle'])
 
 export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now = new Date()) {
@@ -25,7 +30,7 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
   const containmentRels = new Set(edgeTypes.filter(et => et.is_containment).map(et => et.key))
   const customRels = new Map(
     edgeTypes
-      .filter(et => !et.is_builtin && !et.is_containment && !KNOWN_RELS.has(et.key))
+      .filter(et => !et.is_containment && !KNOWN_RELS.has(et.key))
       .map(et => [et.key, et])
   )
 
@@ -100,9 +105,9 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
     task => task.signal || task.blockedBy.length > 0 || task.blocking.length > 0
   )
 
-  // --- Decisions (label nodes whose data kind is 'decision')
+  // --- Decisions (their own node type since ADR-0118; a label wearing a data key before)
   const decisionNodes = nodes
-    .filter(n => n.type === 'label' && n.data?.type === 'decision')
+    .filter(n => n.type === 'decision')
     .map(n => ({
       id: n.id,
       type: 'decision',
@@ -204,7 +209,7 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
     if (projectById.has(id)) return `project:${id}`
     if (isTask(n)) return `task:${id}`
     if (n.type === 'identity') return `identity:${id}`
-    if (n.type === 'label') return `decision:${id}`
+    if (n.type === 'decision') return `decision:${id}`
     return `custom:${id}`
   }
   const customNodes = nodes

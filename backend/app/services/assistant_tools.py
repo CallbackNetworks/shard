@@ -182,7 +182,7 @@ TOOLS = [
     },
     {
         "name": "create_decision",
-        "description": "Create a decision record (as a decision-type label) for a project. Status is set to 'proposed' for user review.",
+        "description": "Create a decision record for a project. Status is set to 'proposed' for user review.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -198,12 +198,12 @@ TOOLS = [
     },
     {
         "name": "tag_task_with_decision",
-        "description": "Tag a task with a decision label and add a comment explaining the relevance.",
+        "description": "Record that a decision governs a task, and add a comment explaining the relevance.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "task_id": {"type": "string", "description": "Task ID to tag"},
-                "decision_label_id": {"type": "string", "description": "Decision label ID to attach"},
+                "decision_label_id": {"type": "string", "description": "Decision record ID to attach"},
                 "reason": {
                     "type": "string",
                     "description": "Explanation of why this task relates to or conflicts with the decision",
@@ -464,7 +464,7 @@ TOOLS = [
     },
     {
         "name": "list_decisions",
-        "description": "List decision records and their status (proposed/accepted/superseded/deprecated).",
+        "description": "List decision records with their status (proposed/accepted/deprecated/superseded), what each supersedes and is superseded by, and the work each governs.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -472,6 +472,29 @@ TOOLS = [
                 "status": {"type": "string", "enum": ["proposed", "accepted", "superseded", "deprecated"]},
             },
             "required": [],
+        },
+    },
+    {
+        "name": "manage_decision_links",
+        "description": (
+            "The relations a decision record carries. 'supersede' records that decision_id replaces "
+            "superseded_id and marks the older one superseded (one act — a record saying it was replaced "
+            "with nothing naming the replacement is a dead end). 'unsupersede' withdraws that. 'governs' "
+            "attaches a decision to a task or container; 'ungoverns' detaches it. 'governing' lists the "
+            "decisions attached to a piece of work."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["supersede", "unsupersede", "governs", "ungoverns", "governing"],
+                },
+                "decision_id": {"type": "string", "description": "The decision record acting"},
+                "superseded_id": {"type": "string", "description": "The decision being replaced"},
+                "node_id": {"type": "string", "description": "The task or container being governed"},
+            },
+            "required": ["action"],
         },
     },
     {
@@ -701,6 +724,8 @@ async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
             return _tool_get_ancestry(db, tool_input["node_ids"])
         elif tool_name == "list_decisions":
             return _tool_list_decisions(db, tool_input.get("project_id"), tool_input.get("status"))
+        elif tool_name == "manage_decision_links":
+            return await _tool_manage_decision_links(db, **tool_input)
         elif tool_name == "export_decision":
             return _tool_export_decision(db, tool_input["decision_id"])
         elif tool_name == "manage_cycles":
@@ -1062,18 +1087,15 @@ def _tool_create_decision(db: Session, project_id: str, name: str, description: 
     if not project:
         return f"Project {project_id} not found"
 
-    label = graph.create_label(
+    decision = graph.create_decision(
         db,
         project_id,
         name=name,
-        color="#818cf8",
-        type="decision",
         description=description,
-        decision_status="proposed",
         source="ai",
     )
     db.commit()
-    return json.dumps({"id": label.id, "name": label.name, "status": "proposed", "source": "ai"})
+    return json.dumps({"id": decision.id, "name": decision.name, "status": "proposed", "source": "ai"})
 
 
 async def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label_id: str, reason: str) -> str:
@@ -1083,27 +1105,28 @@ async def _tool_tag_task_with_decision(db: Session, task_id: str, decision_label
     if not task:
         return f"Task {task_id} not found"
 
-    label = graph.get_label(db, decision_label_id)
-    if not label or label.type != "decision":
-        return f"Decision label {decision_label_id} not found"
+    decision = graph.get_decision(db, decision_label_id)
+    if not decision:
+        return f"Decision {decision_label_id} not found"
 
-    # Add label to task if not already attached (idempotent)
-    newly_tagged = decision_label_id not in graph.label_ids_for_task(db, task_id)
-    graph.set_label(db, task_id, decision_label_id)
+    # The edge runs decision -> task and is called ``governs`` since ADR-0118: a task is not
+    # "labeled with" a decision, a decision decides the task. Idempotent either way.
+    already = any(node.id == task_id for node in decision.governs)
+    graph.add_edge(db, decision_label_id, task_id, graph.REL_GOVERNS)
 
     # Add comment explaining the relevance
     comment = Comment(
         id=str(uuid.uuid4()),
         task_id=task_id,
-        body=f"**Decision: {label.name}**\n\n{reason}",
+        body=f"**Decision: {decision.name}**\n\n{reason}",
         author="AI Assistant",
     )
     db.add(comment)
-    if newly_tagged:
-        await dispatch_edge_added(db, task_id, decision_label_id, graph.REL_LABELED, actor="assistant")
+    if not already:
+        await dispatch_edge_added(db, decision_label_id, task_id, graph.REL_GOVERNS, actor="assistant")
     else:
         db.commit()
-    return json.dumps({"status": "tagged", "task_id": task_id, "decision": label.name, "reason": reason})
+    return json.dumps({"status": "tagged", "task_id": task_id, "decision": decision.name, "reason": reason})
 
 
 async def _tool_batch_create_tasks(db: Session, project_id: str, tasks: list[dict]) -> str:
@@ -1494,14 +1517,57 @@ def _tool_get_ancestry(db: Session, node_ids: list[str]) -> str:
     return json.dumps({k: v.model_dump() for k, v in result.items()}, default=str)
 
 
+def _decision_summary(d) -> dict:
+    """What a model needs to reason about a decision, relations included (ADR-0118).
+
+    Without the chain, an agent reading a superseded record has no way to know what
+    replaced it — the status word says it happened and names nothing.
+    """
+    return {
+        "id": d.id,
+        "name": d.name,
+        "status": d.decision_status,
+        "description": (d.description or "")[:200],
+        "supersedes": [{"id": n.id, "title": n.title} for n in d.supersedes],
+        "superseded_by": [{"id": n.id, "title": n.title} for n in d.superseded_by],
+        "governs": [{"id": n.id, "type": n.type, "title": n.title} for n in d.governs],
+    }
+
+
 def _tool_list_decisions(db: Session, project_id: str | None = None, status: str | None = None) -> str:
     decisions = graph.decisions(db, project_id=project_id, status=status)
-    return json.dumps(
-        [
-            {"id": d.id, "name": d.name, "status": d.decision_status, "description": (d.description or "")[:200]}
-            for d in decisions
-        ]
-    )
+    return json.dumps([_decision_summary(d) for d in decisions])
+
+
+async def _tool_manage_decision_links(
+    db: Session,
+    action: str,
+    decision_id: str | None = None,
+    superseded_id: str | None = None,
+    node_id: str | None = None,
+) -> str:
+    if action == "governing":
+        if not node_id:
+            return "Error: node_id is required"
+        return json.dumps([_decision_summary(d) for d in decision_admin.governing(db, node_id)])
+    if action in ("supersede", "unsupersede"):
+        if not decision_id or not superseded_id:
+            return f"Error: decision_id and superseded_id are required to {action}"
+        act = decision_admin.supersede if action == "supersede" else decision_admin.unsupersede
+        return json.dumps(_decision_summary(act(db, decision_id, superseded_id, actor="assistant")))
+    if action in ("governs", "ungoverns"):
+        if not decision_id or not node_id:
+            return f"Error: decision_id and node_id are required to {action}"
+        decision_admin.get(db, decision_id)  # raises NotFound, rendered by the caller
+        if action == "governs":
+            graph.add_edge(db, decision_id, node_id, graph.REL_GOVERNS)
+            await dispatch_edge_added(db, decision_id, node_id, graph.REL_GOVERNS, actor="assistant")
+        else:
+            if not graph.remove_edge(db, decision_id, node_id, graph.REL_GOVERNS):
+                return "That decision does not govern that node"
+            await dispatch_edge_removed(db, decision_id, node_id, graph.REL_GOVERNS, actor="assistant")
+        return json.dumps(_decision_summary(decision_admin.get(db, decision_id)))
+    return f"Error: unknown action '{action}'"
 
 
 def _tool_export_decision(db: Session, decision_id: str) -> str:

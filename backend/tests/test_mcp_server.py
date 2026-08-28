@@ -1113,7 +1113,7 @@ async def test_manage_attachments_upload_without_bytes_says_so():
 @pytest.mark.asyncio
 async def test_list_tools_count():
     tools = await mcp_server.mcp.list_tools()
-    assert len(tools) == 51
+    assert len(tools) == 52
 
 
 @pytest.mark.asyncio
@@ -1176,6 +1176,9 @@ async def test_list_tools_names():
         "manage_unfiled",
         "list_decisions",
         "export_decision",
+        # ADR-0118: a decision is its own node type with relations of its own; supersession
+        # and "what was decided about this work" had no tool because they had no data.
+        "manage_decision_links",
         "manage_cycles",
         # ADR-0093: the MCP registry catches up with what /api/v1 already offers.
         "get_analytics",

@@ -178,11 +178,10 @@ class TestUnfiledBucket:
 class TestDecisionRecords:
     @pytest.fixture()
     def decision(self, db, sample_project):
-        d = graph.create_label(
+        d = graph.create_decision(
             db,
             sample_project.id,
             name="Use Postgres",
-            type="decision",
             description="## Context\nSQLite locks.\n",
             decision_status="accepted",
         )

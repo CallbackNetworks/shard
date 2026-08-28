@@ -314,17 +314,37 @@ def test_a_picker_and_its_options_travel_together(client):
 
 
 def test_closed_sets_are_declared_as_pickers_not_text(client):
-    """Label's decision vocabulary is fixed (ADR-0004), so it is an enum."""
+    """A decision's status vocabulary is fixed (ADR-0118), so it is an enum."""
     types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
-    label = {f["key"]: f for f in types[graph.NODE_LABEL]["fields"]}
+    decision = {f["key"]: f for f in types[graph.NODE_DECISION]["fields"]}
 
-    assert label["type"]["kind"] == "enum"
-    assert set(label["type"]["options"]) == {"label", "decision"}
-    assert label["decision_status"]["kind"] == "enum"
-    assert set(label["decision_status"]["options"]) == {"proposed", "accepted", "superseded"}
+    assert decision["decision_status"]["kind"] == "enum"
+    # `deprecated` is in the set: the UI has always offered it as a filter and the old
+    # declaration did not carry it, so the editor could not set what the filter could find.
+    assert set(decision["decision_status"]["options"]) == {
+        "proposed",
+        "accepted",
+        "deprecated",
+        "superseded",
+    }
 
     # `source` records which surface created the row — the system's note, not a field.
-    assert "source" not in label
+    assert "source" not in decision
+
+
+def test_a_label_no_longer_declares_the_decision_convention(client):
+    """A label is a label again (ADR-0118).
+
+    While a decision was a label wearing ``data.type="decision"``, the label type declared
+    both keys as editable — which meant the generic node editor offered every label a
+    picker that would turn it into a decision record none of the decision surfaces knew
+    how to find.
+    """
+    types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
+    label = {f["key"] for f in types[graph.NODE_LABEL]["fields"]}
+
+    assert "type" not in label
+    assert "decision_status" not in label
 
 
 def test_a_project_has_its_own_colour(client):

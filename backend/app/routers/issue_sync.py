@@ -103,16 +103,17 @@ def _find_external_task(
 def _apply_external_labels(task: "graph.TaskView", label_names: list[str], db: Session) -> None:
     """Mirror the external issue's label set onto the task.
 
-    Only plain labels (type == "label") are touched; decision labels and other
-    enhanced label types (ADR-0004) are never attached or detached here.
+    Only label nodes are touched. A decision record is its own node type since ADR-0118,
+    so it can no longer arrive here by wearing a label's shape — the type query is the
+    filter that the ``type == "label"`` check used to be.
     Missing labels are created project-scoped with source "issue_sync".
     """
     wanted = set(label_names)
-    current = {lb.name: lb for lb in graph.labels_for_task(db, task.id) if lb.type == "label"}
+    current = {lb.name: lb for lb in graph.labels_for_task(db, task.id)}
     task_project_id = graph.project_id_of_task(db, task.id)
 
     for name in wanted - set(current):
-        label = graph.find_label_by_name(db, task_project_id, name, label_type="label")
+        label = graph.find_label_by_name(db, task_project_id, name)
         if not label:
             label = graph.create_label(db, task_project_id, name=name, source="issue_sync")
         graph.set_label(db, task.id, label.id)
@@ -732,7 +733,7 @@ async def sync_labels_to_external(task: "graph.TaskView", db: Session) -> bool:
     if not target:
         return False
     token, base = target
-    names = [lb.name for lb in graph.labels_for_task(db, task.id) if lb.type == "label"]
+    names = [lb.name for lb in graph.labels_for_task(db, task.id)]
     if task.external_provider == "github":
         return await replace_github_issue_labels(task.external_repo, task.external_id, names, token, base)
     return await replace_gitlab_issue_labels(task.external_repo, task.external_id, names, token, base)
@@ -822,7 +823,7 @@ async def create_external_issue_from_task(
         raise Invalid("Project has no valid repo URL; set the project's repo URL first")
 
     token = integration.secret
-    labels = [lb.name for lb in graph.labels_for_task(db, task.id) if lb.type == "label"]
+    labels = [lb.name for lb in graph.labels_for_task(db, task.id)]
 
     if parsed["provider"] == "github":
         result = await create_github_issue(

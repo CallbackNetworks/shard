@@ -231,8 +231,8 @@ A label is `Node(type="label")` scoped to its project by a `contains` edge:
 // DELETE /nodes/{label_id}
 ```
 
-A **decision record** is the same node with `data.type = "decision"` and a `decision_status`
-(ADR-0004/ADR-0041) — it reuses the whole label mechanism, including the `#` quick-link UX.
+A decision record used to be one of these, wearing `data.type = "decision"` (ADR-0004). It is
+its own node type since ADR-0118 — see [Decisions](#decisions) below.
 
 #### `POST /projects/{pid}/tasks/{tid}/labels/{lid}`
 Assigns a label to a task.
@@ -1139,13 +1139,44 @@ Persisted filter/view configurations for task lists.
 
 ### Decisions
 
-A decision record is a label node with `data.type = "decision"` (ADR-0004, reaffirmed in
-ADR-0041), so it is **written** through `POST /nodes` like any other label. These are the
-decision-specific read views:
+A decision record is a node of type `decision` (ADR-0118; it was a label carrying
+`data.type = "decision"` until then), so it is **written** through `POST /nodes` like any
+other node:
+
+```jsonc
+// POST /nodes
+{ "type": "decision", "title": "string", "container_id": "<project id>",
+  "data": { "decision_status": "proposed|accepted|deprecated|superseded",
+            "description": "markdown", "color": "#hex" } }
+```
+
+It carries two relations of its own, and both are ordinary edges written through
+`POST /nodes/{id}/edges`:
+
+| Relation | Direction | Means |
+|----------|-----------|-------|
+| `supersedes` | decision → decision | this record replaces that one |
+| `governs` | decision → task or container | this record decides that work |
+
+Every decision read embeds `supersedes`, `superseded_by` and `governs` as `NodeRef` lists,
+so a client never has to fetch the edges separately.
 
 #### `GET /decisions?project_id=&status=` · `GET /decisions/{id}`
+An unknown `status` is a 400, not an empty list.
+
 #### `GET /decisions/{id}/export`
-Plain-text export of the decision record.
+Plain-text export of the decision record, under the ADR headings. A superseded record's
+`Status` line names what replaced it.
+
+#### `POST /decisions/{id}/supersedes/{superseded_id}` · `DELETE` the same path
+Records (or withdraws) a supersession. This is the one decision write that is *not* a plain
+node/edge call, because it is an edge **and** a status change on the far end: split across
+two client calls, the half that can fail on its own is the one that leaves a record saying
+it was replaced with nothing naming the replacement.
+
+#### `GET /nodes/{id}/decisions`
+The decisions governing a task or container — "what was decided about this?", asked from the
+work's side.
 
 ---
 
@@ -1763,10 +1794,17 @@ not who may call it (ADR-0092).
 ### Decisions (External API)
 
 #### `GET /api/v1/decisions` · `GET /api/v1/decisions/{id}` · `GET /api/v1/decisions/{id}/export` (`read`)
-Read-only on purpose: writing a decision is `POST /api/v1/nodes` with `type="label"` and
-`data={"type": "decision", "decision_status": "proposed"}` (a decision record is a label —
-ADR-0004; there is no `decision` node type and `type="decision"` answers 422), and
-a second write path would be the duplicate ADR-0087 exists to prevent.
+#### `GET /api/v1/nodes/{id}/decisions` (`read`)
+The decisions governing a task or container.
+
+#### `POST /api/v1/decisions/{id}/supersedes/{superseded_id}` · `DELETE` the same path (`write`)
+Records or withdraws a supersession — an edge plus the far end's status, as one act.
+
+Otherwise read-only on purpose: writing a decision is `POST /api/v1/nodes` with
+`type="decision"` (ADR-0118 — it used to be a label with `data.type="decision"`, and the
+instruction here named a node type that did not exist), and attaching one to work is
+`POST /api/v1/nodes/{decision_id}/edges` with `rel_type="governs"`. A second write path
+would be the duplicate ADR-0087 exists to prevent.
 
 ---
 

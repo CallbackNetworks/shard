@@ -27,9 +27,9 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../api/client', () => ({
   getDecisions: vi.fn(),
   getProjects: vi.fn(),
-  createLabel: vi.fn(),
-  updateLabel: vi.fn(),
-  deleteLabel: vi.fn(),
+  createDecision: vi.fn(),
+  updateDecision: vi.fn(),
+  deleteDecision: vi.fn(),
   exportDecision: vi.fn(),
 }))
 
@@ -77,9 +77,19 @@ describe('Decisions Decision Room', () => {
     setup()
     fireEvent.click(screen.getByText('decisions.accept').closest('button'))
     expect(mutate).toHaveBeenCalledWith({
-      projectId: 'p1',
       id: 'd1',
       data: { decision_status: 'accepted' },
+    })
+  })
+
+  it('rejecting deprecates the record instead of deleting it', () => {
+    // A decision that was considered and turned down is still something that was decided;
+    // Reject called delete and the history went with it.
+    setup()
+    fireEvent.click(screen.getByText('decisions.reject').closest('button'))
+    expect(mutate).toHaveBeenCalledWith({
+      id: 'd1',
+      data: { decision_status: 'deprecated' },
     })
   })
 })

@@ -286,12 +286,13 @@ def delete_container(db: Session, container_id: str) -> None:
     custom container): a contained top-level task belonging only to this container is
     deleted with its subtask tree; a task also linked into another container is merely
     unlinked from this one (``member_container_ids``). Contained node-only project-
-    scoped entities (labels, cycles: ADR-0033 Phase B) have no ORM cascade, so their
-    nodes are deleted too. Finally ``delete_node`` drops the container and its edges.
+    scoped entities (labels, cycles, decision records: ADR-0033 Phase B, ADR-0118) have
+    no ORM cascade, so their nodes are deleted too. Finally ``delete_node`` drops the container and its edges.
     """
     # Deferred imports: labels/cycles sit above tasks in the package dependency
     # order (cycles imports tasks), so importing them at module load would cycle.
     from app.services.graph.cycles import cycles_in_project
+    from app.services.graph.decision_records import decisions as decisions_in
     from app.services.graph.labels import labels_in_project
 
     contained = contained_task_ids(db, container_id)
@@ -304,7 +305,12 @@ def delete_container(db: Session, container_id: str) -> None:
             remove_edge(db, container_id, tid, REL_CONTAINS)
         else:
             delete_task_tree(db, tid)
-    for entity in labels_in_project(db, container_id) + cycles_in_project(db, container_id):
+    scoped = (
+        labels_in_project(db, container_id)
+        + cycles_in_project(db, container_id)
+        + decisions_in(db, project_id=container_id)
+    )
+    for entity in scoped:
         delete_node(db, entity.id)
     delete_node(db, container_id)
 

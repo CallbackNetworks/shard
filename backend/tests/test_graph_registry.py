@@ -25,6 +25,7 @@ def test_seed_inserts_all_builtins(db):
         graph.NODE_GOAL,
         graph.NODE_CYCLE,
         graph.NODE_LABEL,
+        graph.NODE_DECISION,
     }
 
 

@@ -61,9 +61,13 @@ class TaskPullRequest(Base):
 
 
 # ``Label`` was collapsed to a node-only entity in ADR-0033 Phase B: a label is a
-# ``Node(type="label")`` (name in ``title``; color/type/description/decision_status/
-# source in ``data``) scoped to its project by a ``contains`` edge. The dedicated
-# ``labels`` table was dropped; see ``services/graph.py`` label helpers.
+# ``Node(type="label")`` (name in ``title``; color/description/source in ``data``)
+# scoped to its project by a ``contains`` edge. The dedicated ``labels`` table was
+# dropped; see ``services/graph/labels.py``.
+#
+# A decision record used to be one of these, wearing ``data.type="decision"`` (ADR-0004).
+# It is ``Node(type="decision")`` since ADR-0118, with ``supersedes``/``governs`` edges of
+# its own; see ``services/graph/decision_records.py``.
 
 
 # ``Cycle`` was collapsed to a node-only entity in ADR-0033 Phase B: a cycle is a

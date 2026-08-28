@@ -9,6 +9,7 @@ const nodeTypes = [
   { key: 'identity', label: 'Identity', is_builtin: true, roles: ['shareable', 'subscribable'] },
   { key: 'goal', label: 'Goal', is_builtin: true, roles: ['container'] },
   { key: 'label', label: 'Label', is_builtin: true, roles: [] },
+  { key: 'decision', label: 'Decision', is_builtin: true, roles: [] },
   { key: 'topic', label: 'Topic', is_builtin: false, roles: ['container'], color: '#f59e0b' },
   { key: 'ticket', label: 'Ticket', is_builtin: false, roles: ['task'], color: '#22d3ee' },
   { key: 'note', label: 'Note', is_builtin: false, roles: [], color: '#a3e635' },
@@ -18,6 +19,8 @@ const edgeTypes = [
   { key: 'owns', label: 'Owns', is_builtin: true, is_containment: false },
   { key: 'depends_on', label: 'Depends on', is_builtin: true, is_containment: false },
   { key: 'labeled', label: 'Labeled', is_builtin: true, is_containment: false },
+  { key: 'supersedes', label: 'Supersedes', is_builtin: true, is_containment: false },
+  { key: 'governs', label: 'Governs', is_builtin: true, is_containment: false },
   { key: 'references', label: 'References', is_builtin: false, is_containment: false },
 ]
 
@@ -31,7 +34,7 @@ function fixture() {
     { id: 't3', type: 'task', title: 'Subtask', status: 'todo', priority: 'medium', data: {} },
     { id: 'k1', type: 'ticket', title: 'Custom ticket', status: 'todo', priority: 'high', data: {} },
     { id: 'g1', type: 'goal', title: 'Ship it', status: 'active', data: {} },
-    { id: 'd1', type: 'label', title: 'Use graph', data: { type: 'decision', decision_status: 'proposed' } },
+    { id: 'd1', type: 'decision', title: 'Use graph', data: { decision_status: 'proposed' } },
     { id: 'l1', type: 'label', title: 'bug', data: { type: 'label' } },
     { id: 'n1', type: 'note', title: 'Design note', data: {} },
   ]
@@ -105,7 +108,18 @@ describe('deriveGraphStructure', () => {
     expect(t1.assignee).toBe('me')
   })
 
-  it('derives decisions from decision-kind labels only', () => {
+  it('draws a built-in relation that has no lane of its own', () => {
+    // `supersedes`/`governs` are built-ins with no dedicated rendering (ADR-0118). The
+    // custom-link filter used to key off `is_builtin`, so the map drew neither.
+    const withEdges = fixture()
+    withEdges.edges.push({ id: 'e90', source_id: 'd1', target_id: 't1', rel_type: 'governs' })
+    const g = deriveGraphStructure(withEdges, nodeTypes, edgeTypes)
+    expect(g.customLinks).toEqual(
+      expect.arrayContaining([{ from: 'decision:d1', to: 'task:t1', relType: 'governs', label: 'Governs' }])
+    )
+  })
+
+  it('derives decisions from decision-type nodes', () => {
     expect(graph.decisionNodes.map(d => d.id)).toEqual(['d1'])
     expect(graph.decisionNodes[0].status).toBe('proposed')
     expect(graph.decisionNodes[0].projectId).toBe('p1')

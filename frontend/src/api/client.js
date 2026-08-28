@@ -329,8 +329,29 @@ export const updateTemplate = (id, data) => api.patch(`/templates/${id}`, data).
 export const deleteTemplate = (id) => api.delete(`/templates/${id}`)
 
 // Decisions
+// Decisions — reads on /decisions; entity writes go through the node surface (ADR-0043),
+// because a decision is a node of its own type since ADR-0118 (it was a label carrying
+// `data.type = 'decision'` before, which is why these used to call createLabel).
+// Supersession is the one exception: an edge plus a status on the far end is a single act
+// the server owns, not two calls a client makes in sequence.
 export const getDecisions = (params = {}) => api.get('/decisions', { params }).then(r => r.data)
 export const exportDecision = (id) => api.get(`/decisions/${id}/export`).then(r => r.data)
+export const createDecision = (projectId, { name, ...rest }) =>
+  createNode({ type: 'decision', container_id: projectId, title: name, data: rest })
+export const updateDecision = (id, { name, ...rest }) =>
+  updateNode(id, {
+    ...(name !== undefined ? { title: name } : {}),
+    ...(Object.keys(rest).length ? { data: rest } : {}),
+  })
+export const deleteDecision = (id) => deleteNode(id)
+export const supersedeDecision = (id, supersededId) =>
+  api.post(`/decisions/${id}/supersedes/${supersededId}`).then(r => r.data)
+export const unsupersedeDecision = (id, supersededId) =>
+  api.delete(`/decisions/${id}/supersedes/${supersededId}`).then(r => r.data)
+export const getDecisionsGoverning = (nodeId) => api.get(`/nodes/${nodeId}/decisions`).then(r => r.data)
+export const linkDecisionToWork = (id, nodeId) =>
+  attachNodeEdge(id, { target_id: nodeId, rel_type: 'governs' })
+export const unlinkDecisionFromWork = (id, nodeId) => detachNodeEdge(id, nodeId, 'governs')
 
 // Goals — reads stay on /goals (enriched: per-project breakdown + subtree progress);
 // writes go through the generic node/edge surface (ADR-0041 step c). A goal is a

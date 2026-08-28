@@ -1,0 +1,232 @@
+"""Decision records as a node type of their own (ADR-0118).
+
+Named ``decision_records`` rather than ``decisions`` so the facade's ``graph.decisions``
+is unambiguously the listing function and not this module.
+
+ADR-0004 stored a decision as a ``label`` node carrying ``data.type="decision"``. That
+was the right shape while a decision was a tag you stuck on a task, and the wrong one the
+moment a decision needed relations: ADR-0078's endpoint declarations name node *types*, so
+the strongest rule the old shape could express was ``label -> label`` — which constrains
+nothing and would have let any tag supersede any other. The modelling was already fighting
+itself elsewhere, too: ``label_names`` had to *subtract* decisions from the label
+vocabulary so a workflow rule would not offer one.
+
+A decision carries no roles. It is not a place work lives and it is not a piece of work,
+so it stays out of every size and progress rollup (ADR-0068) exactly as it did before, while
+``contains`` still files it under a project the way it filed the label.
+
+Two relations make the record answerable about itself (both declared in
+``graph_registry``):
+
+``supersedes``  newer decision -> the one it replaces. The ``superseded`` status is a
+                consequence of this edge, never typed on its own — a status saying "this
+                was replaced" while nothing says by what is a dead end, which is what
+                production held for all nine of them.
+``governs``     decision -> the task or container it decides. The reverse read
+                (:func:`governing`) is the question that had no query at all: labels
+                could be listed for a task, and the work could never be listed for a
+                decision.
+"""
+
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import Edge, Node
+from app.services.graph.core import (
+    NODE_DECISION,
+    REL_CONTAINS,
+    REL_GOVERNS,
+    REL_SUPERSEDES,
+    add_edge,
+    create_node,
+    project_container_map,
+    remove_edge,
+)
+
+# Status vocabulary lives in the type registry (the editor's picker reads the same list).
+STATUS_PROPOSED = "proposed"
+STATUS_SUPERSEDED = "superseded"
+
+
+@dataclass
+class DecisionView:
+    """The historical ``LabelOut`` attribute surface, plus the relations.
+
+    Keeping ``type`` on the view — always the constant ``"decision"`` — is deliberate:
+    every existing reader, ``/api/v1/decisions`` included, was written against a label
+    whose ``data.type`` said ``decision``, and the response contract does not change just
+    because the storage did.
+    """
+
+    id: str
+    project_id: str | None
+    name: str
+    color: str
+    description: str | None
+    decision_status: str | None
+    source: str | None
+    created_at: datetime
+    type: str = "decision"
+    supersedes: list[Node] = field(default_factory=list)
+    superseded_by: list[Node] = field(default_factory=list)
+    governs: list[Node] = field(default_factory=list)
+
+
+def _view(node: Node, project_id: str | None, links: dict | None = None) -> DecisionView:
+    data = node.data or {}
+    links = links or {}
+    return DecisionView(
+        id=node.id,
+        project_id=project_id,
+        name=node.title,
+        color=data.get("color", "#818cf8"),
+        description=data.get("description"),
+        decision_status=data.get("decision_status", STATUS_PROPOSED),
+        source=data.get("source"),
+        created_at=node.created_at,
+        supersedes=links.get(REL_SUPERSEDES, []),
+        superseded_by=links.get("superseded_by", []),
+        governs=links.get(REL_GOVERNS, []),
+    )
+
+
+def links_map(db: Session, decision_ids) -> dict[str, dict[str, list[Node]]]:
+    """Batch-load both relations for many decisions, in three queries.
+
+    Batched for the same reason ADR-0094 batched ancestry: every caller is a list, and one
+    request per row is how a page ends up not asking at all.
+    """
+    ids = set(decision_ids)
+    result: dict[str, dict[str, list[Node]]] = defaultdict(lambda: defaultdict(list))
+    if not ids:
+        return result
+
+    def _load(rel_type: str, own_side, other_side, key: str) -> None:
+        rows = db.execute(
+            select(own_side, Node)
+            .join(Node, Node.id == other_side)
+            .where(Edge.rel_type == rel_type, own_side.in_(ids))
+            .order_by(Node.created_at.asc())
+        ).all()
+        for own_id, node in rows:
+            result[own_id][key].append(node)
+
+    _load(REL_SUPERSEDES, Edge.source_id, Edge.target_id, REL_SUPERSEDES)
+    _load(REL_SUPERSEDES, Edge.target_id, Edge.source_id, "superseded_by")
+    _load(REL_GOVERNS, Edge.source_id, Edge.target_id, REL_GOVERNS)
+    return result
+
+
+def decisions(db: Session, *, project_id: str | None = None, status: str | None = None) -> list[DecisionView]:
+    """Decision records, newest first, optionally narrowed by project or status."""
+    query = db.query(Node).filter(Node.type == NODE_DECISION)
+    nodes = query.order_by(Node.created_at.desc()).all()
+    ids = [n.id for n in nodes]
+    pmap = project_container_map(db, ids)
+    lmap = links_map(db, ids)
+    result: list[DecisionView] = []
+    for node in nodes:
+        pid = pmap.get(node.id)
+        if project_id is not None and pid != project_id:
+            continue
+        if status is not None and (node.data or {}).get("decision_status", STATUS_PROPOSED) != status:
+            continue
+        result.append(_view(node, pid, lmap.get(node.id)))
+    return result
+
+
+def get_decision(db: Session, decision_id: str) -> DecisionView | None:
+    node = db.get(Node, decision_id)
+    if node is None or node.type != NODE_DECISION:
+        return None
+    pid = project_container_map(db, [decision_id]).get(decision_id)
+    return _view(node, pid, links_map(db, [decision_id]).get(decision_id))
+
+
+def create_decision(
+    db: Session,
+    project_id: str | None,
+    *,
+    name: str,
+    color: str = "#818cf8",
+    description: str | None = None,
+    decision_status: str = STATUS_PROPOSED,
+    source: str | None = None,
+    actor: str | None = None,
+) -> DecisionView:
+    # Only the keys that carry a value: ``create_node`` folds every keyword into ``data``,
+    # and a stored ``null`` shows up on the node page as an ad-hoc key the type does not
+    # declare — noise that looks like data somebody wrote.
+    fields = {"color": color, "description": description, "decision_status": decision_status, "source": source}
+    node = create_node(db, NODE_DECISION, title=name, actor=actor, **{k: v for k, v in fields.items() if v is not None})
+    if project_id:
+        add_edge(db, project_id, node.id, REL_CONTAINS)
+    return _view(node, project_id)
+
+
+# No ``update_decision`` / ``delete_decision`` here on purpose: a decision is a node, so
+# editing and deleting one go through the generic node surface (ADR-0040→0043) the same way
+# every other entity's do. A pair of helpers beside it would be the duplicate write path
+# ADR-0087 spent its existence removing — and the first draft of this module had them,
+# reachable from nothing.
+
+
+def supersede(db: Session, decision_id: str, superseded_id: str, *, actor: str | None = None) -> None:
+    """Record that ``decision_id`` replaces ``superseded_id``, and mark the older one.
+
+    The edge and the status are one act. Left to a caller they are two writes that can
+    half-succeed, and the half that fails silently is the one that leaves the status
+    saying "replaced" with nothing naming the replacement — the exact state this ADR
+    exists to end.
+    """
+    add_edge(db, decision_id, superseded_id, REL_SUPERSEDES, actor=actor)
+    old = db.get(Node, superseded_id)
+    data = dict(old.data or {})
+    data["decision_status"] = STATUS_SUPERSEDED
+    old.data = data
+    db.flush()
+
+
+def unsupersede(db: Session, decision_id: str, superseded_id: str, *, actor: str | None = None) -> bool:
+    """Drop a supersession. The far end returns to ``accepted``: it is a live decision again."""
+    removed = remove_edge(db, decision_id, superseded_id, REL_SUPERSEDES, actor=actor)
+    if not removed:
+        return False
+    old = db.get(Node, superseded_id)
+    if old is not None and (old.data or {}).get("decision_status") == STATUS_SUPERSEDED:
+        remaining = db.execute(
+            select(Edge.id).where(Edge.target_id == superseded_id, Edge.rel_type == REL_SUPERSEDES)
+        ).first()
+        if remaining is None:
+            data = dict(old.data or {})
+            data["decision_status"] = "accepted"
+            old.data = data
+            db.flush()
+    return True
+
+
+def governing(db: Session, node_id: str) -> list[DecisionView]:
+    """The decisions that govern a piece of work — the read that had no query.
+
+    ``labels_for_task`` existed from the start and its mirror never did, so "what was
+    decided about this?" could only be answered by fetching every decision and filtering
+    client-side, which is to say it was not answered anywhere.
+    """
+    rows = (
+        db.execute(
+            select(Node)
+            .join(Edge, Edge.source_id == Node.id)
+            .where(Edge.target_id == node_id, Edge.rel_type == REL_GOVERNS, Node.type == NODE_DECISION)
+            .order_by(Node.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+    ids = [n.id for n in rows]
+    pmap = project_container_map(db, ids)
+    lmap = links_map(db, ids)
+    return [_view(n, pmap.get(n.id), lmap.get(n.id)) for n in rows]

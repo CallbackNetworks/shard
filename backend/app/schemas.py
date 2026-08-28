@@ -66,6 +66,24 @@ class LabelOut(BaseModel):
     created_at: datetime
 
 
+class DecisionOut(LabelOut):
+    """A decision record, plus the relations that make it more than a note (ADR-0118).
+
+    Extends ``LabelOut`` rather than replacing it: a decision was stored as a label until
+    ADR-0118 and every existing reader — ``/api/v1/decisions``, the MCP tools, the SPA —
+    was written against that shape, which the storage change is not a reason to break.
+    ``project_id`` widens to optional because the generic node write surface can create a
+    decision with no container, and a read that 500s on data the write surface allows is
+    the asymmetry ADR-0086 is about.
+    """
+
+    project_id: str | None = None
+    type: str = "decision"
+    supersedes: list["NodeRef"] = []
+    superseded_by: list["NodeRef"] = []
+    governs: list["NodeRef"] = []
+
+
 # --- Project ---
 
 
@@ -1378,6 +1396,12 @@ class NodeRef(BaseModel):
     type: str
     title: str
     status: str | None = None
+
+
+# ``DecisionOut`` is declared far above but embeds ``NodeRef``; resolve it here, where the
+# name finally exists, rather than leaving a forward reference to be discovered at request
+# time by whichever endpoint happens to be called first.
+DecisionOut.model_rebuild()
 
 
 class EdgeOut(BaseModel):

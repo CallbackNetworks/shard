@@ -7,8 +7,8 @@ unchanged. Private helpers consumed across modules or by tests (``_project_view`
 ``_log_event``, ...) are re-exported deliberately.
 
 Internal dependency order (acyclic): core <- projects <- tasks <- cycles;
-labels/identities/goals build on core (+ projects). ``tasks.delete_container``
-reaches labels/cycles via deferred imports.
+labels/identities/goals/decision_records build on core (+ projects).
+``tasks.delete_container`` reaches labels/cycles via deferred imports.
 """
 
 from app.services.graph.core import (
@@ -16,6 +16,7 @@ from app.services.graph.core import (
     CLOSED_STATUSES,
     CONTAINER_DEFAULT_STATUS,
     NODE_CYCLE,
+    NODE_DECISION,
     NODE_GOAL,
     NODE_IDENTITY,
     NODE_LABEL,
@@ -23,9 +24,11 @@ from app.services.graph.core import (
     NODE_TASK,
     REL_CONTAINS,
     REL_DEPENDS_ON,
+    REL_GOVERNS,
     REL_IN_CYCLE,
     REL_LABELED,
     REL_OWNS,
+    REL_SUPERSEDES,
     ROLE_CONTAINER,
     ROLE_SHAREABLE,
     ROLE_SUBSCRIBABLE,
@@ -91,6 +94,18 @@ from app.services.graph.cycles import (
     tasks_in_cycle,
     update_cycle,
 )
+from app.services.graph.decision_records import (
+    DecisionView,
+    create_decision,
+    decisions,
+    get_decision,
+    governing,
+    supersede,
+    unsupersede,
+)
+from app.services.graph.decision_records import (
+    links_map as decision_links_map,
+)
 from app.services.graph.goals import (
     GoalView,
     _goal_view,
@@ -126,7 +141,6 @@ from app.services.graph.labels import (
     LabelView,
     _label_view,
     create_label,
-    decisions,
     delete_label,
     find_label_by_name,
     get_label,

@@ -95,7 +95,7 @@ change; only a new *root-level* route does.
 | `attachments` | `/projects/{pid}/tasks/{tid}/attachments` | File upload/download/delete |
 | `identities` | `/identities` | Identity reads, hub stats, project lists, share views |
 | `goals` | `/goals` | Goal reads + subtree progress |
-| `decisions` | `/decisions` | Decision records (enhanced labels) + export |
+| `decisions` | `/decisions` | Decision records + supersession + export (ADR-0118) |
 | `bulk` | `/projects/{pid}/tasks/bulk-update` | Multi-task update in one request |
 | `imports` | `/projects/{pid}/import/*` | GitHub / Linear / Trello import |
 | `integrations` | `/integrations` | Outbound notification targets + templates + health |

@@ -233,10 +233,17 @@ class TestInboundLabelMirror:
         names = [lb.name for lb in graph.labels_for_task(db, task.id)]
         assert names == ["bug"]
 
-    def test_decision_labels_untouched(self, client, sample_project, db):
+    def test_a_governing_decision_is_untouched(self, client, sample_project, db):
+        """The mirror replaces the task's *labels*, and a decision is not one (ADR-0118).
+
+        It used to be — a decision was a label wearing ``data.type="decision"`` — so this
+        test guarded a filter that had to hold the two apart by hand. The relation is
+        ``governs`` now and runs the other way, which puts it out of the mirror's reach by
+        construction rather than by exclusion.
+        """
         task = _make_external_task(db, sample_project.id)
-        decision = graph.create_label(db, sample_project.id, name="use-postgres", type="decision")
-        graph.set_label(db, task.id, decision.id)
+        decision = graph.create_decision(db, sample_project.id, name="use-postgres")
+        graph.add_edge(db, decision.id, task.id, graph.REL_GOVERNS)
         db.commit()
 
         r = client.post(
@@ -246,8 +253,8 @@ class TestInboundLabelMirror:
         )
         assert r.status_code == 200
         db.expire_all()
-        names = sorted(lb.name for lb in graph.labels_for_task(db, task.id))
-        assert names == ["bug", "use-postgres"]
+        assert [lb.name for lb in graph.labels_for_task(db, task.id)] == ["bug"]
+        assert [d.name for d in graph.governing(db, task.id)] == ["use-postgres"]
 
     def test_new_task_gets_labels(self, client, sample_project, db):
         r = client.post(

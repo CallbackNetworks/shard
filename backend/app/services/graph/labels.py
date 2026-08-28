@@ -1,8 +1,10 @@
 """Labels (node-only, ADR-0033 Phase B).
 
 A label is a ``Node(type="label")`` whose ``title`` holds the name and whose
-``data`` bag holds ``color``/``type``/``description``/``decision_status``/
-``source``. Its project scope is a ``contains`` edge (project -> label). The
+``data`` bag holds ``color``/``description``. Its project scope is a ``contains``
+edge (project -> label). Decision records used to live here too, as labels carrying
+``data.type="decision"`` — they are their own node type now, in
+``graph/decision_records.py`` (ADR-0118). The
 ``LabelView`` adapter exposes the historical ``Label`` attribute surface so
 ``LabelOut.model_validate`` and existing read sites keep working unchanged.
 """
@@ -80,6 +82,8 @@ def _label_view(node: Node, project_id: str | None) -> LabelView:
         project_id=project_id,
         name=node.title,
         color=data.get("color", "#5e6ad2"),
+        # Always "label" now that a decision is its own node type (ADR-0118). Kept on the
+        # view because ``LabelOut`` declares it and clients read it.
         type=data.get("type", "label"),
         description=data.get("description"),
         decision_status=data.get("decision_status"),
@@ -99,9 +103,7 @@ def create_label(
     *,
     name: str,
     color: str = "#5e6ad2",
-    type: str = "label",
     description: str | None = None,
-    decision_status: str | None = None,
     source: str | None = None,
     actor: str | None = None,
 ) -> LabelView:
@@ -112,9 +114,7 @@ def create_label(
         title=name,
         actor=actor,
         color=color,
-        type=type,
         description=description,
-        decision_status=decision_status,
         source=source,
     )
     if project_id:
@@ -200,35 +200,15 @@ def label_names(db: Session, *, project_id: str | None = None) -> list[str]:
     anywhere. Suggestions, not a closed set — a rule may legitimately name a label that
     will be created later, which is why the miss is a warning and not a 422 (ADR-0056).
 
-    Decision records are label nodes too (``data.type == "decision"``), and naming one in
-    a rule is legal but never intended, so they are left out of the suggestions. Legality
-    is unchanged — this list is what to offer, not what is allowed.
+    This used to subtract decision records from the list, because ADR-0004 stored one as a
+    label. A decision is its own node type since ADR-0118, so there is nothing left to
+    subtract — the type query is the filter.
     """
     if project_id is not None:
         views = labels_in_project(db, project_id)
     else:
         views = [_label_view(node, None) for node in db.query(Node).filter(Node.type == NODE_LABEL).all()]
-    return sorted({view.name for view in views if view.name and view.type != "decision"})
-
-
-def decisions(db: Session, *, project_id: str | None = None, status: str | None = None) -> list[LabelView]:
-    """Label nodes whose kind is ``decision``, newest first (filtered in Python).
-
-    JSON ``data`` filtering is done in Python so the query stays portable across
-    SQLite and PostgreSQL; decision counts are small.
-    """
-    nodes = db.query(Node).filter(Node.type == NODE_LABEL).order_by(Node.created_at.desc()).all()
-    decision_nodes = [n for n in nodes if (n.data or {}).get("type") == "decision"]
-    pmap = label_project_map(db, [n.id for n in decision_nodes])
-    result: list[LabelView] = []
-    for node in decision_nodes:
-        pid = pmap.get(node.id)
-        if project_id is not None and pid != project_id:
-            continue
-        if status is not None and (node.data or {}).get("decision_status") != status:
-            continue
-        result.append(_label_view(node, pid))
-    return result
+    return sorted({view.name for view in views if view.name})
 
 
 def labels_for_task(db: Session, task_id: str) -> list[LabelView]:

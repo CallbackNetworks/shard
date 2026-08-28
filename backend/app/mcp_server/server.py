@@ -37,6 +37,7 @@ SettingsAction = Literal["get", "bounds", "update", "llm_update", "ical_token", 
 BackupAction = Literal["status", "run", "restore"]
 ImportSource = Literal["github", "linear", "trello"]
 UnfiledAction = Literal["list", "file"]
+DecisionLinkAction = Literal["supersede", "unsupersede", "governing"]
 CrudAction = Literal["create", "update", "delete"]
 CycleAction = Literal["list", "get", "compare", "duplicate"]
 RecurrenceAction = Literal["get", "create", "update", "delete"]
@@ -616,6 +617,31 @@ async def _list_decisions(project_id: str | None = None, status: str | None = No
 
 async def _export_decision(decision_id: str) -> str:
     return await _get_text(f"/decisions/{decision_id}/export")
+
+
+async def _manage_decision_links(
+    action: str,
+    decision_id: str | None = None,
+    superseded_id: str | None = None,
+    node_id: str | None = None,
+) -> str:
+    """The relations a decision record carries (ADR-0118).
+
+    Arguments are checked here rather than round-tripping a request the server would only
+    refuse (ADR-0093): a missing id is a mistake the caller can fix without the network.
+    """
+    if action == "governing":
+        if not node_id:
+            return "Error: node_id is required to list the decisions governing a node"
+        result = await _get(f"/nodes/{node_id}/decisions")
+    elif action in ("supersede", "unsupersede"):
+        if not decision_id or not superseded_id:
+            return f"Error: decision_id and superseded_id are required to {action}"
+        path = f"/decisions/{decision_id}/supersedes/{superseded_id}"
+        result = await (_post(path) if action == "supersede" else _delete(path))
+    else:
+        return f"Error: unknown action '{action}'"
+    return json.dumps(result) if not isinstance(result, str) else result
 
 
 async def _manage_cycles(
@@ -1320,15 +1346,37 @@ async def manage_unfiled(action: UnfiledAction, task_id: str | None = None, proj
 
 @mcp.tool(
     description=(
-        "List decision records — what was decided about the work, and its status "
-        "(proposed/accepted/superseded/deprecated). Read this before proposing a decision "
-        "somebody already made. Writing one is create_node with type='label' and "
-        "data={'type': 'decision', 'decision_status': 'proposed'} — there is no 'decision' "
-        "node type; a decision record is a label (ADR-0004)."
+        "List decision records — what was decided about the work, its status "
+        "(proposed/accepted/deprecated/superseded), what each one supersedes and is "
+        "superseded by, and the work each governs. Read this before proposing a decision "
+        "somebody already made, and read the supersession chain before treating an old one "
+        "as current. Writing one is create_node with type='decision' (ADR-0118 — it used to "
+        "be a label with data.type='decision')."
     )
 )
 async def list_decisions(project_id: str | None = None, status: str | None = None) -> str:
     return await _list_decisions(project_id=project_id, status=status)
+
+
+@mcp.tool(
+    description=(
+        "The relations a decision record carries. 'supersede' records that decision_id "
+        "replaces superseded_id and marks the older one superseded — one act, because a "
+        "record saying it was replaced with nothing naming the replacement is a dead end. "
+        "'unsupersede' withdraws that. 'governing' lists the decisions attached to a task "
+        "or container, i.e. what was decided about this piece of work. Attaching a decision "
+        "to work is manage_edges with rel_type='governs', source=decision, target=work."
+    )
+)
+async def manage_decision_links(
+    action: DecisionLinkAction,
+    decision_id: str | None = None,
+    superseded_id: str | None = None,
+    node_id: str | None = None,
+) -> str:
+    return await _manage_decision_links(
+        action=action, decision_id=decision_id, superseded_id=superseded_id, node_id=node_id
+    )
 
 
 @mcp.tool(

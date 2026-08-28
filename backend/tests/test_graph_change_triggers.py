@@ -41,13 +41,13 @@ def _rule(db, trigger, *, conditions=None, actions=None, project_id=None):
 
 
 @pytest.fixture()
-def decision(db):
+def proposal(db):
     """A node with no task role, inside a project — the case that had no trigger at all."""
-    db.add(NodeType(key="decision", label="Decision", is_builtin=False, roles=[]))
+    db.add(NodeType(key="proposal", label="Proposal", is_builtin=False, roles=[]))
     project = make_project(db, name="P")
     db.add(project)
     db.flush()
-    node = Node(type="decision", title="Adopt the graph model", status="todo")
+    node = Node(type="proposal", title="Adopt the graph model", status="todo")
     db.add(node)
     db.flush()
     graph.add_edge(db, project.id, node.id, graph.REL_CONTAINS)
@@ -60,9 +60,9 @@ def decision(db):
 
 class TestNodeUpdated:
     @pytest.mark.asyncio
-    async def test_a_non_task_node_can_start_a_rule(self, db, decision):
-        """ "When this decision is superseded, tell my external system" — previously unsayable."""
-        _, node = decision
+    async def test_a_non_task_node_can_start_a_rule(self, db, proposal):
+        """ "When this proposal is superseded, tell my external system" — previously unsayable."""
+        _, node = proposal
         rule = _rule(db, "node.updated")
 
         await dispatch_node_updated(db, node, {"status": "done"})
@@ -71,9 +71,9 @@ class TestNodeUpdated:
         assert rule.run_count == 1
 
     @pytest.mark.asyncio
-    async def test_a_write_that_changes_nothing_is_not_a_change(self, db, decision):
+    async def test_a_write_that_changes_nothing_is_not_a_change(self, db, proposal):
         """A PATCH echoing the current value back must not count as the field moving."""
-        _, node = decision
+        _, node = proposal
         rule = _rule(db, "node.updated")
 
         await dispatch_node_updated(db, node, {"status": node.status})
@@ -82,9 +82,9 @@ class TestNodeUpdated:
         assert (rule.run_count or 0) == 0
 
     @pytest.mark.asyncio
-    async def test_changed_field_narrows_a_generic_trigger_back_down(self, db, decision):
+    async def test_changed_field_narrows_a_generic_trigger_back_down(self, db, proposal):
         """The condition that replaces the old ``task.status_changed`` trigger."""
-        _, node = decision
+        _, node = proposal
         on_status = _rule(db, "node.updated", conditions=[{"field": "changed_field", "op": "eq", "value": "status"}])
         on_title = _rule(db, "node.updated", conditions=[{"field": "changed_field", "op": "eq", "value": "title"}])
 
@@ -94,9 +94,9 @@ class TestNodeUpdated:
         db.refresh(on_title)
         assert (on_status.run_count, on_title.run_count or 0) == (1, 0)
 
-    def test_changed_field_reads_the_whole_change_set(self, db, decision):
+    def test_changed_field_reads_the_whole_change_set(self, db, proposal):
         """One update naming two fields satisfies a condition on either of them."""
-        _, node = decision
+        _, node = proposal
         context = {"changed": ["priority", "status"]}
         assert _eval_condition({"field": "changed_field", "op": "eq", "value": "status"}, node, context, db) is True
         assert _eval_condition({"field": "changed_field", "op": "eq", "value": "title"}, node, context, db) is False
@@ -106,9 +106,9 @@ class TestNodeUpdated:
         )
 
     @pytest.mark.asyncio
-    async def test_a_task_update_reaches_the_same_trigger(self, db, decision):
+    async def test_a_task_update_reaches_the_same_trigger(self, db, proposal):
         """Tasks and every other node type now arrive through one trigger, not two."""
-        project, _ = decision
+        project, _ = proposal
         task = make_task(db, project_id=project.id, title="T", status="todo")
         db.add(task)
         db.flush()
@@ -132,8 +132,8 @@ class TestNodeUpdated:
 
 class TestNodeDeleted:
     @pytest.mark.asyncio
-    async def test_a_deletion_can_start_a_rule(self, db, decision):
-        _, node = decision
+    async def test_a_deletion_can_start_a_rule(self, db, proposal):
+        _, node = proposal
         rule = _rule(db, "node.deleted")
 
         await dispatch_node_deleted(db, node)
@@ -142,9 +142,9 @@ class TestNodeDeleted:
         assert rule.run_count == 1
 
     @pytest.mark.asyncio
-    async def test_a_task_deletion_reaches_the_rule_before_the_teardown(self, db, decision):
+    async def test_a_task_deletion_reaches_the_rule_before_the_teardown(self, db, proposal):
         """The subject must still exist when conditions are evaluated against it."""
-        project, _ = decision
+        project, _ = proposal
         task = make_task(db, project_id=project.id, title="Doomed", status="todo")
         db.add(task)
         db.flush()
@@ -157,9 +157,9 @@ class TestNodeDeleted:
         assert graph.get_task(db, task.id) is None
 
     @pytest.mark.asyncio
-    async def test_writing_to_a_node_on_its_way_out_is_skipped_visibly(self, db, decision):
+    async def test_writing_to_a_node_on_its_way_out_is_skipped_visibly(self, db, proposal):
         """Not silently dropped: a write nobody will ever read is reported as skipped."""
-        _, node = decision
+        _, node = proposal
         _rule(db, "node.deleted", actions=[{"type": "set_status", "value": "done"}])
 
         await dispatch_node_deleted(db, node)
@@ -170,19 +170,19 @@ class TestNodeDeleted:
         assert "is being deleted" in skipped[0].detail
 
     @pytest.mark.asyncio
-    async def test_fire_event_still_runs_on_a_deletion(self, db, decision):
+    async def test_fire_event_still_runs_on_a_deletion(self, db, proposal):
         """The one action that outlives its subject: it leaves, it does not write back."""
-        _, node = decision
-        _rule(db, "node.deleted", actions=[{"type": "fire_event", "value": "decision.dropped"}])
+        _, node = proposal
+        _rule(db, "node.deleted", actions=[{"type": "fire_event", "value": "proposal.dropped"}])
 
         await dispatch_node_deleted(db, node)
 
         assert db.query(ActivityLog).filter(ActivityLog.action == "rule.skipped").count() == 0
 
     @pytest.mark.asyncio
-    async def test_the_activity_entry_does_not_point_at_the_deleted_task(self, db, decision):
+    async def test_the_activity_entry_does_not_point_at_the_deleted_task(self, db, proposal):
         """``delete_task_tree`` clears rows referencing the task, so scoping to it loses them."""
-        project, _ = decision
+        project, _ = proposal
         task = make_task(db, project_id=project.id, title="Doomed", status="todo")
         db.add(task)
         db.flush()
@@ -200,8 +200,8 @@ class TestNodeDeleted:
 
 class TestEdgeTriggers:
     @pytest.fixture()
-    def linked(self, db, decision):
-        project, node = decision
+    def linked(self, db, proposal):
+        project, node = proposal
         task = make_task(db, project_id=project.id, title="T", status="todo")
         db.add(task)
         db.flush()
@@ -259,13 +259,13 @@ class TestEdgeTriggers:
             "edge.added",
             conditions=[
                 {"field": "has_role", "op": "eq", "value": "task"},
-                {"field": "other_type", "op": "eq", "value": "decision"},
+                {"field": "other_type", "op": "eq", "value": "proposal"},
             ],
         )
 
         await dispatch_edge_added(db, node.id, task.id, graph.REL_DEPENDS_ON)
 
-        # Once: the task end, whose far end is the decision. The decision end sees a task
+        # Once: the task end, whose far end is the proposal. The proposal end sees a task
         # at the far side and fails the has_role condition about itself.
         db.refresh(rule)
         assert rule.run_count == 1
@@ -319,17 +319,17 @@ class TestMembershipRespectsTheOperator:
 
 
 class TestUndecidableConditions:
-    def test_no_change_at_hand_is_null_not_false(self, db, decision):
+    def test_no_change_at_hand_is_null_not_false(self, db, proposal):
         """Reporting it ``False`` would make every dry-run of a node.updated rule say
         "would not fire" — the same wrong answer as the old dry-run, mirrored."""
-        _, node = decision
+        _, node = proposal
         assert _eval_condition({"field": "changed_field", "op": "eq", "value": "status"}, node, {}, db) is None
         assert _eval_condition({"field": "edge_type", "op": "eq", "value": "labeled"}, node, {}, db) is None
 
     @pytest.mark.asyncio
-    async def test_an_undecidable_condition_does_not_fire_a_rule(self, db, decision):
+    async def test_an_undecidable_condition_does_not_fire_a_rule(self, db, proposal):
         """``is True``, not truthiness: at run time the only way to be here is a bug."""
-        _, node = decision
+        _, node = proposal
         rule = _rule(db, "node.created", conditions=[{"field": "changed_field", "op": "eq", "value": "status"}])
 
         await run_rules(db, "node.created", node, {})

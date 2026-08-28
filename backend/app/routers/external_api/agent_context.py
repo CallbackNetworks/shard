@@ -37,7 +37,7 @@ def api_agent_context(
 
     project_infos = []
     for p in projects:
-        label_names = [lb.name for lb in graph.labels_in_project(db, p.id) if lb.type == "label"]
+        label_names = [lb.name for lb in graph.labels_in_project(db, p.id)]
 
         p_tasks = graph.subtree_task_views(db, p.id)
         sub = graph.subtask_ids_among(db, [t.id for t in p_tasks])
