@@ -12,6 +12,7 @@ probe this module replaced looked for `tasks`, gone since the graph migration, a
 called every existing database new.
 """
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -136,6 +137,59 @@ class TestAMigrationRunsAgainstTheStrictSchema:
             conn.execute(text("DELETE FROM alembic_version"))
             conn.execute(text("INSERT INTO alembic_version (version_num) VALUES (:r)"), {"r": revision})
         command.upgrade(cfg, "head")
+
+    def test_a_stale_builtin_declaration_is_brought_back_in_line(self, tmp_path, monkeypatch):
+        """The half `seed_builtin_types` cannot do (ADR-0078, b5d7f9a1c3e6).
+
+        Production's `contains` description said "an identity cannot be a parent here"
+        long after ADR-0095 made that false, because the seed only inserts what is
+        missing. A database holding yesterday's sentence has to come out of `upgrade`
+        holding today's.
+        """
+        from app.services.graph_registry import BUILTIN_EDGE_TYPES, BUILTIN_NODE_TYPES
+
+        engine = self._fresh_strict_db(tmp_path)
+        now = datetime.now(UTC)
+        stale = "an identity cannot be a parent here"
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)"))
+            conn.execute(
+                text(
+                    "INSERT INTO edge_types "
+                    "(key, label, description, is_builtin, is_containment, is_symmetric, created_at, updated_at) "
+                    "VALUES ('contains', 'Contains', :d, 1, 1, 0, :t, :t)"
+                ),
+                {"d": stale, "t": now},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO node_types (key, label, is_builtin, fields, created_at, updated_at) "
+                    "VALUES ('project', 'Project', 1, '[]', :t, :t)"
+                ),
+                {"t": now},
+            )
+            # A custom type with its own declarations, which the resync must not touch.
+            conn.execute(
+                text(
+                    "INSERT INTO node_types (key, label, is_builtin, fields, created_at, updated_at) "
+                    "VALUES ('topic', 'Topic', 0, :f, :t, :t)"
+                ),
+                {"f": '[{"key": "mine", "label": "Mine", "kind": "text"}]', "t": now},
+            )
+
+        self._upgrade(engine, "d601757ef2ef", monkeypatch)
+
+        want_edge = next(s for s in BUILTIN_EDGE_TYPES if s["key"] == "contains")["description"]
+        want_node = next(s for s in BUILTIN_NODE_TYPES if s["key"] == "project")["fields"]
+        with engine.begin() as conn:
+            got = conn.execute(text("SELECT description FROM edge_types WHERE key='contains'")).scalar()
+            assert got == want_edge
+            assert stale not in got
+            fields = json.loads(conn.execute(text("SELECT fields FROM node_types WHERE key='project'")).scalar())
+            assert [f["key"] for f in fields] == [f["key"] for f in want_node]
+            # The user's own type is left exactly as it was.
+            custom = json.loads(conn.execute(text("SELECT fields FROM node_types WHERE key='topic'")).scalar())
+            assert [f["key"] for f in custom] == ["mine"]
 
     def test_the_decision_revision_applies_to_a_create_all_schema(self, tmp_path, monkeypatch):
         engine = self._fresh_strict_db(tmp_path)
