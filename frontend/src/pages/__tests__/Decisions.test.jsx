@@ -27,6 +27,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../api/client', () => ({
   getDecisions: vi.fn(),
   getProjects: vi.fn(),
+  getAncestry: vi.fn(),
   getNodeTypes: vi.fn(),
   getNodes: vi.fn(),
   getDecisionsGoverning: vi.fn(),
@@ -56,10 +57,19 @@ const decisions = [
   { id: 'd4', project_id: 'p1', name: 'Rejected cache', description: 'Rejected desc', decision_status: 'deprecated', source: 'manual' },
 ]
 
-function setup() {
+// Where each decision lives (ADR-0094). Every record here sits under one organization,
+// so the page has a real hierarchy to draw rather than a flat project name per card.
+const org = { id: 'o1', type: 'organization', type_label: 'Organization', title: 'Acme' }
+const proj = { id: 'p1', type: 'project', type_label: 'Project', title: 'Project One' }
+const ancestry = Object.fromEntries(
+  ['d1', 'd2', 'd3', 'd4'].map(id => [id, { id, trails: [[org, proj]], owners: [] }])
+)
+
+function setup(rows = decisions, tree = ancestry) {
   mockUseQuery.mockImplementation(({ queryKey }) => {
-    if (queryKey[0] === 'decisions') return { data: decisions, isLoading: false }
+    if (queryKey[0] === 'decisions') return { data: rows, isLoading: false }
     if (queryKey[0] === 'projects') return { data: projects, isLoading: false }
+    if (queryKey[0] === 'ancestry') return { data: tree, isLoading: false }
     return { data: [], isLoading: false }
   })
 
@@ -174,5 +184,69 @@ describe('Decisions Decision Room', () => {
     setup()
     fireEvent.click(screen.getAllByLabelText('more')[0])
     expect(screen.getByText('decisions.openNode').closest('a').getAttribute('href')).toBe('/n/d1')
+  })
+  it('files decisions under the containers they live in', () => {
+    // The page drew a project *name* as grey meta text on each card and nothing above
+    // it, so the only structure on screen was supersession — of which production has
+    // two edges across 103 records (ADR-0126).
+    setup()
+    expect(screen.getAllByText('Acme').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Organization').length).toBeGreaterThan(0)
+    const group = screen.getAllByText('Acme')[0].closest('[aria-expanded]')
+    expect(group.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('starts a big section collapsed, and opens one group at a time', () => {
+    // The complaint this exists for: a hundred records arrive and the column is one
+    // unreadable scroll. Below the limit the page reads as it always did; above it the
+    // column is a list of containers.
+    const many = Array.from({ length: 40 }, (_, i) => ({
+      id: `m${i}`, project_id: 'p1', name: `Bulk ${i}`, decision_status: 'accepted', source: 'manual',
+    }))
+    const tree = Object.fromEntries(many.map(m => [m.id, { id: m.id, trails: [[org, proj]], owners: [] }]))
+    setup(many, tree)
+
+    expect(screen.queryByText('Bulk 0')).toBeNull()
+    const toggle = screen.getAllByText('Acme')[0].closest('[aria-expanded]')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(toggle)
+    // Opening the organization reveals the project it holds, not 40 cards at once.
+    const project = screen.getAllByText('Project One').find(el => el.closest('[aria-expanded]'))
+    fireEvent.click(project.closest('[aria-expanded]'))
+    expect(screen.getByText('Bulk 0')).toBeTruthy()
+  })
+
+  it('counts records, so a header never disagrees with the rows under it', () => {
+    // The pending queue holds one record; its group must say 1, not "one lineage".
+    setup()
+    const queue = screen.getByText('decisions.pendingQueue').closest('section')
+    const head = queue.querySelector('[aria-expanded]').parentElement
+    expect(head.textContent).toContain('Acme')
+    expect(head.textContent.endsWith('1')).toBe(true)
+  })
+
+  it('narrows the whole room by free text, counts included', () => {
+    // A count beside a list it does not describe is the disagreement ADR-0068 exists to
+    // prevent, so the scoreboard is derived from the filtered set too.
+    setup()
+    fireEvent.change(screen.getByLabelText('decisions.searchPlaceholder'), { target: { value: 'Rejected' } })
+    expect(screen.getByText('Rejected cache')).toBeTruthy()
+    expect(screen.queryByText('Accepted API')).toBeNull()
+    expect(screen.queryByText('decisions.empty')).toBeNull()
+  })
+
+  it('does not offer "create your first decision" over a filtered-out list', () => {
+    setup()
+    fireEvent.change(screen.getByLabelText('decisions.searchPlaceholder'), { target: { value: 'zzzz no match' } })
+    expect(screen.queryByText('decisions.emptyHint')).toBeNull()
+    expect(screen.getByText('decisions.pendingQueue')).toBeTruthy()
+  })
+
+  it('keeps a decision nothing contains on screen', () => {
+    // An unfiled decision is a real state of the graph, not a reason to drop a record.
+    setup(decisions, {})
+    expect(screen.getAllByText('decisions.unfiledGroup').length).toBeGreaterThan(0)
+    expect(screen.getByText('Accepted API')).toBeTruthy()
   })
 })

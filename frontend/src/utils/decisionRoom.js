@@ -119,3 +119,93 @@ export function splitLineages(lineages = []) {
   }
   return { chains, singles }
 }
+
+/**
+ * File lineages under the containers they live in (ADR-0126).
+ *
+ * A decision is a node, so it lives somewhere: production's 103 records sit under 16
+ * distinct `contains` trails across two organizations. The page drew none of that — a
+ * project's *name* appeared as grey meta text on each card and the level above it
+ * appeared nowhere, so the only structure on screen was supersession, of which there
+ * are two edges. The result is one flat column ~90 cards long in which nothing says
+ * what belongs with what.
+ *
+ * `ancestry` is `GET /graph/ancestry`'s answer (ADR-0094), root-first with the direct
+ * parent last, so the trail of a decision *ends* at its project. Trails are folded into
+ * a trie, which is why an organization holding four projects is one row and not four.
+ *
+ * The group of a chain is the group of its head: supersession candidates are restricted
+ * to one project (`SupersedePicker`), so a chain never spans two.
+ *
+ * A decision whose trail is empty — nothing contains it, or ancestry has not loaded —
+ * comes back under `loose` rather than being dropped or given an invented parent.
+ */
+export function buildDecisionGroups(lineages = [], ancestry = {}) {
+  const make = (ref, id) => ({ id, ref, children: new Map(), lineages: [], total: 0 })
+  const root = make(null, '')
+
+  for (const lineage of lineages) {
+    const trail = (ancestry[lineage.head.id]?.trails || [])[0] || []
+    let node = root
+    for (const ref of trail) {
+      let child = node.children.get(ref.id)
+      if (!child) {
+        child = make(ref, node.id ? `${node.id}/${ref.id}` : ref.id)
+        node.children.set(ref.id, child)
+      }
+      node = child
+    }
+    node.lineages.push(lineage)
+  }
+
+  // `total` counts decision *records*, not lineages: a chain of three is three records,
+  // and a group header claiming "1" above three cards is the kind of count ADR-0068
+  // exists to prevent.
+  const finalize = (node) => {
+    const children = [...node.children.values()].map(finalize)
+    const own = node.lineages.reduce((n, l) => n + l.chain.length, 0)
+    return {
+      id: node.id,
+      ref: node.ref,
+      children,
+      lineages: node.lineages,
+      total: own + children.reduce((n, c) => n + c.total, 0),
+    }
+  }
+
+  const built = finalize(root)
+  // Deepest-first would put a bare project above an organization holding four of them;
+  // biggest-first matches how the column is read.
+  const sortGroups = (groups) => {
+    groups.sort((a, b) => b.total - a.total)
+    groups.forEach(g => sortGroups(g.children))
+    return groups
+  }
+
+  return { groups: sortGroups(built.children), loose: built.lineages, total: built.total }
+}
+
+/**
+ * Wrap plain decisions as lineages of one.
+ *
+ * The queue lists records, not histories, but it is filed under the same containment
+ * groups as the outcomes are — and a grouper that took two shapes would be two groupers.
+ */
+export function soloLineages(decisions = []) {
+  return decisions.map(decision => ({
+    id: decision.id,
+    head: decision,
+    chain: [{ decision, depth: 0, parentId: null }],
+    chainIds: new Set([decision.id]),
+  }))
+}
+
+/** Does this decision match a free-text query? Name, then body, then the project it is
+ *  filed under — a decision's title is an ADR line ("ADR-0118: …"), so typing a number
+ *  has to reach it. */
+export function decisionMatches(decision, query, projectName = '') {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return [decision.name, decision.description, projectName]
+    .some(field => (field || '').toLowerCase().includes(q))
+}

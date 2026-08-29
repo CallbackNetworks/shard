@@ -528,10 +528,19 @@ export const getGraphMap = ({ types, includeData } = {}) => {
 // Where nodes live and whose they are (ADR-0094). Batched by id: the caller is always a
 // list (a header asking about one node, a dashboard asking about every card it draws), and
 // one-per-node would have made the dashboard's question cost a request per project.
+// The server caps one request at `MAX_IDS` (200, `services/ancestry.py`), so a caller
+// asking about more than that silently got an answer for a prefix of its list — and a
+// missing entry reads as "this node lives nowhere", not as "you asked for too much".
+// Chunking lives here so the cap is honoured once, for every caller.
+const ANCESTRY_BATCH = 200
 export const getAncestry = (ids) => {
-  const list = (ids || []).filter(Boolean)
+  const list = [...new Set((ids || []).filter(Boolean))]
   if (list.length === 0) return Promise.resolve({})
-  return api.get('/graph/ancestry', { params: { ids: list.join(',') } }).then(r => r.data)
+  const batches = []
+  for (let i = 0; i < list.length; i += ANCESTRY_BATCH) batches.push(list.slice(i, i + ANCESTRY_BATCH))
+  return Promise.all(
+    batches.map(batch => api.get('/graph/ancestry', { params: { ids: batch.join(',') } }).then(r => r.data))
+  ).then(parts => Object.assign({}, ...parts))
 }
 export const createNode = (data) => api.post('/nodes', data).then(r => r.data)
 export const updateNode = (id, data) => api.patch(`/nodes/${id}`, data).then(r => r.data)

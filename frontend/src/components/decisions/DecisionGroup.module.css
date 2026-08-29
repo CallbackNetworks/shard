@@ -1,0 +1,109 @@
+/* The containment hierarchy a decision list is filed under (ADR-0126). The rail here is
+   `contains`; the rail in `pages/Decisions.module.css` is `supersedes`. They are drawn
+   differently on purpose — one is where a record lives, the other is what replaced it,
+   and a single visual language for both would say they are the same relation. */
+
+.group {
+  display: grid;
+  gap: 0;
+}
+
+.group[data-depth='0'] + .group[data-depth='0'] {
+  border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px calc(10px + var(--depth) * 14px);
+}
+
+.head:hover {
+  background: rgba(var(--kt-ink-rgb), 0.03);
+}
+
+/* The header is the control: a chevron alone is a 12px target in a column that may hold
+   sixteen of these. */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--kt-ink);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.toggle > svg {
+  flex-shrink: 0;
+  color: var(--kt-faint);
+}
+
+/* The engine name is never the user's name (ADR-0058): this is the registry's own
+   `type_label`, drawn server-side by the ancestry endpoint. */
+.type {
+  flex-shrink: 0;
+  color: var(--kt-faint);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.open {
+  flex-shrink: 0;
+  color: var(--kt-faint);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  opacity: 0;
+}
+
+.head:hover .open,
+.open:focus-visible {
+  opacity: 1;
+}
+
+.open:hover {
+  color: var(--accent);
+}
+
+.count {
+  flex-shrink: 0;
+  color: var(--kt-faint);
+  font-family: var(--kt-display);
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* A left rule at the child's indent, so an open group reads as a bracket around what it
+   holds rather than as a row that happens to sit above some cards. */
+.body {
+  display: grid;
+  gap: 0;
+  margin-left: calc(15px + var(--depth) * 14px);
+  padding-left: 2px;
+  border-left: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+}

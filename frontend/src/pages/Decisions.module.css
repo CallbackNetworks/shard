@@ -111,3 +111,72 @@
   font-style: normal;
   text-transform: uppercase;
 }
+
+/* Sections are drawn as containment groups (ADR-0126), so the padding that used to sit
+   on the card stack moves onto the group body — a group header runs the full width of
+   the column, the way a heading does. */
+.groups {
+  display: grid;
+  gap: 0;
+  padding: 4px 0;
+}
+
+.groups .lineage {
+  padding: 6px 10px;
+}
+
+.loose {
+  display: grid;
+  gap: 0;
+  padding-top: 4px;
+  border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
+}
+
+.looseHead {
+  color: var(--kt-faint);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 7px 10px 0;
+}
+
+/* Free-text narrowing, sitting above the two selects because it is the filter that
+   reaches a record whose project you cannot remember. */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  background: rgba(var(--kt-ink-rgb), 0.02);
+  color: var(--kt-faint);
+  padding: 0 8px;
+  min-height: 32px;
+}
+
+.search:focus-within {
+  border-color: var(--accent);
+}
+
+.search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--kt-ink);
+  font-size: 12px;
+  outline: none;
+}
+
+.search button {
+  display: inline-flex;
+  border: none;
+  background: transparent;
+  color: var(--kt-faint);
+  cursor: pointer;
+  padding: 0;
+}
+
+.search button:hover {
+  color: var(--kt-ink);
+}

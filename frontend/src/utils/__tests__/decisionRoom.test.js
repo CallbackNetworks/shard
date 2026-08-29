@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildDecisionLineages, decisionStatus, deriveDecisionRoom, groupDecisionsByProject, splitLineages,
+  buildDecisionGroups, buildDecisionLineages, decisionMatches, decisionStatus,
+  deriveDecisionRoom, groupDecisionsByProject, soloLineages, splitLineages,
 } from '../decisionRoom'
 
 const decisions = [
@@ -102,5 +103,93 @@ describe('buildDecisionLineages', () => {
       { id: 'n', decision_status: 'accepted' },
     ])
     expect(room.counts.governing).toBe(1)
+  })
+})
+
+describe('buildDecisionGroups', () => {
+  const ref = (id, type, title) => ({ id, type, type_label: type, title })
+  const org = ref('org', 'organization', 'CallbackNetwork')
+  const shard = ref('shard', 'project', 'Shard')
+  const n8n = ref('n8n', 'project', 'n8n')
+  const solo = ref('solo', 'project', 'Callback Relay')
+
+  const d = (id) => ({ id, name: id, decision_status: 'accepted' })
+  const lineages = soloLineages([d('a'), d('b'), d('c'), d('d')])
+  const ancestry = {
+    a: { trails: [[org, shard]] },
+    b: { trails: [[org, shard]] },
+    c: { trails: [[org, n8n]] },
+    d: { trails: [[solo]] },
+  }
+
+  it('folds shared trails into one parent row', () => {
+    // The point of the trie: an organization holding two projects is one row and not
+    // two, which is the difference between reading a hierarchy and reading a list of
+    // repeated breadcrumbs.
+    const { groups } = buildDecisionGroups(lineages, ancestry)
+    expect(groups.map(g => g.ref.id)).toEqual(['org', 'solo'])
+    const orgGroup = groups[0]
+    expect(orgGroup.total).toBe(3)
+    expect(orgGroup.children.map(g => g.ref.id)).toEqual(['shard', 'n8n'])
+    expect(orgGroup.children[0].total).toBe(2)
+    // Records live at the level that contains them, not at the level above it.
+    expect(orgGroup.lineages).toEqual([])
+  })
+
+  it('counts records, not lineages', () => {
+    // A group header saying "1" above a chain of three is the disagreement between a
+    // count and the rows under it that ADR-0068 exists to prevent.
+    const chain = [{
+      id: 'v3',
+      head: d('v3'),
+      chain: [{ decision: d('v3'), depth: 0 }, { decision: d('v2'), depth: 1 }, { decision: d('v1'), depth: 2 }],
+      chainIds: new Set(['v3', 'v2', 'v1']),
+    }]
+    const { groups, total } = buildDecisionGroups(chain, { v3: { trails: [[shard]] } })
+    expect(groups[0].total).toBe(3)
+    expect(total).toBe(3)
+  })
+
+  it('keeps a decision nothing contains rather than inventing a parent', () => {
+    const { groups, loose } = buildDecisionGroups(soloLineages([d('orphan')]), {})
+    expect(groups).toEqual([])
+    expect(loose.map(l => l.head.id)).toEqual(['orphan'])
+  })
+
+  it('files a chain under the group of its head', () => {
+    // Supersession candidates are restricted to one project, so a chain never spans
+    // two groups — but it must not be split across them either.
+    const chain = [{
+      id: 'new',
+      head: d('new'),
+      chain: [{ decision: d('new'), depth: 0 }, { decision: d('old'), depth: 1 }],
+      chainIds: new Set(['new', 'old']),
+    }]
+    const { groups } = buildDecisionGroups(chain, { new: { trails: [[org, shard]] }, old: { trails: [[solo]] } })
+    expect(groups).toHaveLength(1)
+    expect(groups[0].children[0].lineages).toHaveLength(1)
+  })
+
+  it('orders groups by how much they hold', () => {
+    const { groups } = buildDecisionGroups(lineages, ancestry)
+    expect(groups.map(g => g.total)).toEqual([3, 1])
+  })
+})
+
+describe('decisionMatches', () => {
+  const decision = { name: 'ADR-0118: a decision is a node type', description: 'supersedes and governs' }
+
+  it('matches an empty query', () => {
+    expect(decisionMatches(decision, '   ')).toBe(true)
+  })
+
+  it('reaches the ADR number in the title', () => {
+    expect(decisionMatches(decision, '0118')).toBe(true)
+  })
+
+  it('reaches the body and the project name', () => {
+    expect(decisionMatches(decision, 'governs')).toBe(true)
+    expect(decisionMatches(decision, 'shard', 'Shard')).toBe(true)
+    expect(decisionMatches(decision, 'nothing here')).toBe(false)
   })
 })
