@@ -124,3 +124,4 @@
 | [0120](0120-a-shared-page-says-why-the-work-exists.md) | 公開分享頁要說得出這些工作是依什麼決定的 | Accepted | 2026-08-28 |
 | [0121](0121-a-builtin-declaration-is-code-not-a-row.md) | 內建型別宣告的來源是程式碼，不是可改的資料列 | Accepted | 2026-08-28 |
 | [0122](0122-a-relation-is-drawn-once-and-can-be-created.md) | 一條關係只畫一次，而且建得出來 | Accepted | 2026-08-29 |
+| [0123](0123-the-dev-stack-binds-to-the-loopback.md) | 開發用的 port 綁在 loopback，不綁 0.0.0.0 | Accepted | 2026-08-29 |
