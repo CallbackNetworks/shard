@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildDecisionLineages, decisionStatus, deriveDecisionRoom, groupDecisionsByProject } from '../decisionRoom'
+import {
+  buildDecisionLineages, decisionStatus, deriveDecisionRoom, groupDecisionsByProject, splitLineages,
+} from '../decisionRoom'
 
 const decisions = [
   { id: 'p', name: 'Pending', decision_status: 'proposed', project_id: 'a' },
@@ -53,7 +55,26 @@ describe('buildDecisionLineages', () => {
 
   it('gives a decision with no relations a lineage of one', () => {
     const lineages = buildDecisionLineages(chain)
-    expect(lineages[1].chain).toEqual([{ decision: lone, depth: 0 }])
+    expect(lineages[1].chain).toEqual([{ decision: lone, depth: 0, parentId: null }])
+  })
+
+  it('names the decision each row was replaced by, so the rail can withdraw the edge', () => {
+    // The rail *is* the supersession edge; without the parent it would be a picture of
+    // a relation with no way to act on it, and the withdraw control had to stay on a
+    // chip the rail already made redundant.
+    const [head] = buildDecisionLineages(chain)
+    expect(head.chain.map(r => [r.decision.id, r.parentId])).toEqual([
+      ['v3', null], ['v2', 'v3'], ['v1', 'v2'],
+    ])
+    expect([...head.chainIds]).toEqual(['v3', 'v2', 'v1'])
+  })
+
+  it('keeps chains apart from single records', () => {
+    // Production holds 103 decisions and one supersession edge. A "lineage" section
+    // listing both is a list of 102 identical cards in which the one chain is invisible.
+    const { chains, singles } = splitLineages(buildDecisionLineages(chain))
+    expect(chains.map(l => l.id)).toEqual(['v3'])
+    expect(singles.map(l => l.id)).toEqual(['lone'])
   })
 
   it('promotes a child to a head when its replacement is filtered out', () => {

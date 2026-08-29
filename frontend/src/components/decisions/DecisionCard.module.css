@@ -1,0 +1,187 @@
+/* One decision record. The lineage rail that arranges cards lives with the page
+   (`pages/Decisions.module.css`); everything here is the card itself. */
+
+.card {
+  min-height: 74px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.retired {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.source {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--kt-faint);
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--kt-faint);
+  margin-top: 4px;
+}
+
+.excerpt {
+  margin-left: 8px;
+  color: var(--kt-muted);
+}
+
+/* Its own row under the title rather than a squeezed column beside it: this column is
+   320px at its narrowest, and the actions competing with the title for that width is
+   what turned the title into one word per line. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.statusBtn {
+  padding: 4px 10px;
+}
+
+/* A relation write, weighted below a status change and far above the unlabelled glyph
+   it replaces. Outlined, not filled: creating an edge is not the card's default act. */
+.relBtn {
+  padding: 4px 10px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.16);
+  background: transparent;
+  color: var(--kt-muted);
+}
+
+.relBtn:hover {
+  border-color: rgba(var(--kt-ink-rgb), 0.34);
+  color: var(--kt-ink);
+}
+
+.relations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.relation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
+  background: rgba(var(--kt-ink-rgb), 0.02);
+  color: var(--kt-muted);
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* What this record replaced reads as a solid claim; what replaced it is history, so it
+   is dashed and dimmer. The two used to be one style and one icon, which left the
+   direction of the edge legible only in the sentence. */
+.replaces {
+  border-style: solid;
+  color: var(--kt-ink);
+}
+
+.replacedBy {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.relation:hover {
+  border-color: rgba(var(--kt-ink-rgb), 0.22);
+  color: var(--kt-ink);
+}
+
+.relationDrop {
+  opacity: 0.5;
+  margin-left: 2px;
+}
+
+.replaces:hover .relationDrop {
+  opacity: 1;
+}
+
+.governs {
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
+}
+
+.governsHead {
+  color: var(--kt-faint);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.governsItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--kt-muted);
+  font-size: 11px;
+}
+
+.governsLink {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+
+.governsLink:hover {
+  color: var(--kt-ink);
+}
+
+.governsType {
+  color: var(--kt-faint);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.governsDrop {
+  display: inline-flex;
+  border: none;
+  background: transparent;
+  color: var(--kt-faint);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.5;
+}
+
+.governsItem:hover .governsDrop {
+  opacity: 1;
+}
+
+.governsDrop:hover {
+  color: var(--kt-status-failed);
+}

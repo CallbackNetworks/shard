@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key, params) => params?.count ? `${key}:${params.count}` : key }),
+  useTranslation: () => ({ t: (key, params) => params?.count !== undefined ? `${key}:${params.count}` : key }),
 }))
 
 vi.mock('../../hooks/useBreakpoint', () => ({
@@ -27,12 +27,17 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../api/client', () => ({
   getDecisions: vi.fn(),
   getProjects: vi.fn(),
+  getNodeTypes: vi.fn(),
+  getNodes: vi.fn(),
+  getDecisionsGoverning: vi.fn(),
   createDecision: vi.fn(),
   updateDecision: vi.fn(),
   deleteDecision: vi.fn(),
   exportDecision: vi.fn(),
   supersedeDecision: vi.fn(),
   unsupersedeDecision: vi.fn(),
+  linkDecisionToWork: vi.fn(),
+  unlinkDecisionFromWork: vi.fn(),
 }))
 
 import Decisions from '../Decisions'
@@ -48,6 +53,7 @@ const decisions = [
     governs: [{ id: 't1', type: 'task', title: 'Rewrite the client' }] },
   { id: 'd3', project_id: 'p1', name: 'Old API', description: 'Old desc', decision_status: 'superseded', source: 'manual',
     superseded_by: [{ id: 'd2', type: 'decision', title: 'Accepted API' }] },
+  { id: 'd4', project_id: 'p1', name: 'Rejected cache', description: 'Rejected desc', decision_status: 'deprecated', source: 'manual' },
 ]
 
 function setup() {
@@ -63,6 +69,8 @@ function setup() {
     </MemoryRouter>
   )
 }
+
+const clickText = (text) => fireEvent.click(screen.getByText(text).closest('button'))
 
 describe('Decisions Decision Room', () => {
   beforeEach(() => {
@@ -81,7 +89,7 @@ describe('Decisions Decision Room', () => {
 
   it('accepts a proposed decision', () => {
     setup()
-    fireEvent.click(screen.getByText('decisions.accept').closest('button'))
+    clickText('decisions.accept')
     expect(mutate).toHaveBeenCalledWith({
       id: 'd1',
       data: { decision_status: 'accepted' },
@@ -92,28 +100,79 @@ describe('Decisions Decision Room', () => {
     // A decision that was considered and turned down is still something that was
     // decided; the old Reject button called delete and the history went with it.
     setup()
-    fireEvent.click(screen.getByText('decisions.reject').closest('button'))
+    clickText('decisions.reject')
     expect(mutate).toHaveBeenCalledWith({
       id: 'd1',
       data: { decision_status: 'deprecated' },
     })
   })
 
-  it('draws the supersession chain and what each decision governs', () => {
+  it('gives every status a way out, not just proposed', () => {
+    // Accept/reject were the only status controls, so an accepted decision could never
+    // be deprecated and a rejected one could never be reconsidered: the record was
+    // writable exactly once and then frozen by its own outcome.
     setup()
-    // The replaced record is nested under its replacement rather than filed by project.
+    clickText('decisions.deprecate')
+    expect(mutate).toHaveBeenCalledWith({ id: 'd2', data: { decision_status: 'deprecated' } })
+
+    mutate.mockClear()
+    clickText('decisions.reopen')
+    expect(mutate).toHaveBeenCalledWith({ id: 'd4', data: { decision_status: 'proposed' } })
+  })
+
+  it('offers no status button for a superseded record', () => {
+    // `superseded` is a consequence of the supersession edge. A button setting it, or
+    // clearing it, would leave the status and the edge saying opposite things.
+    setup()
+    const card = screen.getByText('Old API').closest('.kt-decision-card')
+    expect(card.textContent).not.toContain('decisions.accept')
+    expect(card.textContent).not.toContain('decisions.reopen')
+    expect(card.textContent).not.toContain('decisions.deprecate')
+  })
+
+  it('separates real chains from single records', () => {
+    // Production holds 103 decisions and one supersession edge: a single "lineage"
+    // section listing both made the one real chain indistinguishable from the rest.
+    setup()
+    expect(screen.getByText('decisions.standalone')).toBeTruthy()
+    const chainCount = screen.getByText('decisions.lineage').nextSibling
+    expect(chainCount.textContent).toBe('1')
+  })
+
+  it('states a supersession once, on the rail that draws it', () => {
+    // The indent, the caption and both cards' chips were four renderings of one edge.
+    // Inside a chain the rail is the statement — and it carries the withdraw control,
+    // because the connector *is* the edge.
+    setup()
     expect(screen.getByText('decisions.replacedByAbove')).toBeTruthy()
-    expect(screen.getByText('decisions.supersedesName')).toBeTruthy()
-    expect(screen.getByText('decisions.supersededByName')).toBeTruthy()
+    expect(screen.queryByText('decisions.supersedesName')).toBeNull()
+    expect(screen.queryByText('decisions.supersededByName')).toBeNull()
+
+    fireEvent.click(screen.getByTitle('decisions.unsupersede'))
+    expect(mutate).toHaveBeenCalledWith({ id: 'd2', supersededId: 'd3' })
+  })
+
+  it('draws what each decision governs, and can unlink it', () => {
+    setup()
     expect(screen.getByText('decisions.governs:1')).toBeTruthy()
     expect(screen.getByText('Rewrite the client')).toBeTruthy()
+
+    fireEvent.click(screen.getByLabelText('decisions.ungovern'))
+    expect(mutate).toHaveBeenCalledWith({ id: 'd2', nodeId: 't1' })
+  })
+
+  it('opens a picker that links a decision to work', () => {
+    // `linkDecisionToWork` shipped with ADR-0118 and had zero callers: a decision could
+    // be read as governing work and connected to it by nothing in the UI.
+    setup()
+    fireEvent.click(screen.getAllByText('decisions.governAction')[0])
+    expect(screen.getByText('decisions.governHint')).toBeTruthy()
   })
 
   it('links every card into the node explorer', () => {
     // ADR-0114 draws a node's relations on /n/{id}; the decisions page had no way there.
-    const { container } = setup()
-    const hrefs = [...container.querySelectorAll('a')].map(a => a.getAttribute('href'))
-    expect(hrefs).toContain('/n/d1')
-    expect(hrefs).toContain('/n/d2')
+    setup()
+    fireEvent.click(screen.getAllByLabelText('more')[0])
+    expect(screen.getByText('decisions.openNode').closest('a').getAttribute('href')).toBe('/n/d1')
   })
 })

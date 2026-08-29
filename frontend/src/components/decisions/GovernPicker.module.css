@@ -1,0 +1,45 @@
+.current {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.12);
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.chipName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kt-ink);
+  text-decoration: none;
+}
+
+.chip em {
+  color: var(--kt-faint);
+  font-size: 9px;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.chip button {
+  display: inline-flex;
+  border: none;
+  background: transparent;
+  color: var(--kt-faint);
+  cursor: pointer;
+  padding: 0;
+}
+
+.chip button:hover {
+  color: var(--kt-status-failed);
+}

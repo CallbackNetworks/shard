@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getNodes: vi.fn(),
   getNodeEdges: vi.fn(),
   getEdgeTypes: vi.fn(),
+  getDecisionsGoverning: vi.fn(),
   addTaskMembership: vi.fn(() => Promise.resolve()),
   removeTaskMembership: vi.fn(() => Promise.resolve()),
   attachNodeEdge: vi.fn(() => Promise.resolve()),
@@ -36,6 +37,7 @@ vi.mock('../../api/client', () => ({
   getNodes: mocks.getNodes,
   getNodeEdges: mocks.getNodeEdges,
   getEdgeTypes: mocks.getEdgeTypes,
+  getDecisionsGoverning: mocks.getDecisionsGoverning,
   addTaskMembership: mocks.addTaskMembership,
   removeTaskMembership: mocks.removeTaskMembership,
   attachNodeEdge: mocks.attachNodeEdge,
@@ -48,8 +50,9 @@ const projects = [
   { id: 'pC', name: 'Gamma' },
 ]
 
-function mockQueries({ nodeTypes = [], edgeTypes = [], taskEdges = [] } = {}) {
+function mockQueries({ nodeTypes = [], edgeTypes = [], taskEdges = [], governing = [] } = {}) {
   mocks.useQuery.mockImplementation(({ queryKey }) => {
+    if (queryKey[0] === 'governing-decisions') return { data: governing }
     if (queryKey[0] === 'node-types') return { data: nodeTypes }
     if (queryKey[0] === 'edge-types') return { data: edgeTypes }
     if (queryKey[0] === 'node-edges') return { data: taskEdges }
@@ -120,6 +123,25 @@ describe('MembershipPanel', () => {
     expect(screen.getByText('Research')).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('unlink container Research'))
     expect(mocks.detachNodeEdge).toHaveBeenCalledWith('c1', 't1', 'contains')
+  })
+
+  it('says which decisions govern the task, once', () => {
+    // ADR-0118 gave `governs` a reverse read with no reader. As a bare edge row it also
+    // said nothing about the decision's status, so a task being run on thinking that had
+    // already been replaced looked exactly like one that was not.
+    mockQueries({
+      governing: [{ id: 'd1', name: 'Use PostgreSQL', decision_status: 'superseded' }],
+      edgeTypes: [{ key: 'governs', label: 'Governs', is_builtin: true }],
+      taskEdges: [{
+        id: 'e9', source_id: 'd1', target_id: 't1', rel_type: 'governs',
+        source: { id: 'd1', type: 'decision', title: 'Use PostgreSQL' },
+      }],
+    })
+    renderPanel({ projectId: 'pA', task })
+    expect(screen.getByText('decisions.governedBy')).toBeInTheDocument()
+    // Drawn by the decision strip, not also as a raw edge in "other relations".
+    expect(screen.getAllByText('Use PostgreSQL')).toHaveLength(1)
+    expect(screen.queryByText('membership.otherRelations')).not.toBeInTheDocument()
   })
 
   it('hides the other-relations section without custom edge types or edges', () => {

@@ -1,7 +1,9 @@
-/* Decision lineage + relation chrome (ADR-0118). The room's frame still lives in
-   global.css as `kt-decision-*`; everything the relations added is scoped here. */
+/* The lineage rail (ADR-0118). The card itself moved to
+   `components/decisions/DecisionCard.module.css`; what is left here is how a chain of
+   cards is arranged, plus the two pickers' lists. */
 
-.lineages {
+.lineages,
+.singles {
   display: grid;
   gap: 12px;
   padding: 10px;
@@ -9,13 +11,17 @@
 
 .lineage {
   display: grid;
-  gap: 6px;
+  gap: 0;
 }
 
-/* A chain rail: the indent is the history, so it needs a line to read as one. */
+/* A chain rail: the indent is the history, so it needs a line to read as one. The line
+   is continuous down the rows at a given depth — before this each row drew its own
+   fragment with a gap between them, which is a dotted suggestion of a line rather than
+   one, and the direction of the edge lived only in a caption. */
 .chainRow {
   position: relative;
   display: grid;
+  padding-bottom: 6px;
 }
 
 .chainRow[data-depth='0'] {
@@ -25,152 +31,52 @@
 /* One step per generation, capped so a long chain does not walk off the column. */
 .chainRow:not([data-depth='0']) {
   margin-left: calc(min(var(--depth), 3) * 16px);
-  padding-left: 14px;
-  border-left: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+  padding-left: 16px;
+  border-left: 2px solid rgba(var(--kt-ink-rgb), 0.18);
 }
 
 .chainRow:not([data-depth='0'])::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 22px;
-  width: 13px;
-  height: 1px;
-  background: rgba(var(--kt-ink-rgb), 0.14);
+  top: 9px;
+  width: 12px;
+  height: 2px;
+  background: rgba(var(--kt-ink-rgb), 0.18);
 }
 
-.replacedBy {
+/* The connector, which *is* the supersession edge — hence the withdraw control on it
+   rather than on the card, and hence the arrow: a caption that reads "replaced by the
+   decision above" with no direction glyph made the two halves of the relation look the
+   same on the two cards it joins. */
+.chainLink {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   color: var(--kt-faint);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding-left: 32px;
+  padding: 2px 0 6px;
 }
 
-.card {
-  min-height: 74px;
-}
-
-/* The action row wraps below the title rather than squeezing it: this column is 320px
-   at its narrowest and a card carries up to six controls, which turned the title into
-   one word per line. */
-.head {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.body {
-  flex: 1 1 190px;
-  min-width: 0;
-  cursor: pointer;
-}
-
-.titleRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.retired {
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-
-.source {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10px;
-  color: var(--kt-faint);
-}
-
-.meta {
-  font-size: 11px;
-  color: var(--kt-faint);
-  margin-top: 4px;
-}
-
-.excerpt {
-  margin-left: 8px;
-  color: var(--kt-muted);
-}
-
-.actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-
-.actionsMobile {
-  margin-top: 8px;
-}
-
-/* Relations, stated on the card. Before this the only place an edge appeared was the raw
-   node explorer, which the decisions page had no link to either. */
-.relations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.relation {
+.chainLinkDrop {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: rgba(var(--kt-ink-rgb), 0.02);
-  color: var(--kt-muted);
-  padding: 2px 7px;
-  font-size: 10px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.relation:hover {
-  border-color: rgba(var(--kt-ink-rgb), 0.22);
-  color: var(--kt-ink);
-}
-
-.governs {
-  display: grid;
-  gap: 3px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
-}
-
-.governsHead {
+  border: none;
+  background: transparent;
   color: var(--kt-faint);
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.5;
 }
 
-.governsItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--kt-muted);
-  font-size: 11px;
-  text-decoration: none;
+.chainLink:hover .chainLinkDrop {
+  opacity: 1;
 }
 
-.governsItem:hover {
-  color: var(--kt-ink);
-}
-
-.governsType {
-  color: var(--kt-faint);
-  font-size: 9px;
-  text-transform: uppercase;
+.chainLinkDrop:hover {
+  color: var(--kt-status-failed);
 }
 
 .supersedeList {

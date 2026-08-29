@@ -1,20 +1,18 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router'
-import {
-  GitFork, Plus, Trash2, Edit2, Download, Check, XCircle, Bot, User,
-  ArrowUpRight, GitMerge, Link2,
-} from 'lucide-react'
+import { ArrowUp, GitFork, Plus, X } from 'lucide-react'
 import {
   getDecisions, getProjects, createDecision, updateDecision, deleteDecision,
   exportDecision, supersedeDecision, unsupersedeDecision,
+  linkDecisionToWork, unlinkDecisionFromWork,
 } from '../api/client'
 import { qk } from '../api/queryKeys'
 import MarkdownEditor from '../components/MarkdownEditor'
-import MarkdownPreview from '../components/MarkdownPreview'
-import { BRAND, DARK, DECISION_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
-import { buildDecisionLineages, deriveDecisionRoom } from '../utils/decisionRoom'
+import DecisionCard from '../components/decisions/DecisionCard'
+import GovernPicker from '../components/decisions/GovernPicker'
+import { BRAND } from '../constants/theme'
+import { buildDecisionLineages, deriveDecisionRoom, splitLineages } from '../utils/decisionRoom'
 import useBreakpoint from '../hooks/useBreakpoint'
 import FormModal from '../components/shared/FormModal'
 import EmptyState from '../components/shared/EmptyState'
@@ -31,8 +29,6 @@ const DECISION_SNIPPETS = [
   { key: 'tradeoffs', text: '## Tradeoffs\n\n- \n' },
   { key: 'followups', text: '## Follow-ups\n\n- [ ] \n' },
 ]
-
-const RETIRED = new Set(['deprecated', 'superseded'])
 
 function DecisionForm({ projects, initial, onSave, onClose }) {
   const { t } = useTranslation()
@@ -125,119 +121,6 @@ function SupersedePicker({ decision, candidates, onPick, onClose }) {
   )
 }
 
-function DecisionCard({
-  decision, projectName, onAccept, onDeprecate, onEdit, onDelete, onExport,
-  onSupersede, onUnsupersede, isMobile,
-}) {
-  const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
-  const status = decision.decision_status || 'proposed'
-  const statusStyle = STATUS_COLORS[status] || STATUS_COLORS.proposed
-  const supersedes = decision.supersedes || []
-  const supersededBy = decision.superseded_by || []
-  const governs = decision.governs || []
-
-  return (
-    <div className={`kt-card kt-decision-card ${s.card} is-${status}`} style={{
-      borderStyle: status === 'proposed' ? 'dashed' : 'solid',
-      borderColor: status === 'proposed' ? BRAND : undefined,
-    }}>
-      <div className={s.head}>
-        <GitFork size={14} style={{ color: statusStyle.color, marginTop: 2, flexShrink: 0 }} />
-        <div className={s.body} onClick={() => setExpanded(v => !v)}>
-          <div className={s.titleRow}>
-            <span className={`kt-card-title ${RETIRED.has(status) ? s.retired : ''}`}>
-              {decision.name}
-            </span>
-            <span className="kt-badge" style={{ background: statusStyle.bg, color: statusStyle.color }}>
-              {t(`decisions.${status}`)}
-            </span>
-            {decision.source && (
-              <span className={s.source}>
-                {decision.source === 'ai' ? <Bot size={10} /> : <User size={10} />}
-                {t(`decisions.source.${decision.source}`)}
-              </span>
-            )}
-          </div>
-          <div className={s.meta}>
-            {projectName}
-            {decision.description && !expanded && (
-              <span className={s.excerpt}>
-                {decision.description.slice(0, 80)}{decision.description.length > 80 ? '...' : ''}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className={`${s.actions} ${isMobile ? s.actionsMobile : ''}`}>
-          {status === 'proposed' && (
-            <>
-              <button onClick={() => onAccept(decision)} className="kt-btn kt-btn-accept" style={{ padding: '4px 10px' }}>
-                <Check size={11} /> {t('decisions.accept')}
-              </button>
-              <button onClick={() => onDeprecate(decision)} className="kt-btn kt-btn-danger" style={{ padding: '4px 10px' }}>
-                <XCircle size={11} /> {t('decisions.reject')}
-              </button>
-            </>
-          )}
-          {!RETIRED.has(status) && (
-            <button onClick={() => onSupersede(decision)} className="kt-icon-btn" title={t('decisions.supersede')}>
-              <GitMerge size={13} />
-            </button>
-          )}
-          <Link to={`/n/${decision.id}`} className="kt-icon-btn" title={t('decisions.openNode')}>
-            <ArrowUpRight size={13} />
-          </Link>
-          <button onClick={() => onExport(decision)} className="kt-icon-btn" title={t('decisions.export')}>
-            <Download size={13} />
-          </button>
-          <button onClick={() => onEdit(decision)} className="kt-icon-btn">
-            <Edit2 size={13} />
-          </button>
-          <button onClick={() => onDelete(decision)} className="kt-icon-btn" style={{ color: DARK.danger }}>
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-
-      {(supersedes.length > 0 || supersededBy.length > 0) && (
-        <div className={s.relations}>
-          {supersedes.map(n => (
-            <button key={n.id} type="button" className={s.relation}
-              onClick={() => onUnsupersede(decision, n)} title={t('decisions.unsupersede')}>
-              <GitMerge size={10} /> {t('decisions.supersedesName', { name: n.title })}
-            </button>
-          ))}
-          {supersededBy.map(n => (
-            <Link key={n.id} to={`/n/${n.id}`} className={s.relation}>
-              <GitMerge size={10} /> {t('decisions.supersededByName', { name: n.title })}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {governs.length > 0 && (
-        <div className={s.governs}>
-          <div className={s.governsHead}>{t('decisions.governs', { count: governs.length })}</div>
-          {governs.map(n => (
-            <Link key={n.id} to={`/n/${n.id}`} className={s.governsItem}>
-              <Link2 size={10} />
-              <span>{n.title}</span>
-              <span className={s.governsType}>{n.type}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {expanded && decision.description && (
-        <div className="kt-decision-preview">
-          <MarkdownPreview content={decision.description} />
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function Decisions() {
   const { t } = useTranslation()
   const bp = useBreakpoint()
@@ -245,6 +128,7 @@ export default function Decisions() {
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [supersedeTarget, setSupersedeTarget] = useState(null)
+  const [governTarget, setGovernTarget] = useState(null)
   const [filterProject, setFilterProject] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
 
@@ -262,6 +146,7 @@ export default function Decisions() {
   })
 
   const projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]))
+  const decisionById = useMemo(() => new Map(decisions.map(d => [d.id, d])), [decisions])
 
   const room = deriveDecisionRoom(decisions)
   const pendingCount = room.counts.proposed
@@ -273,6 +158,10 @@ export default function Decisions() {
   // queue rather than appearing twice on one screen.
   const lineages = buildDecisionLineages(decisions)
     .filter(l => l.chain.length > 1 || (l.head.decision_status || 'proposed') !== 'proposed')
+  // A chain of one is a record, not a history. Kept apart so the chain count is the
+  // number of chains: production has 103 decisions and one supersession, and a single
+  // section listing both made the one real chain indistinguishable from the 102.
+  const { chains, singles } = splitLineages(lineages)
 
   const createDecisionMut = useInvalidatingMutation({
     mutationFn: (form) => createDecision(form.project_id, {
@@ -308,11 +197,24 @@ export default function Decisions() {
     invalidateKeys: [['decisions']],
   })
 
-  const handleAccept = (d) => editDecision.mutate({ id: d.id, data: { decision_status: 'accepted' } })
+  // `governs` writes go through the generic edge surface (ADR-0118); the two client
+  // helpers for it existed from the start with no caller, which is why the relation
+  // could be read on a card and created by nothing.
+  const govern = useInvalidatingMutation({
+    mutationFn: ({ id, nodeId }) => linkDecisionToWork(id, nodeId),
+    invalidateKeys: [['decisions'], ['governing-decisions']],
+  })
+
+  const ungovern = useInvalidatingMutation({
+    mutationFn: ({ id, nodeId }) => unlinkDecisionFromWork(id, nodeId),
+    invalidateKeys: [['decisions'], ['governing-decisions']],
+  })
 
   // Rejecting records the outcome; it does not erase the record. A decision that was
-  // considered and turned down is still something that was decided (ADR-0118).
-  const handleDeprecate = (d) => editDecision.mutate({ id: d.id, data: { decision_status: 'deprecated' } })
+  // considered and turned down is still something that was decided (ADR-0118). Every
+  // status is reachable from every other one except `superseded`, which the supersession
+  // edge owns — the card offers no button that would contradict an edge.
+  const handleStatus = (d, status) => editDecision.mutate({ id: d.id, data: { decision_status: status } })
 
   const handleEdit = (d) => setEditTarget(d)
 
@@ -322,9 +224,19 @@ export default function Decisions() {
     }
   }
 
-  const handleUnsupersede = (d, replaced) => {
-    if (window.confirm(t('decisions.unsupersedeConfirm', { name: replaced.title }))) {
-      unsupersede.mutate({ id: d.id, supersededId: replaced.id })
+  // `newer` replaced `older`; withdrawing is the same act whether it is asked for on the
+  // chip of a card or on the rail that draws the same edge inside a chain.
+  const handleUnsupersede = (newer, older) => {
+    if (!newer || !older) return
+    const name = older.title || older.name
+    if (window.confirm(t('decisions.unsupersedeConfirm', { name }))) {
+      unsupersede.mutate({ id: newer.id, supersededId: older.id })
+    }
+  }
+
+  const handleUngovern = (d, node) => {
+    if (window.confirm(t('decisions.ungovernConfirm', { name: node.title }))) {
+      ungovern.mutate({ id: d.id, nodeId: node.id })
     }
   }
 
@@ -352,15 +264,45 @@ export default function Decisions() {
     : []
 
   const cardProps = {
-    onAccept: handleAccept,
-    onDeprecate: handleDeprecate,
+    onStatus: handleStatus,
     onEdit: handleEdit,
     onDelete: handleDelete,
     onExport: handleExport,
     onSupersede: setSupersedeTarget,
     onUnsupersede: handleUnsupersede,
-    isMobile,
+    onGovern: setGovernTarget,
+    onUngovern: handleUngovern,
   }
+
+  const renderLineage = (lineage, i) => (
+    <div key={lineage.id} className={s.lineage}
+      style={{ animation: 'fadeUpIn 0.35s ease forwards', animationDelay: `${i * 0.04}s`, opacity: 0 }}>
+      {lineage.chain.map(({ decision, depth, parentId }) => (
+        <div key={decision.id} className={s.chainRow} data-depth={depth} style={{ '--depth': depth }}>
+          {depth > 0 && (
+            // The connector *is* the supersession edge, so the control that withdraws it
+            // sits on the connector. The card inside a chain drops the matching chip:
+            // an indent, a caption and a chip were three renderings of one edge.
+            <div className={s.chainLink}>
+              <ArrowUp size={10} />
+              <span>{t('decisions.replacedByAbove')}</span>
+              <button type="button" className={s.chainLinkDrop}
+                aria-label={t('decisions.unsupersede')} title={t('decisions.unsupersede')}
+                onClick={() => handleUnsupersede(decisionById.get(parentId), decision)}>
+                <X size={10} />
+              </button>
+            </div>
+          )}
+          <DecisionCard
+            decision={decision}
+            projectName={projectMap[decision.project_id] || ''}
+            chainIds={lineage.chainIds}
+            {...cardProps}
+          />
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className="kt-page kt-decision-room-page">
@@ -451,30 +393,22 @@ export default function Decisions() {
           <section className="kt-decision-outcomes">
             <div className="kt-decision-section-head">
               <span>{t('decisions.lineage')}</span>
-              <b>{lineages.length}</b>
+              <b>{chains.length}</b>
             </div>
-            {lineages.length === 0 ? (
+            {chains.length === 0 ? (
+              <div className="kt-empty kt-decision-empty">{t('decisions.noChains')}</div>
+            ) : (
+              <div className={s.lineages}>{chains.map(renderLineage)}</div>
+            )}
+
+            <div className="kt-decision-section-head">
+              <span>{t('decisions.standalone')}</span>
+              <b>{singles.length}</b>
+            </div>
+            {singles.length === 0 ? (
               <div className="kt-empty kt-decision-empty">{t('decisions.noOutcomes')}</div>
             ) : (
-              <div className={s.lineages}>
-                {lineages.map((lineage, i) => (
-                  <div key={lineage.id} className={s.lineage}
-                    style={{ animation: 'fadeUpIn 0.35s ease forwards', animationDelay: `${i * 0.04}s`, opacity: 0 }}>
-                    {lineage.chain.map(({ decision, depth }) => (
-                      <div key={decision.id} className={s.chainRow} data-depth={depth} style={{ '--depth': depth }}>
-                        {depth > 0 && (
-                          <div className={s.replacedBy}>{t('decisions.replacedByAbove')}</div>
-                        )}
-                        <DecisionCard
-                          decision={decision}
-                          projectName={projectMap[decision.project_id] || ''}
-                          {...cardProps}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+              <div className={s.singles}>{singles.map(renderLineage)}</div>
             )}
           </section>
         </div>
@@ -504,6 +438,15 @@ export default function Decisions() {
           candidates={supersedeCandidates}
           onPick={(c) => supersede.mutate({ id: supersedeTarget.id, supersededId: c.id })}
           onClose={() => setSupersedeTarget(null)}
+        />
+      )}
+
+      {governTarget && (
+        <GovernPicker
+          decision={decisionById.get(governTarget.id) || governTarget}
+          onPick={(node) => govern.mutate({ id: governTarget.id, nodeId: node.id })}
+          onDrop={(node) => ungovern.mutate({ id: governTarget.id, nodeId: node.id })}
+          onClose={() => setGovernTarget(null)}
         />
       )}
     </div>

@@ -2969,6 +2969,14 @@ h1 {
 .kt-ancestry {
   margin-bottom: 6px;
 }
+/* Spacing only — `GoverningDecisions` owns its own look; these two say how much room
+   the strip takes on the page that mounts it. */
+.kt-node-governed {
+  margin-bottom: 16px;
+}
+.kt-membership-governed {
+  margin-bottom: 12px;
+}
 .kt-page-title {
   margin: 0;
   color: var(--kt-ink);

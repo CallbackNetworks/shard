@@ -12,6 +12,7 @@ import { DARK, STATUS_COLOR } from '../constants/theme'
 import NodeCombobox from '../components/shared/NodeCombobox'
 import NodeShareFacet from '../components/NodeShareFacet'
 import NodeFieldsPanel from '../components/NodeFieldsPanel'
+import GoverningDecisions from '../components/GoverningDecisions'
 import EmptyState from '../components/shared/EmptyState'
 import AncestryTrail from '../components/shared/AncestryTrail'
 import { hasNodeRole } from '../constants/nodeRoles'
@@ -235,6 +236,11 @@ export default function NodePage() {
           <code style={{ fontSize: 11, color: DARK.textDim }}>{node.id}</code>
         </div>
       </div>
+
+      {/* Why this node exists (ADR-0118's `governs`, read from the work's side). Above
+          the fields on purpose: the decision that produced a node explains it in a way
+          none of its own columns can. Renders nothing when nothing governs it. */}
+      <GoverningDecisions nodeId={id} className="kt-node-governed" />
 
       {/* The type's own fields (ADR-0074), drawn from its declaration. */}
       <NodeFieldsPanel node={node} typeMeta={typeMeta} />

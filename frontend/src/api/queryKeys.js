@@ -48,6 +48,7 @@ export const qk = {
   focusTargets: key('focus-targets'),
   globalActivityTicker: key('global-activity-ticker'),
   goals: key('goals'),
+  governingDecisions: key('governing-decisions'),
   graphMap: key('graph-map'),
   icalToken: key('ical-token'),
   identities: key('identities'),

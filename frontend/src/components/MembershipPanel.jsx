@@ -10,11 +10,15 @@ import {
   getNodeTypes, getNode, getNodeEdges, getEdgeTypes, attachNodeEdge, detachNodeEdge,
 } from '../api/client'
 import NodeCombobox from './shared/NodeCombobox'
+import GoverningDecisions from './GoverningDecisions'
 import { hasNodeRole } from '../constants/nodeRoles'
 
 // Relations managed by dedicated panels/UI; everything else (custom edge
-// types) surfaces in the "other relations" section below (ADR-0037).
-const CORE_RELS = new Set(['contains', 'depends_on', 'labeled', 'in_cycle', 'owns'])
+// types) surfaces in the "other relations" section below (ADR-0037). `governs` joins
+// them because the decision strip below draws it with the record's status attached —
+// as a bare edge row it said "governs ← <title>" and nothing about whether the thinking
+// behind the task was still current.
+const CORE_RELS = new Set(['contains', 'depends_on', 'labeled', 'in_cycle', 'owns', 'governs'])
 
 // Cross-project membership management (ADR-0032): a task can belong to multiple
 // projects via graph contains edges. ``projectId`` is the project this row is
@@ -95,6 +99,11 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
       borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
       background: 'rgba(var(--kt-ink-rgb), 0.02)',
     }}>
+      {/* What decided this task, before where it lives. The relation had a read
+          endpoint and no reader (ADR-0118); a task could be governed by a superseded
+          decision and say so nowhere. */}
+      <GoverningDecisions nodeId={task.id} className="kt-membership-governed" />
+
       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {t('membership.title')}
       </div>

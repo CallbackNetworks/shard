@@ -1,0 +1,57 @@
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Bordered, unlike the bare `kt-icon-btn` it replaces: a control with no label needs
+   an edge to read as a control at all. */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+  background: transparent;
+  color: var(--kt-muted);
+  cursor: pointer;
+  padding: 3px 6px;
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  border-color: rgba(var(--kt-ink-rgb), 0.3);
+  color: var(--kt-ink);
+}
+
+.menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 168px;
+  display: grid;
+  padding: 4px;
+  background: var(--kt-surface);
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 9px;
+  border: none;
+  background: transparent;
+  color: var(--kt-ink);
+  font-size: 12px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: rgba(var(--kt-ink-rgb), 0.07);
+}
+
+.danger {
+  color: var(--kt-status-failed);
+}

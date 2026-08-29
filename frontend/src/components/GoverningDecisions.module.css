@@ -1,0 +1,56 @@
+.root {
+  display: grid;
+  gap: 5px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--kt-faint);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* The status border is the whole signal: a task governed by a superseded decision is
+   being run on thinking that has already been replaced, and that has to be visible
+   without opening the record. */
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid;
+  background: rgba(var(--kt-ink-rgb), 0.03);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.chip:hover {
+  background: rgba(var(--kt-ink-rgb), 0.08);
+}
+
+.chipName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipStatus {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}

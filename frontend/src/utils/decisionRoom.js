@@ -62,29 +62,60 @@ export function buildDecisionLineages(decisions = []) {
   const visible = (refs) => (refs || []).map(r => r.id).filter(id => byId.has(id))
   const seen = new Set()
 
-  const walk = (decision, depth) => {
+  // `parentId` is the decision one step *newer* in the chain — the one whose
+  // `supersedes` edge put this row here. The rail that draws the chain is that edge, so
+  // the control that withdraws it belongs on the rail; without naming the parent the
+  // connector would be a picture of a relation you could not act on.
+  const walk = (decision, depth, parentId) => {
     if (!decision || seen.has(decision.id)) return []
     seen.add(decision.id)
-    const rows = [{ decision, depth }]
-    for (const id of visible(decision.supersedes)) rows.push(...walk(byId.get(id), depth + 1))
+    const rows = [{ decision, depth, parentId }]
+    for (const id of visible(decision.supersedes)) rows.push(...walk(byId.get(id), depth + 1, decision.id))
     return rows
+  }
+
+  const lineage = (decision) => {
+    const chain = walk(decision, 0, null)
+    if (!chain.length) return null
+    // The ids drawn in this chain. A card inside one suppresses the relation chips the
+    // rail already states, and keeps the ones pointing outside it (ADR-0069's rule for
+    // resolving within the visible set, applied to a card's own text).
+    return { id: decision.id, head: decision, chain, chainIds: new Set(chain.map(r => r.decision.id)) }
   }
 
   const lineages = []
   for (const decision of decisions) {
     if (visible(decision.superseded_by).length) continue
-    const chain = walk(decision, 0)
-    if (chain.length) lineages.push({ id: decision.id, head: decision, chain })
+    const built = lineage(decision)
+    if (built) lineages.push(built)
   }
   // Anything left is in a supersession cycle — impossible through the API, possible in
   // data written by hand. Show it rather than silently dropping it.
   for (const decision of decisions) {
     if (seen.has(decision.id)) continue
-    const chain = walk(decision, 0)
-    if (chain.length) lineages.push({ id: decision.id, head: decision, chain })
+    const built = lineage(decision)
+    if (built) lineages.push(built)
   }
 
   // Longest first: a chain is the part of this page that carries history. Sort is stable,
   // so equal-length lineages keep the server's newest-first order.
   return lineages.sort((a, b) => b.chain.length - a.chain.length)
+}
+
+/**
+ * Split lineages into the ones that carry history and the ones that are a single record.
+ *
+ * A chain of one is a decision, not a lineage. Production holds 103 decision records and
+ * one supersession edge, so a "LINEAGE" column that lists every outcome is 102 identical
+ * single cards and one chain — a list wearing the name of a graph, in which the one real
+ * chain is invisible. Keeping the sections apart makes the chain count mean what it says,
+ * and gives the empty state something true to say when there is nothing to draw.
+ */
+export function splitLineages(lineages = []) {
+  const chains = []
+  const singles = []
+  for (const lineage of lineages) {
+    (lineage.chain.length > 1 ? chains : singles).push(lineage)
+  }
+  return { chains, singles }
 }
