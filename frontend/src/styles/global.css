@@ -1997,13 +1997,34 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   border: 1px solid var(--kt-line);
   background: rgba(var(--kt-ink-rgb), 0.025);
 }
+/* The segment carries its own padding and active state. It used to inherit both from
+   `.kt-map-toolbar button`, so the first time it was mounted anywhere else (the decisions
+   page's list/graph switch, ADR-0128) the labels collided with their icons and the active
+   half was indistinguishable from the inactive one. */
 .kt-map-segment button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 0;
   border-right: 1px solid var(--kt-line);
   background: transparent;
+  color: var(--kt-muted);
+  cursor: pointer;
+  padding: 6px 11px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .kt-map-segment button:last-child {
   border-right: 0;
+}
+.kt-map-segment button:hover {
+  color: var(--kt-ink);
+}
+.kt-map-segment button.is-active {
+  background: rgba(250,204,21,0.1);
+  color: var(--kt-hit);
 }
 .kt-map-toolbar button.is-active,
 .kt-map-inspector button:hover {
@@ -3763,6 +3784,19 @@ h1 {
 }
 .kt-decision-room.is-mobile {
   grid-template-columns: 1fr;
+}
+/* Graph mode drops the two card columns and gives the canvas the rest of the row
+   (ADR-0128). The console stays: its filters and scoreboard describe the same set in
+   either mode, and a graph-only copy of them would be two controls for one job. */
+.kt-decision-room.is-graph {
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+.kt-decision-room.is-graph.is-mobile {
+  grid-template-columns: 1fr;
+}
+/* The canvas manages its own scrolling, so this pane must not clip it. */
+.kt-decision-graph-pane {
+  overflow: visible;
 }
 .kt-decision-console,
 .kt-decision-queue,

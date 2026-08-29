@@ -28,6 +28,9 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: (...args) => mocks.useQuery(...args),
   useQueries: (...args) => mocks.useQueries(...args),
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
+  // `GoverningDecisions` became writable with ADR-0128, so this panel's tree now holds a
+  // mutation as well as queries.
+  useMutation: (options) => ({ mutate: (payload) => { mocks.mutate?.(payload); options?.onSuccess?.() } }),
 }))
 
 vi.mock('../../api/client', () => ({

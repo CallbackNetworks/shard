@@ -1,0 +1,191 @@
+/* The decision graph (ADR-0128).
+
+   Relations are told apart by stroke *pattern* and glyph, not by hue. This page already
+   spends its colours on decision status (ADR-0088), and a fifth and sixth colour family
+   here would make a node's border and the line touching it argue about what a colour
+   means. `conflicts_with` is the one that gets weight, because it is the only relation on
+   this canvas that is a problem rather than a fact. */
+
+.root {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--kt-faint);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.swatch {
+  width: 18px;
+  height: 0;
+  border-top: 2px solid rgba(var(--kt-ink-rgb), 0.45);
+}
+
+.swatch.requires {
+  border-top-style: dashed;
+}
+
+.swatch.conflicts {
+  border-top-style: double;
+  border-top-width: 4px;
+}
+
+.swatch.governs {
+  border-top-style: dotted;
+}
+
+.unconnected {
+  margin-left: auto;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+  background: transparent;
+  color: var(--kt-faint);
+  cursor: pointer;
+  padding: 3px 8px;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+.unconnected:hover {
+  border-color: var(--accent);
+  color: var(--kt-ink);
+}
+
+/* The canvas scrolls inside its own box. The column is 360px at its narrowest and the
+   graph is as wide as the deepest chain — letting it push the page sideways would break
+   the three-column room around it. */
+.scroll {
+  overflow: auto;
+  max-height: 62vh;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
+  background:
+    linear-gradient(rgba(var(--kt-ink-rgb), 0.025) 1px, transparent 1px) 0 0 / 100% 28px,
+    linear-gradient(90deg, rgba(var(--kt-ink-rgb), 0.025) 1px, transparent 1px) 0 0 / 28px 100%;
+}
+
+.canvas {
+  position: relative;
+}
+
+.links {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.link {
+  fill: none;
+  stroke: rgba(var(--kt-ink-rgb), 0.4);
+  stroke-width: 1.6;
+  /* `currentColor` is what the arrow marker paints with, so it has to be set on the
+     path — a marker cannot read its host's `stroke`. */
+  color: rgba(var(--kt-ink-rgb), 0.4);
+  transition: opacity 0.15s ease;
+}
+
+.link.requires {
+  stroke-dasharray: 5 4;
+}
+
+.link.governs {
+  stroke-dasharray: 2 4;
+  stroke: rgba(var(--kt-ink-rgb), 0.28);
+  color: rgba(var(--kt-ink-rgb), 0.28);
+}
+
+.link.conflicts {
+  stroke: var(--kt-status-failed);
+  color: var(--kt-status-failed);
+  stroke-width: 3;
+}
+
+.linkMuted {
+  opacity: 0.12;
+}
+
+.node {
+  position: absolute;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+  background: var(--kt-surface);
+  color: var(--kt-ink);
+  cursor: pointer;
+  padding: 6px 9px;
+  text-align: left;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.node:hover {
+  border-color: var(--accent);
+}
+
+/* Status is the node's own colour, exactly as on the card — the graph must not be a
+   second vocabulary for the same fact. */
+.decision {
+  border-left: 3px solid var(--node-color, var(--kt-line));
+}
+
+.work {
+  border-style: dashed;
+  background: rgba(var(--kt-ink-rgb), 0.02);
+}
+
+.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.muted {
+  opacity: 0.18;
+}
+
+.nodeName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nodeMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kt-faint);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.axis {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--kt-faint);
+  font-size: 10px;
+}
+
+.emptyHint {
+  margin-top: 6px;
+  color: var(--kt-faint);
+  font-size: 11px;
+}

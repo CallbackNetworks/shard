@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowUp, GitFork, Plus, Search, X } from 'lucide-react'
+import { ArrowUp, GitFork, List, Network, Plus, Search, X } from 'lucide-react'
 import {
   getDecisions, getProjects, getAncestry, getNodeTypes,
   createDecision, updateDecision, deleteDecision,
@@ -12,6 +12,7 @@ import {
 import { qk } from '../api/queryKeys'
 import MarkdownEditor from '../components/MarkdownEditor'
 import DecisionCard from '../components/decisions/DecisionCard'
+import DecisionGraph from '../components/decisions/DecisionGraph'
 import DecisionGroup from '../components/decisions/DecisionGroup'
 import GovernPicker from '../components/decisions/GovernPicker'
 import { BRAND } from '../constants/theme'
@@ -176,6 +177,12 @@ export default function Decisions() {
   // Keyed by `<section>:<group path>` because the same container heads a group in more
   // than one section and the two are not the same disclosure.
   const [groupOverrides, setGroupOverrides] = useState({})
+  // 'list' | 'graph' (ADR-0128). The list is the default because it is the mode that
+  // answers "what is here"; the graph answers "how does it hang together", which is only
+  // a question once there are edges.
+  const [mode, setMode] = useState('list')
+  const [includeUnconnected, setIncludeUnconnected] = useState(false)
+  const [graphSelection, setGraphSelection] = useState(null)
 
   const { data: allDecisions = [], isLoading } = useQuery({
     queryKey: qk.decisions(filterProject, filterStatus),
@@ -227,6 +234,9 @@ export default function Decisions() {
   })
 
   const decisionById = useMemo(() => new Map(decisions.map(d => [d.id, d])), [decisions])
+  // Resolved through the live map rather than held in state: a card built from a stale
+  // copy would keep showing the relation you just cut.
+  const selectedDecision = graphSelection ? decisionById.get(graphSelection) : null
 
   const room = deriveDecisionRoom(decisions)
   const pendingCount = room.counts.proposed
@@ -486,6 +496,14 @@ export default function Decisions() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <div className="kt-map-segment" aria-label={t('decisions.mode')}>
+            <button type="button" onClick={() => setMode('list')} className={mode === 'list' ? 'is-active' : ''}>
+              <List size={12} /> {t('decisions.modeList')}
+            </button>
+            <button type="button" onClick={() => setMode('graph')} className={mode === 'graph' ? 'is-active' : ''}>
+              <Network size={12} /> {t('decisions.modeGraph')}
+            </button>
+          </div>
           <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
             <Plus size={13} /> {t('decisions.new')}
           </button>
@@ -508,7 +526,13 @@ export default function Decisions() {
           )}
         />
       ) : (
-        <div className={isMobile ? 'kt-decision-room is-mobile' : 'kt-decision-room'}>
+        <div className={[
+          isMobile ? 'kt-decision-room is-mobile' : 'kt-decision-room',
+          // The graph replaces the two card columns and keeps the console: the filters
+          // and the scoreboard describe the same set in either mode, so duplicating them
+          // into a graph-only sidebar would be two copies of one control.
+          mode === 'graph' ? 'is-graph' : '',
+        ].filter(Boolean).join(' ')}>
           <aside className="kt-decision-console">
             <div className="kt-decision-console-title">
               <GitFork size={13} />
@@ -555,27 +579,58 @@ export default function Decisions() {
             </div>
           </aside>
 
-          <section className="kt-decision-queue">
-            <div className="kt-decision-section-head">
-              <span>{t('decisions.pendingQueue')}</span>
-              <b>{room.queue.length}</b>
-            </div>
-            {renderSection('queue', soloLineages(room.queue), t('decisions.noPendingQueue'))}
-          </section>
+          {mode === 'graph' ? (
+            <section className="kt-decision-outcomes kt-decision-graph-pane">
+              <div className="kt-decision-section-head">
+                <span>{t('decisions.modeGraph')}</span>
+                <b>{room.counts.total}</b>
+              </div>
+              <DecisionGraph
+                decisions={decisions}
+                includeUnconnected={includeUnconnected}
+                onToggleUnconnected={() => setIncludeUnconnected(v => !v)}
+                selectedId={graphSelection}
+                onSelect={setGraphSelection}
+                projectMap={projectMap}
+              />
+              {/* The same card as the list draws. Selecting a node has to give you the
+                  record's own controls, or the graph is a picture you cannot act on —
+                  which is what `governs` was for the whole of ADR-0118's life. */}
+              {selectedDecision && (
+                <div className={s.graphSelection}>
+                  <DecisionCard
+                    decision={selectedDecision}
+                    projectName={projectMap[selectedDecision.project_id] || ''}
+                    {...cardProps}
+                  />
+                </div>
+              )}
+            </section>
+          ) : (
+            <>
+              <section className="kt-decision-queue">
+                <div className="kt-decision-section-head">
+                  <span>{t('decisions.pendingQueue')}</span>
+                  <b>{room.queue.length}</b>
+                </div>
+                {renderSection('queue', soloLineages(room.queue), t('decisions.noPendingQueue'))}
+              </section>
 
-          <section className="kt-decision-outcomes">
-            <div className="kt-decision-section-head">
-              <span>{t('decisions.lineage')}</span>
-              <b>{chains.length}</b>
-            </div>
-            {renderSection('chains', chains, t('decisions.noChains'))}
+              <section className="kt-decision-outcomes">
+                <div className="kt-decision-section-head">
+                  <span>{t('decisions.lineage')}</span>
+                  <b>{chains.length}</b>
+                </div>
+                {renderSection('chains', chains, t('decisions.noChains'))}
 
-            <div className="kt-decision-section-head">
-              <span>{t('decisions.standalone')}</span>
-              <b>{singles.length}</b>
-            </div>
-            {renderSection('singles', singles, t('decisions.noOutcomes'))}
-          </section>
+                <div className="kt-decision-section-head">
+                  <span>{t('decisions.standalone')}</span>
+                  <b>{singles.length}</b>
+                </div>
+                {renderSection('singles', singles, t('decisions.noOutcomes'))}
+              </section>
+            </>
+          )}
         </div>
       )}
 

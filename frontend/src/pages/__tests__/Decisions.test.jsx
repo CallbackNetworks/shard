@@ -310,4 +310,27 @@ describe('Decisions Decision Room', () => {
     expect(modal().querySelector('input[aria-label="decisions.searchPlaceholder"]')).toBeTruthy()
     expect(modal().textContent).toContain('decisions.supersedeHint')
   })
+  it('switches to the graph and draws only what has relations', () => {
+    // ADR-0128. The list answers "what is here"; the graph answers "how does this hang
+    // together", which is only a question once there are edges — so it is a mode, not
+    // the default, and unconnected records are counted rather than silently dropped.
+    setup()
+    fireEvent.click(screen.getByText('decisions.modeGraph'))
+    expect(screen.getByText('decisions.graph.governs')).toBeTruthy()
+    // d1 is proposed with no relations; d2/d3 are a chain, d4 has a premise and a conflict.
+    expect(screen.queryByText('Pending layout')).toBeNull()
+    expect(screen.getByText('Accepted API')).toBeTruthy()
+    expect(screen.getByText('decisions.graph.showUnconnected:1')).toBeTruthy()
+  })
+
+  it('selecting a graph node gives you the record its own controls', () => {
+    // A graph you cannot act on is a picture. Selecting draws the same card the list
+    // draws, so the relation writes are the ones that already exist.
+    setup()
+    fireEvent.click(screen.getByText('decisions.modeGraph'))
+    fireEvent.click(screen.getByTitle('Accepted API'))
+    expect(screen.getAllByText('decisions.governAction').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getAllByText('decisions.deprecate')[0])
+    expect(mutate).toHaveBeenCalledWith({ id: 'd2', data: { decision_status: 'deprecated' } })
+  })
 })

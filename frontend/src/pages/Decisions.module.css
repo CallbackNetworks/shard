@@ -180,3 +180,10 @@
 .search button:hover {
   color: var(--kt-ink);
 }
+
+/* The card for the node selected in the graph (ADR-0128). Sits under the canvas rather
+   than in a side panel: the room's third column is already the narrow one, and a card
+   squeezed beside a graph is the width problem the actions row was moved for. */
+.graphSelection {
+  padding: 0 10px 12px;
+}

@@ -54,3 +54,44 @@
   text-transform: uppercase;
   opacity: 0.75;
 }
+
+/* ADR-0128: the strip is writable now. The add control sits in the heading rather than
+   after the chips, so its position does not move as links are added — and so it is still
+   there when there are no chips at all, which is the state it exists for. */
+.add {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  color: var(--kt-faint);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+.add:hover {
+  color: var(--accent);
+}
+
+.none {
+  color: var(--kt-faint);
+  font-size: 11px;
+}
+
+.drop {
+  display: inline-flex;
+  align-self: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.55;
+}
+
+.chip:hover .drop {
+  opacity: 1;
+}

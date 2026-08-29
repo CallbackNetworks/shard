@@ -240,7 +240,7 @@ export default function NodePage() {
       {/* Why this node exists (ADR-0118's `governs`, read from the work's side). Above
           the fields on purpose: the decision that produced a node explains it in a way
           none of its own columns can. Renders nothing when nothing governs it. */}
-      <GoverningDecisions nodeId={id} className="kt-node-governed" />
+      <GoverningDecisions nodeId={id} className="kt-node-governed" editable />
 
       {/* The type's own fields (ADR-0074), drawn from its declaration. */}
       <NodeFieldsPanel node={node} typeMeta={typeMeta} />

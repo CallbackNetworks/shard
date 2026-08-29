@@ -153,19 +153,38 @@ export default function StructureMap() {
     [territorySignature]
   )
 
+  // Ids the drawn relation edges actually touch. "Settled decisions are noise" was true
+  // while a decision's only relation was to its project — and it silently deleted the
+  // opposite case: production's two `supersedes` edges join records that are *both*
+  // settled, so the one piece of decision history in the database could never appear
+  // here. Since ADR-0127 the same is true of `requires` and `conflicts_with`. A node an
+  // edge on screen points at is the definition of not-noise (ADR-0128).
+  const relationEndpointKeys = useMemo(() => {
+    const keys = new Set()
+    for (const link of graph.customLinks || []) { keys.add(link.from); keys.add(link.to) }
+    return keys
+  }, [graph.customLinks])
+
   const laneNodes = [
     ...graph.goalNodes.map(node => ({ ...node, lane: 'goal', color: STATUS_COLOR.done })),
     ...graph.decisionNodes.map(node => ({ ...node, lane: 'decision', color: node.status === 'proposed' ? STATUS_COLOR.in_progress : STATUS_COLOR.done })),
   ].filter(node => {
     const linkedProjectIds = node.projectIds || (node.projectId ? [node.projectId] : [])
     const linkedVisible = linkedProjectIds.some(projectId => visibleProjectIds.has(projectId))
-    // The network view stays readable by showing only linked goals and still
-    // undecided decisions; settled decisions are noise there.
-    if (layoutStyle === 'network' && node.lane === 'decision' && node.status !== 'proposed') return false
-    if (layoutStyle === 'network' && !search) return linkedVisible
+    const related = relationEndpointKeys.has(`${node.lane}:${node.id}`)
+    // The network view stays readable by showing only linked goals and still-undecided
+    // decisions — plus any decision that an edge on screen touches, whatever its status.
+    if (layoutStyle === 'network' && node.lane === 'decision' && node.status !== 'proposed' && !related) return false
+    if (layoutStyle === 'network' && !search) return linkedVisible || related
     if (!search) return true
     return node.name.toLowerCase().includes(search) || linkedVisible
-  }).slice(0, layoutStyle === 'network' ? 18 : 12)
+  })
+  // A cap that drops a node an edge points at leaves a line ending in nothing, so the
+  // related ones are kept first and the cap applies to what is left.
+  const laneCap = layoutStyle === 'network' ? 18 : 12
+  const laneRelated = laneNodes.filter(node => relationEndpointKeys.has(`${node.lane}:${node.id}`))
+  const laneRest = laneNodes.filter(node => !relationEndpointKeys.has(`${node.lane}:${node.id}`))
+  const visibleLaneNodes = [...laneRelated, ...laneRest.slice(0, Math.max(0, laneCap - laneRelated.length))]
 
   // Custom plain nodes and custom-relation edges surface in the network view
   // (ADR-0037); they follow their container's visibility and match search.
@@ -186,7 +205,7 @@ export default function StructureMap() {
     visibleIdentityNodes.map(n => `${n.id}:${n.color}`).join(','),
     visibleProjects.map(n => `${n.id}:${n.risk}:${n.progress}:${n.identityIds.join('+')}:${n.parentContainerId || ''}`).join(','),
     visibleTaskNodes.map(n => `${n.id}:${n.status}:${n.projectId}`).join(','),
-    laneNodes.map(n => `${n.lane}:${n.id}:${(n.projectIds || n.projectId || '')}`).join(','),
+    visibleLaneNodes.map(n => `${n.lane}:${n.id}:${(n.projectIds || n.projectId || '')}`).join(','),
     visibleCustomNodes.map(n => `${n.id}:${n.parentProjectId || ''}`).join(','),
     visibleCustomLinks.map(l => `${l.from}>${l.to}:${l.relType}`).join(','),
     visibleDependencyLinks.map(l => `${l.from}>${l.to}`).join(','),
@@ -197,7 +216,7 @@ export default function StructureMap() {
       if (layoutStyle === 'territory') {
         return { nodes: [], links: [], nodeById: new Map(), width: 960, height: 600, columns: null }
       }
-      const params = { visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes, dependencyLinks: visibleDependencyLinks, viewMode }
+      const params = { visibleProjects, visibleIdentityNodes, visibleTaskNodes, laneNodes: visibleLaneNodes, dependencyLinks: visibleDependencyLinks, viewMode }
       if (layoutStyle === 'network') {
         return buildNetworkLayout({ ...params, customNodes: visibleCustomNodes, customLinks: visibleCustomLinks })
       }

@@ -102,7 +102,7 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
       {/* What decided this task, before where it lives. The relation had a read
           endpoint and no reader (ADR-0118); a task could be governed by a superseded
           decision and say so nowhere. */}
-      <GoverningDecisions nodeId={task.id} className="kt-membership-governed" />
+      <GoverningDecisions nodeId={task.id} className="kt-membership-governed" editable />
 
       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {t('membership.title')}
