@@ -85,7 +85,7 @@ docker compose -f docker-compose.ci.yml --profile integration up --build backend
 | `DB_MAX_OVERFLOW` | Max overflow connections for PostgreSQL/MySQL (default `10`) |
 | `DB_POOL_TIMEOUT` | Pool timeout in seconds for PostgreSQL/MySQL (default `30`) |
 | `DB_SSL_MODE` | SSL mode for PostgreSQL cloud connections (e.g. `require`) |
-| `AUTH_PASSWORD` | Built-in shared-password gate for `/app`; leave empty for no auth. Set it on *any* stack that has a public entrance pointed at it — a Cloudflare tunnel reaches the containers over the compose network and is not covered by `BIND_HOST` (ADR-0124). Tests are unaffected either way: `conftest.py` sets it empty itself |
+| `AUTH_PASSWORD` | Built-in shared-password gate for `/app`; leave empty for no auth. Set it on *any* stack whose address other people hold — a tunnel reaches the containers over the compose network and is not covered by `BIND_HOST`, so binding to the loopback does not cover one (ADR-0124 → ADR-0125, where the dev stack's own answer is to stop the tunnel instead). Tests are unaffected either way: `conftest.py` sets it empty itself |
 | `AUTH_TOKEN_TTL` | Session token lifetime in seconds (default `604800`, 7 days) |
 | `AUTH_MAX_ATTEMPTS` | Failed logins per IP before lockout (default `5`) |
 | `AUTH_LOCKOUT_SECONDS` | Login lockout window in seconds (default `300`) |

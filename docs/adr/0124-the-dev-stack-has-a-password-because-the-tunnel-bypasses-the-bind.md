@@ -1,7 +1,7 @@
 # ADR-0124: dev 也要有密碼，因為 tunnel 繞過了綁定
 
 ## Status
-Accepted
+Superseded by ADR-0125
 
 ## Date
 2026-08-29
