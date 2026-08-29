@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import {
-  ArrowDown, ArrowUp, Bot, Check, Download, Edit2, GitFork, GitMerge,
-  Gavel, Link2, RotateCcw, Trash2, User, X, XCircle,
+  Anchor, ArrowDown, ArrowUp, Bot, Check, Download, Edit2, GitFork, GitMerge,
+  Gavel, Link2, RotateCcw, Trash2, TriangleAlert, User, X, XCircle,
 } from 'lucide-react'
 import MarkdownPreview from '../MarkdownPreview'
 import OverflowMenu from '../shared/OverflowMenu'
@@ -46,6 +46,7 @@ const RETIRED = new Set(['deprecated', 'superseded'])
 export default function DecisionCard({
   decision, projectName, chainIds,
   onStatus, onEdit, onDelete, onExport, onSupersede, onUnsupersede, onGovern, onUngovern,
+  onLink, onUnlink,
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
@@ -55,6 +56,12 @@ export default function DecisionCard({
   const supersedes = (decision.supersedes || []).filter(n => !inChain(n.id))
   const supersededBy = (decision.superseded_by || []).filter(n => !inChain(n.id))
   const governs = decision.governs || []
+  // ADR-0127. `requires` is directed and drawn from both ends; `conflicts_with` is
+  // symmetric and arrives already merged from the server, so the card never has to know
+  // which end holds the row.
+  const requires = decision.requires || []
+  const requiredBy = decision.required_by || []
+  const conflicts = decision.conflicts_with || []
 
   return (
     <div className={`kt-card kt-decision-card ${s.card} is-${status}`} style={{
@@ -118,6 +125,12 @@ export default function DecisionCard({
 
         <OverflowMenu
           items={[
+            // Behind the `⋯` rather than beside `REPLACES…`/`GOVERNS…` on purpose: ADR-0122
+            // weighted this row by how often the act happens, and four labelled relation
+            // buttons is the wall of controls it took out. The graph view (ADR-0128) is
+            // where connecting is the primary act, and there they are first-class.
+            { key: 'requires', onClick: () => onLink?.(decision, 'requires'), icon: <Anchor size={12} />, label: t('decisions.requiresAction') },
+            { key: 'conflicts', onClick: () => onLink?.(decision, 'conflicts_with'), icon: <TriangleAlert size={12} />, label: t('decisions.conflictsAction') },
             { key: 'node', href: `/n/${decision.id}`, icon: <Link2 size={12} />, label: t('decisions.openNode') },
             { key: 'export', onClick: () => onExport(decision), icon: <Download size={12} />, label: t('decisions.export') },
             { key: 'edit', onClick: () => onEdit(decision), icon: <Edit2 size={12} />, label: t('edit') },
@@ -126,7 +139,8 @@ export default function DecisionCard({
         />
       </div>
 
-      {(supersedes.length > 0 || supersededBy.length > 0) && (
+      {(supersedes.length > 0 || supersededBy.length > 0 || requires.length > 0
+        || requiredBy.length > 0 || conflicts.length > 0) && (
         <div className={s.relations}>
           {/* Direction is carried by the glyph and the weight, not by a hue: this page
               already spends its colours on decision status (ADR-0088). */}
@@ -141,6 +155,29 @@ export default function DecisionCard({
             <Link key={n.id} to={`/n/${n.id}`} className={`${s.relation} ${s.replacedBy}`}>
               <ArrowDown size={10} /> {t('decisions.supersededByName', { name: n.title })}
             </Link>
+          ))}
+          {/* A premise this record rests on: removable here, because this end owns the
+              edge. The reverse (`required_by`) is somebody else's edge, so it links and
+              does not offer to cut it — the same asymmetry `supersedes` already draws. */}
+          {requires.map(n => (
+            <button key={`req-${n.id}`} type="button" className={`${s.relation} ${s.requires}`}
+              onClick={() => onUnlink?.(decision, n, 'requires')} title={t('decisions.unrequire')}>
+              <Anchor size={10} /> {t('decisions.requiresName', { name: n.title })}
+              <X size={9} className={s.relationDrop} />
+            </button>
+          ))}
+          {requiredBy.map(n => (
+            <Link key={`reqby-${n.id}`} to={`/n/${n.id}`} className={`${s.relation} ${s.requiredBy}`}>
+              <Anchor size={10} /> {t('decisions.requiredByName', { name: n.title })}
+            </Link>
+          ))}
+          {/* Symmetric, so either end may cut it and the chip looks the same on both. */}
+          {conflicts.map(n => (
+            <button key={`cf-${n.id}`} type="button" className={`${s.relation} ${s.conflicts}`}
+              onClick={() => onUnlink?.(decision, n, 'conflicts_with')} title={t('decisions.unconflict')}>
+              <TriangleAlert size={10} /> {t('decisions.conflictsName', { name: n.title })}
+              <X size={9} className={s.relationDrop} />
+            </button>
           ))}
         </div>
       )}

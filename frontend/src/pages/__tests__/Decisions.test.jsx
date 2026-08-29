@@ -39,6 +39,8 @@ vi.mock('../../api/client', () => ({
   unsupersedeDecision: vi.fn(),
   linkDecisionToWork: vi.fn(),
   unlinkDecisionFromWork: vi.fn(),
+  linkDecisionRelation: vi.fn(),
+  unlinkDecisionRelation: vi.fn(),
 }))
 
 import Decisions from '../Decisions'
@@ -51,10 +53,13 @@ const decisions = [
   { id: 'd1', project_id: 'p1', name: 'Pending layout', description: 'Pending desc', decision_status: 'proposed', source: 'manual' },
   { id: 'd2', project_id: 'p1', name: 'Accepted API', description: 'Accepted desc', decision_status: 'accepted', source: 'ai',
     supersedes: [{ id: 'd3', type: 'decision', title: 'Old API' }],
+    required_by: [{ id: 'd4', type: 'decision', title: 'Rejected cache' }],
     governs: [{ id: 't1', type: 'task', title: 'Rewrite the client' }] },
   { id: 'd3', project_id: 'p1', name: 'Old API', description: 'Old desc', decision_status: 'superseded', source: 'manual',
     superseded_by: [{ id: 'd2', type: 'decision', title: 'Accepted API' }] },
-  { id: 'd4', project_id: 'p1', name: 'Rejected cache', description: 'Rejected desc', decision_status: 'deprecated', source: 'manual' },
+  { id: 'd4', project_id: 'p1', name: 'Rejected cache', description: 'Rejected desc', decision_status: 'deprecated', source: 'manual',
+    requires: [{ id: 'd2', type: 'decision', title: 'Accepted API' }],
+    conflicts_with: [{ id: 'd1', type: 'decision', title: 'Pending layout' }] },
 ]
 
 // Where each decision lives (ADR-0094). Every record here sits under one organization,
@@ -81,6 +86,8 @@ function setup(rows = decisions, tree = ancestry) {
 }
 
 const clickText = (text) => fireEvent.click(screen.getByText(text).closest('button'))
+// The page and the open modal both list decisions, so a bare text query matches twice.
+const modal = () => document.querySelector('.kt-modal')
 
 describe('Decisions Decision Room', () => {
   beforeEach(() => {
@@ -248,5 +255,59 @@ describe('Decisions Decision Room', () => {
     setup(decisions, {})
     expect(screen.getAllByText('decisions.unfiledGroup').length).toBeGreaterThan(0)
     expect(screen.getByText('Accepted API')).toBeTruthy()
+  })
+  it('draws a premise and a contradiction, and can cut either', () => {
+    // ADR-0127. Production ran with 103 records and three non-containment edges: the two
+    // relations a decision most often actually has did not exist, so 98 of them named
+    // nothing and were named by nothing.
+    setup()
+    expect(screen.getByText('decisions.requiresName')).toBeTruthy()
+    expect(screen.getByText('decisions.conflictsName')).toBeTruthy()
+    expect(screen.getByText('decisions.requiredByName')).toBeTruthy()
+
+    fireEvent.click(screen.getByTitle('decisions.unrequire'))
+    expect(mutate).toHaveBeenCalledWith({ id: 'd4', otherId: 'd2', relType: 'requires' })
+
+    mutate.mockClear()
+    fireEvent.click(screen.getByTitle('decisions.unconflict'))
+    expect(mutate).toHaveBeenCalledWith({ id: 'd4', otherId: 'd1', relType: 'conflicts_with' })
+  })
+
+  it('offers a cross-project candidate for a premise and refuses it for a supersession', () => {
+    // `supersedes` stays inside one project (ADR-0118); `requires` and `conflicts_with`
+    // reach across, because an organization-level premise for a project-level decision is
+    // the interesting case and nothing in the declaration forbids it.
+    const rows = [
+      ...decisions,
+      { id: 'x1', project_id: 'p2', name: 'Elsewhere decision', decision_status: 'accepted', source: 'manual' },
+    ]
+    const { unmount } = setup(rows, { ...ancestry, x1: { id: 'x1', trails: [[org]], owners: [] } })
+
+    fireEvent.click(screen.getAllByLabelText('more')[0])
+    fireEvent.click(screen.getByText('decisions.requiresAction'))
+    expect(modal().textContent).toContain('Elsewhere decision')
+    unmount()
+
+    setup(rows, { ...ancestry, x1: { id: 'x1', trails: [[org]], owners: [] } })
+    fireEvent.click(screen.getAllByText('decisions.supersedeAction')[0])
+    expect(modal().textContent).not.toContain('Elsewhere decision')
+  })
+
+  it('creates the edge through the generic surface, not a relation-specific endpoint', () => {
+    setup()
+    fireEvent.click(screen.getAllByLabelText('more')[0])
+    fireEvent.click(screen.getByText('decisions.conflictsAction'))
+    const option = [...modal().querySelectorAll('button')].find(b => b.textContent.includes('Accepted API'))
+    fireEvent.click(option)
+    expect(mutate).toHaveBeenCalledWith({ id: 'd1', otherId: 'd2', relType: 'conflicts_with' })
+  })
+
+  it('uses one picker for all three decision-to-decision relations', () => {
+    // Three modals listing the same rows and differing only in their heading is three
+    // places to fix when the list needs a search box — which it did at a hundred records.
+    setup()
+    fireEvent.click(screen.getAllByText('decisions.supersedeAction')[0])
+    expect(modal().querySelector('input[aria-label="decisions.searchPlaceholder"]')).toBeTruthy()
+    expect(modal().textContent).toContain('decisions.supersedeHint')
   })
 })

@@ -7,6 +7,7 @@ import {
   createDecision, updateDecision, deleteDecision,
   exportDecision, supersedeDecision, unsupersedeDecision,
   linkDecisionToWork, unlinkDecisionFromWork,
+  linkDecisionRelation, unlinkDecisionRelation,
 } from '../api/client'
 import { qk } from '../api/queryKeys'
 import MarkdownEditor from '../components/MarkdownEditor'
@@ -104,29 +105,55 @@ function DecisionForm({ projects, initial, onSave, onClose }) {
   )
 }
 
-/** Pick the record this decision replaces. Only decisions in the same project are
- *  offered, and never one already in this decision's own lineage. */
-function SupersedePicker({ decision, candidates, onPick, onClose }) {
+// One picker for every decision -> decision relation (ADR-0127). Three modals listing
+// the same rows and differing only in their heading would be three places to fix when the
+// list needs a search box — which it did the moment production held a hundred records.
+const DECISION_LINK_RELATIONS = {
+  supersedes: { title: 'decisions.supersedeTitle', hint: 'decisions.supersedeHint', none: 'decisions.supersedeNone' },
+  requires: { title: 'decisions.requiresTitle', hint: 'decisions.requiresHint', none: 'decisions.linkNone' },
+  conflicts_with: { title: 'decisions.conflictsTitle', hint: 'decisions.conflictsHint', none: 'decisions.linkNone' },
+}
+
+function DecisionLinkPicker({ decision, relType, candidates, projectMap, onPick, onClose }) {
   const { t } = useTranslation()
+  const [query, setQuery] = useState('')
+  const copy = DECISION_LINK_RELATIONS[relType]
+  const shown = candidates.filter(c => decisionMatches(c, query, projectMap[c.project_id]))
+
   return (
     <FormModal
-      title={t('decisions.supersedeTitle', { name: decision.name })}
+      title={t(copy.title, { name: decision.name })}
       onClose={onClose}
       onSubmit={onClose}
       submitLabel={t('close')}
     >
-      <div className="kt-page-subtitle" style={{ marginBottom: 10 }}>{t('decisions.supersedeHint')}</div>
+      <div className="kt-page-subtitle" style={{ marginBottom: 10 }}>{t(copy.hint)}</div>
       {candidates.length === 0 ? (
-        <div className="kt-empty">{t('decisions.supersedeNone')}</div>
+        <div className="kt-empty">{t(copy.none)}</div>
       ) : (
-        <div className={s.supersedeList}>
-          {candidates.map(c => (
-            <button key={c.id} type="button" className={s.supersedeOption} onClick={() => onPick(c)}>
-              <span>{c.name}</span>
-              <em>{t(`decisions.${c.decision_status || 'proposed'}`)}</em>
-            </button>
-          ))}
-        </div>
+        <>
+          <label className={s.search} style={{ marginBottom: 8 }}>
+            <Search size={12} />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={t('decisions.searchPlaceholder')}
+              aria-label={t('decisions.searchPlaceholder')}
+            />
+          </label>
+          <div className={s.supersedeList}>
+            {shown.map(c => (
+              <button key={c.id} type="button" className={s.supersedeOption} onClick={() => onPick(c)}>
+                <span>{c.name}</span>
+                {/* Which project a candidate is in matters here in a way it does not on a
+                    card: `requires` and `conflicts_with` reach across projects, so two
+                    similarly named records are told apart by where they live. */}
+                <em>{projectMap[c.project_id] || t('decisions.unfiledGroup')} · {t(`decisions.${c.decision_status || 'proposed'}`)}</em>
+              </button>
+            ))}
+            {shown.length === 0 && <div className="kt-empty">{t('decisions.linkNone')}</div>}
+          </div>
+        </>
       )}
     </FormModal>
   )
@@ -138,7 +165,9 @@ export default function Decisions() {
   const isMobile = bp === 'mobile'
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
-  const [supersedeTarget, setSupersedeTarget] = useState(null)
+  // `{ decision, relType }` — one bit of state for all three decision -> decision
+  // relations, because they are one picker (ADR-0127).
+  const [linkTarget, setLinkTarget] = useState(null)
   const [governTarget, setGovernTarget] = useState(null)
   const [filterProject, setFilterProject] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -240,7 +269,21 @@ export default function Decisions() {
   const supersede = useInvalidatingMutation({
     mutationFn: ({ id, supersededId }) => supersedeDecision(id, supersededId),
     invalidateKeys: [['decisions']],
-    onSuccess: () => setSupersedeTarget(null),
+    onSuccess: () => setLinkTarget(null),
+  })
+
+  // `requires` / `conflicts_with` are plain edges, so they go through the generic edge
+  // surface (ADR-0118's rule; `supersedes` is the one exception because the edge and the
+  // far end's status are a single act).
+  const linkRelation = useInvalidatingMutation({
+    mutationFn: ({ id, otherId, relType }) => linkDecisionRelation(id, otherId, relType),
+    invalidateKeys: [['decisions']],
+    onSuccess: () => setLinkTarget(null),
+  })
+
+  const unlinkRelation = useInvalidatingMutation({
+    mutationFn: ({ id, otherId, relType }) => unlinkDecisionRelation(id, otherId, relType),
+    invalidateKeys: [['decisions']],
   })
 
   const unsupersede = useInvalidatingMutation({
@@ -285,6 +328,15 @@ export default function Decisions() {
     }
   }
 
+  const handleLink = (d, relType) => setLinkTarget({ decision: d, relType })
+
+  const handleUnlink = (d, node, relType) => {
+    const key = relType === 'requires' ? 'decisions.unrequireConfirm' : 'decisions.unconflictConfirm'
+    if (window.confirm(t(key, { name: node.title }))) {
+      unlinkRelation.mutate({ id: d.id, otherId: node.id, relType })
+    }
+  }
+
   const handleUngovern = (d, node) => {
     if (window.confirm(t('decisions.ungovernConfirm', { name: node.title }))) {
       ungovern.mutate({ id: d.id, nodeId: node.id })
@@ -304,23 +356,38 @@ export default function Decisions() {
     } catch { /* ignore */ }
   }
 
-  // Offered as "what this replaces": same project, not itself, and not already in this
-  // decision's own chain — superseding your own ancestor is the cycle the server refuses.
-  const supersedeCandidates = supersedeTarget
-    ? decisions.filter(d =>
-      d.id !== supersedeTarget.id &&
-      d.project_id === supersedeTarget.project_id &&
-      !(supersedeTarget.supersedes || []).some(n => n.id === d.id) &&
-      !(d.supersedes || []).some(n => n.id === supersedeTarget.id))
-    : []
+  // What may sit at the far end of each relation. `supersedes` stays inside one project —
+  // that is ADR-0118's rule and the server refuses the cycle anyway. The other two reach
+  // across projects on purpose: an organization-level decision being the premise of a
+  // project-level one is the interesting case, not an edge case, and nothing in the
+  // declaration restricts it.
+  const linkCandidates = (() => {
+    if (!linkTarget) return []
+    const { decision: subject, relType } = linkTarget
+    const already = new Set([
+      ...(subject[relType] || []).map(n => n.id),
+      ...(relType === 'requires' ? (subject.required_by || []).map(n => n.id) : []),
+    ])
+    // Filtered against the *unfiltered* set: the search box narrows what you are reading,
+    // not what you are allowed to connect to.
+    return allDecisions.filter(d => {
+      if (d.id === subject.id || already.has(d.id)) return false
+      if (relType !== 'supersedes') return true
+      return d.project_id === subject.project_id
+        && !(subject.supersedes || []).some(n => n.id === d.id)
+        && !(d.supersedes || []).some(n => n.id === subject.id)
+    })
+  })()
 
   const cardProps = {
     onStatus: handleStatus,
     onEdit: handleEdit,
     onDelete: handleDelete,
     onExport: handleExport,
-    onSupersede: setSupersedeTarget,
+    onSupersede: (d) => handleLink(d, 'supersedes'),
     onUnsupersede: handleUnsupersede,
+    onLink: handleLink,
+    onUnlink: handleUnlink,
     onGovern: setGovernTarget,
     onUngovern: handleUngovern,
   }
@@ -530,12 +597,16 @@ export default function Decisions() {
         />
       )}
 
-      {supersedeTarget && (
-        <SupersedePicker
-          decision={supersedeTarget}
-          candidates={supersedeCandidates}
-          onPick={(c) => supersede.mutate({ id: supersedeTarget.id, supersededId: c.id })}
-          onClose={() => setSupersedeTarget(null)}
+      {linkTarget && (
+        <DecisionLinkPicker
+          decision={linkTarget.decision}
+          relType={linkTarget.relType}
+          candidates={linkCandidates}
+          projectMap={projectMap}
+          onPick={(c) => (linkTarget.relType === 'supersedes'
+            ? supersede.mutate({ id: linkTarget.decision.id, supersededId: c.id })
+            : linkRelation.mutate({ id: linkTarget.decision.id, otherId: c.id, relType: linkTarget.relType }))}
+          onClose={() => setLinkTarget(null)}
         />
       )}
 

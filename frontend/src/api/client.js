@@ -352,6 +352,14 @@ export const getDecisionsGoverning = (nodeId) => api.get(`/nodes/${nodeId}/decis
 export const linkDecisionToWork = (id, nodeId) =>
   attachNodeEdge(id, { target_id: nodeId, rel_type: 'governs' })
 export const unlinkDecisionFromWork = (id, nodeId) => detachNodeEdge(id, nodeId, 'governs')
+// Decision -> decision (ADR-0127). Same generic edge surface as `governs`: `supersedes`
+// is the only relation with a write endpoint of its own, and it earns it because the edge
+// and the far end's status are one act. These two change nothing but the edge.
+// `conflicts_with` is declared symmetric, so the server treats the reverse row as this
+// same edge — the client never has to guess which end holds it.
+export const linkDecisionRelation = (id, otherId, relType) =>
+  attachNodeEdge(id, { target_id: otherId, rel_type: relType })
+export const unlinkDecisionRelation = (id, otherId, relType) => detachNodeEdge(id, otherId, relType)
 
 // Goals — reads stay on /goals (enriched: per-project breakdown + subtree progress);
 // writes go through the generic node/edge surface (ADR-0041 step c). A goal is a

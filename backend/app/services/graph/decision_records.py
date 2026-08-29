@@ -26,6 +26,21 @@ Two relations make the record answerable about itself (both declared in
                 (:func:`governing`) is the question that had no query at all: labels
                 could be listed for a task, and the work could never be listed for a
                 decision.
+
+Two more make a decision answerable about the *other decisions* around it (ADR-0127).
+Production ran for months with 103 records, two ``supersedes`` edges and one ``governs``,
+so 98 of them named nothing and were named by nothing — a decision graph with no edges is
+a list wearing a graph's name, and the missing edges were the ones a record most often
+actually has:
+
+``requires``        decision -> the decision it takes as a premise. This one holds only
+                    while that one does. Not ``supersedes`` (which retires the far end)
+                    and not ``depends_on`` (which means "blocked until done", and a
+                    decision is never done).
+``conflicts_with``  decision <-> the decision that contradicts it. Stored one way like
+                    every edge and **read both ways**: the claim is symmetric, so a record
+                    that only looked at its own outgoing edges would read as clean while
+                    the record it contradicts already said otherwise.
 """
 
 from collections import defaultdict
@@ -38,8 +53,10 @@ from sqlalchemy.orm import Session
 from app.models import Edge, Node
 from app.services.graph.core import (
     NODE_DECISION,
+    REL_CONFLICTS_WITH,
     REL_CONTAINS,
     REL_GOVERNS,
+    REL_REQUIRES,
     REL_SUPERSEDES,
     add_edge,
     create_node,
@@ -74,6 +91,9 @@ class DecisionView:
     supersedes: list[Node] = field(default_factory=list)
     superseded_by: list[Node] = field(default_factory=list)
     governs: list[Node] = field(default_factory=list)
+    requires: list[Node] = field(default_factory=list)
+    required_by: list[Node] = field(default_factory=list)
+    conflicts_with: list[Node] = field(default_factory=list)
 
 
 def _view(node: Node, project_id: str | None, links: dict | None = None) -> DecisionView:
@@ -91,6 +111,9 @@ def _view(node: Node, project_id: str | None, links: dict | None = None) -> Deci
         supersedes=links.get(REL_SUPERSEDES, []),
         superseded_by=links.get("superseded_by", []),
         governs=links.get(REL_GOVERNS, []),
+        requires=links.get(REL_REQUIRES, []),
+        required_by=links.get("required_by", []),
+        conflicts_with=links.get(REL_CONFLICTS_WITH, []),
     )
 
 
@@ -118,6 +141,25 @@ def links_map(db: Session, decision_ids) -> dict[str, dict[str, list[Node]]]:
     _load(REL_SUPERSEDES, Edge.source_id, Edge.target_id, REL_SUPERSEDES)
     _load(REL_SUPERSEDES, Edge.target_id, Edge.source_id, "superseded_by")
     _load(REL_GOVERNS, Edge.source_id, Edge.target_id, REL_GOVERNS)
+    _load(REL_REQUIRES, Edge.source_id, Edge.target_id, REL_REQUIRES)
+    _load(REL_REQUIRES, Edge.target_id, Edge.source_id, "required_by")
+    # Both directions land in one list. ``conflicts_with`` is symmetric in meaning and
+    # directed in storage like every other edge, so a record reading only its own outgoing
+    # edges would say "no conflicts" while the record it contradicts already says
+    # otherwise — one of the two ends would be telling the truth and nothing would say
+    # which. Deduped because a client may write the edge from both sides.
+    _load(REL_CONFLICTS_WITH, Edge.source_id, Edge.target_id, REL_CONFLICTS_WITH)
+    _load(REL_CONFLICTS_WITH, Edge.target_id, Edge.source_id, REL_CONFLICTS_WITH)
+    for links in result.values():
+        seen: set[str] = set()
+        merged = []
+        for node in links.get(REL_CONFLICTS_WITH, []):
+            if node.id in seen:
+                continue
+            seen.add(node.id)
+            merged.append(node)
+        if merged:
+            links[REL_CONFLICTS_WITH] = merged
     return result
 
 

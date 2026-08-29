@@ -128,3 +128,4 @@
 | [0124](0124-the-dev-stack-has-a-password-because-the-tunnel-bypasses-the-bind.md) | dev 也要有密碼，因為 tunnel 繞過了綁定 | Superseded by ADR-0125 | 2026-08-29 |
 | [0125](0125-the-only-door-is-the-tunnel-so-the-tunnel-is-the-control.md) | 唯一的入口是 tunnel，所以控制點就在 tunnel | Accepted | 2026-08-29 |
 | [0126](0126-a-decision-is-filed-where-it-lives.md) | 決策按「它住在哪裡」歸檔，量大時預設收起 | Accepted | 2026-08-29 |
+| [0127](0127-a-decision-names-its-premises-and-its-conflicts.md) | 決策要說得出自己的前提，以及自己跟誰矛盾 | Accepted | 2026-08-29 |

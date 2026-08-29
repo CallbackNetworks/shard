@@ -33,14 +33,17 @@ MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations" / "versions"
 # ``roles``: those are editable per ADR-0079, so resyncing them would revert a choice
 # somebody made rather than correct a fact.
 NODE_DECLARED = ("fields",)
-EDGE_DECLARED = ("description", "allowed_source", "allowed_target")
+# ``is_symmetric`` joined this list with ADR-0127: until ``conflicts_with`` nothing read
+# it, so it was a comment shaped like a column. ``graph.add_edge``/``remove_edge`` read it
+# now, which makes a stale copy of it a behaviour difference, not a wording one.
+EDGE_DECLARED = ("description", "allowed_source", "allowed_target", "is_symmetric")
 
 # Bump this together with a revision that re-applies the declarations to existing
 # databases — see migrations/versions/b5d7f9a1c3e6_resync_builtin_declarations.py for the
 # shape. Changing the fingerprint alone makes the test pass and leaves production stale,
 # which is the failure this file exists to make impossible to reach by accident.
-FINGERPRINT = "454b5945848a45b2"
-LAST_RESYNC_REVISION = "b5d7f9a1c3e6"
+FINGERPRINT = "54675595aeea2578"
+LAST_RESYNC_REVISION = "c6e8a0b2d4f7"
 
 
 def _fingerprint() -> str:

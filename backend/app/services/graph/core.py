@@ -10,7 +10,7 @@ import uuid
 from collections import defaultdict, deque
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
@@ -39,6 +39,8 @@ REL_LABELED = "labeled"  # task -> label
 REL_IN_CYCLE = "in_cycle"  # task -> cycle
 REL_SUPERSEDES = "supersedes"  # newer decision -> the decision it replaces
 REL_GOVERNS = "governs"  # decision -> the work it decides (task or container)
+REL_REQUIRES = "requires"  # decision -> the decision it takes as a premise
+REL_CONFLICTS_WITH = "conflicts_with"  # decision <-> decision that contradicts it
 
 # A task is overdue when it is past its due date and still open. "Still open"
 # excludes ``failed`` as well as ``done`` (ADR-0089): a failed task is not late,
@@ -480,6 +482,18 @@ def check_edge_endpoints(db: Session, source: Node, target: Node, rel_type: str)
 # --- Edge CRUD ---------------------------------------------------------------
 
 
+def is_symmetric_rel(db: Session, rel_type: str) -> bool:
+    """Does this relation mean the same thing read from either end (ADR-0127)?
+
+    ``edge_types.is_symmetric`` has existed since ADR-0033 and, until ``conflicts_with``,
+    nothing read it: it was declared, exposed on both API doors and frozen on built-ins
+    while deciding no behaviour at all. A flag in that state is the silent-empty-set trap
+    ADR-0056 is about — it looks like a setting and is a comment.
+    """
+    et = db.get(EdgeType, rel_type)
+    return bool(et is not None and et.is_symmetric)
+
+
 def add_edge(
     db: Session,
     source_id: str,
@@ -493,16 +507,28 @@ def add_edge(
     """Create an edge if it does not already exist; otherwise return the existing one.
 
     For ``contains`` edges this guards against introducing a cycle, and every
-    relation's declared endpoint types are enforced (ADR-0078).
+    relation's declared endpoint types are enforced (ADR-0078). For a *symmetric*
+    relation the reverse edge already **is** this edge, so writing it from the other side
+    returns the existing row rather than storing the same claim twice (ADR-0127).
     """
     if rel_type == REL_CONTAINS and detect_cycle(db, source_id, target_id):
         raise ValueError(f"adding contains edge {source_id} -> {target_id} would create a cycle")
     source, target = db.get(Node, source_id), db.get(Node, target_id)
     if source is not None and target is not None:
         check_edge_endpoints(db, source, target, rel_type)
-    existing = db.execute(
-        select(Edge).where(Edge.source_id == source_id, Edge.target_id == target_id, Edge.rel_type == rel_type)
-    ).scalar_one_or_none()
+    pairs = [(source_id, target_id)]
+    if is_symmetric_rel(db, rel_type):
+        pairs.append((target_id, source_id))
+    existing = (
+        db.execute(
+            select(Edge).where(
+                or_(*[and_(Edge.source_id == a, Edge.target_id == b) for a, b in pairs]),
+                Edge.rel_type == rel_type,
+            )
+        )
+        .scalars()
+        .first()
+    )
     if existing is not None:
         return existing
     edge = Edge(source_id=source_id, target_id=target_id, rel_type=rel_type, position=position, data=data)
@@ -529,9 +555,19 @@ def remove_edges(db: Session, *, source_id: str | None = None, target_id: str | 
 
 
 def remove_edge(db: Session, source_id: str, target_id: str, rel_type: str, *, actor: str | None = None) -> bool:
+    """Drop one edge. A symmetric relation is dropped from either end (ADR-0127): the
+    row's stored direction is an implementation detail, so a caller that asked to remove
+    a conflict and got ``False`` because it named the ends the other way round would be
+    looking at a relation the UI still draws."""
+    pairs = [(source_id, target_id)]
+    if is_symmetric_rel(db, rel_type):
+        pairs.append((target_id, source_id))
     deleted = (
         db.query(Edge)
-        .filter(Edge.source_id == source_id, Edge.target_id == target_id, Edge.rel_type == rel_type)
+        .filter(
+            or_(*[and_(Edge.source_id == a, Edge.target_id == b) for a, b in pairs]),
+            Edge.rel_type == rel_type,
+        )
         .delete(synchronize_session=False)
     )
     db.flush()

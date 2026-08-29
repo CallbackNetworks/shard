@@ -287,6 +287,37 @@ BUILTIN_EDGE_TYPES: list[dict] = [
         "allowed_source": {"types": [graph.NODE_DECISION]},
         "allowed_target": {"roles": [graph.ROLE_TASK, graph.ROLE_CONTAINER]},
     },
+    {
+        "key": graph.REL_REQUIRES,
+        "label": "Requires",
+        "description": (
+            "Decision -> the decision it takes as a premise: this one only holds while "
+            "that one does. Not 'supersedes', which retires the far end, and not "
+            "'depends_on', which means a task is blocked until another is done — a "
+            "decision is never done. Reversing it is what makes a record answerable "
+            "about what would fall over if the premise were reopened."
+        ),
+        "allowed_source": {"types": [graph.NODE_DECISION]},
+        "allowed_target": {"types": [graph.NODE_DECISION]},
+    },
+    {
+        "key": graph.REL_CONFLICTS_WITH,
+        "label": "Conflicts with",
+        # The one relation that reads the same from either end. ``is_symmetric`` has been
+        # a column since ADR-0033 and nothing ever read it; ``graph.add_edge`` and
+        # ``graph.remove_edge`` now do, so writing the conflict from the other side
+        # returns the row that exists rather than storing the same claim twice.
+        "is_symmetric": True,
+        "description": (
+            "Decision <-> decision that contradicts it. Stored one way like every edge "
+            "and read both ways, because the claim is symmetric: naming the conflict "
+            "from one side only would let a record look clean while the record it "
+            "contradicts already says otherwise. A conflict is a question, not a "
+            "verdict — resolve it by superseding one side, not by deleting either."
+        ),
+        "allowed_source": {"types": [graph.NODE_DECISION]},
+        "allowed_target": {"types": [graph.NODE_DECISION]},
+    },
 ]
 
 

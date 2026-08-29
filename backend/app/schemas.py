@@ -82,6 +82,13 @@ class DecisionOut(LabelOut):
     supersedes: list["NodeRef"] = []
     superseded_by: list["NodeRef"] = []
     governs: list["NodeRef"] = []
+    # ADR-0127. ``conflicts_with`` is one list from both directions: the claim is
+    # symmetric, so which end happens to hold the row is not something a reader should
+    # have to know, and a record answering "no conflicts" while the other end says
+    # otherwise is the half-truth the merge exists to prevent.
+    requires: list["NodeRef"] = []
+    required_by: list["NodeRef"] = []
+    conflicts_with: list["NodeRef"] = []
 
 
 # --- Project ---

@@ -278,3 +278,109 @@ class TestADecisionNamesTheWorkItGoverns:
             json={"target_id": label.id, "rel_type": "governs"},
         )
         assert r.status_code == 400
+
+
+class TestADecisionNamesItsPremisesAndItsConflicts:
+    """ADR-0127. Production ran with 103 records, two ``supersedes`` edges and one
+    ``governs``: 98 decisions named nothing and were named by nothing, because the two
+    relations a record most often actually has did not exist."""
+
+    def _link(self, client, source, target, rel):
+        return client.post(f"/api/nodes/{source.id}/edges", json={"target_id": target.id, "rel_type": rel})
+
+    def test_a_premise_reads_from_both_ends(self, client, db, sample_project):
+        newer = _make_decision(db, sample_project.id, "Stream the backfill", decision_status="accepted")
+        premise = _make_decision(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+
+        assert self._link(client, newer, premise, "requires").status_code in (200, 201)
+
+        assert [n["id"] for n in client.get(f"/api/decisions/{newer.id}").json()["requires"]] == [premise.id]
+        assert [n["id"] for n in client.get(f"/api/decisions/{premise.id}").json()["required_by"]] == [newer.id]
+
+    def test_a_premise_does_not_retire_the_far_end(self, client, db, sample_project):
+        """The difference from ``supersedes``: that one marks the target replaced."""
+        newer = _make_decision(db, sample_project.id, "Stream the backfill", decision_status="accepted")
+        premise = _make_decision(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+
+        self._link(client, newer, premise, "requires")
+
+        assert client.get(f"/api/decisions/{premise.id}").json()["decision_status"] == "accepted"
+
+    def test_a_conflict_is_read_from_both_ends_though_stored_from_one(self, client, db, sample_project):
+        """The claim is symmetric. A record reading only its own outgoing edges would
+        answer "no conflicts" while the record it contradicts already said otherwise, and
+        nothing on either page would say which end was telling the truth."""
+        a = _make_decision(db, sample_project.id, "Redis for the retry queue", decision_status="accepted")
+        b = _make_decision(db, sample_project.id, "SQS for the retry queue", decision_status="accepted")
+
+        assert self._link(client, a, b, "conflicts_with").status_code in (200, 201)
+
+        assert [n["id"] for n in client.get(f"/api/decisions/{a.id}").json()["conflicts_with"]] == [b.id]
+        assert [n["id"] for n in client.get(f"/api/decisions/{b.id}").json()["conflicts_with"]] == [a.id]
+
+    def test_a_conflict_written_from_both_sides_is_named_once(self, client, db, sample_project):
+        """Nothing stops a client writing the edge in both directions; the read must not
+        then show the same conflict twice."""
+        a = _make_decision(db, sample_project.id, "Redis for the retry queue", decision_status="accepted")
+        b = _make_decision(db, sample_project.id, "SQS for the retry queue", decision_status="accepted")
+
+        self._link(client, a, b, "conflicts_with")
+        self._link(client, b, a, "conflicts_with")
+
+        assert [n["id"] for n in client.get(f"/api/decisions/{a.id}").json()["conflicts_with"]] == [b.id]
+        assert [n["id"] for n in client.get(f"/api/decisions/{b.id}").json()["conflicts_with"]] == [a.id]
+
+    def test_only_a_decision_may_sit_at_either_end(self, client, db, sample_project):
+        from tests.factories import make_task
+
+        task = make_task(db, project_id=sample_project.id, title="Migrate the schema")
+        db.add(task)
+        db.commit()
+        d = _make_decision(db, sample_project.id, "Use PostgreSQL")
+
+        for rel in ("requires", "conflicts_with"):
+            r = client.post(f"/api/nodes/{d.id}/edges", json={"target_id": task.id, "rel_type": rel})
+            assert r.status_code == 400, rel
+            # The refusal has to name a relation that *would* work — an agent reads the
+            # error, not always the docs (ADR-0078).
+            assert "governs" in r.json()["detail"], rel
+
+    def test_the_vocabulary_reaches_agents(self, client, db):
+        """Declared but absent from ``/api/v1/edge-types`` is a relation nothing can learn."""
+        key = _read_key(db, "tdp_test_rel_vocab")
+        rows = client.get("/api/v1/edge-types", headers={"X-API-Key": key}).json()
+        relations = {r["key"]: r for r in rows["relations"]}
+        for rel in ("requires", "conflicts_with"):
+            assert rel in relations, rel
+            assert relations[rel]["allowed_source"] == {"types": ["decision"]}
+            assert relations[rel]["allowed_target"] == {"types": ["decision"]}
+
+    def test_a_symmetric_relation_is_stored_once_and_dropped_from_either_end(self, client, db, sample_project):
+        """``edge_types.is_symmetric`` decided nothing before ADR-0127. It does now, and
+        this is the behaviour it decides: the reverse edge already *is* this edge."""
+        from app.models import Edge
+
+        a = _make_decision(db, sample_project.id, "Redis for the retry queue", decision_status="accepted")
+        b = _make_decision(db, sample_project.id, "SQS for the retry queue", decision_status="accepted")
+
+        self._link(client, a, b, "conflicts_with")
+        self._link(client, b, a, "conflicts_with")
+        rows = db.query(Edge).filter(Edge.rel_type == "conflicts_with").all()
+        assert len(rows) == 1
+
+        # Named from the end that does not hold the row, and it still comes off.
+        r = client.delete(f"/api/nodes/{b.id}/edges", params={"target_id": a.id, "rel_type": "conflicts_with"})
+        assert r.status_code in (200, 204), r.text
+        assert db.query(Edge).filter(Edge.rel_type == "conflicts_with").count() == 0
+
+    def test_an_asymmetric_relation_still_keeps_its_direction(self, client, db, sample_project):
+        """The negative control: ``requires`` is not symmetric, so both directions are
+        two different claims and both rows exist."""
+        from app.models import Edge
+
+        a = _make_decision(db, sample_project.id, "Stream the backfill", decision_status="accepted")
+        b = _make_decision(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+
+        self._link(client, a, b, "requires")
+        self._link(client, b, a, "requires")
+        assert db.query(Edge).filter(Edge.rel_type == "requires").count() == 2

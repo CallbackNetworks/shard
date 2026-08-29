@@ -111,6 +111,33 @@
   opacity: 0.8;
 }
 
+/* ADR-0127. Same rule as above: the relation is carried by the glyph and the weight, not
+   by a hue — decision *status* is what this page spends colour on (ADR-0088). An edge
+   this end owns is solid; one pointing back at it from elsewhere is dashed. */
+.requires {
+  border-style: solid;
+  color: var(--kt-ink);
+}
+
+.requiredBy {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+/* A contradiction is the one relation that is a problem rather than a fact, so it is the
+   one that gets weight: a double border reads as "look at this" without borrowing the
+   status family's red, which already means `failed` on this page. */
+.conflicts {
+  border-style: double;
+  border-width: 3px;
+  color: var(--kt-ink);
+}
+
+.requires:hover .relationDrop,
+.conflicts:hover .relationDrop {
+  opacity: 1;
+}
+
 .relation:hover {
   border-color: rgba(var(--kt-ink-rgb), 0.22);
   color: var(--kt-ink);
