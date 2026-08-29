@@ -85,11 +85,12 @@ docker compose -f docker-compose.ci.yml --profile integration up --build backend
 | `DB_MAX_OVERFLOW` | Max overflow connections for PostgreSQL/MySQL (default `10`) |
 | `DB_POOL_TIMEOUT` | Pool timeout in seconds for PostgreSQL/MySQL (default `30`) |
 | `DB_SSL_MODE` | SSL mode for PostgreSQL cloud connections (e.g. `require`) |
-| `AUTH_PASSWORD` | Built-in shared-password gate for `/app`; leave empty for no auth |
+| `AUTH_PASSWORD` | Built-in shared-password gate for `/app`; leave empty for no auth. Set it on *any* stack that has a public entrance pointed at it — a Cloudflare tunnel reaches the containers over the compose network and is not covered by `BIND_HOST` (ADR-0124). Tests are unaffected either way: `conftest.py` sets it empty itself |
 | `AUTH_TOKEN_TTL` | Session token lifetime in seconds (default `604800`, 7 days) |
 | `AUTH_MAX_ATTEMPTS` | Failed logins per IP before lockout (default `5`) |
 | `AUTH_LOCKOUT_SECONDS` | Login lockout window in seconds (default `300`) |
 | `AUTH_PROXY_HEADER` | Forward-auth: trust this header from an upstream SSO proxy (e.g. `Cf-Access-Authenticated-User-Email`). Only safe when the origin is reachable exclusively via that proxy — see ADR-0030 |
+| `BIND_HOST` | Which host interface the dev stack publishes on (default `127.0.0.1`). `0.0.0.0` puts the vite dev server, the dev backend and the database on every address this host has — ADR-0123 |
 | `TRUSTED_PROXY_HOPS` | How many reverse proxies sit in front (default `0` = trust no `X-Forwarded-For`). Decides how far the login throttle and share rate limiter read into it — ADR-0109. The generated production compose defaults it to `1` for its own nginx |
 | `SECRET_KEY` | Signs share-PIN sessions. Unset falls back to a random per-process secret, so PIN sessions do not survive a restart |
 | `CORS_ORIGINS` | Comma-separated allowed origins. Empty means none — correct for the same-origin production deploy behind nginx |
