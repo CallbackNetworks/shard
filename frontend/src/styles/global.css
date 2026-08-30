@@ -314,9 +314,12 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   from { transform: scaleY(0); }
   to { transform: scaleY(1); }
 }
+/* One loop of the track, in px, measured by useTickerLoop — the -50% fallback
+   only holds while the track is unmeasured, and is off by half a gap plus the
+   track's own padding, which is exactly the seam jump the measurement removes. */
 @keyframes kineticTicker {
   from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  to { transform: translateX(var(--kt-ticker-shift, -50%)); }
 }
 @keyframes kineticFlicker {
   0%, 100% { opacity: 1; text-shadow: none; }

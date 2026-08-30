@@ -5,6 +5,7 @@ import { AlertTriangle, X } from 'lucide-react'
 import { getActivity, getProjects, getActivityWatches, createActivityWatch, deleteActivityWatch } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
+import { loopDuration, loopRepeats, repeatItems } from '../utils/tickerLoop'
 import { countOverdue } from '../utils/overdue'
 import ActivityWatchPicker from './ActivityWatchPicker'
 
@@ -16,38 +17,59 @@ const FALLBACK_ITEMS = [
   'GOALS LIVE',
 ]
 
-// A fixed animation-duration makes the scroll speed a function of how much
-// content there is: more items (or longer labels) means the same distance
-// covers more content in the same time, so a track visibly speeds up as its
-// feed grows. Pin px/sec instead and derive the duration from the measured
-// track width so a busy feed reads at the same pace as a quiet one.
 const TICKER_PX_PER_SECOND = 55
-const TICKER_MIN_DURATION = 24
-const TICKER_MAX_DURATION = 240
 const ALERT_PX_PER_SECOND = 42
-const ALERT_MIN_DURATION = 14
-const ALERT_MAX_DURATION = 60
 
-function useTickerPace(contentKey, { pxPerSecond, minDuration, maxDuration }) {
+// The activity query pulls enough rows for the watch curves below to have a
+// shape; the marquee shows the newest handful. A loop of 200 rows is minutes
+// of text, and at a readable pace the top of it never comes round again.
+const TICKER_MAX_ITEMS = 12
+
+// Both strips duplicate their content so the loop is seamless, and both need
+// the same two measurements: the exact width of one loop (which sets the
+// keyframe's shift and, at a pinned px/sec, its duration) and how many times
+// the item list has to repeat before one loop is wider than the strip.
+function useTickerLoop(items, pxPerSecond) {
   const trackRef = useRef(null)
-  const [duration, setDuration] = useState(minDuration)
+  const [repeats, setRepeats] = useState(1)
+  const [loopWidth, setLoopWidth] = useState(0)
+  const contentKey = items.join('|')
 
   useEffect(() => {
     const el = trackRef.current
     if (!el) return
+    const strip = el.parentElement
+    const perLoop = el.children.length / 2
     const measure = () => {
-      const loopWidth = el.scrollWidth / 2
-      if (!loopWidth) return
-      const seconds = loopWidth / pxPerSecond
-      setDuration(Math.min(maxDuration, Math.max(minDuration, seconds)))
+      const first = el.children[0]
+      const mid = el.children[perLoop]
+      if (!first || !mid) return
+      // Measured from the second copy's first item, not as scrollWidth / 2:
+      // that splits the track's own padding and one gap across the seam, so
+      // the loop lands a few px off and the marquee jumps once per pass.
+      const width = mid.offsetLeft - first.offsetLeft
+      if (!width) return
+      const next = loopRepeats(width / repeats, strip?.clientWidth || 0)
+      if (next !== repeats) {
+        setRepeats(next)
+        return
+      }
+      setLoopWidth(width)
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    if (strip) ro.observe(strip)
     return () => ro.disconnect()
-  }, [contentKey, pxPerSecond, minDuration, maxDuration])
+  }, [contentKey, repeats])
 
-  return [trackRef, duration]
+  const unit = repeatItems(items, repeats)
+  const duration = loopDuration(loopWidth, pxPerSecond)
+  const style = {}
+  if (duration) style.animationDuration = `${duration}s`
+  if (loopWidth) style['--kt-ticker-shift'] = `${-loopWidth}px`
+
+  return { trackRef, style, loopItems: [...unit, ...unit] }
 }
 
 function eventLabel(entry) {
@@ -222,9 +244,8 @@ export default function GlobalActivityTicker() {
     ].filter(Boolean)
   }, [projects, t])
 
-  const activityItems = activities.map(eventLabel).filter(Boolean)
+  const activityItems = activities.slice(0, TICKER_MAX_ITEMS).map(eventLabel).filter(Boolean)
   const tickerItems = activityItems.length > 0 ? activityItems : FALLBACK_ITEMS
-  const loopItems = [...tickerItems, ...tickerItems]
   const chart = useMemo(() => buildActivityHeat(activities), [activities])
   const spark = useMemo(() => sparkPaths(chart.cells), [chart.cells])
 
@@ -238,18 +259,8 @@ export default function GlobalActivityTicker() {
     })
   ), [watches, activities, chart.minTime, chart.maxTime])
 
-  const [tickerTrackRef, tickerDuration] = useTickerPace(tickerItems.join('|'), {
-    pxPerSecond: TICKER_PX_PER_SECOND,
-    minDuration: TICKER_MIN_DURATION,
-    maxDuration: TICKER_MAX_DURATION,
-  })
-
-  const loopAlerts = alerts.length > 0 ? [...alerts, ...alerts] : []
-  const [alertTrackRef, alertDuration] = useTickerPace(alerts.join('|'), {
-    pxPerSecond: ALERT_PX_PER_SECOND,
-    minDuration: ALERT_MIN_DURATION,
-    maxDuration: ALERT_MAX_DURATION,
-  })
+  const ticker = useTickerLoop(tickerItems, TICKER_PX_PER_SECOND)
+  const alertStrip = useTickerLoop(alerts, ALERT_PX_PER_SECOND)
 
   return (
     <>
@@ -262,10 +273,10 @@ export default function GlobalActivityTicker() {
             <div
               className="kt-alert-strip-track"
               aria-hidden="true"
-              ref={alertTrackRef}
-              style={{ animationDuration: `${alertDuration}s` }}
+              ref={alertStrip.trackRef}
+              style={alertStrip.style}
             >
-              {loopAlerts.map((alert, index) => (
+              {alertStrip.loopItems.map((alert, index) => (
                 <span key={`${alert}-${index}`}>
                   <AlertTriangle size={13} />
                   {alert}
@@ -277,10 +288,10 @@ export default function GlobalActivityTicker() {
         <div className="kt-ticker" aria-label="Recent activity">
           <div
             className="kt-ticker-track"
-            ref={tickerTrackRef}
-            style={{ animationDuration: `${tickerDuration}s` }}
+            ref={ticker.trackRef}
+            style={ticker.style}
           >
-            {loopItems.map((item, index) => (
+            {ticker.loopItems.map((item, index) => (
               <span key={`${item}-${index}`}>{item}</span>
             ))}
           </div>
