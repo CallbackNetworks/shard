@@ -4,6 +4,10 @@
 
 A personal multi-identity task management platform with CI/CD integration, AI agent support, and bidirectional issue sync. Built for developers who manage work across multiple roles, repositories, and tools.
 
+![Shard command center](docs/screenshots/01-command-center.png)
+
+*Every screen, annotated: [**Visual Tour**](docs/screenshots.md).*
+
 ## Key Highlights
 
 - **GitHub / GitLab Issue Sync** — Bidirectional: inbound webhooks create tasks from issues, completing a task closes the external issue via API
@@ -11,6 +15,7 @@ A personal multi-identity task management platform with CI/CD integration, AI ag
 - **AI Agent Platform** — MCP server (51 tools, local stdio or remote HTTP), External API v1, event subscriptions, agent identity tracking, and tools-schema auto-discovery
 - **Multi-Identity** — Manage separate personas (work, open source, freelance) with independent projects, share pages, and analytics
 - **CI/CD Webhooks** — Auto-detect GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket from headers; build history with commit/branch/duration tracking
+- **Decision Records as a Graph** — Decisions are a node type with their own relations (`supersedes`, `requires`, `conflicts_with`, `governs`), shown as lineage chains or a directional graph, and carried onto the project's public share page
 - **Workflow Automation** — Rules engine with triggers, conditions, and actions; chain rules up to depth 2
 - **Critical Path Analysis** — DAG-based computation of the longest dependency chain with slack analysis
 - **SLA / Aging Alerts** — Auto-escalate tasks stuck in a status too long; fire notifications for stale work
