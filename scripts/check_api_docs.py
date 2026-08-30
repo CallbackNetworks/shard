@@ -27,6 +27,9 @@ RETIRED = {
     ("POST", "/api/identities"),
     # Moved behind auth by ADR-0085; the docs name the old path to say so.
     ("GET", "/webhook/events/{}"),
+    # Widened into /graph-types/fields/vocabulary by ADR-0132; the docs name the old
+    # path to say what replaced it.
+    ("GET", "/api/graph-types/data-keys/managed"),
 }
 
 # Routes that were undocumented when this check was first wired into CI.
