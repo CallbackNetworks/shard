@@ -46,6 +46,25 @@ describe('FormModal', () => {
     expect(screen.getByText('Go')).toBeDisabled()
   })
 
+  // ADR-0129: the backdrop is `fixed; inset: 0`, so a transformed ancestor would make
+  // it size itself to that ancestor rather than the viewport. Rendered from inside a
+  // subtree, the dialog must still land on the body.
+  it('portals out of the subtree that opened it', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    render(
+      <div data-testid="opener">
+        <FormModal title="Portalled" onClose={() => {}} onSubmit={() => {}}>
+          <input aria-label="field" />
+        </FormModal>
+      </div>,
+      { container: host }
+    )
+    const dialog = screen.getByRole('dialog', { name: 'Portalled' })
+    expect(host.contains(dialog)).toBe(false)
+    expect(dialog.parentElement).toBe(document.body)
+  })
+
   it('renders a custom footer instead of the default', () => {
     render(
       <FormModal title="Custom" onClose={() => {}} footer={<div>custom-footer</div>}>

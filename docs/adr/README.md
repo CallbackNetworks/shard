@@ -130,3 +130,4 @@
 | [0126](0126-a-decision-is-filed-where-it-lives.md) | 決策按「它住在哪裡」歸檔，量大時預設收起 | Accepted | 2026-08-29 |
 | [0127](0127-a-decision-names-its-premises-and-its-conflicts.md) | 決策要說得出自己的前提，以及自己跟誰矛盾 | Accepted | 2026-08-29 |
 | [0128](0128-the-decision-graph-is-a-view-you-can-act-on.md) | 決策的關係圖是一個可以動手的檢視 | Accepted | 2026-08-29 |
+| [0129](0129-an-overlay-does-not-trust-its-ancestors.md) | 覆蓋層不信任自己的祖先：portal 到 body，入場動畫不留 transform | Accepted | 2026-08-29 |

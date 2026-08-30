@@ -1913,10 +1913,18 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-width: var(--rail-w);
   flex-shrink: 0;
 }
+/* `backwards`, never `both`: `routeReveal` ends on `transform: translateX(0)` and
+   `clip-path: inset(0 0 0 0)`, and a forwards fill *keeps* them — an identity transform
+   is still a transform, so the shell became the containing block and a new stacking
+   context for every `position: fixed` descendant under it, and the clip-path cropped
+   them to its box. A modal backdrop then sized itself to the scroll content instead of
+   the viewport and sat below the rail. `backwards` fills only before the animation
+   starts; afterwards the element returns to its own computed style, which is what the
+   last keyframe was drawing anyway. ADR-0129. */
 .kt-route-shell {
   min-height: calc(100% - 28px);
   padding-bottom: 88px;
-  animation: routeReveal 0.34s cubic-bezier(.2,.8,.2,1) both;
+  animation: routeReveal 0.34s cubic-bezier(.2,.8,.2,1) backwards;
 }
 .layout-main::before {
   content: '';
@@ -3114,7 +3122,7 @@ h1 {
   max-width: 95vw;
   max-height: 85vh;
   overflow: auto;
-  animation: routeReveal 0.24s cubic-bezier(.2,.8,.2,1) both;
+  animation: routeReveal 0.24s cubic-bezier(.2,.8,.2,1) backwards;
 }
 .kt-modal-wide {
   width: 560px;

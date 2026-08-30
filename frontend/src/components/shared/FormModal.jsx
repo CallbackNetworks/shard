@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import useFocusTrap from '../../hooks/useFocusTrap'
@@ -9,6 +10,14 @@ import useFocusTrap from '../../hooks/useFocusTrap'
  * Escape-to-close) automatically, so page-level form modals only provide their
  * fields. Footer defaults to Cancel + a primary submit button; pass `footer`
  * for fully custom actions or `footer={null}` to omit it.
+ *
+ * Portalled to the body, for the same reason `OverflowMenu` is (ADR-0122, ADR-0129):
+ * the backdrop is `position: fixed; inset: 0`, and any transformed ancestor becomes
+ * the containing block for that — `.kt-route-shell` keeps an identity transform after
+ * its entrance animation, so the backdrop sized itself to the *scroll content* and
+ * centred the panel in the middle of the whole page instead of the viewport, inside a
+ * stacking context the rail and the tickers then drew over. A dialog must not depend
+ * on which subtree opened it.
  */
 export default function FormModal({
   title,
@@ -25,7 +34,7 @@ export default function FormModal({
   const { t } = useTranslation()
   const trapRef = useFocusTrap(onClose)
 
-  return (
+  return createPortal(
     <div role="dialog" aria-modal="true" aria-label={ariaLabel || title} className="kt-modal-backdrop">
       <div
         ref={trapRef}
@@ -50,6 +59,7 @@ export default function FormModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
