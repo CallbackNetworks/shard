@@ -387,11 +387,19 @@ def update_node(db: Session, node_id: str, **fields) -> Node | None:
 
 
 def delete_node(db: Session, node_id: str, *, actor: str | None = None) -> bool:
-    """Delete a node and every edge touching it."""
+    """Delete a node, every edge touching it, and every row that belongs to it."""
+    # Deferred: node_teardown imports the peripheral models, which this layer otherwise
+    # knows nothing about — it is the graph primitive, not the schema.
+    from app.services.node_teardown import purge_side_rows
+
     node = db.get(Node, node_id)
     if node is None:
         return False
     node_type = node.type
+    # Here rather than in each caller (ADR-0131): the task delete had a hand-written list
+    # of five tables and every other type had none, so deleting a container stranded
+    # everything filed under it.
+    purge_side_rows(db, node_id)
     db.query(Edge).filter((Edge.source_id == node_id) | (Edge.target_id == node_id)).delete(synchronize_session=False)
     db.delete(node)
     db.flush()

@@ -262,20 +262,17 @@ def delete_task_tree(db: Session, task_id: str) -> None:
 
 
 def _delete_task_node(db: Session, task_id: str) -> None:
-    """Delete a task node plus its peripheral rows (comments/attachments/PRs/...).
+    """Delete a task node, if it is one.
 
-    Node-only tasks have no ORM delete-orphan cascade; the peripheral tables FK to
-    ``nodes.id`` with ``ondelete CASCADE`` but SQLite does not enforce that without
-    ``PRAGMA foreign_keys=ON``, so clean them explicitly for dialect-independence.
+    The peripheral rows used to be listed here — the only place in the codebase that knew
+    side rows existed, which is why deleting a container cleaned nothing. That list lives
+    in ``services/node_teardown`` and runs inside ``delete_node`` now (ADR-0131), so every
+    type gets it. What is left here is the type check: this is reachable from the subtree
+    walk, and a node that is not a task must not be torn down as one.
     """
-    from app.models import Attachment, Comment, RecurrenceRule, TaskPullRequest, WebhookEvent
-
     node = db.get(Node, task_id)
     if node is None or node.type not in task_type_keys(db):
         return
-    for model in (Comment, Attachment, TaskPullRequest, WebhookEvent):
-        db.query(model).filter(model.task_id == task_id).delete(synchronize_session=False)
-    db.query(RecurrenceRule).filter(RecurrenceRule.template_task_id == task_id).delete(synchronize_session=False)
     delete_node(db, task_id)
 
 

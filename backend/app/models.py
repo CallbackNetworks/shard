@@ -269,7 +269,6 @@ class AssistantMessage(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # user | assistant | tool
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tool_calls: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    tool_call_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # Token counts from the provider's own response (ADR-0100), null when the provider
     # didn't report them (StubProvider, or a row written before this column existed) —
     # never 0, which would misreport as "this reply cost nothing."
