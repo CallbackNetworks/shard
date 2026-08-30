@@ -18,8 +18,8 @@ from app.schemas import (
     NodeTypeOut,
     NodeTypeUpdate,
 )
+from app.services import graph, node_data
 from app.services import graph_registry as type_registry
-from app.services import node_data
 
 router = APIRouter(prefix="/graph-types", tags=["graph-types"])
 
@@ -45,19 +45,32 @@ def list_node_types(db: Session = Depends(get_db)):
     return type_registry.node_types_with_usage(db)
 
 
-@router.get("/data-keys/managed")
-def list_managed_data_keys():
-    """Keys of a node's ``data`` that belong to a feature, not to the user (ADR-0074).
+@router.get("/fields/vocabulary")
+def field_vocabulary():
+    """Everything a field declaration may say, from the code that enforces it (ADR-0132).
 
     Served rather than mirrored in the client: a second copy of a vocabulary is how the
     rules editor ended up offering values the engine rejected (ADR-0056) and how the
-    rule-name list drifted (ADR-0058). The field editor needs this to tell the third
-    bucket — machinery — apart from a key somebody wrote by hand, and it must be the
-    same list the write guard enforces.
-    """
-    from app.services.graph_registry import MANAGED_DATA_KEYS
+    rule-name list drifted (ADR-0058).
 
-    return {"keys": sorted(set(MANAGED_DATA_KEYS) | set(node_data.DERIVED))}
+    ``managed`` are the keys of a node's ``data`` that belong to a feature rather than to
+    the user (ADR-0074) — the field editor needs them to tell machinery apart from a key
+    somebody wrote by hand, and it must be the same list the write guard enforces.
+    ``kinds`` / ``stores`` / ``columns`` are what the *declaration* may contain, and they
+    are here for the same reason one step earlier: until ADR-0132 no UI could declare a
+    field at all, so a custom type's editor was permanently empty and the vocabulary had
+    nowhere to be read. ``columns`` matters most — a ``column`` field naming anything
+    outside it is written into ``data`` under the same name, which looks saved and
+    changes nothing.
+    """
+    from app.services.graph_registry import FIELD_KINDS, FIELD_STORES, MANAGED_DATA_KEYS
+
+    return {
+        "managed": sorted(set(MANAGED_DATA_KEYS) | set(node_data.DERIVED)),
+        "kinds": list(FIELD_KINDS),
+        "stores": list(FIELD_STORES),
+        "columns": sorted(graph.WRITABLE_COLUMNS),
+    }
 
 
 @router.post("/nodes", response_model=NodeTypeOut, status_code=status.HTTP_201_CREATED)

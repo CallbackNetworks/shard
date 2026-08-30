@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { SlidersHorizontal, Check } from 'lucide-react'
-import { updateNode, getManagedDataKeys } from '../api/client'
+import { updateNode, getFieldVocabulary } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 
@@ -104,14 +104,14 @@ export default function NodeFieldsPanel({ node, typeMeta, invalidateKeys }) {
   // A node loaded later, or switched to, must not keep the previous one's edits.
   useEffect(() => { setDraft({}); setSaved(false) }, [node?.id])
 
-  const { data: managed } = useQuery({
-    queryKey: qk.managedDataKeys(),
-    queryFn: getManagedDataKeys,
+  const { data: vocabulary } = useQuery({
+    queryKey: qk.fieldVocabulary(),
+    queryFn: getFieldVocabulary,
     staleTime: 600000,
   })
 
   const declaredKeys = new Set(specs.filter(f => f.store !== 'column').map(f => f.key))
-  const managedKeys = new Set(managed?.keys || [])
+  const managedKeys = new Set(vocabulary?.managed || [])
   const extras = Object.keys(data).filter(k => !declaredKeys.has(k) && !managedKeys.has(k)).sort()
 
   const stored = (key) => {

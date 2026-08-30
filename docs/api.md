@@ -1160,9 +1160,19 @@ other node:
 ```jsonc
 // POST /nodes
 { "type": "decision", "title": "string", "container_id": "<project id>",
-  "data": { "decision_status": "proposed|accepted|deprecated|superseded",
-            "description": "markdown", "color": "#hex" } }
+  "status": "proposed|accepted|deprecated|superseded",
+  "data": { "description": "markdown", "color": "#hex" } }
 ```
+
+The state is the node's `status` **column**, like every other type's (ADR-0130); reads
+still report it as `decision_status`, which is the name every existing client uses. Both
+older shapes are refused with a 422 naming the one that works, because both used to be
+accepted silently and land somewhere nothing reads:
+
+| Sent | What it used to do |
+|------|--------------------|
+| `type: "label"` + `data.type: "decision"` | 201, created a label — invisible to the decisions page, visible in the label vocabulary. Production collected 17 (ADR-0130). |
+| `type: "decision"` + `data.decision_status` | wrote an inert `data` key while the column stayed empty |
 
 It carries two relations of its own, and both are ordinary edges written through
 `POST /nodes/{id}/edges`:
@@ -1361,9 +1371,19 @@ parent — a node may have several) plus `owns` owners, which are never folded i
 (ADR-0094). Batched because every caller is a list. Caps at `MAX_TRAILS`/`MAX_DEPTH`/
 `MAX_IDS` and reports `truncated` rather than presenting a partial trail as a whole one.
 
-#### `GET /graph-types/data-keys/managed`
-The `data` keys a node type may never declare editable — feature machinery like
-`share_token` and `callback_token` (ADR-0074). Served rather than mirrored in the client.
+#### `GET /graph-types/fields/vocabulary`
+Everything a field declaration may say, from the code that enforces it (ADR-0132):
+
+| Key | Means |
+|-----|-------|
+| `managed` | `data` keys a type may never declare editable — feature machinery like `share_token`, plus the read-only projections like `share_pin_set` (ADR-0074) |
+| `kinds` | the widget vocabulary: `text`, `longtext`, `color`, `emoji`, `number`, `url`, `bool`, `json`, `enum`, `date` |
+| `stores` | `data` or `column` |
+| `columns` | the real columns a `column` field may name. **A `column` field naming anything else is written into `data` under the same name** — it looks saved and the column never changes, so the editor turns this into a picker rather than a text box |
+
+Served rather than mirrored in the client, for ADR-0056's and ADR-0058's reasons. Replaces
+the narrower `GET /graph-types/data-keys/managed`, which served one quarter of the same
+vocabulary.
 
 #### `GET /graph-types/nodes` · `POST /graph-types/nodes`
 #### `PATCH /graph-types/nodes/{key}` · `DELETE /graph-types/nodes/{key}`

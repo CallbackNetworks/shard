@@ -59,7 +59,7 @@ export const qk = {
   integrationTemplate: key('integration-template'),
   integrationTemplates: key('integration-templates'),
   integrations: key('integrations'),
-  managedDataKeys: key('managed-data-keys'),
+  fieldVocabulary: key('field-vocabulary'),
   node: key('node'),
   nodeEdges: key('node-edges'),
   nodeEvents: key('node-events'),

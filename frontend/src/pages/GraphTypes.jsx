@@ -5,8 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Shapes, Spline, Plus, Trash2, Lock, Pencil, Check, X } from 'lucide-react'
 import {
   getNodeTypes, createNodeType, updateNodeType, deleteNodeType,
-  getEdgeTypes, createEdgeType, deleteEdgeType,
+  getEdgeTypes, createEdgeType, deleteEdgeType, getFieldVocabulary,
 } from '../api/client'
+import NodeTypeFieldsEditor, { FieldSummary } from '../components/graph/NodeTypeFieldsEditor'
 import { DARK } from '../constants/theme'
 import { NODE_ROLE_DEFS, hasNodeRole, toggleNodeRole } from '../constants/nodeRoles'
 
@@ -131,14 +132,19 @@ function RoleToggles({ roles, onChange }) {
   ))
 }
 
-// Inline editor for a custom node type: label, color, capability roles (ADR-0040).
-function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
+// Inline editor for a custom node type: label, color, capability roles (ADR-0040) and
+// the field declarations the generic node editor is drawn from (ADR-0074/ADR-0132).
+function NodeTypeEditRow({ item, onSave, onCancel, saving, vocabulary }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState({
     label: item.label,
     color: item.color || '#818cf8',
     roles: [...(item.roles || [])],
+    fields: (item.fields || []).map(f => ({ ...f })),
   })
+  // A half-written row would 422 on save and take the whole edit with it; a field with
+  // neither key nor label is somebody who clicked Add and changed their mind.
+  const incomplete = draft.fields.some(f => !f.key || !f.label || (f.kind === 'enum' && !f.options?.length))
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '9px 0', borderBottom: `1px solid ${DARK.border}` }}>
       <code style={{ fontSize: 11, color: DARK.textDim }}>{item.key}</code>
@@ -158,7 +164,7 @@ function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
       <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
         <button
           className="kt-btn kt-btn-primary" aria-label="save"
-          disabled={!draft.label || saving}
+          disabled={!draft.label || incomplete || saving}
           onClick={() => onSave(item.key, draft)}
         >
           <Check size={12} />
@@ -167,6 +173,11 @@ function NodeTypeEditRow({ item, onSave, onCancel, saving }) {
           <X size={12} />
         </button>
       </div>
+      <NodeTypeFieldsEditor
+        fields={draft.fields}
+        vocabulary={vocabulary}
+        onChange={fields => setDraft({ ...draft, fields })}
+      />
     </div>
   )
 }
@@ -178,6 +189,10 @@ export default function GraphTypes() {
   const { data: nodeTypes = [], isLoading: nodeLoading } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes })
   const { data: edgeTypes = [], isLoading: edgeLoading } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes })
   const nodeTypeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
+  // The vocabulary a declaration may use, from the code that enforces it (ADR-0132).
+  const { data: vocabulary } = useQuery({
+    queryKey: qk.fieldVocabulary(), queryFn: getFieldVocabulary, staleTime: 600000,
+  })
 
   const emptyNodeForm = { key: '', label: '', color: '#818cf8', roles: [] }
   const [nodeForm, setNodeForm] = useState(emptyNodeForm)
@@ -232,6 +247,7 @@ export default function GraphTypes() {
               item.key === editingKey ? (
                 <NodeTypeEditRow
                   key={item.key}
+                  vocabulary={vocabulary}
                   item={item}
                   saving={nodeUpdate.isPending}
                   onSave={(key, data) => nodeUpdate.mutate({ key, data })}
@@ -242,6 +258,7 @@ export default function GraphTypes() {
                   key={item.key} item={item}
                   onDelete={(k) => confirmDelete(nodeDelete, k)} deleting={nodeDelete.isPending}
                   onEdit={(it) => setEditingKey(it.key)}
+                  sub={<FieldSummary fields={item.fields} />}
                 >
                   {NODE_ROLE_DEFS.map(({ role, labelKey }) => (
                     hasNodeRole(item, role) && <RoleBadge key={role} label={t(labelKey)} />

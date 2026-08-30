@@ -1084,9 +1084,15 @@ class NodeFieldSpec(BaseModel):
     @field_validator("key")
     @classmethod
     def _not_managed(cls, v: str) -> str:
+        # ``DERIVED`` too, not only ``MANAGED_DATA_KEYS`` (ADR-0132): ``share_pin_set`` is
+        # computed on read and stripped on write, so a field declared on it draws a widget
+        # whose every save is discarded. The vocabulary endpoint already tells the editor
+        # to hide it; the two lists must be the same list or the editor hides a key the
+        # writer would have accepted.
+        from app.services import node_data
         from app.services.graph_registry import MANAGED_DATA_KEYS
 
-        if v in MANAGED_DATA_KEYS:
+        if v in MANAGED_DATA_KEYS or v in node_data.DERIVED:
             raise ValueError(f"{v} is written by a feature and cannot be declared editable")
         return v
 

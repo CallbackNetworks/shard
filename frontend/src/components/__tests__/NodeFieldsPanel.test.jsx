@@ -5,14 +5,14 @@ import NodeFieldsPanel from '../NodeFieldsPanel'
 const mocks = vi.hoisted(() => ({
   invalidateQueries: vi.fn(),
   updateNode: vi.fn(() => Promise.resolve()),
-  getManagedDataKeys: vi.fn(),
-  managed: { keys: ['share_token', 'share_pin_set', 'callback_token', 'allow_guest_notes'] },
+  getFieldVocabulary: vi.fn(),
+  vocabulary: { managed: ['share_token', 'share_pin_set', 'callback_token', 'allow_guest_notes'] },
 }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k) => k }) }))
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: mocks.managed }),
+  useQuery: () => ({ data: mocks.vocabulary }),
   useMutation: ({ mutationFn, onSuccess }) => ({
     mutate: () => { mutationFn(); onSuccess?.() },
     isPending: false,
@@ -20,7 +20,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
 }))
 
-vi.mock('../../api/client', () => ({ updateNode: mocks.updateNode, getManagedDataKeys: mocks.getManagedDataKeys }))
+vi.mock('../../api/client', () => ({ updateNode: mocks.updateNode, getFieldVocabulary: mocks.getFieldVocabulary }))
 
 const identityType = {
   key: 'identity',

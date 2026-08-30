@@ -131,3 +131,6 @@
 | [0127](0127-a-decision-names-its-premises-and-its-conflicts.md) | 決策要說得出自己的前提，以及自己跟誰矛盾 | Accepted | 2026-08-29 |
 | [0128](0128-the-decision-graph-is-a-view-you-can-act-on.md) | 決策的關係圖是一個可以動手的檢視 | Accepted | 2026-08-29 |
 | [0129](0129-an-overlay-does-not-trust-its-ancestors.md) | 覆蓋層不信任自己的祖先：portal 到 body，入場動畫不留 transform | Accepted | 2026-08-29 |
+| [0130](0130-a-decision-lands-where-it-is-read.md) | 一筆決策要落在會被讀到的地方 | Accepted | 2026-08-30 |
+| [0131](0131-what-dies-with-a-node.md) | 刪掉一個節點，屬於它的列也要跟著走 | Accepted | 2026-08-30 |
+| [0132](0132-a-field-declaration-can-be-declared.md) | 一個欄位宣告要在畫面上宣告得出來 | Accepted | 2026-08-30 |

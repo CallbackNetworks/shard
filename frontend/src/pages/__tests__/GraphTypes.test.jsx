@@ -26,15 +26,29 @@ vi.mock('../../api/client', () => ({
   getEdgeTypes: vi.fn(),
   createEdgeType: vi.fn(),
   deleteEdgeType: vi.fn(),
+  getFieldVocabulary: vi.fn(),
 }))
 
 import GraphTypes from '../GraphTypes'
 
 const nodeTypes = [
-  { key: 'project', label: 'Project', color: '#818cf8', is_builtin: true, roles: ['container'] },
-  { key: 'task', label: 'Task', color: '#38bdf8', is_builtin: true, roles: ['task'] },
-  { key: 'topic', label: 'Topic', color: '#abcdef', is_builtin: false, roles: [], usage_count: 4 },
+  {
+    key: 'project', label: 'Project', color: '#818cf8', is_builtin: true, roles: ['container'],
+    fields: [{ key: 'title', label: 'Name', kind: 'text', store: 'column' }],
+  },
+  { key: 'task', label: 'Task', color: '#38bdf8', is_builtin: true, roles: ['task'], fields: [] },
+  {
+    key: 'topic', label: 'Topic', color: '#abcdef', is_builtin: false, roles: [], usage_count: 4,
+    fields: [{ key: 'owner', label: 'Owner', kind: 'text', store: 'data' }],
+  },
 ]
+// Served by the registry, never mirrored in the client (ADR-0132).
+const vocabulary = {
+  managed: ['share_token', 'callback_token'],
+  kinds: ['text', 'longtext', 'enum', 'color'],
+  stores: ['data', 'column'],
+  columns: ['title', 'status', 'priority', 'due_date'],
+}
 const edgeTypes = [
   { key: 'contains', label: 'Contains', is_builtin: true, is_containment: true, is_symmetric: false },
   { key: 'blocks', label: 'Blocks', is_builtin: false, is_containment: false, is_symmetric: false },
@@ -46,6 +60,7 @@ function setup() {
   mockUseQuery.mockImplementation(({ queryKey }) => {
     if (queryKey[0] === 'node-types') return { data: nodeTypes, isLoading: false }
     if (queryKey[0] === 'edge-types') return { data: edgeTypes, isLoading: false }
+    if (queryKey[0] === 'field-vocabulary') return { data: vocabulary, isLoading: false }
     return { data: [], isLoading: false }
   })
   mockUseMutation.mockImplementation(({ mutationFn, onSuccess }) => {
@@ -144,5 +159,60 @@ describe('GraphTypes', () => {
     setup()
     expect(screen.queryByLabelText('edit project')).toBeNull()
     expect(screen.queryByLabelText('edit task')).toBeNull()
+  })
+})
+
+// `node_types.fields` is what the generic node editor draws (ADR-0074) and was writable
+// through both API doors while this page — the one screen about the registry — could not
+// touch it. So a custom type could never gain an editable field, and production's own
+// `repository` layer carried eight of them undeclared and read-only (ADR-0132).
+describe('GraphTypes field declarations', () => {
+  const openEditor = () => {
+    setup()
+    fireEvent.click(screen.getByLabelText('edit topic'))
+  }
+
+  it('states how many fields a type declares without opening it', () => {
+    setup()
+    expect(screen.getAllByText(/graphTypes.fieldsCount/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('graphTypes.fieldsNone').length).toBeGreaterThan(0)
+  })
+
+  it('saves a declared field through the type update', () => {
+    openEditor()
+    fireEvent.click(screen.getByText('graphTypes.fieldAdd'))
+    const keys = screen.getAllByLabelText('graphTypes.fieldKey')
+    fireEvent.change(keys[keys.length - 1], { target: { value: 'area' } })
+    const labels = screen.getAllByLabelText('graphTypes.fieldLabel')
+    fireEvent.change(labels[labels.length - 1], { target: { value: 'Area' } })
+    fireEvent.click(screen.getByLabelText('save'))
+
+    expect(lastMutations.arg.data.fields).toEqual([
+      { key: 'owner', label: 'Owner', kind: 'text', store: 'data' },
+      { key: 'area', label: 'Area', kind: 'text', store: 'data' },
+    ])
+  })
+
+  it('offers the columns as a picker once a field is stored as one', () => {
+    // A `column` field naming anything outside WRITABLE_COLUMNS is written into `data`
+    // under the same name: it looks saved and the column never changes. A free text box
+    // is how you get there, so there isn't one.
+    openEditor()
+    fireEvent.change(screen.getByLabelText('graphTypes.fieldStore'), { target: { value: 'column' } })
+    const key = screen.getByLabelText('graphTypes.fieldKey')
+    expect(key.tagName).toBe('SELECT')
+    expect([...key.options].map(o => o.value)).toEqual(['', 'title', 'status', 'priority', 'due_date'])
+  })
+
+  it('will not save a half-written declaration the server would refuse', () => {
+    openEditor()
+    fireEvent.click(screen.getByText('graphTypes.fieldAdd'))
+    expect(screen.getByLabelText('save')).toBeDisabled()
+  })
+
+  it('says so when a declared key belongs to a feature', () => {
+    openEditor()
+    fireEvent.change(screen.getByLabelText('graphTypes.fieldKey'), { target: { value: 'share_token' } })
+    expect(screen.getByText('graphTypes.fieldManaged:share_token')).toBeTruthy()
   })
 })
