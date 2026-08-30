@@ -98,6 +98,7 @@ from app.services.graph.cycles import (
 )
 from app.services.graph.decision_records import (
     DecisionView,
+    assert_decision_write_shape,
     create_decision,
     decisions,
     get_decision,

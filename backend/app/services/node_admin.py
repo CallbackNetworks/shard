@@ -76,6 +76,10 @@ async def create(
     fields = body.model_dump(exclude={"type", "title", "data", "container_id", "parent_id"}, exclude_none=True)
     if body.data:
         fields.update(body.data)
+    # A write whose shape means "decision" must actually make one (ADR-0130). Checked
+    # after the merge because the old shape can arrive in ``data`` or, since NodeCreate
+    # allows extras, flat beside it — both fold into the same bag.
+    graph.assert_decision_write_shape(db, body.type, fields)
     node = graph.create_node(db, body.type, title=body.title, **fields)
 
     # Containment before dispatch, so the task pipeline can resolve the node's project

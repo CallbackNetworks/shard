@@ -42,8 +42,8 @@ EDGE_DECLARED = ("description", "allowed_source", "allowed_target", "is_symmetri
 # databases — see migrations/versions/b5d7f9a1c3e6_resync_builtin_declarations.py for the
 # shape. Changing the fingerprint alone makes the test pass and leaves production stale,
 # which is the failure this file exists to make impossible to reach by accident.
-FINGERPRINT = "54675595aeea2578"
-LAST_RESYNC_REVISION = "c6e8a0b2d4f7"
+FINGERPRINT = "94b5a9517939dc08"
+LAST_RESYNC_REVISION = "d8f0a2c4e6b1"
 
 
 def _fingerprint() -> str:

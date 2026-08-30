@@ -422,3 +422,73 @@ class TestNodeCreation:
         # other reason means the two doors have diverged.
         assert set(internal) - set(external) == {"callback_token"}
         assert set(external) - set(internal) == set()
+
+
+class TestADecisionLandsWhereItIsRead:
+    """The two shapes that used to be accepted and then never found (ADR-0130).
+
+    Both doors, because an agent writes through ``/api/v1`` and the refusal is the only
+    thing it reads — production's 17 misfiled records were written by something following
+    the older instruction, and a 201 gave it nothing to notice.
+    """
+
+    def test_the_old_label_shape_is_refused_identically_at_both_doors(self, client, write_key, sample_project):
+        body = {
+            "type": "label",
+            "title": "Adopt the graph model",
+            "container_id": sample_project.id,
+            "data": {"type": "decision", "decision_status": "accepted"},
+        }
+        internal = client.post("/api/nodes", json=body)
+        external = client.post("/api/v1/nodes", headers=_hdr(write_key), json=body)
+
+        assert internal.status_code == external.status_code == 422
+        assert internal.json()["detail"] == external.json()["detail"]
+        # The refusal names the type that works — an agent always reads the error and
+        # does not always read the docs (ADR-0078).
+        assert "type='decision'" in internal.json()["detail"]
+
+    def test_the_status_as_a_data_key_is_refused_identically_at_both_doors(self, client, write_key, sample_project):
+        body = {
+            "type": "decision",
+            "title": "Adopt the graph model",
+            "container_id": sample_project.id,
+            "data": {"decision_status": "accepted"},
+        }
+        internal = client.post("/api/nodes", json=body)
+        external = client.post("/api/v1/nodes", headers=_hdr(write_key), json=body)
+
+        assert internal.status_code == external.status_code == 422
+        assert internal.json()["detail"] == external.json()["detail"]
+        assert "status=" in internal.json()["detail"]
+
+    def test_the_refusal_covers_an_update_too_not_only_a_create(self, client, write_key, sample_project):
+        created = client.post(
+            "/api/v1/nodes",
+            headers=_hdr(write_key),
+            json={"type": "decision", "title": "D", "container_id": sample_project.id, "status": "proposed"},
+        )
+        assert created.status_code == 201, created.text
+        node_id = created.json()["id"]
+
+        body = {"data": {"decision_status": "accepted"}}
+        internal = client.patch(f"/api/nodes/{node_id}", json=body)
+        external = client.patch(f"/api/v1/nodes/{node_id}", headers=_hdr(write_key), json=body)
+
+        assert internal.status_code == external.status_code == 422
+        assert internal.json()["detail"] == external.json()["detail"]
+
+    def test_the_state_the_write_sets_is_the_state_the_read_reports(self, client, write_key, sample_project):
+        created = client.post(
+            "/api/v1/nodes",
+            headers=_hdr(write_key),
+            json={"type": "decision", "title": "D", "container_id": sample_project.id, "status": "accepted"},
+        )
+        node_id = created.json()["id"]
+
+        listed = client.get("/api/v1/decisions", headers=_hdr(write_key)).json()
+        assert [(d["id"], d["decision_status"]) for d in listed] == [(node_id, "accepted")]
+        # And it is the column, so a generic node read narrows by it like any other type.
+        raw = client.get(f"/api/v1/nodes/{node_id}", headers=_hdr(write_key)).json()
+        assert raw["status"] == "accepted"
+        assert "decision_status" not in (raw.get("data") or {})

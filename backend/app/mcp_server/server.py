@@ -1350,8 +1350,10 @@ async def manage_unfiled(action: UnfiledAction, task_id: str | None = None, proj
         "(proposed/accepted/deprecated/superseded), what each one supersedes and is "
         "superseded by, and the work each governs. Read this before proposing a decision "
         "somebody already made, and read the supersession chain before treating an old one "
-        "as current. Writing one is create_node with type='decision' (ADR-0118 — it used to "
-        "be a label with data.type='decision')."
+        "as current. Writing one is create_node with type='decision' and the state in "
+        "status= (ADR-0118, ADR-0130). Both older shapes — a label carrying "
+        "data.type='decision', and data.decision_status on a decision — are refused with a "
+        "422 naming this one, because each used to be accepted and land where nothing reads."
     )
 )
 async def list_decisions(project_id: str | None = None, status: str | None = None) -> str:

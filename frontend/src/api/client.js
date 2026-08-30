@@ -336,13 +336,19 @@ export const deleteTemplate = (id) => api.delete(`/templates/${id}`)
 // the server owns, not two calls a client makes in sequence.
 export const getDecisions = (params = {}) => api.get('/decisions', { params }).then(r => r.data)
 export const exportDecision = (id) => api.get(`/decisions/${id}/export`).then(r => r.data)
-export const createDecision = (projectId, { name, ...rest }) =>
-  createNode({ type: 'decision', container_id: projectId, title: name, data: rest })
-export const updateDecision = (id, { name, ...rest }) =>
-  updateNode(id, {
-    ...(name !== undefined ? { title: name } : {}),
-    ...(Object.keys(rest).length ? { data: rest } : {}),
-  })
+// A decision's state is the node's `status` column (ADR-0130), and the read shape still
+// calls it `decision_status` — the name every caller, the share page and the assistant
+// were written against. The translation happens here, once, rather than at each call
+// site: sent as a data key it is refused, and before the guard existed it was accepted
+// as an inert key while the column the decision surfaces read stayed empty.
+const decisionBody = ({ name, decision_status, ...rest }) => ({
+  ...(name !== undefined ? { title: name } : {}),
+  ...(decision_status !== undefined ? { status: decision_status } : {}),
+  ...(Object.keys(rest).length ? { data: rest } : {}),
+})
+export const createDecision = (projectId, form) =>
+  createNode({ type: 'decision', container_id: projectId, ...decisionBody(form) })
+export const updateDecision = (id, form) => updateNode(id, decisionBody(form))
 export const deleteDecision = (id) => deleteNode(id)
 export const supersedeDecision = (id, supersededId) =>
   api.post(`/decisions/${id}/supersedes/${supersededId}`).then(r => r.data)
@@ -509,7 +515,9 @@ export const getNodeShareViews = (id) => api.get(`/nodes/${id}/share-views`).the
 export const getNodeShareChatLog = (id) => api.get(`/nodes/${id}/share-chat-log`).then(r => r.data)
 // Which data keys belong to a feature rather than the user (ADR-0074). Served, not
 // mirrored here — a second copy of a vocabulary is exactly what ADR-0056/0058 cost.
-export const getManagedDataKeys = () => api.get('/graph-types/data-keys/managed').then(r => r.data)
+// One door for the whole field vocabulary (ADR-0132): the managed keys the editor must
+// hide, plus the kinds/stores/columns a declaration may name. Served, never mirrored.
+export const getFieldVocabulary = () => api.get('/graph-types/fields/vocabulary').then(r => r.data)
 export const getEdgeTypes = () => api.get('/graph-types/edges').then(r => r.data)
 export const createEdgeType = (data) => api.post('/graph-types/edges', data).then(r => r.data)
 export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)

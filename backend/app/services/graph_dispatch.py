@@ -104,6 +104,7 @@ async def dispatch_node_updated(
     ``graph.update_node`` and emit a generic activity entry + broadcast. Commits
     and returns the refreshed ``Node``.
     """
+    graph.assert_decision_write_shape(db, node.type, changes)
     if _has_task_role(db, node.type):
         await apply_task_update(db, node.id, changes, actor=actor, source=source)
         return db.get(Node, node.id)

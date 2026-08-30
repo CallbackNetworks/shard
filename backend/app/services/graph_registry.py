@@ -199,10 +199,15 @@ BUILTIN_NODE_TYPES: list[dict] = [
             _name("Title"),
             {"key": "color", "label": "Colour", "kind": "color"},
             _DESCRIPTION,
+            # The ``nodes.status`` column, like every other type's state (ADR-0130).
+            # It lived in ``data["decision_status"]`` while a decision was a label, which
+            # left the column NULL on every record and made this the one type a generic
+            # node filter could not narrow by state.
             {
-                "key": "decision_status",
+                "key": "status",
                 "label": "Status",
                 "kind": "enum",
+                "store": "column",
                 "options": list(DECISION_STATUSES),
             },
         ],

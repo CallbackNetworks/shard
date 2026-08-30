@@ -82,11 +82,14 @@ def _label_view(node: Node, project_id: str | None) -> LabelView:
         project_id=project_id,
         name=node.title,
         color=data.get("color", "#5e6ad2"),
-        # Always "label" now that a decision is its own node type (ADR-0118). Kept on the
-        # view because ``LabelOut`` declares it and clients read it.
-        type=data.get("type", "label"),
+        # The literal, not ``data["type"]`` (ADR-0130). A decision has been its own node
+        # type since ADR-0118, and reading the key back kept the old shape *displaying*
+        # correctly — which is part of why 17 misfiled records sat in production looking
+        # like decisions to the one surface that drew them and like labels to every other.
+        # Kept on the view at all because ``LabelOut`` declares it and clients read it.
+        type=NODE_LABEL,
         description=data.get("description"),
-        decision_status=data.get("decision_status"),
+        decision_status=None,
         source=data.get("source"),
         created_at=node.created_at,
     )

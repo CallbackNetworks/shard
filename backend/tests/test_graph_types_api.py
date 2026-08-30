@@ -318,10 +318,13 @@ def test_closed_sets_are_declared_as_pickers_not_text(client):
     types = {t["key"]: t for t in client.get("/api/graph-types/nodes").json()}
     decision = {f["key"]: f for f in types[graph.NODE_DECISION]["fields"]}
 
-    assert decision["decision_status"]["kind"] == "enum"
+    assert decision["status"]["kind"] == "enum"
+    # And it is the ``nodes.status`` column, not a data key (ADR-0130) — declared as
+    # ``data`` it would be written beside the column every decision surface reads.
+    assert decision["status"]["store"] == "column"
     # `deprecated` is in the set: the UI has always offered it as a filter and the old
     # declaration did not carry it, so the editor could not set what the filter could find.
-    assert set(decision["decision_status"]["options"]) == {
+    assert set(decision["status"]["options"]) == {
         "proposed",
         "accepted",
         "deprecated",
@@ -396,3 +399,54 @@ def test_every_builtin_names_itself_through_the_title_column(client):
         title = next((f for f in t["fields"] if f["key"] == "title"), None)
         assert title, f"{t['key']} declares no name field"
         assert title["store"] == "column"
+
+
+class TestTheFieldVocabularyIsServedNotMirrored:
+    """A declaration's vocabulary comes from the code that enforces it (ADR-0132).
+
+    Until the field editor existed there was no UI reading any of this, which is exactly
+    how a second copy gets written: ADR-0056 found the rules editor offering values the
+    engine rejected, ADR-0058 found the rule-name list drifted. The endpoint exists so
+    the new editor has nothing to copy.
+    """
+
+    def test_it_serves_what_the_server_actually_enforces(self, client):
+        from app.services import graph
+        from app.services.graph_registry import FIELD_KINDS, FIELD_STORES, MANAGED_DATA_KEYS
+
+        body = client.get("/api/graph-types/fields/vocabulary").json()
+
+        assert body["kinds"] == list(FIELD_KINDS)
+        assert body["stores"] == list(FIELD_STORES)
+        # The columns matter most: a `column` field naming anything outside this set is
+        # written into `data` under the same name, which looks saved and changes nothing.
+        assert body["columns"] == sorted(graph.WRITABLE_COLUMNS)
+        assert set(MANAGED_DATA_KEYS) <= set(body["managed"])
+
+    def test_every_kind_it_offers_is_a_kind_a_declaration_may_use(self, client):
+        """The list is a picker's contents; an entry the writer refuses is a dead option."""
+        client.post("/api/graph-types/nodes", json={"key": "brief", "label": "Brief"})
+        for kind in client.get("/api/graph-types/fields/vocabulary").json()["kinds"]:
+            field = {"key": "f", "label": "F", "kind": kind}
+            if kind == "enum":
+                field["options"] = ["a"]
+            r = client.patch("/api/graph-types/nodes/brief", json={"fields": [field]})
+            assert r.status_code == 200, f"{kind}: {r.text}"
+
+    def test_every_column_it_offers_is_one_a_declaration_may_name(self, client):
+        client.post("/api/graph-types/nodes", json={"key": "memo", "label": "Memo"})
+        for column in client.get("/api/graph-types/fields/vocabulary").json()["columns"]:
+            r = client.patch(
+                "/api/graph-types/nodes/memo",
+                json={"fields": [{"key": column, "label": column, "kind": "text", "store": "column"}]},
+            )
+            assert r.status_code == 200, f"{column}: {r.text}"
+
+    def test_a_managed_key_it_names_is_one_a_declaration_may_not_use(self, client):
+        client.post("/api/graph-types/nodes", json={"key": "note", "label": "Note"})
+        for key in client.get("/api/graph-types/fields/vocabulary").json()["managed"]:
+            r = client.patch(
+                "/api/graph-types/nodes/note",
+                json={"fields": [{"key": key, "label": key, "kind": "text"}]},
+            )
+            assert r.status_code == 422, f"{key} was accepted as an editable field"

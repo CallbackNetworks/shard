@@ -150,7 +150,8 @@ class TestTheDocumentedWayToWriteADecision:
                 "type": "decision",
                 "title": "Adopt the graph model",
                 "container_id": sample_project.id,
-                "data": {"decision_status": "accepted", "description": "## Context\n"},
+                "status": "accepted",
+                "data": {"description": "## Context\n"},
             },
         )
         assert r.status_code == 201, r.text
@@ -159,8 +160,13 @@ class TestTheDocumentedWayToWriteADecision:
         assert [d["name"] for d in listed] == ["Adopt the graph model"]
         assert listed[0]["decision_status"] == "accepted"
 
-    def test_a_label_wearing_the_old_data_key_is_just_a_label(self, client, sample_project):
-        """The old shape does not quietly keep working — it makes a label, which is what it is."""
+    def test_a_label_wearing_the_old_data_key_is_refused(self, client, sample_project):
+        """The old shape is refused at the door, and the refusal names the one that works.
+
+        ADR-0118 asserted here that the old shape "does not quietly keep working" because
+        it produced a label rather than a decision. It produced a label *and a 201*, which
+        is quiet — production wrote 17 records that way (ADR-0130).
+        """
         r = client.post(
             "/api/nodes",
             json={
@@ -170,8 +176,10 @@ class TestTheDocumentedWayToWriteADecision:
                 "data": {"type": "decision", "decision_status": "accepted"},
             },
         )
-        assert r.status_code == 201, r.text
+        assert r.status_code == 422, r.text
+        assert "type='decision'" in r.json()["detail"]
         assert client.get("/api/decisions").json() == []
+        assert client.get(f"/api/projects/{sample_project.id}/labels").json() == []
 
     def test_the_same_write_reaches_the_v1_read_surface(self, client, db, sample_project):
         raw = _read_key(db)
@@ -181,7 +189,7 @@ class TestTheDocumentedWayToWriteADecision:
                 "type": "decision",
                 "title": "Adopt the graph model",
                 "container_id": sample_project.id,
-                "data": {"decision_status": "accepted"},
+                "status": "accepted",
             },
         )
         r = client.get("/api/v1/decisions", headers={"X-API-Key": raw})

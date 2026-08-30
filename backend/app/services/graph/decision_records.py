@@ -51,8 +51,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Edge, Node
+from app.services.errors import Unprocessable
 from app.services.graph.core import (
     NODE_DECISION,
+    NODE_LABEL,
     REL_CONFLICTS_WITH,
     REL_CONTAINS,
     REL_GOVERNS,
@@ -67,6 +69,14 @@ from app.services.graph.core import (
 # Status vocabulary lives in the type registry (the editor's picker reads the same list).
 STATUS_PROPOSED = "proposed"
 STATUS_SUPERSEDED = "superseded"
+
+# A decision's state is the ``nodes.status`` column, like every other type's (ADR-0130).
+# It rode in ``data["decision_status"]`` from the label era, which left the column NULL on
+# all 103 production records and made this the one type whose state a generic node filter
+# could not see. The response contract still says ``decision_status`` — that name is what
+# every reader, the share page and the assistant were written against, and the storage
+# moving is not a reason to break them.
+LEGACY_STATUS_KEY = "decision_status"
 
 
 @dataclass
@@ -105,7 +115,7 @@ def _view(node: Node, project_id: str | None, links: dict | None = None) -> Deci
         name=node.title,
         color=data.get("color", "#818cf8"),
         description=data.get("description"),
-        decision_status=data.get("decision_status", STATUS_PROPOSED),
+        decision_status=node.status or STATUS_PROPOSED,
         source=data.get("source"),
         created_at=node.created_at,
         supersedes=links.get(REL_SUPERSEDES, []),
@@ -175,7 +185,7 @@ def decisions(db: Session, *, project_id: str | None = None, status: str | None 
         pid = pmap.get(node.id)
         if project_id is not None and pid != project_id:
             continue
-        if status is not None and (node.data or {}).get("decision_status", STATUS_PROPOSED) != status:
+        if status is not None and (node.status or STATUS_PROPOSED) != status:
             continue
         result.append(_view(node, pid, lmap.get(node.id)))
     return result
@@ -203,7 +213,7 @@ def create_decision(
     # Only the keys that carry a value: ``create_node`` folds every keyword into ``data``,
     # and a stored ``null`` shows up on the node page as an ad-hoc key the type does not
     # declare — noise that looks like data somebody wrote.
-    fields = {"color": color, "description": description, "decision_status": decision_status, "source": source}
+    fields = {"color": color, "description": description, "source": source, "status": decision_status}
     node = create_node(db, NODE_DECISION, title=name, actor=actor, **{k: v for k, v in fields.items() if v is not None})
     if project_id:
         add_edge(db, project_id, node.id, REL_CONTAINS)
@@ -227,9 +237,7 @@ def supersede(db: Session, decision_id: str, superseded_id: str, *, actor: str |
     """
     add_edge(db, decision_id, superseded_id, REL_SUPERSEDES, actor=actor)
     old = db.get(Node, superseded_id)
-    data = dict(old.data or {})
-    data["decision_status"] = STATUS_SUPERSEDED
-    old.data = data
+    old.status = STATUS_SUPERSEDED
     db.flush()
 
 
@@ -239,14 +247,12 @@ def unsupersede(db: Session, decision_id: str, superseded_id: str, *, actor: str
     if not removed:
         return False
     old = db.get(Node, superseded_id)
-    if old is not None and (old.data or {}).get("decision_status") == STATUS_SUPERSEDED:
+    if old is not None and old.status == STATUS_SUPERSEDED:
         remaining = db.execute(
             select(Edge.id).where(Edge.target_id == superseded_id, Edge.rel_type == REL_SUPERSEDES)
         ).first()
         if remaining is None:
-            data = dict(old.data or {})
-            data["decision_status"] = "accepted"
-            old.data = data
+            old.status = "accepted"
             db.flush()
     return True
 
@@ -272,3 +278,40 @@ def governing(db: Session, node_id: str) -> list[DecisionView]:
     pmap = project_container_map(db, ids)
     lmap = links_map(db, ids)
     return [_view(n, pmap.get(n.id), lmap.get(n.id)) for n in rows]
+
+
+def assert_decision_write_shape(db: Session, node_type: str, fields: dict | None) -> None:
+    """Refuse the two ways a decision write silently lands somewhere it will not be found.
+
+    Both are the same defect wearing two dates. ADR-0118 moved a decision out of
+    ``label`` + ``data.type="decision"`` and said the old shape would stop working
+    "visibly"; it did not. ``POST /nodes`` with the old shape returns **201**, and what
+    it creates is a label — invisible to ``decisions()`` (which filters on ``Node.type``)
+    and, since ADR-0118 removed ``label_names``'s subtraction, a real entry in the label
+    vocabulary. Production ran that way for two days and collected 17 records: the newest
+    17 decisions in the database, none of them on the decisions page and all of them in
+    the label picker. ADR-0130 moved the *status* to the ``nodes.status`` column, which
+    opens the identical trap one field down — ``data.decision_status`` would be accepted
+    as an inert key while the column, which is now what every decision surface reads,
+    stayed NULL.
+
+    So both are refused at the door, and the refusal names the shape that works. That is
+    ADR-0078's rule: an agent always reads the error and does not always read the docs.
+    """
+    if not fields:
+        return
+    if node_type != NODE_DECISION and (
+        fields.get("type") == NODE_DECISION or (node_type == NODE_LABEL and LEGACY_STATUS_KEY in fields)
+    ):
+        raise Unprocessable(
+            f"a decision record is its own node type since ADR-0118: create it with "
+            f"type='{NODE_DECISION}' instead of type='{node_type}' carrying "
+            f"data.type='{NODE_DECISION}'. Written this way it is a label — it will not "
+            f"appear on the decisions page and it will appear in the label vocabulary."
+        )
+    if node_type == NODE_DECISION and LEGACY_STATUS_KEY in fields:
+        raise Unprocessable(
+            f"a decision's state is the 'status' field, not data.{LEGACY_STATUS_KEY} "
+            f"(ADR-0130). Send status='{fields[LEGACY_STATUS_KEY]}'; the response still "
+            f"reports it as {LEGACY_STATUS_KEY}."
+        )
