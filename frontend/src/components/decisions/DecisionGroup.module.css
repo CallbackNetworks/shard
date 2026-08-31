@@ -118,3 +118,15 @@
   padding-left: 3px;
   border-left: 1px solid rgba(var(--kt-ink-rgb), 0.1);
 }
+
+/* On a phone the column is ~330px wide, so four levels of a `contains` trail spend a
+   fifth of the card on indent. The rails still read as a bracket at half the step. */
+@media (max-width: 600px) {
+  .head {
+    padding: 7px 8px;
+  }
+
+  .body {
+    margin-left: 7px;
+  }
+}

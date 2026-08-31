@@ -3823,14 +3823,23 @@ h1 {
 .kt-decision-room-page {
   max-width: 1240px;
 }
+/* Every track is `minmax(0, …)` on purpose. A px minimum on an *explicit* track cannot
+   be satisfied by dropping a column the way `repeat(auto-fill, …)` can, so the grid just
+   grows past its container — and the columns here are `overflow: hidden`, which turns
+   that overflow into a card sliced down the middle instead of a scrollbar. The old
+   `230px + minmax(320px…) + minmax(360px…) + 2 × 14px gap` needed 938px of content box
+   before it would honour its own declaration, which the page only has above a ~1180px
+   viewport. Below that — every tablet, every phone held sideways, and a 1024px laptop —
+   the third column ran off the edge. The number of columns is a decision for the media
+   queries below to make; the tracks themselves must always fit. */
 .kt-decision-room {
   display: grid;
-  grid-template-columns: 230px minmax(320px, 0.9fr) minmax(360px, 1.1fr);
+  grid-template-columns: 230px minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 14px;
   align-items: start;
 }
 .kt-decision-room.is-mobile {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 /* Graph mode drops the two card columns and gives the canvas the rest of the row
    (ADR-0128). The console stays: its filters and scoreboard describe the same set in
@@ -3839,7 +3848,44 @@ h1 {
   grid-template-columns: 230px minmax(0, 1fr);
 }
 .kt-decision-room.is-graph.is-mobile {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Three columns need room for three columns. `is-mobile` is a JS breakpoint at 600px
+   (`useBreakpoint`), which left everything from 600px to ~1180px trying to draw the
+   desktop layout in a fraction of the width. The stops below are CSS so the layout and
+   the width it needs are stated in the same place.
+
+   Medium: the console stops being a 230px rail and becomes the banner across the top —
+   it is filters and a scoreboard, so it reads fine as a wide row and gives both card
+   columns the full width back. */
+@media (max-width: 1180px) {
+  .kt-decision-room,
+  .kt-decision-room.is-graph {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .kt-decision-room > .kt-decision-console {
+    grid-column: 1 / -1;
+    position: relative;
+    top: auto;
+  }
+  .kt-decision-room.is-graph > .kt-decision-graph-pane {
+    grid-column: 1 / -1;
+  }
+  .kt-decision-console .kt-decision-scoreboard {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .kt-decision-console .kt-decision-filter-stack {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+/* Narrow: one card per row. Two columns of decision cards below this stop leaves a title
+   at one word per line, which is the width problem ADR-0122 moved the actions row for. */
+@media (max-width: 860px) {
+  .kt-decision-room,
+  .kt-decision-room.is-graph {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 /* The canvas manages its own scrolling, so this pane must not clip it. */
 .kt-decision-graph-pane {

@@ -135,3 +135,4 @@
 | [0131](0131-what-dies-with-a-node.md) | 刪掉一個節點，屬於它的列也要跟著走 | Accepted | 2026-08-30 |
 | [0132](0132-a-field-declaration-can-be-declared.md) | 一個欄位宣告要在畫面上宣告得出來 | Accepted | 2026-08-30 |
 | [0133](0133-hover-is-a-state-change-not-a-stunt.md) | 滑過是狀態改變，不是特技；入場動畫的 fill 不是放狀態的地方 | Accepted | 2026-08-31 |
+| [0134](0134-an-explicit-grid-fits-a-screen-someone-holds.md) | 明確宣告的 grid 要塞得進真的有人拿在手上的螢幕 | Accepted | 2026-08-31 |
