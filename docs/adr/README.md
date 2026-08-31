@@ -134,3 +134,4 @@
 | [0130](0130-a-decision-lands-where-it-is-read.md) | 一筆決策要落在會被讀到的地方 | Accepted | 2026-08-30 |
 | [0131](0131-what-dies-with-a-node.md) | 刪掉一個節點，屬於它的列也要跟著走 | Accepted | 2026-08-30 |
 | [0132](0132-a-field-declaration-can-be-declared.md) | 一個欄位宣告要在畫面上宣告得出來 | Accepted | 2026-08-30 |
+| [0133](0133-hover-is-a-state-change-not-a-stunt.md) | 滑過是狀態改變，不是特技；入場動畫的 fill 不是放狀態的地方 | Accepted | 2026-08-31 |

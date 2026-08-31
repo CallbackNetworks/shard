@@ -64,6 +64,7 @@ export const DEFAULT_UI_PREFS = {
   displayFont: 'anton',
   uiScale: 1.0,
   railExpanded: true, // rail shows labels and reserves its own gutter
+  watchPanelOpen: false, // the activity footer's watch legend + picker row
   sidebarHidden: [], // list of nav `to` paths to hide
   sidebarOrder: [], // list of nav `to` paths giving explicit order
   assistantFabHidden: false, // hide the floating assistant toggle (Assistant page/rail entry stay)
@@ -135,6 +136,10 @@ export function applyUiPrefs(prefs = current) {
     // Drives --rail-w, which sizes the rail *and* the gutter the layout keeps
     // for it, so an expanded rail can never sit on top of the page (ADR-0088).
     root.setAttribute('data-rail', prefs.railExpanded ? 'expanded' : 'collapsed')
+    // Same reason as --rail-w: the footer is `position: fixed`, so the gutter the page
+    // keeps for it has to know its height. Published here rather than measured, so the
+    // reserved space and the row that fills it can never disagree.
+    root.setAttribute('data-watch', prefs.watchPanelOpen ? 'open' : 'closed')
     const accent = resolveAccent(prefs)
     root.style.setProperty('--accent-dark', accent.main)
     root.style.setProperty('--accent-2-dark', accent.deep)

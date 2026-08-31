@@ -52,15 +52,17 @@
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  animation: kineticHit 0.35s ease forwards;
-  opacity: 0;
+  animation: kineticHit 0.35s ease backwards;
   box-shadow: none;
-  transition: border-color 0.16s, transform 0.16s, background 0.16s;
+  transition: border-color 0.16s, background 0.16s;
 }
 
+/* Colour, not motion: a card that shifts under the pointer moves the thing being
+   aimed at. The entrance fill is `backwards` so the card's visibility never depends
+   on an animation another rule could replace (ADR-0129's mechanism). */
 .projectCard:hover {
   border-color: var(--kt-ink);
-  transform: translateX(2px);
+  background: var(--kt-elev);
 }
 
 .projectCardAccent {
@@ -197,8 +199,7 @@
   display: flex;
   gap: 10px;
   padding: 8px 0;
-  animation: fadeIn 0.3s ease forwards;
-  opacity: 0;
+  animation: fadeIn 0.3s ease backwards;
 }
 
 .activityDot {
@@ -316,8 +317,7 @@
   border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 14px 16px;
-  animation: kineticHit 0.35s ease forwards;
-  opacity: 0;
+  animation: kineticHit 0.35s ease backwards;
   box-shadow: none;
   position: relative;
   overflow: hidden;
@@ -362,9 +362,8 @@
   border-radius: 0;
   margin-bottom: 16px;
   overflow: hidden;
-  animation: fadeUpIn 0.3s ease forwards;
+  animation: fadeUpIn 0.3s ease backwards;
   animation-delay: 0.1s;
-  opacity: 0;
 }
 
 .dueSoonToggle {
@@ -529,8 +528,7 @@
   border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 20px 16px;
-  animation: kineticHit 0.35s ease forwards;
-  opacity: 0;
+  animation: kineticHit 0.35s ease backwards;
   position: relative;
   overflow: hidden;
 }

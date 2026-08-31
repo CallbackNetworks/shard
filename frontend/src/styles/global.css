@@ -616,8 +616,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-share-stat {
   min-height: 76px;
   padding: 13px 14px;
-  opacity: 0;
-  animation: kineticCutIn 0.42s ease forwards;
+  animation: kineticCutIn 0.42s ease backwards;
 }
 .kt-share-stat-label {
   margin-bottom: 6px;
@@ -1098,8 +1097,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   gap: 12px;
   padding: 9px 0;
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.04);
-  opacity: 0;
-  animation: slideInLeft 0.34s ease forwards;
+  animation: slideInLeft 0.34s ease backwards;
 }
 .kt-share-activity-mark {
   display: flex;
@@ -1294,12 +1292,11 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 
 .card-hover {
-  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  transition: background 0.16s ease, border-color 0.16s ease;
   position: relative;
   overflow: hidden;
 }
 .card-hover:hover {
-  transform: translateX(2px);
   background: var(--kt-elev) !important;
   border-color: #ffffff;
 }
@@ -1926,8 +1923,15 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
    last keyframe was drawing anyway. ADR-0129. */
 .kt-route-shell {
   min-height: calc(100% - 28px);
-  padding-bottom: 88px;
+  /* The footer strip is `position: fixed`, so the page keeps its own gutter for it.
+     The watch row is collapsed by default and the gutter follows `data-watch`, which
+     `applyUiPrefs` publishes — otherwise closing the row would leave the hole it used
+     to fill. */
+  padding-bottom: 56px;
   animation: routeReveal 0.34s cubic-bezier(.2,.8,.2,1) backwards;
+}
+:root[data-watch="open"] .kt-route-shell {
+  padding-bottom: 88px;
 }
 .layout-main::before {
   content: '';
@@ -2292,7 +2296,6 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-map-node:hover,
 .kt-map-node.is-active {
   z-index: 3;
-  transform: translateY(-2px) scale(1.015);
   border-color: var(--node-color);
   animation-name: kineticMapNodeIn, kineticMapPulse;
   animation-duration: 0.36s, 1.8s;
@@ -2677,7 +2680,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   bottom: 0;
   z-index: 57;
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) 118px;
+  /* The third track carries the intensity scale *and* the watch disclosure; at the old
+     118px the button overflowed the viewport edge. */
+  grid-template-columns: 96px minmax(0, 1fr) 250px;
   align-items: stretch;
   min-height: 40px;
   border-top: 1px solid var(--kt-line);
@@ -2754,8 +2759,14 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   z-index: 1;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
-  padding: 6px 10px;
+  min-width: 0;
+  /* The assistant FAB is `position: fixed` at `bottom: 20 / right: 20` with a far higher
+     z-index, so the last ~64px of this row is covered by it — it was already sitting on
+     the HIGH label. Keep the cell's content out from under it, or the disclosure below
+     is drawn but not clickable. */
+  padding: 6px 66px 6px 10px;
   color: var(--kt-faint);
   font-size: 8px;
   font-weight: 800;
@@ -2763,13 +2774,41 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   text-transform: uppercase;
 }
 .kt-heatscale i {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 24px;
   height: 8px;
-  min-width: 0;
   background: linear-gradient(90deg, hsl(42, 50%, 20%), hsl(42, 75%, 46%), hsl(42, 100%, 72%));
 }
 .kt-heatscale span {
   white-space: nowrap;
+}
+/* The disclosure for the watch row. It sits in the scale cell rather than in the row it
+   opens, because a control inside a collapsed panel cannot reopen it. */
+.kt-watch-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-right: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+  border-radius: 9999px;
+  background: none;
+  color: var(--kt-faint);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.kt-watch-toggle:hover {
+  border-color: var(--accent);
+  color: var(--kt-ink);
+}
+.kt-watch-toggle b {
+  color: var(--kt-ink);
+  font-weight: 800;
 }
 .kt-watch-legend {
   grid-column: 1 / -1;
@@ -2890,9 +2929,18 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   color: var(--kt-hit) !important;
   text-transform: uppercase;
 }
+/* The three words are stacked in one spot and the animation shows one at a time, so the
+   base state has to be "hidden" — with `opacity: 1` inherited, anything that stops the
+   animation (OS reduced motion, `data-motion="reduced"`, the first paint before
+   `applyUiPrefs` runs) drew all three on top of each other. A running animation
+   overrides these declarations, so the first word is the one that stands still. */
 .kt-loading span {
   position: absolute;
+  opacity: 0;
   animation: loadingWord 1.8s steps(1, end) infinite;
+}
+.kt-loading span:first-child {
+  opacity: 1;
 }
 .kt-loading span:nth-child(2) {
   animation-delay: 0.6s;
@@ -3070,43 +3118,34 @@ h1 {
   box-shadow: none;
   position: relative;
 }
+/* Hover is a state change, not a stunt. A card used to pick its hover behaviour from
+   `:nth-child(6n + N)` — six different reactions depending on where a card happened to
+   sit in its list, which reads as the page glitching rather than as feedback, and which
+   moves the thing you are aiming at out from under the pointer.
+   Two of those variants set `animation`, and the shorthand *replaces* whatever entrance
+   animation the card was already running. `Integrations.module.css .card` enters with
+   `opacity: 0` + `fadeUpIn … forwards`, so its visibility lived entirely in that fill:
+   hovering swapped the animation out and the card fell back to `opacity: 0` and
+   vanished. Same mechanism as ADR-0129 — an entrance animation's fill is load-bearing
+   state, so nothing may casually overwrite it. Entrance animations now fill `backwards`
+   (see below) so the base style is the visible one either way. */
 .kt-card {
   background: var(--kt-surface);
   border: 1px solid var(--kt-line);
   padding: 16px;
   position: relative;
   overflow: hidden;
-  transform-origin: left center;
-  transition: border-color 0.15s ease, transform 0.18s cubic-bezier(.2,.8,.2,1), background 0.15s ease, opacity 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .kt-card:hover {
   border-color: var(--kt-hit);
-  transform: translateX(5px) skewX(-0.8deg);
+  background: var(--kt-elev);
 }
 .kt-card:hover .kt-card-title,
 .kt-card:hover [class*="cardName"],
 .kt-card:hover [class*="cardTitle"],
 .kt-card:hover [class*="templateName"] {
   color: var(--kt-hit) !important;
-  animation: kineticSlidePunch 0.28s cubic-bezier(.2,.8,.2,1) both;
-}
-.kt-card:nth-child(6n + 1):hover {
-  animation: kineticRotateTap 0.36s ease both;
-}
-.kt-card:nth-child(6n + 2):hover {
-  transform: translateX(7px) scale(1.012);
-}
-.kt-card:nth-child(6n + 3):hover {
-  animation: kineticExpandPulse 0.3s ease both;
-}
-.kt-card:nth-child(6n + 4):hover {
-  opacity: 0.88;
-}
-.kt-card:nth-child(6n + 5):hover {
-  transform: translateY(-3px) skewX(-1deg);
-}
-.kt-card:nth-child(6n):hover {
-  transform: translateX(4px);
 }
 .kt-modal-backdrop {
   position: fixed;
@@ -3286,7 +3325,6 @@ h1 {
 .kt-chip:hover,
 [class*="eventTag"]:hover,
 [class*="badge"]:hover {
-  transform: scale(1.06);
   background: var(--kt-hit) !important;
   color: var(--kt-bg) !important;
 }
@@ -3363,7 +3401,6 @@ h1 {
 }
 .kt-assistant-conversation:hover {
   background: rgba(var(--kt-ink-rgb), 0.04) !important;
-  transform: translateX(3px) skewX(-1deg);
 }
 .kt-assistant-conversation:hover::after,
 .kt-assistant-conversation.is-active::after {
@@ -3396,7 +3433,6 @@ h1 {
 }
 .kt-assistant-bubble:hover {
   border-color: var(--kt-hit) !important;
-  transform: translateX(2px);
 }
 .kt-activity-page {
   background:
@@ -3992,7 +4028,6 @@ h1 {
 [class*="templateName"]:hover,
 [class*="emptyTitle"]:hover {
   color: var(--kt-hit) !important;
-  transform: scale(1.04);
 }
 
 /* Legacy inline color safety net while older modules are being migrated. */
@@ -4106,7 +4141,10 @@ select[style*="border-radius"],
   .kt-notice-stack {
     top: 0;
   }
-  .kt-route-shell {
+  /* The watch row and its disclosure are both hidden on a phone, so the gutter is
+     fixed here — the desktop `[data-watch="open"]` rule would otherwise still win. */
+  .kt-route-shell,
+  :root[data-watch="open"] .kt-route-shell {
     padding-bottom: 62px;
   }
   .kt-signal-timeline {

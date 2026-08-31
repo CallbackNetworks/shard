@@ -1126,6 +1126,8 @@
   "ticker.watchAddType": "Type",
   "ticker.watchPickType": "Choose a type…",
   "ticker.watchRemove": "Stop watching {{label}}",
+  "ticker.watchShow": "Show watch list",
+  "ticker.watchHide": "Hide watch list",
   "project.myIssues": "My Issues",
   "project.share": "Share",
   "project.shareHint": "Public share link, calendar feed, PIN, expiry and guest notes",

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { getActivity, getProjects, getActivityWatches, createActivityWatch, deleteActivityWatch } from '../api/client'
 import { qk } from '../api/queryKeys'
-import { useUiPrefs, refreshInterval } from '../utils/uiPrefs'
+import { useUiPrefs, setUiPref, refreshInterval } from '../utils/uiPrefs'
 import { loopDuration, loopRepeats, repeatItems } from '../utils/tickerLoop'
 import { countOverdue } from '../utils/overdue'
 import ActivityWatchPicker from './ActivityWatchPicker'
@@ -194,6 +194,7 @@ export default function GlobalActivityTicker() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const prefs = useUiPrefs()
+  const watchOpen = prefs.watchPanelOpen
   // Enough entries for a busy watch curve to read as more than a couple of dots;
   // the scrolling ticker text above only ever shows the newest handful anyway.
   const { data: activities = [] } = useQuery({
@@ -346,10 +347,28 @@ export default function GlobalActivityTicker() {
           ))}
         </svg>
         <div className="kt-heatscale" aria-label="Activity intensity scale">
+          {/* The watch row is configuration, and configuration does not earn a
+              permanent strip across the bottom of every page. It starts closed and
+              remembers what you last chose (`watchPanelOpen`), the same way the rail
+              does — and the gutter the layout reserves reads the same preference, so
+              closing it actually gives the page the pixels back. */}
+          <button
+            type="button"
+            className="kt-watch-toggle"
+            aria-expanded={watchOpen}
+            aria-label={t(watchOpen ? 'ticker.watchHide' : 'ticker.watchShow')}
+            title={t(watchOpen ? 'ticker.watchHide' : 'ticker.watchShow')}
+            onClick={() => setUiPref('watchPanelOpen', !watchOpen)}
+          >
+            {t('ticker.watchAdd')}
+            {watchCurves.length > 0 && <b>{watchCurves.length}</b>}
+            {watchOpen ? <ChevronDown size={10} /> : <ChevronUp size={10} />}
+          </button>
           <span>LOW</span>
           <i />
           <span>HIGH</span>
         </div>
+        {watchOpen && (
         <div className="kt-watch-legend">
           <span className="kt-watch-chip">
             <i style={{ background: '#facc15' }} />
@@ -374,6 +393,7 @@ export default function GlobalActivityTicker() {
             excludeNodeIds={watches.filter(w => w.kind === 'node').map(w => w.target_id)}
           />
         </div>
+        )}
       </div>
     </>
   )

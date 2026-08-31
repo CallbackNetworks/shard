@@ -377,8 +377,7 @@
   border: 1px solid var(--kt-line);
   border-radius: 0;
   padding: 16px 20px;
-  opacity: 0;
-  animation: fadeUpIn 0.35s ease forwards;
+  animation: fadeUpIn 0.35s ease backwards;
 }
 
 .cardBody {

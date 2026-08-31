@@ -3,20 +3,30 @@
    differently on purpose — one is where a record lives, the other is what replaced it,
    and a single visual language for both would say they are the same relation. */
 
+/* `min-width: 0` at every level: the groups are grid items inside a column that is
+   `overflow: hidden`, and a grid item's default `min-width: auto` refuses to shrink
+   below its content — so a nested card pushed past the column edge was clipped rather
+   than wrapped. */
 .group {
   display: grid;
   gap: 0;
+  min-width: 0;
 }
 
 .group[data-depth='0'] + .group[data-depth='0'] {
   border-top: 1px solid rgba(var(--kt-ink-rgb), 0.06);
 }
 
+/* One step, not `depth * step`. The component is recursive and `.body` already indents
+   its children, so scaling by depth *as well* compounded the two: by the third level a
+   card had lost ~145px of a 320px column and its contents were cut off by the column's
+   own `overflow: hidden`. Recursion supplies the accumulation; each level adds one step. */
 .head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px 7px calc(10px + var(--depth) * 14px);
+  padding: 7px 10px;
+  min-width: 0;
 }
 
 .head:hover {
@@ -103,7 +113,8 @@
 .body {
   display: grid;
   gap: 0;
-  margin-left: calc(15px + var(--depth) * 14px);
-  padding-left: 2px;
+  min-width: 0;
+  margin-left: 11px;
+  padding-left: 3px;
   border-left: 1px solid rgba(var(--kt-ink-rgb), 0.1);
 }

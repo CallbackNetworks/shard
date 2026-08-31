@@ -23,7 +23,7 @@ export default function DecisionGroup({ group, depth = 0, isOpen, onToggle, type
   const href = group.ref ? nodeHref(group.ref, typeByKey) : null
 
   return (
-    <div className={s.group} data-depth={depth} style={{ '--depth': Math.min(depth, 3) }}>
+    <div className={s.group} data-depth={depth}>
       <div className={s.head}>
         <button
           type="button"

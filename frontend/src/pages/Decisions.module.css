@@ -12,6 +12,7 @@
 .lineage {
   display: grid;
   gap: 0;
+  min-width: 0;
 }
 
 /* A chain rail: the indent is the history, so it needs a line to read as one. The line
@@ -21,6 +22,7 @@
 .chainRow {
   position: relative;
   display: grid;
+  min-width: 0;
   padding-bottom: 6px;
 }
 

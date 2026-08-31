@@ -1127,6 +1127,8 @@
   "ticker.watchAddType": "型別",
   "ticker.watchPickType": "選擇型別…",
   "ticker.watchRemove": "取消追蹤 {{label}}",
+  "ticker.watchShow": "顯示追蹤列",
+  "ticker.watchHide": "收起追蹤列",
   "project.myIssues": "我的議題",
   "project.share": "分享",
   "project.shareHint": "公開分享連結、行事曆訂閱、PIN、到期與訪客留言",
