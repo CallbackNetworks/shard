@@ -4,7 +4,9 @@
 
 Please **do not** open a public issue for security vulnerabilities.
 
-Report them privately by email to **lynloveyounever@gmail.com** with:
+Use GitHub's **private vulnerability reporting** on this repository
+(Security → Report a vulnerability), or, if that is unavailable to you, email
+**lynloveyounever@gmail.com**. Either way, include:
 
 - a description of the issue and its impact,
 - steps to reproduce (a proof of concept if possible),
@@ -16,8 +18,10 @@ consent, credited.
 
 ## Deployment hardening
 
-Shard is designed primarily for self-hosted, single-user or small-team use.
-When exposing it beyond localhost, review the following:
+Shard is a **single-user system per instance**: one shared password, no accounts,
+no tenants. Everyone who can log in sees and can change everything, so "who is
+allowed in" is the whole of the access model. When exposing it beyond localhost,
+review the following:
 
 - **Set `SECRET_KEY`.** It signs share-PIN session cookies. If unset, an
   ephemeral per-process secret is used and PIN sessions reset on restart; a

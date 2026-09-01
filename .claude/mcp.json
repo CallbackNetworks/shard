@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "shard": {
-      "command": "scripts/mcp-stdio.sh",
-      "cwd": "/home/chungchen/20260318"
+      "command": "scripts/mcp-stdio.sh"
     }
   }
 }
