@@ -27,6 +27,7 @@ from app.routers import auth as auth_mod
 from app.services import llm_settings
 from app.services.ical_token import get_global_ical_token, rotate_global_ical_token
 from app.services.runtime_settings import FIELD_BOUNDS, get_system_settings, update_system_settings
+from app.version import version
 
 
 class SystemSettingsUpdate(BaseModel):
@@ -74,6 +75,9 @@ def read(db: Session) -> dict:
     password, and ``llm_model`` is the name of a model, not the key that reaches it.
     """
     return {
+        # Which version this instance is running. A self-hoster's bug report is worth
+        # nothing without it, and before ADR-0136 nothing served it (see app/version.py).
+        "version": version(),
         "auth_enabled": auth_mod.auth_enabled(),
         "auth_mode": auth_mode(),
         "smtp_configured": bool(os.getenv("SMTP_HOST")),

@@ -1,7 +1,10 @@
 """Tests for the settings router and runtime-adjustable system settings."""
 
+import tomllib
+
 import pytest
 
+from app import version as version_mod
 from app.services.errors import Unprocessable
 from app.services.runtime_settings import get_system_settings, update_system_settings
 
@@ -17,6 +20,27 @@ class TestGetSettings:
         assert body["reminder_cooldown_hours"] == 23
         assert "auth_enabled" in body
         assert "mcp_transport" in body
+
+
+class TestTheInstanceSaysWhichVersionItIs:
+    """ADR-0136. A self-hoster's bug report starts with a version, and until this existed
+    nothing served one: the number sat in pyproject.toml and reached no runtime surface."""
+
+    def test_settings_reports_the_version_pyproject_declares(self, client):
+        with version_mod.PYPROJECT.open("rb") as fh:
+            declared = tomllib.load(fh)["project"]["version"]
+
+        assert client.get("/api/settings").json()["version"] == declared
+
+    def test_an_unreadable_pyproject_does_not_fail_the_request(self, monkeypatch, tmp_path):
+        """A version string is a support convenience. A build that cannot read its own
+        metadata reports `unknown` rather than turning every settings read into a 500."""
+        version_mod.version.cache_clear()
+        monkeypatch.setattr(version_mod, "PYPROJECT", tmp_path / "gone.toml")
+        try:
+            assert version_mod.version() == version_mod.UNKNOWN
+        finally:
+            version_mod.version.cache_clear()
 
 
 class TestUpdateSystemSettings:

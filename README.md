@@ -4,6 +4,12 @@
 
 A personal multi-identity task management platform with CI/CD integration, AI agent support, and bidirectional issue sync. Built for developers who manage work across multiple roles, repositories, and tools.
 
+> **One instance, one person.** Shard has a single shared password, no accounts and no
+> tenants: whoever logs in sees and can change everything. The intended shape is that
+> people run their own instance, not that several share one — the multiple *identities*
+> are your own roles (work, open source, freelance), not other users. See
+> [ADR-0117](docs/adr/0117-someone-who-is-not-us-can-run-this.md).
+
 ![Shard command center](docs/screenshots/01-command-center.png)
 
 *Every screen, annotated: [**Visual Tour**](docs/screenshots.md).*
@@ -103,6 +109,21 @@ and its backups) and `./uploads` (task attachments). Copy those two and you have
 copied the instance. See [ADR-0117](docs/adr/0117-someone-who-is-not-us-can-run-this.md)
 for why this file exists separately from the one CD deploys.
 
+### Upgrading
+
+```bash
+scripts/upgrade.sh
+```
+
+Pull, build, **migrate**, start — in that order, stopping at the first failure. Do not
+upgrade with `docker compose up -d --build` on its own: it starts new code against a
+database nothing migrated, and the mismatch does not show up at startup or in the health
+check, only later inside a request ([ADR-0136](docs/adr/0136-an-install-has-an-upgrade-path-and-a-version.md)).
+
+Which version you are running is on **Settings → System Status** and in `GET /settings` —
+quote it in a bug report, because an image tag does not identify a build. What changed
+between versions is in the [changelog](docs/CHANGELOG.md).
+
 ## Routes
 
 | Path | Description | Auth |
@@ -195,7 +216,10 @@ docker compose up --build
 - [Agent Guide](docs/agent-guide.md) — AI agent integration (API, MCP, subscriptions)
 - [Deployment](docs/deployment.md) — VPS/production setup guide
 - [Integrations](docs/integrations.md) — CI/CD webhook setup
-- [ADRs](docs/adr/) — architecture decision records
+- [Changelog](docs/CHANGELOG.md) — what changed between versions
+- [ADRs](docs/adr/) — 130+ architecture decision records: why the system is the way it
+  is, including the mistakes that shaped it. Written in a mix of English and Traditional
+  Chinese, one file per decision
 
 ## Contributing
 

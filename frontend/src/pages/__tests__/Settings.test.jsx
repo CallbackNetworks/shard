@@ -50,6 +50,7 @@ vi.mock('../../context/ThemeContext', () => ({
 import Settings from '../Settings'
 
 const mockSettings = {
+  version: '1.2.3',
   auth_enabled: true,
   smtp_configured: true,
   summary_hour: 8,
@@ -146,6 +147,14 @@ describe('Settings', () => {
     setup()
     expect(screen.getByText('settings.model')).toBeTruthy()
     expect(screen.getByDisplayValue('claude-sonnet')).toBeTruthy()
+  })
+
+  // ADR-0136: the number a self-hoster is asked to quote in a bug report. It comes from
+  // the backend, so what is on screen is the version that answered, not the one this
+  // bundle was built from.
+  it('shows the running version', () => {
+    setup()
+    expect(screen.getByText('1.2.3')).toBeTruthy()
   })
 
   it('shows the MCP transport', () => {

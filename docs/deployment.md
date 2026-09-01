@@ -1,8 +1,16 @@
 # Deployment
 
+This document is about two different things, and which one applies to you depends on how
+you got here:
+
+- **Self-hosting your own instance** — one compose file, one command, and one upgrade
+  command. Jump to [Self-hosting](#self-hosting).
+- **The maintainer's CD pipeline**, described below, which is how *this* project's own
+  production host is deployed. It is not something a self-hoster needs.
+
 **Production is deployed by the CD pipeline, not by hand.** Pushing to `main` runs
 `.github/workflows/ci.yml`, which builds the `Dockerfile.prod` images, publishes them to the
-registry, and then — on the `cd-deployer` runner — *writes* both the `.env` and the compose
+registry, and then — on the `CD_RUNNER` runner — *writes* both the `.env` and the compose
 file into `$DEPLOY_DIR` before pulling and starting the stack. Nothing you place in that
 directory by hand survives a deploy; the pipeline overwrites both files every time.
 
@@ -63,6 +71,61 @@ test jobs, the frontend job, integration and publish have all passed:
 
 `$DEPLOY_DIR` defaults to `/opt/deployments/<repo-name>` and is overridable with the
 `DEPLOY_DIR` repository variable.
+
+## Self-hosting
+
+The whole install is one file and one command; it builds the production images from the
+checkout, so it needs no registry account and no `.env` to boot:
+
+```bash
+git clone <this repo> && cd shard
+docker compose -f docker-compose.selfhost.yml up -d
+# http://127.0.0.1:8090/
+```
+
+Your data is the two directories beside the compose file: `./data` (the SQLite database and
+its backups) and `./uploads` (attachments). Copy those two and you have copied the instance.
+See [ADR-0117](adr/0117-someone-who-is-not-us-can-run-this.md).
+
+### Upgrading
+
+```bash
+scripts/upgrade.sh
+```
+
+**Do not upgrade with `docker compose up -d --build` alone.** It rebuilds the images and
+starts them against a database that is however many revisions behind. The application
+creates and *stamps* a fresh database but never migrates an existing one — that split is
+deliberate (see "Database Migrations" below) — so a plain rebuild leaves new code running
+on an old schema, with no startup error and no failed health check. The symptom arrives
+later, inside one request, as a missing column.
+
+`scripts/upgrade.sh` is the same three steps in the order that makes a failure stop the
+upgrade: build, migrate, start. By hand it is:
+
+```bash
+git pull
+docker compose -f docker-compose.selfhost.yml build
+docker compose -f docker-compose.selfhost.yml run --rm --no-deps backend python -m app.db_schema
+docker compose -f docker-compose.selfhost.yml up -d
+```
+
+Which version you are on is shown at **Settings → System Status** and served by
+`GET /settings`. Quote it in a bug report — an image tag (`selfhost`, `latest`) does not
+identify a build. Changes between versions are in [the changelog](CHANGELOG.md).
+
+### CI/CD for your own fork
+
+The workflow asks for its runner by repository variable, so a fork runs the checks on
+GitHub-hosted runners with no configuration at all (ADR-0135). To point it at your own
+infrastructure, set these repository variables:
+
+| Variable | Effect |
+|----------|--------|
+| `CI_RUNNER` | Label the check jobs ask for. Unset → `ubuntu-latest` |
+| `CD_RUNNER` | Label the deploy job asks for. Unset → `ubuntu-latest` |
+| `REGISTRY_URL` | **Also the switch**: with no registry configured, `publish` and `deploy` are skipped entirely |
+| `DEPLOY_DIR` | Where the deploy job writes `.env` and the generated compose file |
 
 ## Running the production images locally
 
@@ -215,7 +278,11 @@ docker compose run --rm --no-deps backend python -m app.db_schema
 
 ## Updating
 
-Push to `main`. The pipeline builds, publishes, migrates and restarts (see "What a deploy does").
+**A self-hosted instance:** `scripts/upgrade.sh` — see [Upgrading](#upgrading). The step that
+matters is the migration, and a plain `up -d --build` does not run it.
+
+**This project's own production host:** push to `main`. The pipeline builds, publishes,
+migrates and restarts (see "What a deploy does").
 
 Application data lives in the `./data` host bind mount inside `$DEPLOY_DIR`, not in a named
 volume, so it is untouched by image pulls and container recreation.

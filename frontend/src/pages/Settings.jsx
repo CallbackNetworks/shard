@@ -372,6 +372,12 @@ export default function Settings() {
               icon={<Shield size={16} color={DARK.info} />}
               title={t('settings.systemStatus')}
             />
+            {/* First, because it is the line a self-hoster is asked to quote in a bug
+                report — the version reaches the screen from the backend (ADR-0136), so
+                what is shown is what is running, not what this bundle was built from. */}
+            <InfoRow label={t('settings.version')}>
+              <code>{settings.version}</code>
+            </InfoRow>
             <InfoRow label={t('settings.authentication')}>
               <StatusBadge ok={settings.auth_enabled} label={settings.auth_enabled ? t('settings.enabled') : t('settings.disabled')} />
             </InfoRow>

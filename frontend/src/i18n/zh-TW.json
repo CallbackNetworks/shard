@@ -825,6 +825,7 @@
   "activity.view.timeline": "時間軸",
   "activity.view.wall": "訊號牆",
   "settings.title": "設定",
+  "settings.version": "版本",
   "settings.systemStatus": "系統狀態",
   "settings.authentication": "身份驗證",
   "settings.email": "電子郵件 (SMTP)",

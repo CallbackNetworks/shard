@@ -184,7 +184,11 @@ Runs on push/PR to `main`. Seven jobs:
 4. **Frontend**: ESLint, vitest, npm audit, vite build
 5. **Integration**: production compose up, backend health check, frontend smoke test (needs backend-checks + backend-sqlite + backend-postgres + frontend)
 6. **Publish**: build and push Docker images to registry (main branch only)
-7. **Deploy**: pull images on `cd-deployer`, generate compose file at `$DEPLOY_DIR` (configurable via `vars.DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`), bring services up with health checks (main branch only). Requires `.env` pre-configured in the deploy directory.
+7. **Deploy**: pull images on the `CD_RUNNER` runner, generate compose file at `$DEPLOY_DIR` (configurable via `vars.DEPLOY_DIR`, defaults to `~/deployments/<repo-name>`), bring services up with health checks (main branch only). Requires `.env` pre-configured in the deploy directory.
+
+**Where the jobs run is a repository variable** (ADR-0135): `runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}` (`CD_RUNNER` for deploy). This file is read by two servers — the Gitea instance this repo pushes to, whose runner advertises only `ci-builder`, and GitHub Actions on any public fork, where that label does not exist and jobs would queue forever with no message. The fallback serves the case that needs no setup; this instance sets `CI_RUNNER=ci-builder` / `CD_RUNNER=cd-deployer` in its repository variables. `publish` and `deploy` additionally require `vars.REGISTRY_URL != ''` — no registry configured is exactly the condition under which there is nothing to publish. `preflight`'s sweep is gated at the *step*, never the job: four jobs `needs: [preflight]`, and a skipped job skips them too.
+
+**A self-hosted instance upgrades with `scripts/upgrade.sh`** (ADR-0136), not `up -d --build`: the migration step lived only in the deploy job, so a self-hoster's database was stamped on first boot and never migrated again — new code, original schema, green health check, missing column inside a request. The script is pull → build → `python -m app.db_schema` → `up -d`, stopping at the first failure. `app/version.py` reads the version from `pyproject.toml` (the file that already declares it) and `settings_admin.read` serves it, so both API doors and the Settings page name the build that answered.
 
 ## Schema migrations (Alembic)
 

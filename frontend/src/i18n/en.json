@@ -821,6 +821,7 @@
   "activity.view.timeline": "Timeline",
   "activity.view.wall": "Wall",
   "settings.title": "Settings",
+  "settings.version": "Version",
   "settings.systemStatus": "System Status",
   "settings.authentication": "Authentication",
   "settings.email": "Email (SMTP)",
