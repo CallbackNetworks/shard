@@ -83,15 +83,31 @@ docker compose -f docker-compose.selfhost.yml up -d
 # http://127.0.0.1:8090/
 ```
 
-Your data is the two directories beside the compose file: `./data` (the SQLite database and
-its backups) and `./uploads` (attachments). Copy those two and you have copied the instance.
-See [ADR-0117](adr/0117-someone-who-is-not-us-can-run-this.md).
+Your data is in two Docker volumes — `shard-selfhost_shard-data` (the SQLite database and
+its backups) and `shard-selfhost_shard-uploads` (attachments). Docker seeds each from the
+image's own directory, which the image creates and owns, so the stack starts correctly
+whatever uid the person running it has
+([ADR-0139](adr/0139-the-self-host-stack-keeps-its-data-in-a-volume.md)).
 
-Both are in the clone already, and must be: a bind-mount path Compose has to create is
-created by the daemon as root, and the backend runs as uid 1000, which then cannot write
-its own database — the container dies with `unable to open database file`. If the user on
-your host is not uid 1000, set `SHARD_UID` / `SHARD_GID` in `.env` to `id -u` / `id -g`
-([ADR-0138](adr/0138-a-bind-mount-a-clone-does-not-carry-is-created-by-root.md)).
+They survive `docker compose down`, upgrades and image changes. `down -v` deletes them —
+that flag is the one to be careful with.
+
+To take a copy, use **Settings → Backup** in the app, or tar the volume:
+
+```bash
+docker run --rm -v shard-selfhost_shard-data:/data -v "$PWD:/out" \
+  alpine tar czf /out/shard-data.tgz -C /data .
+```
+
+Restoring is the same command inverted, with the stack stopped:
+
+```bash
+docker run --rm -v shard-selfhost_shard-data:/data -v "$PWD:/in" \
+  alpine sh -c 'rm -rf /data/* && tar xzf /in/shard-data.tgz -C /data'
+```
+
+See [ADR-0117](adr/0117-someone-who-is-not-us-can-run-this.md) for why this compose file
+exists separately from the one CD deploys.
 
 ### Pulling instead of building
 

@@ -108,12 +108,6 @@ docker compose -f docker-compose.selfhost.yml up -d
 A version tag names one build forever; `latest` follows `main`
 ([ADR-0137](docs/adr/0137-the-images-are-published-where-somebody-can-pull-them.md)).
 
-Your instance's data is written to `./data` and `./uploads`, which are in the clone
-already — they have to be, because a path Compose creates itself is created by the
-daemon as root and the app, which runs as uid 1000, cannot then write to it
-([ADR-0138](docs/adr/0138-a-bind-mount-a-clone-does-not-carry-is-created-by-root.md)).
-If `id -u` on your host is not 1000, set `SHARD_UID` and `SHARD_GID` in `.env` to match.
-
 It binds to loopback on purpose, because `AUTH_PASSWORD` is empty by default and an
 empty password means no login gate at all. To reach it from elsewhere on your network,
 set both together in `.env`:
@@ -123,10 +117,20 @@ SHARD_BIND=0.0.0.0
 AUTH_PASSWORD=something-long
 ```
 
-Your data is two directories beside the compose file — `./data` (the SQLite database
-and its backups) and `./uploads` (task attachments). Copy those two and you have
-copied the instance. See [ADR-0117](docs/adr/0117-someone-who-is-not-us-can-run-this.md)
-for why this file exists separately from the one CD deploys.
+Your data lives in two Docker volumes, `shard-selfhost_shard-data` (the SQLite database
+and its backups) and `shard-selfhost_shard-uploads` (task attachments). They survive
+`down`, upgrades and image changes; only `down -v` deletes them
+([ADR-0139](docs/adr/0139-the-self-host-stack-keeps-its-data-in-a-volume.md)).
+
+To take a copy, either use **Settings → Backup** inside the app, or:
+
+```bash
+docker run --rm -v shard-selfhost_shard-data:/data -v "$PWD:/out" \
+  alpine tar czf /out/shard-data.tgz -C /data .
+```
+
+See [ADR-0117](docs/adr/0117-someone-who-is-not-us-can-run-this.md) for why this compose
+file exists separately from the one CD deploys.
 
 ### Upgrading
 

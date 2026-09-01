@@ -139,4 +139,5 @@
 | [0135](0135-the-pipeline-runs-on-somebody-elses-machine-too.md) | CI 的 runner 是設定，不是寫死的字面值；沒設 registry 就不發佈也不部署 | Accepted | 2026-08-31 |
 | [0136](0136-an-install-has-an-upgrade-path-and-a-version.md) | 一份安裝要有升級路徑，也要說得出自己是哪一版 | Accepted | 2026-08-31 |
 | [0137](0137-the-images-are-published-where-somebody-can-pull-them.md) | 把 image 發到別人拉得到的地方；版本 tag 不可變，latest 才會動 | Accepted | 2026-09-01 |
-| [0138](0138-a-bind-mount-a-clone-does-not-carry-is-created-by-root.md) | clone 沒帶的 bind mount 目錄會由 root 建出來，容器就寫不進去 | Accepted | 2026-09-01 |
+| [0138](0138-a-bind-mount-a-clone-does-not-carry-is-created-by-root.md) | clone 沒帶的 bind mount 目錄會由 root 建出來，容器就寫不進去 | Superseded by ADR-0139 | 2026-09-01 |
+| [0139](0139-the-self-host-stack-keeps-its-data-in-a-volume.md) | 自架的資料放 named volume：volume 從 image 繼承擁有者，就不再綁主機的 uid | Accepted | 2026-09-01 |

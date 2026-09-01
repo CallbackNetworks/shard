@@ -1,7 +1,11 @@
 # ADR-0138: A bind mount the clone does not carry is created by root
 
 ## Status
-Accepted
+Superseded by ADR-0139
+
+(Its diagnosis stands and is why ADR-0139 exists; what it decided about the self-host
+stack — the `user:` override, and `./data` as a bind mount — is replaced. The tracked
+`data/` directory survives, for the dev stack.)
 
 ## Date
 2026-09-01

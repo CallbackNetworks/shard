@@ -348,13 +348,11 @@ jobs:
   # dev stack. Every other check in this workflow runs against a compose file with no
   # bind mounts, so none of them could have caught it.
   #
-  # The test needs a real host path: this job talks to the host's Docker daemon, so a
-  # relative bind mount inside the compose file is resolved by the *daemon*, not here —
-  # `./data` under the job's workspace would become a stray root-owned directory on the
-  # host root filesystem and the run would test nothing. The tree is therefore copied
-  # to an absolute host path through a helper container, the same move the deploy job
-  # makes for `$DEPLOY_DIR`, and chowned to 1000 to stand in for a clone owned by a
-  # human rather than by the runner's root.
+  # The tree is copied to an absolute host path through a helper container — the move
+  # the deploy job makes for `$DEPLOY_DIR` — because this job talks to the host's Docker
+  # daemon, and the compose file's `build:` contexts are resolved by that daemon, not
+  # here. The data itself is in named volumes now (ADR-0139), so nothing depends on who
+  # owns the copied tree.
   selfhost-install:
     name: Self-host install from a clean tree
     needs: [backend-checks, backend-sqlite, backend-postgres, frontend]
@@ -367,24 +365,23 @@ jobs:
           echo "SELFHOST_DIR=/tmp/shard-selfhost-ci-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
           echo "SELFHOST_PROJECT=ci-selfhost-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
 
-      # The regression this exists for, stated before anything is built: the two mount
-      # points have to arrive *with the checkout*. If they do not, Compose asks the
-      # daemon to create them and the daemon is root, and uid 1000 cannot write there.
-      - name: The tree carries its mount points
+      # Not about this job's stack — about the *dev* one, which still bind-mounts ./data
+      # and is the only place left that can hit ADR-0138. It is asserted here because
+      # this is the job that knows why the directory is tracked.
+      - name: The tree still carries the dev stack's mount point
         run: |
-          test -d data && test -d uploads || {
-            echo "data/ and uploads/ are missing from the checkout."
-            echo "Compose will have the daemon create them as root, and the app runs as uid 1000."
-            echo "They are tracked via .gitkeep on purpose — see docs/adr/0138-*.md"
+          test -d data || {
+            echo "data/ is missing from the checkout."
+            echo "The dev stack bind-mounts it, so Compose would have the daemon create it as root,"
+            echo "and the backend runs as uid 1000. It is tracked via .gitkeep on purpose — ADR-0138."
             exit 1
           }
 
-      - name: Copy the tree to a host path, owned by a user rather than root
+      - name: Copy the tree to a host path the daemon can build from
         run: |
           printf 'FRONTEND_PORT=8099\n' > .env
           docker run --rm -v "${SELFHOST_DIR}:/x" alpine:3.20 sh -c 'rm -rf /x/* /x/.??*' || true
-          tar cf - . | docker run --rm -i -v "${SELFHOST_DIR}:/x" alpine:3.20 \
-            sh -c 'tar xf - -C /x && chown -R 1000:1000 /x'
+          tar cf - . | docker run --rm -i -v "${SELFHOST_DIR}:/x" alpine:3.20 sh -c 'tar xf - -C /x'
 
       # The documented command, verbatim apart from the file's location. It builds from
       # source, which is what somebody with no registry account gets.
@@ -415,14 +412,28 @@ jobs:
           compose exec -T frontend wget -q -O - http://127.0.0.1/api/settings | grep -q '"version"' \
             || { echo "nginx did not proxy /api to the backend"; compose logs frontend backend; exit 1; }
 
-      # The app wrote its own database, as uid 1000, into a directory it did not create.
-      # A health check only reads, so without this the ADR-0138 failure could come back
-      # as a stack that comes up green and fails on the first write — which is exactly
-      # what the deploy job's own chown step exists to prevent.
+      # The app wrote its own database, as itself. A health check only reads, so without
+      # this the failure ADR-0138 describes could come back as a stack that comes up
+      # green and dies on the first write — the state the deploy job's chown step exists
+      # to prevent. Under ADR-0139 the volume is seeded from the image, so uid 1000 is
+      # what a correct setup looks like on every host.
       - name: The database belongs to the app user
         run: |
-          owner=$(docker run --rm -v "${SELFHOST_DIR}:/x" alpine:3.20 stat -c %u /x/data/shard.db)
-          test "$owner" = "1000" || { echo "data/shard.db is owned by uid $owner, expected 1000"; exit 1; }
+          cd "$SELFHOST_DIR"
+          owner=$(docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" \
+            exec -T backend stat -c %u /app/data/shard.db | tr -d '\r')
+          test "$owner" = "1000" || { echo "/app/data/shard.db is owned by uid $owner, expected 1000"; exit 1; }
+
+      # The whole point of a volume: the containers are disposable and the data is not.
+      # `down` without -v keeps the volumes, which is also what an upgrade does.
+      - name: The data survives the containers
+        run: |
+          cd "$SELFHOST_DIR"
+          compose() { docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" "$@"; }
+          compose down
+          compose up -d
+          compose exec -T backend test -f /app/data/shard.db \
+            || { echo "the database did not survive a down/up — the volume is not persisting"; exit 1; }
 
       - name: Cleanup
         if: always()

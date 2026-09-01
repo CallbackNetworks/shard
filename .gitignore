@@ -18,10 +18,11 @@ frontend/dist/
 .coverage
 backend/.coverage
 
-# Data. The directories themselves are tracked (via .gitkeep) and only their
-# contents are ignored: they are bind-mount targets, and a path Compose has to
-# create is created by the daemon as root, which the container — uid 1000 — then
-# cannot write to. A fresh clone that has them already owns them. See ADR-0138.
+# Data. The directory itself is tracked (via .gitkeep) and only its contents are
+# ignored: the *dev* stack still bind-mounts ./data, and a path Compose has to create
+# is created by the daemon as root, which the container — uid 1000 — cannot then write
+# to. A clone that already carries it owns it instead. The self-host stack no longer
+# needs this: its data is in named volumes (ADR-0139 supersedes ADR-0138).
 data/*
 !data/.gitkeep
 
@@ -30,8 +31,7 @@ data/*
 *.swp
 .env
 backend/uploads/
-/uploads/*
-!/uploads/.gitkeep
+/uploads/
 
 # Crash artifacts. Node OOMs on this host have left multi-GB core dumps in
 # frontend/ more than once (2.2GB and 4.3GB at last count), and nothing was

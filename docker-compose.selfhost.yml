@@ -9,10 +9,15 @@
 # somebody who is not us: it builds the same `Dockerfile.prod` images from the
 # checkout, so it needs no `docker login` and no `.env` to start. See ADR-0117.
 #
-# Every value below has a working default, so a bare clone boots. Put overrides in
-# a `.env` beside this file — `cp .env.example .env` — and Compose picks them up.
+# Every value below has a working default, so a bare clone boots on any host. Put
+# overrides in a `.env` beside this file — `cp .env.example .env` — and Compose picks
+# them up.
 #
-# The one exception is a host whose user is not uid 1000: see `user:` on the backend.
+# Your data lives in two named volumes, `shard-data` and `shard-uploads`. To copy it
+# out (Settings -> Backup does this from inside the app too):
+#
+#   docker run --rm -v shard-selfhost_shard-data:/data -v "$PWD:/out" \
+#     alpine tar czf /out/shard-data.tgz -C /data .
 
 # Its own project name, so bringing this up never reconciles — i.e. never stops and
 # replaces — the containers of the dev stack in the same checkout.
@@ -38,18 +43,15 @@ services:
       dockerfile: Dockerfile.prod
     expose:
       - "8000"
-    # The image runs as uid 1000 (`USER app`) and the two bind mounts below are owned
-    # by whoever cloned the repo — on most Linux hosts the same 1000, since that is the
-    # first user account. Where it is not, the app cannot create its own database and
-    # the container dies at startup with "unable to open database file", so set both to
-    # `id -u` / `id -g` in `.env`. ADR-0138.
-    user: "${SHARD_UID:-1000}:${SHARD_GID:-1000}"
     volumes:
-      # Both are bind mounts on purpose: the database and the attachments are the
-      # only state worth keeping, and a self-hoster must be able to see, copy and
-      # back them up without knowing what a named volume is.
-      - ./data:/app/data
-      - ./uploads:/app/uploads
+      # Named volumes, not bind mounts (ADR-0139). Docker seeds a fresh volume from the
+      # image's own directory, which `Dockerfile.prod` creates and chowns to uid 1000 —
+      # so the app can write its data on any host, whatever uid the person running it
+      # happens to have. A bind-mounted host directory carries the host's ownership
+      # instead, and Compose creating a missing one as root is what made the documented
+      # install fail for three months.
+      - shard-data:/app/data
+      - shard-uploads:/app/uploads
     environment:
       - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/shard.db}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
@@ -128,6 +130,12 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+
+volumes:
+  # Compose prefixes these with the project name above, so they are
+  # `shard-selfhost_shard-data` and `shard-selfhost_shard-uploads` to `docker volume`.
+  shard-data:
+  shard-uploads:
 
 networks:
   app-network:

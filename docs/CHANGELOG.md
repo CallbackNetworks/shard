@@ -22,6 +22,15 @@ which `docker compose up -d --build` on its own does not — see
   `main` (ADR-0137). Publishing them is its own CI job, so a public-registry failure
   cannot block a deploy.
 
+### Changed
+
+- **Self-hosted data lives in Docker volumes**, not in `./data` and `./uploads` beside
+  the compose file (ADR-0139). Docker seeds a volume from the image, which owns its own
+  directories, so the stack starts on any host regardless of the uid running it, and
+  `SHARD_UID`/`SHARD_GID` are gone. Copy your data out with **Settings → Backup** or by
+  tarring the volume — see the README. *Anyone who installed before this has data in
+  `./data`: move it in with `docker run --rm -v shard-selfhost_shard-data:/to -v "$PWD/data:/from" alpine cp -a /from/. /to/` before starting the new version.*
+
 ### Fixed
 
 - **The documented install failed on a fresh clone.** `./data` and `./uploads` are
