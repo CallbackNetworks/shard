@@ -11,7 +11,7 @@
  * an empty PATCH that cost a request and a full refetch to change nothing.
  */
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k) => k }),
@@ -26,6 +26,13 @@ import CalendarView from '../CalendarView'
 // A realistic id: a UUID, and one that begins with a digit so the old
 // parseInt path would have produced a plausible-looking wrong number.
 const TASK_ID = '7f3a1c22-9b41-4de1-8f0a-2c5d6e7a8b90'
+
+// The task has to fall inside the month the calendar opens on, and `CalendarView`
+// opens on `new Date()` — it takes no month prop. With a hardcoded due date that is
+// a test which passes until the calendar turns the page: this file was green for
+// three weeks and failed on 1 September, on a card that had stopped being rendered
+// at all. So the clock is pinned, and the due date is stated relative to it.
+const NOW = new Date('2026-08-10T12:00:00')
 
 const TASKS = [
   { id: TASK_ID, title: 'Write the migration', status: 'todo', priority: 'high', due_date: '2026-08-10T00:00:00' },
@@ -55,7 +62,15 @@ describe('CalendarView drag-to-reschedule', () => {
   let onUpdateTask
 
   beforeEach(() => {
+    // Only `Date` is faked: the timers testing-library uses to settle the DOM stay
+    // real, so pinning the calendar's month does not also stop them.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
     onUpdateTask = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('reschedules using the task id as given, not a parsed number', () => {
