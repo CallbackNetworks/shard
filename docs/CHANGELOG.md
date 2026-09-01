@@ -14,7 +14,18 @@ which `docker compose up -d --build` on its own does not — see
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Published images. `docker compose -f docker-compose.selfhost.yml pull` with
+  `SHARD_IMAGE_PREFIX=callbacknetwork/shard` installs a build CI already tested, instead
+  of compiling one locally. A version tag names one build forever; `latest` follows
+  `main` (ADR-0137).
+
+### Changed
+
+- The self-host compose names its images `<prefix>-backend` / `<prefix>-frontend` rather
+  than `<prefix>/backend`, because a Docker Hub repository has no nested path. A bare
+  clone that builds locally is unaffected.
 
 ## [1.0.0] — 2026-08-31
 

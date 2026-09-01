@@ -138,3 +138,4 @@
 | [0134](0134-an-explicit-grid-fits-a-screen-someone-holds.md) | 明確宣告的 grid 要塞得進真的有人拿在手上的螢幕 | Accepted | 2026-08-31 |
 | [0135](0135-the-pipeline-runs-on-somebody-elses-machine-too.md) | CI 的 runner 是設定，不是寫死的字面值；沒設 registry 就不發佈也不部署 | Accepted | 2026-08-31 |
 | [0136](0136-an-install-has-an-upgrade-path-and-a-version.md) | 一份安裝要有升級路徑，也要說得出自己是哪一版 | Accepted | 2026-08-31 |
+| [0137](0137-the-images-are-published-where-somebody-can-pull-them.md) | 把 image 發到別人拉得到的地方；版本 tag 不可變，latest 才會動 | Accepted | 2026-09-01 |

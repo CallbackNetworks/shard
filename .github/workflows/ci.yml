@@ -343,7 +343,7 @@ jobs:
   publish:
     name: Publish Docker images
     needs: [integration]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.REGISTRY_URL != ''
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (vars.REGISTRY_URL != '' || vars.PUBLIC_REGISTRY_URL != '')
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       # The backend and frontend steps only re-tag images the integration job
@@ -354,6 +354,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Login to registry
+        if: ${{ vars.REGISTRY_URL != '' }}
         env:
           REGISTRY_URL: ${{ vars.REGISTRY_URL }}
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
@@ -361,6 +362,7 @@ jobs:
         run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USERNAME" --password-stdin
 
       - name: Compute image prefix
+        if: ${{ vars.REGISTRY_URL != '' }}
         run: echo "IMAGE_PREFIX=$(echo '${{ vars.REGISTRY_URL }}/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       # Compose names a built image `<project>-<service>`, and the integration job's
@@ -371,6 +373,7 @@ jobs:
         run: echo "INTEGRATION_PROJECT=ci-integration-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
 
       - name: Tag and push backend
+        if: ${{ vars.REGISTRY_URL != '' }}
         run: |
           docker tag $INTEGRATION_PROJECT-backend-prod:latest $IMAGE_PREFIX/backend:${{ github.sha }}
           docker tag $INTEGRATION_PROJECT-backend-prod:latest $IMAGE_PREFIX/backend:latest
@@ -378,11 +381,61 @@ jobs:
           docker push $IMAGE_PREFIX/backend:latest
 
       - name: Tag and push frontend
+        if: ${{ vars.REGISTRY_URL != '' }}
         run: |
           docker tag $INTEGRATION_PROJECT-frontend-prod:latest $IMAGE_PREFIX/frontend:${{ github.sha }}
           docker tag $INTEGRATION_PROJECT-frontend-prod:latest $IMAGE_PREFIX/frontend:latest
           docker push $IMAGE_PREFIX/frontend:${{ github.sha }}
           docker push $IMAGE_PREFIX/frontend:latest
+
+      # Public images, so a self-hoster pulls a build instead of spending ten minutes
+      # making their own (ADR-0137). Same artifacts the integration job just proved:
+      # re-tagged, never rebuilt, because a second build is a second thing to trust.
+      - name: Login to the public registry
+        if: ${{ vars.PUBLIC_REGISTRY_URL != '' }}
+        env:
+          PUBLIC_REGISTRY_URL: ${{ vars.PUBLIC_REGISTRY_URL }}
+          PUBLIC_REGISTRY_USERNAME: ${{ vars.PUBLIC_REGISTRY_USERNAME }}
+          PUBLIC_REGISTRY_TOKEN: ${{ secrets.PUBLIC_REGISTRY_TOKEN }}
+        run: echo "$PUBLIC_REGISTRY_TOKEN" | docker login "$PUBLIC_REGISTRY_URL" -u "$PUBLIC_REGISTRY_USERNAME" --password-stdin
+
+      - name: Publish public images
+        if: ${{ vars.PUBLIC_REGISTRY_URL != '' }}
+        env:
+          PUBLIC_REGISTRY_URL: ${{ vars.PUBLIC_REGISTRY_URL }}
+          PUBLIC_REGISTRY_NAMESPACE: ${{ vars.PUBLIC_REGISTRY_NAMESPACE }}
+        run: |
+          set -eu
+          # Docker Hub has no nested repository paths — `ns/shard/backend` is not a name
+          # it can hold — so the public images are flat: `<ns>/shard-backend`. Any other
+          # registry keeps its host in front. The private registry above is untouched by
+          # this and keeps its own three-level prefix.
+          case "$PUBLIC_REGISTRY_URL" in
+            docker.io) PREFIX="$PUBLIC_REGISTRY_NAMESPACE/shard" ;;
+            *)         PREFIX="$PUBLIC_REGISTRY_URL/$PUBLIC_REGISTRY_NAMESPACE/shard" ;;
+          esac
+
+          # The version comes from the file that declares it (ADR-0136), so bumping
+          # `backend/pyproject.toml` is what cuts a release.
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' backend/pyproject.toml | head -1)
+          echo "publishing $PREFIX-{backend,frontend}:$VERSION and :latest"
+
+          for svc in backend frontend; do
+            src="$INTEGRATION_PROJECT-$svc-prod:latest"
+
+            docker tag "$src" "$PREFIX-$svc:latest"
+            docker push "$PREFIX-$svc:latest"
+
+            # A version tag is immutable: once `1.0.0` is published it names one build
+            # forever, so a later push to main moves `latest` and leaves it alone. Without
+            # this, every merge would silently replace what somebody pinned.
+            if docker manifest inspect "$PREFIX-$svc:$VERSION" >/dev/null 2>&1; then
+              echo "$PREFIX-$svc:$VERSION is already published — leaving it; bump the version to cut a new one"
+            else
+              docker tag "$src" "$PREFIX-$svc:$VERSION"
+              docker push "$PREFIX-$svc:$VERSION"
+            fi
+          done
 
       # No MCP image to build: the server is a module inside the backend package
       # (ADR-0080), so a deployment that enables remote MCP runs the backend image

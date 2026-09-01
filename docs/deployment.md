@@ -87,6 +87,24 @@ Your data is the two directories beside the compose file: `./data` (the SQLite d
 its backups) and `./uploads` (attachments). Copy those two and you have copied the instance.
 See [ADR-0117](adr/0117-someone-who-is-not-us-can-run-this.md).
 
+### Pulling instead of building
+
+The compose file carries `image:` beside `build:`, so the same file installs either way.
+Point it at the published images and Compose stops building:
+
+```bash
+SHARD_IMAGE_PREFIX=callbacknetwork/shard    # <namespace>/shard, giving shard-backend / shard-frontend
+SHARD_TAG=1.0.0                             # a version tag never moves; `latest` follows main
+```
+
+```bash
+docker compose -f docker-compose.selfhost.yml pull
+docker compose -f docker-compose.selfhost.yml up -d
+```
+
+Publishing them is the `publish` job's second half, switched on by `PUBLIC_REGISTRY_URL`
+— see the variables table below and [ADR-0137](adr/0137-the-images-are-published-where-somebody-can-pull-them.md).
+
 ### Upgrading
 
 ```bash
@@ -124,8 +142,14 @@ infrastructure, set these repository variables:
 |----------|--------|
 | `CI_RUNNER` | Label the check jobs ask for. Unset → `ubuntu-latest` |
 | `CD_RUNNER` | Label the deploy job asks for. Unset → `ubuntu-latest` |
-| `REGISTRY_URL` | **Also the switch**: with no registry configured, `publish` and `deploy` are skipped entirely |
+| `REGISTRY_URL` | The private registry the deploy job pulls from. **Also a switch**: unset, nothing is published there and `deploy` is skipped |
 | `DEPLOY_DIR` | Where the deploy job writes `.env` and the generated compose file |
+| `PUBLIC_REGISTRY_URL` | The public registry, e.g. `docker.io`. **Also a switch**: unset, no public image is published |
+| `PUBLIC_REGISTRY_USERNAME` | Account to log in as there |
+| `PUBLIC_REGISTRY_NAMESPACE` | Namespace the images go under, giving `<ns>/shard-backend` and `<ns>/shard-frontend` |
+
+`publish` runs if *either* registry is configured; with neither (the fork case), both it
+and `deploy` are skipped. The one secret is `PUBLIC_REGISTRY_TOKEN`.
 
 ## Running the production images locally
 

@@ -22,9 +22,15 @@ services:
     # literal host `backend:8000`, so renaming this breaks every API call.
     #
     # `image` + `build` together: Compose builds from source when the tag is not
-    # present locally, and `docker compose pull` uses it if these images are ever
-    # published. A self-hoster needs neither a registry nor an account.
-    image: ${SHARD_IMAGE_PREFIX:-shard}/backend:${SHARD_TAG:-selfhost}
+    # present locally, and `docker compose pull` fetches a published build instead.
+    # A self-hoster needs neither a registry account nor a ten-minute build:
+    #
+    #   SHARD_IMAGE_PREFIX=callbacknetwork/shard SHARD_TAG=1.0.0 \
+    #     docker compose -f docker-compose.selfhost.yml pull && ... up -d
+    #
+    # `<prefix>-backend`, not `<prefix>/backend`, because Docker Hub repositories are
+    # `namespace/name` with no nested path (ADR-0137).
+    image: ${SHARD_IMAGE_PREFIX:-shard}-backend:${SHARD_TAG:-selfhost}
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
@@ -95,7 +101,7 @@ services:
       - app-network
 
   frontend:
-    image: ${SHARD_IMAGE_PREFIX:-shard}/frontend:${SHARD_TAG:-selfhost}
+    image: ${SHARD_IMAGE_PREFIX:-shard}-frontend:${SHARD_TAG:-selfhost}
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod

@@ -95,6 +95,19 @@ That is the whole install. It builds the production images from this checkout, s
 needs no registry account, and every setting has a working default, so it needs no
 `.env`. Open **http://127.0.0.1:8090/**.
 
+Building takes a few minutes. To pull the images CI already built and tested instead,
+put these two in `.env` beside the compose file and `pull` first:
+
+```bash
+echo 'SHARD_IMAGE_PREFIX=callbacknetwork/shard' >> .env
+echo 'SHARD_TAG=1.0.0' >> .env          # or `latest`
+docker compose -f docker-compose.selfhost.yml pull
+docker compose -f docker-compose.selfhost.yml up -d
+```
+
+A version tag names one build forever; `latest` follows `main`
+([ADR-0137](docs/adr/0137-the-images-are-published-where-somebody-can-pull-them.md)).
+
 It binds to loopback on purpose, because `AUTH_PASSWORD` is empty by default and an
 empty password means no login gate at all. To reach it from elsewhere on your network,
 set both together in `.env`:
