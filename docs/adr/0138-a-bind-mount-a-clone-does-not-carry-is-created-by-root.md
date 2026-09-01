@@ -72,6 +72,22 @@ would look.
 learn it from a failure. The failure is at least loud — the container exits and the
 health check never passes, rather than the app running and misbehaving later.
 
-**Negative.** Nothing in CI runs the documented install from a clean clone, so this
-class of defect can return. The integration job builds the production images and
-exercises them through `docker-compose.ci.yml`, whose mounts are not these.
+**The guard.** A `selfhost-install` job now runs the documented command against a clean
+tree and asserts four things: the checkout carries `data/` and `uploads/`, the backend
+becomes healthy, nginx serves the SPA *and* proxies `/api` to it, and `data/shard.db`
+ends up owned by uid 1000 — the last because a health check only reads, and the failure
+this ADR is about would otherwise be able to return as a stack that comes up green and
+dies on the first write. No other job could have caught it: every one of them runs
+against `docker-compose.ci.yml`, which has no bind mounts.
+
+It needs one piece of stagecraft. The job talks to the host's Docker daemon, so a
+relative bind mount in the compose file is resolved by the daemon rather than in the
+job's own filesystem: `./data` under the workspace would become a stray root-owned
+directory on the host and the run would prove nothing. The tree is copied to an absolute
+host path through a helper container — the same move the deploy job makes for
+`$DEPLOY_DIR` — and chowned to 1000, standing in for a clone owned by a person rather
+than by the runner's root.
+
+Only `publish-public` depends on it. A broken self-host install must not be published to
+strangers, and must not block production's own deploy — that is ADR-0137's lesson, one
+job later.

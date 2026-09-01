@@ -340,6 +340,97 @@ jobs:
           docker image prune -f
           docker builder prune -f --filter until=48h
 
+  # Install the way the README says a stranger does, and prove it comes up.
+  #
+  # ADR-0138: `git clone && docker compose -f docker-compose.selfhost.yml up -d` had
+  # been broken since ADR-0117 shipped and nothing noticed for months, because the
+  # only machine it was ever run on had `./data` and `./uploads` lying around from the
+  # dev stack. Every other check in this workflow runs against a compose file with no
+  # bind mounts, so none of them could have caught it.
+  #
+  # The test needs a real host path: this job talks to the host's Docker daemon, so a
+  # relative bind mount inside the compose file is resolved by the *daemon*, not here —
+  # `./data` under the job's workspace would become a stray root-owned directory on the
+  # host root filesystem and the run would test nothing. The tree is therefore copied
+  # to an absolute host path through a helper container, the same move the deploy job
+  # makes for `$DEPLOY_DIR`, and chowned to 1000 to stand in for a clone owned by a
+  # human rather than by the runner's root.
+  selfhost-install:
+    name: Self-host install from a clean tree
+    needs: [backend-checks, backend-sqlite, backend-postgres, frontend]
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Name this run's directory and compose project
+        run: |
+          echo "SELFHOST_DIR=/tmp/shard-selfhost-ci-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+          echo "SELFHOST_PROJECT=ci-selfhost-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+
+      # The regression this exists for, stated before anything is built: the two mount
+      # points have to arrive *with the checkout*. If they do not, Compose asks the
+      # daemon to create them and the daemon is root, and uid 1000 cannot write there.
+      - name: The tree carries its mount points
+        run: |
+          test -d data && test -d uploads || {
+            echo "data/ and uploads/ are missing from the checkout."
+            echo "Compose will have the daemon create them as root, and the app runs as uid 1000."
+            echo "They are tracked via .gitkeep on purpose — see docs/adr/0138-*.md"
+            exit 1
+          }
+
+      - name: Copy the tree to a host path, owned by a user rather than root
+        run: |
+          printf 'FRONTEND_PORT=8099\n' > .env
+          docker run --rm -v "${SELFHOST_DIR}:/x" alpine:3.20 sh -c 'rm -rf /x/* /x/.??*' || true
+          tar cf - . | docker run --rm -i -v "${SELFHOST_DIR}:/x" alpine:3.20 \
+            sh -c 'tar xf - -C /x && chown -R 1000:1000 /x'
+
+      # The documented command, verbatim apart from the file's location. It builds from
+      # source, which is what somebody with no registry account gets.
+      - name: docker compose up
+        run: docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" up -d --build
+
+      - name: The backend is healthy
+        run: |
+          for i in $(seq 1 30); do
+            docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" \
+              exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null && exit 0
+            sleep 2
+          done
+          echo "the self-host stack never became healthy"
+          docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" logs backend
+          exit 1
+
+      # Through nginx, so this covers the half a health check cannot: the SPA is served
+      # and its API calls are proxied to the backend.
+      - name: The frontend serves the app and proxies the API
+        run: |
+          cd "$SELFHOST_DIR"
+          compose() { docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" "$@"; }
+          # 127.0.0.1, not localhost: nginx listens on 0.0.0.0:80 only, and busybox wget
+          # tries ::1 first, which answers "connection refused" and reads like a dead server.
+          compose exec -T frontend wget -q -O - http://127.0.0.1/ | grep -q '<div id="root"' \
+            || { echo "nginx did not serve the SPA"; compose logs frontend; exit 1; }
+          compose exec -T frontend wget -q -O - http://127.0.0.1/api/settings | grep -q '"version"' \
+            || { echo "nginx did not proxy /api to the backend"; compose logs frontend backend; exit 1; }
+
+      # The app wrote its own database, as uid 1000, into a directory it did not create.
+      # A health check only reads, so without this the ADR-0138 failure could come back
+      # as a stack that comes up green and fails on the first write — which is exactly
+      # what the deploy job's own chown step exists to prevent.
+      - name: The database belongs to the app user
+        run: |
+          owner=$(docker run --rm -v "${SELFHOST_DIR}:/x" alpine:3.20 stat -c %u /x/data/shard.db)
+          test "$owner" = "1000" || { echo "data/shard.db is owned by uid $owner, expected 1000"; exit 1; }
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" down -v || true
+          docker run --rm -v "${SELFHOST_DIR}:/x" alpine:3.20 sh -c 'rm -rf /x/* /x/.??*' || true
+          docker image prune -f
+
   publish:
     name: Publish Docker images
     needs: [integration]
@@ -399,7 +490,7 @@ jobs:
   # public image is worth a red job of its own, not a blocked release.
   publish-public:
     name: Publish public images
-    needs: [integration]
+    needs: [integration, selfhost-install]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PUBLIC_REGISTRY_URL != ''
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:

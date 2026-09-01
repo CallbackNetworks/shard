@@ -28,7 +28,8 @@ which `docker compose up -d --build` on its own does not — see
   gitignored bind-mount targets, so Compose asked the daemon to create them and they
   came out root-owned; the backend runs as uid 1000 and died with "unable to open
   database file". The directories are tracked now (contents still ignored), and
-  `SHARD_UID`/`SHARD_GID` cover a host whose user is not uid 1000 (ADR-0138).
+  `SHARD_UID`/`SHARD_GID` cover a host whose user is not uid 1000 (ADR-0138). CI now
+  performs the documented install on every push, so it cannot break unnoticed again.
 
 ### Changed
 
