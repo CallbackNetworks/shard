@@ -141,3 +141,4 @@
 | [0137](0137-the-images-are-published-where-somebody-can-pull-them.md) | 把 image 發到別人拉得到的地方；版本 tag 不可變，latest 才會動 | Accepted | 2026-09-01 |
 | [0138](0138-a-bind-mount-a-clone-does-not-carry-is-created-by-root.md) | clone 沒帶的 bind mount 目錄會由 root 建出來，容器就寫不進去 | Superseded by ADR-0139 | 2026-09-01 |
 | [0139](0139-the-self-host-stack-keeps-its-data-in-a-volume.md) | 自架的資料放 named volume：volume 從 image 繼承擁有者，就不再綁主機的 uid | Accepted | 2026-09-01 |
+| [0140](0140-an-upgrade-stops-first-and-keeps-what-it-replaces.md) | 升級要先停、先留一份可以回去的資料，再跑 migration | Accepted | 2026-09-01 |

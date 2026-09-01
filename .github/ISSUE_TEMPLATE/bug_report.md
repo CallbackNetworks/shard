@@ -33,3 +33,14 @@ What actually happened (include error messages / logs if any).
 ## Additional context
 
 Anything else that helps — screenshots, config (with secrets redacted), etc.
+
+## Diagnostics
+
+Please attach the output of:
+
+```bash
+scripts/diagnose.sh > report.txt
+```
+
+It reports the version, container status, schema revision, recent logs, and which
+settings are set — **names only, never their values**, so it carries no credentials.

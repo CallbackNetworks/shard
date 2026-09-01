@@ -1,5 +1,39 @@
 # Troubleshooting
 
+## Start here
+
+```bash
+scripts/diagnose.sh            # the self-host stack
+scripts/diagnose.sh --dev      # the development stack
+```
+
+One command for the questions every problem starts with: which version, which containers
+are up, which schema revision the database is on, which settings are set, and what the
+last log lines say. It prints setting *names* only, never their values, so the output is
+safe to paste into an issue.
+
+## An upgrade went wrong
+
+`scripts/upgrade.sh` stops the app and snapshots the database before it migrates, keeping
+the last five (ADR-0140). To go back to the snapshot it took, with the app stopped:
+
+```bash
+docker compose -f docker-compose.selfhost.yml stop
+docker run --rm --volumes-from "$(docker compose -f docker-compose.selfhost.yml ps -aq backend)" \
+  -v shard-snapshots:/in alpine:3.20 \
+  sh -c 'rm -rf /app/data/* && tar xzf /in/pre-upgrade-<stamp>.tgz -C /app/data'
+docker compose -f docker-compose.selfhost.yml up -d
+```
+
+List what is there with:
+
+```bash
+docker run --rm -v shard-snapshots:/out alpine:3.20 ls -l /out
+```
+
+Then check out the version you were on before and run `scripts/upgrade.sh --no-pull`, or
+the old code will migrate it forward again.
+
 ## Common Issues
 
 ### Frontend shows blank page or 502

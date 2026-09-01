@@ -22,6 +22,16 @@ which `docker compose up -d --build` on its own does not — see
   `main` (ADR-0137). Publishing them is its own CI job, so a public-registry failure
   cannot block a deploy.
 
+### Added
+
+- `scripts/upgrade.sh` stops the app and snapshots the database before migrating, keeps
+  the last five, and prints the command that restores one (ADR-0140).
+- `scripts/diagnose.sh` — one command that collects what a bug report needs: version,
+  container status, schema revision, the names of the settings you have set (never their
+  values), and recent logs.
+- [Concepts](concepts.md) — what nodes, roles, identities, containers and decisions mean,
+  for somebody meeting the app for the first time.
+
 ### Changed
 
 - **Self-hosted data lives in Docker volumes**, not in `./data` and `./uploads` beside

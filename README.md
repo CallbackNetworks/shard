@@ -12,7 +12,8 @@ A personal multi-identity task management platform with CI/CD integration, AI ag
 
 ![Shard command center](docs/screenshots/01-command-center.png)
 
-*Every screen, annotated: [**Visual Tour**](docs/screenshots.md).*
+*New here? [**Concepts**](docs/concepts.md) explains the five words that make the rest
+make sense. Every screen, annotated: [**Visual Tour**](docs/screenshots.md).*
 
 ## Key Highlights
 
@@ -138,14 +139,35 @@ file exists separately from the one CD deploys.
 scripts/upgrade.sh
 ```
 
-Pull, build, **migrate**, start — in that order, stopping at the first failure. Do not
-upgrade with `docker compose up -d --build` on its own: it starts new code against a
-database nothing migrated, and the mismatch does not show up at startup or in the health
-check, only later inside a request ([ADR-0136](docs/adr/0136-an-install-has-an-upgrade-path-and-a-version.md)).
+Pull, build, **stop**, **snapshot the database**, **migrate**, start — in that order,
+stopping at the first failure ([ADR-0140](docs/adr/0140-an-upgrade-stops-first-and-keeps-what-it-replaces.md)).
+The last five snapshots are kept and the script prints the command that restores one.
+
+Do not upgrade with `docker compose up -d --build` on its own: it starts new code
+against a database nothing migrated, and the mismatch does not show up at startup or in
+the health check, only later inside a request
+([ADR-0136](docs/adr/0136-an-install-has-an-upgrade-path-and-a-version.md)).
 
 Which version you are running is on **Settings → System Status** and in `GET /settings` —
 quote it in a bug report, because an image tag does not identify a build. What changed
 between versions is in the [changelog](docs/CHANGELOG.md).
+
+### Platforms
+
+Verified on **Linux** with Docker Engine — that is what CI installs from a clean tree on
+every push. It should work on **macOS** with Docker Desktop and on **Windows** under
+WSL2, since nothing is left that depends on host paths or host user ids, but neither has
+been run by anybody. If you try one, an issue saying so either way is useful.
+
+### Something went wrong
+
+```bash
+scripts/diagnose.sh > report.txt
+```
+
+Version, container status, schema revision, which settings are set (names only, never
+values) and the last log lines. Attach it to an issue — it is the difference between one
+reply and five.
 
 ## Routes
 
@@ -232,6 +254,7 @@ docker compose up --build
 
 ## Documentation
 
+- [**Concepts**](docs/concepts.md) — what the words mean: nodes, roles, identities, containers, decisions
 - [**Visual Tour**](docs/screenshots.md) — annotated screenshots of the main features
 - [**Highlights**](docs/highlights.md) — detailed feature descriptions and usage
 - [Architecture](docs/architecture.md) — system design, data models, data flow
