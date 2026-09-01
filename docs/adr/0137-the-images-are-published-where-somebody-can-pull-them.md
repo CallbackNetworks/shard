@@ -28,11 +28,17 @@ so `callbacknetwork/shard/backend` is not a name that can exist there.
 **Publish the images the integration job already proved, to a public registry, under a
 version tag that never moves.**
 
-The `publish` job gains a second half, gated on `vars.PUBLIC_REGISTRY_URL` — the same
-pattern ADR-0135 used for the private one, where the variable *is* the switch. The job's
-own condition becomes `REGISTRY_URL != '' || PUBLIC_REGISTRY_URL != ''`, so either
-registry alone is reason enough to run it, and each half is skipped by its own variable.
-A fork with neither still skips the whole job.
+A `publish-public` job, gated on `vars.PUBLIC_REGISTRY_URL` — the same pattern ADR-0135
+used for the private registry, where the variable *is* the switch. A fork with neither
+variable skips both jobs.
+
+**Its own job, and nothing depends on it.** The first version of this shipped as a second
+half of `publish`, and the very first run proved why that is wrong: the Docker Hub token
+turned out to be read-only, the push failed, and `deploy` — which `needs: [publish]` —
+never ran. An optional convenience had taken production's release with it. The two
+registries answer different questions ("can the deploy pull this?" and "can a stranger
+pull this?"), so they are two jobs, and a public-registry problem is a red job of its own
+rather than a blocked deploy.
 
 Three properties are deliberate:
 
@@ -67,6 +73,11 @@ attached. An image published under a version tag is permanent in a way a git tag
 **Negative.** Two naming schemes for the same two images (three-level for the private
 registry, flat for the public one). They are computed in one step each and neither is
 derived from the other, so the risk is confusion when reading, not drift.
+
+**Negative.** `publish-public` re-tags images the `integration` job left on the runner,
+which assumes both jobs share a Docker daemon. That is already true of `publish`, and
+true of any self-hosted setup, but it would not hold on ephemeral hosted runners — where
+neither job runs, because neither registry variable is set there.
 
 **Negative.** Nothing verifies that the published images are pullable — the pipeline
 pushes and stops. The first person to run `docker compose pull` is the test, and the

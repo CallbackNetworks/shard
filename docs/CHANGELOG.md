@@ -19,7 +19,8 @@ which `docker compose up -d --build` on its own does not — see
 - Published images. `docker compose -f docker-compose.selfhost.yml pull` with
   `SHARD_IMAGE_PREFIX=callbacknetwork/shard` installs a build CI already tested, instead
   of compiling one locally. A version tag names one build forever; `latest` follows
-  `main` (ADR-0137).
+  `main` (ADR-0137). Publishing them is its own CI job, so a public-registry failure
+  cannot block a deploy.
 
 ### Changed
 
