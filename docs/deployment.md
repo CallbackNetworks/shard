@@ -87,6 +87,12 @@ Your data is the two directories beside the compose file: `./data` (the SQLite d
 its backups) and `./uploads` (attachments). Copy those two and you have copied the instance.
 See [ADR-0117](adr/0117-someone-who-is-not-us-can-run-this.md).
 
+Both are in the clone already, and must be: a bind-mount path Compose has to create is
+created by the daemon as root, and the backend runs as uid 1000, which then cannot write
+its own database — the container dies with `unable to open database file`. If the user on
+your host is not uid 1000, set `SHARD_UID` / `SHARD_GID` in `.env` to `id -u` / `id -g`
+([ADR-0138](adr/0138-a-bind-mount-a-clone-does-not-carry-is-created-by-root.md)).
+
 ### Pulling instead of building
 
 The compose file carries `image:` beside `build:`, so the same file installs either way.

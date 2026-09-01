@@ -18,15 +18,20 @@ frontend/dist/
 .coverage
 backend/.coverage
 
-# Data
-data/
+# Data. The directories themselves are tracked (via .gitkeep) and only their
+# contents are ignored: they are bind-mount targets, and a path Compose has to
+# create is created by the daemon as root, which the container — uid 1000 — then
+# cannot write to. A fresh clone that has them already owns them. See ADR-0138.
+data/*
+!data/.gitkeep
 
 # Editor
 .DS_Store
 *.swp
 .env
 backend/uploads/
-/uploads/
+/uploads/*
+!/uploads/.gitkeep
 
 # Crash artifacts. Node OOMs on this host have left multi-GB core dumps in
 # frontend/ more than once (2.2GB and 4.3GB at last count), and nothing was

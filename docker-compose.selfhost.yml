@@ -11,6 +11,8 @@
 #
 # Every value below has a working default, so a bare clone boots. Put overrides in
 # a `.env` beside this file — `cp .env.example .env` — and Compose picks them up.
+#
+# The one exception is a host whose user is not uid 1000: see `user:` on the backend.
 
 # Its own project name, so bringing this up never reconciles — i.e. never stops and
 # replaces — the containers of the dev stack in the same checkout.
@@ -36,6 +38,12 @@ services:
       dockerfile: Dockerfile.prod
     expose:
       - "8000"
+    # The image runs as uid 1000 (`USER app`) and the two bind mounts below are owned
+    # by whoever cloned the repo — on most Linux hosts the same 1000, since that is the
+    # first user account. Where it is not, the app cannot create its own database and
+    # the container dies at startup with "unable to open database file", so set both to
+    # `id -u` / `id -g` in `.env`. ADR-0138.
+    user: "${SHARD_UID:-1000}:${SHARD_GID:-1000}"
     volumes:
       # Both are bind mounts on purpose: the database and the attachments are the
       # only state worth keeping, and a self-hoster must be able to see, copy and

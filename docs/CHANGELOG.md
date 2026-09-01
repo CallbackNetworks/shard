@@ -22,6 +22,14 @@ which `docker compose up -d --build` on its own does not — see
   `main` (ADR-0137). Publishing them is its own CI job, so a public-registry failure
   cannot block a deploy.
 
+### Fixed
+
+- **The documented install failed on a fresh clone.** `./data` and `./uploads` are
+  gitignored bind-mount targets, so Compose asked the daemon to create them and they
+  came out root-owned; the backend runs as uid 1000 and died with "unable to open
+  database file". The directories are tracked now (contents still ignored), and
+  `SHARD_UID`/`SHARD_GID` cover a host whose user is not uid 1000 (ADR-0138).
+
 ### Changed
 
 - The self-host compose names its images `<prefix>-backend` / `<prefix>-frontend` rather

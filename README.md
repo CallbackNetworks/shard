@@ -108,6 +108,12 @@ docker compose -f docker-compose.selfhost.yml up -d
 A version tag names one build forever; `latest` follows `main`
 ([ADR-0137](docs/adr/0137-the-images-are-published-where-somebody-can-pull-them.md)).
 
+Your instance's data is written to `./data` and `./uploads`, which are in the clone
+already — they have to be, because a path Compose creates itself is created by the
+daemon as root and the app, which runs as uid 1000, cannot then write to it
+([ADR-0138](docs/adr/0138-a-bind-mount-a-clone-does-not-carry-is-created-by-root.md)).
+If `id -u` on your host is not 1000, set `SHARD_UID` and `SHARD_GID` in `.env` to match.
+
 It binds to loopback on purpose, because `AUTH_PASSWORD` is empty by default and an
 empty password means no login gate at all. To reach it from elsewhere on your network,
 set both together in `.env`:
