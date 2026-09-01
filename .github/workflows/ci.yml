@@ -21,6 +21,26 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Where these jobs run is a repository variable, not a literal.
+#
+# This workflow file is read by two different servers: the Gitea instance this repo is
+# pushed to, whose runner advertises one label (`ci-builder`), and — since the repo is
+# public — GitHub Actions on anybody's fork, where that label does not exist and never
+# will. A literal `runs-on: ci-builder` is correct on exactly one of them; on the other
+# every job sits queued forever, which is the worst of the two failure modes because a
+# contributor sees a pending check rather than an error naming what is wrong.
+#
+# So the label is `vars.CI_RUNNER` with `ubuntu-latest` as the fallback: a fork needs no
+# configuration at all, and this instance sets CI_RUNNER=ci-builder / CD_RUNNER=cd-deployer
+# once in its repository variables. Gitea 1.25 evaluates expressions in `runs-on` — this
+# was probed against the live runner before being relied on, because if it did not, the
+# symptom would again be a queue and not a message.
+#
+# Publishing and deploying are gated on `vars.REGISTRY_URL` for the same reason from the
+# other side: a fork has no registry and no deploy host, and "no registry configured" is
+# exactly the condition under which there is nothing to publish. Without that gate a fork
+# pushing to its own `main` gets two jobs that can never be scheduled.
+
 jobs:
   # The runner's own housekeeping, before anything asks it for a container.
   #
@@ -37,9 +57,13 @@ jobs:
   # live run's resources with it — these jobs finish in minutes, not hours.
   preflight:
     name: Reclaim leaked CI resources
-    runs-on: ci-builder
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
+      # Step-level, not job-level: the check jobs below declare `needs: [preflight]`, and a
+      # *skipped* job skips everything that needs it. On an ephemeral hosted runner there is
+      # nothing to reclaim anyway — the machine is discarded after the run.
       - name: Remove containers and networks left by earlier runs
+        if: ${{ vars.CI_RUNNER != '' }}
         run: |
           set -u
           cutoff=$(date -u -d '3 hours ago' +%s)
@@ -69,7 +93,7 @@ jobs:
   backend-checks:
     name: Backend checks
     needs: [preflight]
-    runs-on: ci-builder
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -103,7 +127,7 @@ jobs:
   backend-sqlite:
     name: Backend tests (SQLite)
     needs: [preflight]
-    runs-on: ci-builder
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -128,7 +152,7 @@ jobs:
   backend-postgres:
     name: Backend tests (PostgreSQL)
     needs: [preflight]
-    runs-on: ci-builder
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -167,7 +191,7 @@ jobs:
   frontend:
     name: Frontend tests
     needs: [preflight]
-    runs-on: ci-builder
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -222,7 +246,7 @@ jobs:
   integration:
     name: Integration smoke test (prod)
     needs: [backend-checks, backend-sqlite, backend-postgres, frontend]
-    runs-on: ci-builder
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -319,8 +343,8 @@ jobs:
   publish:
     name: Publish Docker images
     needs: [integration]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ci-builder
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.REGISTRY_URL != ''
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       # The backend and frontend steps only re-tag images the integration job
       # left on the runner, so this job used to need no source at all. Building
@@ -367,8 +391,8 @@ jobs:
   deploy:
     name: Deploy to production
     needs: [publish]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: cd-deployer
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.REGISTRY_URL != ''
+    runs-on: ${{ vars.CD_RUNNER || 'ubuntu-latest' }}
     defaults:
       run:
         shell: sh
