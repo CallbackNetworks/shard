@@ -360,10 +360,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Name this run's directory and compose project
-        run: |
-          echo "SELFHOST_DIR=/tmp/shard-selfhost-ci-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
-          echo "SELFHOST_PROJECT=ci-selfhost-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
+      - name: Name this run's compose project
+        run: echo "SELFHOST_PROJECT=ci-selfhost-${GITHUB_RUN_ID:?no run id in the environment}" >> $GITHUB_ENV
 
       # Not about this job's stack — about the *dev* one, which still bind-mounts ./data
       # and is the only place left that can hit ADR-0138. It is asserted here because
@@ -377,33 +375,45 @@ jobs:
             exit 1
           }
 
-      - name: Copy the tree to a host path the daemon can build from
+      # This job used to copy the checkout to a host path and run compose against *that*,
+      # because the runner is docker-out-of-docker. Only a bind mount needs the daemon's
+      # filesystem, and ADR-0139 took the bind mounts out of this stack — named volumes
+      # and relative build contexts are both resolved by the client. So the copy had
+      # nothing left to do except put the compose file somewhere this job cannot read,
+      # and `docker compose -f` opens that file locally: the job failed on every run from
+      # the day ADR-0139 shipped (ADR-0144). Asserted rather than assumed, because the
+      # copy step's failure mode was silence.
+      - name: The compose file is readable from where compose runs
+        run: |
+          test -f docker-compose.selfhost.yml && test -d backend && test -d frontend || {
+            echo "the checkout is not what compose is about to read — ADR-0144"
+            exit 1
+          }
+
+      # The documented command, verbatim, run from the checkout, which is where somebody
+      # who just cloned this runs it. It builds from source: what a person with no
+      # registry account gets. `-p` is the one divergence, so two runs cannot collide and
+      # so Cleanup removes this run's volumes and no one else's.
+      - name: docker compose up
         run: |
           printf 'FRONTEND_PORT=8099\n' > .env
-          docker run --rm -v "${SELFHOST_DIR}:/x" alpine:3.20 sh -c 'rm -rf /x/* /x/.??*' || true
-          tar cf - . | docker run --rm -i -v "${SELFHOST_DIR}:/x" alpine:3.20 sh -c 'tar xf - -C /x'
-
-      # The documented command, verbatim apart from the file's location. It builds from
-      # source, which is what somebody with no registry account gets.
-      - name: docker compose up
-        run: docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" up -d --build
+          docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" up -d --build
 
       - name: The backend is healthy
         run: |
           for i in $(seq 1 30); do
-            docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" \
+            docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" \
               exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null && exit 0
             sleep 2
           done
           echo "the self-host stack never became healthy"
-          docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" logs backend
+          docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" logs backend
           exit 1
 
       # Through nginx, so this covers the half a health check cannot: the SPA is served
       # and its API calls are proxied to the backend.
       - name: The frontend serves the app and proxies the API
         run: |
-          cd "$SELFHOST_DIR"
           compose() { docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" "$@"; }
           # 127.0.0.1, not localhost: nginx listens on 0.0.0.0:80 only, and busybox wget
           # tries ::1 first, which answers "connection refused" and reads like a dead server.
@@ -419,7 +429,6 @@ jobs:
       # what a correct setup looks like on every host.
       - name: The database belongs to the app user
         run: |
-          cd "$SELFHOST_DIR"
           owner=$(docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" \
             exec -T backend stat -c %u /app/data/shard.db | tr -d '\r')
           test "$owner" = "1000" || { echo "/app/data/shard.db is owned by uid $owner, expected 1000"; exit 1; }
@@ -428,7 +437,6 @@ jobs:
       # `down` without -v keeps the volumes, which is also what an upgrade does.
       - name: The data survives the containers
         run: |
-          cd "$SELFHOST_DIR"
           compose() { docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" "$@"; }
           compose down
           compose up -d
@@ -438,8 +446,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f "$SELFHOST_DIR/docker-compose.selfhost.yml" -p "$SELFHOST_PROJECT" down -v || true
-          docker run --rm -v "${SELFHOST_DIR}:/x" alpine:3.20 sh -c 'rm -rf /x/* /x/.??*' || true
+          docker compose -f docker-compose.selfhost.yml -p "$SELFHOST_PROJECT" down -v || true
           docker image prune -f
 
   publish:
