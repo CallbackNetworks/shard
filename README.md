@@ -4,286 +4,125 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-callbacknetwork%2Fshard-blue)](https://hub.docker.com/r/callbacknetwork/shard-backend)
 
-A personal multi-identity task management platform with CI/CD integration, AI agent support, and bidirectional issue sync. Built for developers who manage work across multiple roles, repositories, and tools.
+A personal multi-identity task management platform with CI/CD integration, AI agent
+support, and bidirectional issue sync. Built for developers who manage work across
+several roles, repositories and tools.
 
-> **One instance, one person.** Shard has a single shared password, no accounts and no
-> tenants: whoever logs in sees and can change everything. The intended shape is that
-> people run their own instance, not that several share one — the multiple *identities*
-> are your own roles (work, open source, freelance), not other users. See
-> [ADR-0117](docs/adr/0117-someone-who-is-not-us-can-run-this.md).
+> **One instance, one person.** One shared password, no accounts, no tenants — the
+> several *identities* are your own roles, not other users. Run your own instance;
+> share a read-only page when somebody else needs to see something.
 
 ![Shard command center](docs/screenshots/01-command-center.png)
 
-*New here? [**Concepts**](docs/concepts.md) explains the five words that make the rest
-make sense. Every screen, annotated: [**Visual Tour**](docs/screenshots.md).*
+*New here? [**Concepts**](docs/concepts.md) explains the handful of words that make the
+rest make sense. Every screen, annotated: [**Visual Tour**](docs/screenshots.md).*
 
-## Key Highlights
+## What it does
 
-- **GitHub / GitLab Issue Sync** — Bidirectional: inbound webhooks create tasks from issues, completing a task closes the external issue via API
-- **GitHub PR Linking** — Parse `Fixes #N` refs in PR body, auto-close linked tasks on merge
-- **AI Agent Platform** — MCP server (51 tools, local stdio or remote HTTP), External API v1, event subscriptions, agent identity tracking, and tools-schema auto-discovery
-- **Multi-Identity** — Manage separate personas (work, open source, freelance) with independent projects, share pages, and analytics
-- **CI/CD Webhooks** — Auto-detect GitHub Actions, GitLab CI, Jenkins, Drone, Bitbucket from headers; build history with commit/branch/duration tracking
-- **Decision Records as a Graph** — Decisions are a node type with their own relations (`supersedes`, `requires`, `conflicts_with`, `governs`), shown as lineage chains or a directional graph, and carried onto the project's public share page
-- **Workflow Automation** — Rules engine with triggers, conditions, and actions; chain rules up to depth 2
-- **Critical Path Analysis** — DAG-based computation of the longest dependency chain with slack analysis
-- **SLA / Aging Alerts** — Auto-escalate tasks stuck in a status too long; fire notifications for stale work
+- **Work lives in a graph** — identities contain projects contain tasks, and any level
+  can be shared, automated or reported on. Invent your own layer if none of those fit.
+- **Issue sync, both ways** — an inbound webhook turns a GitHub or GitLab issue into a
+  task; finishing the task closes the issue.
+- **CI/CD reports in** — point a pipeline at a task's callback URL and its status
+  follows your builds, with history per commit and branch.
+- **Agents are first-class** — every capability has an API and an MCP tool, not just a
+  screen. An assistant can plan, file and update work through the same code the UI uses.
+- **Decisions are recorded and related** — one decision supersedes, requires or
+  conflicts with another, and travels with the project's shared page.
+- **Automation, analytics and notifications** — rules on graph changes, critical path
+  and burn-down, signed webhooks and email digests.
 
-See [**docs/highlights.md**](docs/highlights.md) for detailed descriptions of all major features.
+Everything, in one list: [**docs/highlights.md**](docs/highlights.md).
 
-## All Features
-
-- **Multiple views**: Board (kanban with WIP limits), table, Gantt chart, and calendar per project
-- **Time tracking**: Inline start/stop timer on tasks with elapsed time display
-- **Customizable dashboard**: Toggle widget visibility with server-persisted preferences
-- **LLM assistant**: Built-in AI chat with tool use (Claude, OpenAI, or stub), including batch task creation
-- **Real-time sync**: WebSocket live updates + offline queue with IndexedDB
-- **Cycles/sprints**: Time-box work into named cycles with progress tracking
-- **Labels & decisions**: Color-coded tags and structured decision records per project
-- **Comments & attachments**: Threaded markdown comments, file upload/download (max 20 MB)
-- **Recurring tasks**: Daily, weekly, monthly, or custom-interval recurrence
-- **Task templates**: Reusable structures with subtasks and labels
-- **Analytics**: Activity heatmap, burn-down charts, velocity, status trends, and identity-level charts
-- **Outbound notifications**: Webhooks (HMAC-signed) and emails with retry backoff
-- **Public share pages**: Per-identity shareable pages with optional PIN protection and expiry
-- **Command palette**: Fuzzy search across tasks and projects (`Ctrl+K` / `Cmd+K`)
-- **Keyboard shortcuts**: Single-key and chord navigation (`?` for help)
-- **Search**: Full-text search with pluggable backend
-- **Bulk operations**: Multi-select tasks for batch status/priority/pin changes
-- **Data import**: Trello JSON, Linear JSON, and GitHub Issues import with auto label creation
-- **Weekly digest**: Scheduled email summary with per-project progress and top active projects
-- **PWA support**: Installable progressive web app with offline caching and service worker
-- **Saved filters & JSON import/export**: Bookmark filters, move data in/out
-- **Multi-database**: SQLite (default), PostgreSQL, or MySQL
-- **Optional auth**: Password-protect the UI; leave unset for local use
-
-## Quick Start
-
-New here? Run the interactive first-run wizard once — it checks that Docker is
-installed (and tells you how to install it if not), walks you through the few
-settings that matter, and can start the app for you:
+## Install
 
 ```bash
-scripts/setup.sh
-```
-
-Prefer to do it by hand? The wizard is optional:
-
-```bash
-# First run (or after dependency changes)
-docker compose up --build
-
-# Subsequent runs
-docker compose up
-```
-
-`scripts/setup.sh --check` verifies your environment is ready without changing anything.
-
-- Management UI: http://localhost:5173/
-- Public status page: http://localhost:5173/
-- API docs (Swagger): http://localhost:8000/docs
-
-### Running it for real (self-hosting)
-
-Everything above starts the **development** stack: source mounted into the containers,
-Vite with hot reload on 5173. It is not what you leave running.
-
-To run Shard as an app — production images, one nginx in front, no source mount:
-
-```bash
+git clone https://github.com/CallbackNetworks/shard.git && cd shard
 docker compose -f docker-compose.selfhost.yml up -d
 ```
 
-That is the whole install. It builds the production images from this checkout, so it
-needs no registry account, and every setting has a working default, so it needs no
-`.env`. Open **http://127.0.0.1:8090/**.
+That is the whole install — it builds from source, so it needs no registry account and
+no configuration. Open **http://127.0.0.1:8090/**.
 
-Building takes a few minutes. To pull the images CI already built and tested instead,
-put these two in `.env` beside the compose file and `pull` first:
+To pull the images CI already built instead of building your own, and for everything
+about running this beyond your own machine — reverse proxy, HTTPS, a real database,
+backups — see [**docs/deployment.md**](docs/deployment.md).
 
-```bash
-echo 'SHARD_IMAGE_PREFIX=callbacknetwork/shard' >> .env
-echo 'SHARD_TAG=1.0.0' >> .env          # or `latest`
-docker compose -f docker-compose.selfhost.yml pull
-docker compose -f docker-compose.selfhost.yml up -d
-```
+Never used Docker? `scripts/setup.sh` checks what you need and walks you through it.
 
-A version tag names one build forever; `latest` follows `main`
-([ADR-0137](docs/adr/0137-the-images-are-published-where-somebody-can-pull-them.md)).
+### Install it as an app
 
-It binds to loopback on purpose, because `AUTH_PASSWORD` is empty by default and an
-empty password means no login gate at all. To reach it from elsewhere on your network,
-set both together in `.env`:
+Shard is a PWA, so it does not need a desktop build to get a desktop window. In Chrome
+or Edge, open your instance and click the **install icon** in the address bar (or
+⋮ → *Cast, save and share* → *Install page as app*); in Safari, *File → Add to Dock*. You
+get an icon, its own window, and offline caching of what you have already loaded.
 
-```bash
-SHARD_BIND=0.0.0.0
-AUTH_PASSWORD=something-long
-```
+Browsers only offer this over HTTPS or on localhost, so a plain-HTTP address on your
+network will not show the install icon — put it behind a reverse proxy with a
+certificate first ([docs/deployment.md](docs/deployment.md)).
 
-Your data lives in two Docker volumes, `shard-selfhost_shard-data` (the SQLite database
-and its backups) and `shard-selfhost_shard-uploads` (task attachments). They survive
-`down`, upgrades and image changes; only `down -v` deletes them
-([ADR-0139](docs/adr/0139-the-self-host-stack-keeps-its-data-in-a-volume.md)).
-
-To take a copy, either use **Settings → Backup** inside the app, or:
-
-```bash
-docker run --rm -v shard-selfhost_shard-data:/data -v "$PWD:/out" \
-  alpine tar czf /out/shard-data.tgz -C /data .
-```
-
-See [ADR-0117](docs/adr/0117-someone-who-is-not-us-can-run-this.md) for why this compose
-file exists separately from the one CD deploys.
-
-### Upgrading
+### Upgrade
 
 ```bash
 scripts/upgrade.sh
 ```
 
-Pull, build, **stop**, **snapshot the database**, **migrate**, start — in that order,
-stopping at the first failure ([ADR-0140](docs/adr/0140-an-upgrade-stops-first-and-keeps-what-it-replaces.md)).
-The last five snapshots are kept and the script prints the command that restores one.
+Pull, build, stop, **snapshot the database**, migrate, start — in that order, stopping
+at the first failure. Do not upgrade with `docker compose up -d --build` on its own: it
+starts new code against a database nothing migrated, and nothing tells you until a
+request fails ([ADR-0136](docs/adr/0136-an-install-has-an-upgrade-path-and-a-version.md)).
 
-Do not upgrade with `docker compose up -d --build` on its own: it starts new code
-against a database nothing migrated, and the mismatch does not show up at startup or in
-the health check, only later inside a request
-([ADR-0136](docs/adr/0136-an-install-has-an-upgrade-path-and-a-version.md)).
+## Configure
 
-Which version you are running is on **Settings → System Status** and in `GET /settings` —
-quote it in a bug report, because an image tag does not identify a build. What changed
-between versions is in the [changelog](docs/CHANGELOG.md).
+Everything is environment variables, and [`.env.example`](.env.example) documents every
+one of them next to its default — copy it to `.env` and edit. The two that matter before
+anyone else can reach your instance:
 
-### Platforms
+| Variable | |
+|----------|--|
+| `AUTH_PASSWORD` | Empty by default, which means **no login gate at all**. Set it before binding to anything but the loopback |
+| `SECRET_KEY` | Signs share-PIN sessions. Unset means they reset on every restart |
 
-Verified on **Linux** with Docker Engine — that is what CI installs from a clean tree on
-every push. It should work on **macOS** with Docker Desktop and on **Windows** under
-WSL2, since nothing is left that depends on host paths or host user ids, but neither has
-been run by anybody. If you try one, an issue saying so either way is useful.
+Read [SECURITY](.github/SECURITY.md) before deploying beyond localhost.
 
-### Something went wrong
+## When something goes wrong
 
 ```bash
 scripts/diagnose.sh > report.txt
 ```
 
 Version, container status, schema revision, which settings are set (names only, never
-values) and the last log lines. Attach it to an issue — it is the difference between one
-reply and five.
+values) and the last log lines — the answers to the first five questions of any bug
+report. More in [docs/troubleshooting.md](docs/troubleshooting.md).
 
-## Routes
-
-| Path | Description | Auth |
-|------|-------------|------|
-| `/` | Public status page | Public |
-| `/s/:token` | Public identity share page | Public |
-| `/app` | Dashboard (customizable widgets) | Protected |
-| `/app/projects/:id` | Project detail (board/table/gantt/calendar) | Protected |
-| `/app/identities` | Identity management | Protected |
-| `/app/integrations` | Webhook/email/issue-sync config | Protected |
-| `/app/api-keys` | API key management | Protected |
-| `/app/analytics` | Analytics dashboard | Protected |
-| `/app/workflow-rules` | Workflow automation rules | Protected |
-| `/app/goals` | Goals & OKR tracking | Protected |
-| `/app/activity` | Activity feed | Protected |
-| `/app/settings` | System settings | Protected |
-| `/login` | Password login | Public |
-
-## Authentication
-
-Set `AUTH_PASSWORD` in your environment to enable the login gate. Leave it empty to disable auth (default for local development).
-
-Empty means *no gate*, not *a weak gate*: anyone who can reach the port has full access to `/app`. The backend logs a warning at startup when neither `AUTH_PASSWORD` nor `AUTH_PROXY_HEADER` is set, and the self-host stack binds to loopback until you change both together.
-
-```bash
-AUTH_PASSWORD=mypassword docker compose up
-```
-
-The management UI at `/app` requires login; the public status page at `/` is always accessible.
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `sqlite:///./shard.db` | Database connection (`sqlite`, `postgresql+psycopg`, `mysql+pymysql`) |
-| `AUTH_PASSWORD` | _(empty)_ | Password for management UI; empty = no auth |
-| `SECRET_KEY` | _(empty)_ | Signs share-PIN session cookies. **Set in production** (`python -c "import secrets; print(secrets.token_hex(32))"`); empty = ephemeral per-process secret |
-| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:4173` | Comma-separated allowed CORS origins; set to your deployed frontend origin |
-| `SMTP_HOST` | _(empty)_ | SMTP server hostname |
-| `SMTP_PORT` | `587` | SMTP port |
-| `SMTP_USER` / `SMTP_PASS` | _(empty)_ | SMTP credentials |
-| `SMTP_FROM` | _(empty)_ | Sender address |
-| `LLM_PROVIDER` | `stub` | LLM provider: `claude`, `openai`, or `stub` |
-| `LLM_API_KEY` | _(empty)_ | API key for the chosen LLM provider |
-| `LLM_MODEL` | _(varies)_ | Model name (e.g. `claude-sonnet-4-6`, `gpt-4o`) |
-| `MCP_HTTP_TOKEN` | _(empty)_ | Bearer token for `/mcp`. Set it and the backend serves remote MCP; leave it empty and the route does not exist |
-| `MCP_API_KEY` | _(empty)_ | API key the MCP tools call the backend with |
-| `SUMMARY_HOUR` | `8` | Hour (UTC) to send daily summary email |
-
-Copy `.env.example` to `.env` in the project root and adjust:
-
-```env
-AUTH_PASSWORD=your_password
-SECRET_KEY=change_me_to_a_random_64_char_hex
-CORS_ORIGINS=https://your-frontend.example.com
-SMTP_HOST=smtp.example.com
-SMTP_FROM=notify@example.com
-SMTP_USER=notify@example.com
-SMTP_PASS=smtp_password
-
-# LLM assistant (optional)
-LLM_PROVIDER=claude
-LLM_API_KEY=sk-ant-...
-LLM_MODEL=claude-sonnet-4-6
-```
-
-## Dependency Changes
-
-After editing `backend/requirements.txt` or `frontend/package.json`:
-
-```bash
-docker compose build
-docker compose up
-```
-
-For frontend package additions, also remove the cached node_modules volume:
-
-```bash
-docker compose down
-docker volume rm $(basename $PWD)_frontend_modules
-docker compose up --build
-```
+Verified on **Linux**, which is what CI installs from a clean tree on every push. It
+should work on **macOS** (Docker Desktop) and **Windows** (WSL2) — nothing left depends
+on host paths or user ids — but nobody has run it there yet. An issue saying it did or
+did not is useful either way.
 
 ## Documentation
 
 - [**Concepts**](docs/concepts.md) — what the words mean: nodes, roles, identities, containers, decisions
-- [**Visual Tour**](docs/screenshots.md) — annotated screenshots of the main features
-- [**Highlights**](docs/highlights.md) — detailed feature descriptions and usage
-- [Architecture](docs/architecture.md) — system design, data models, data flow
-- [API Reference](docs/api.md) — all endpoints, request/response schemas
-- [Agent Guide](docs/agent-guide.md) — AI agent integration (API, MCP, subscriptions)
-- [Deployment](docs/deployment.md) — VPS/production setup guide
+- [**Visual Tour**](docs/screenshots.md) — annotated screenshots of every screen
+- [**Highlights**](docs/highlights.md) — the complete feature list, and what the notable ones do
+- [Local setup](docs/local-setup.md) — development environment, page routes, tests
+- [Deployment](docs/deployment.md) — self-hosting, upgrades, reverse proxy, backups
+- [API reference](docs/api.md) · [Agent guide](docs/agent-guide.md) — the external API, MCP, subscriptions
 - [Integrations](docs/integrations.md) — CI/CD webhook setup
-- [Changelog](docs/CHANGELOG.md) — what changed between versions
-- [ADRs](docs/adr/) — 130+ architecture decision records: why the system is the way it
-  is, including the mistakes that shaped it. Written in a mix of English and Traditional
-  Chinese, one file per decision
+- [Architecture](docs/architecture.md) — how it is built
+- [Troubleshooting](docs/troubleshooting.md) · [Changelog](docs/CHANGELOG.md)
+- [ADRs](docs/adr/) — 140 decisions, one per file, including the mistakes that shaped
+  them. Written in a mix of English and Traditional Chinese
 
 ## Contributing
 
-Contributions are welcome — issues and pull requests go to
-**[github.com/CallbackNetworks/shard](https://github.com/CallbackNetworks/shard)**.
+Issues and pull requests: **[github.com/CallbackNetworks/shard](https://github.com/CallbackNetworks/shard)**.
 
-That repository is a **mirror**: development happens on a private Gitea instance and is
-pushed from there, so nothing is merged on GitHub directly. A pull request is applied
-upstream and appears on GitHub on the next sync, with your commit and authorship intact.
-It means a merge button on GitHub would be undone by the next push, so please do not
-expect one — the review still happens in the pull request.
-
-See [CONTRIBUTING](.github/CONTRIBUTING.md) for the development setup and quality bar,
-and the [Code of Conduct](.github/CODE_OF_CONDUCT.md). Before deploying beyond
-localhost, read the hardening notes in [SECURITY](.github/SECURITY.md).
+That repository is a **mirror** — development happens upstream and is pushed here, so a
+pull request is applied upstream and appears on the next sync rather than being merged
+on GitHub. [CONTRIBUTING](.github/CONTRIBUTING.md) explains that and the quality bar;
+there is also a [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 ## License
 
-Released under the [MIT License](LICENSE).
+[MIT](LICENSE).

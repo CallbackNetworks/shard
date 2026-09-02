@@ -19,6 +19,24 @@ docker compose up --build
 - Backend API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
+## Routes
+
+| Path | Description | Auth |
+|------|-------------|------|
+| `/` | Public status page | Public |
+| `/s/:token` | Public identity share page | Public |
+| `/app` | Dashboard (customizable widgets) | Protected |
+| `/app/projects/:id` | Project detail (board/table/gantt/calendar) | Protected |
+| `/app/identities` | Identity management | Protected |
+| `/app/integrations` | Webhook/email/issue-sync config | Protected |
+| `/app/api-keys` | API key management | Protected |
+| `/app/analytics` | Analytics dashboard | Protected |
+| `/app/workflow-rules` | Workflow automation rules | Protected |
+| `/app/goals` | Goals & OKR tracking | Protected |
+| `/app/activity` | Activity feed | Protected |
+| `/app/settings` | System settings | Protected |
+| `/login` | Password login | Public |
+
 ## Environment Variables
 
 All configuration lives in `.env` (gitignored). See `CLAUDE.md` for the full variable reference.

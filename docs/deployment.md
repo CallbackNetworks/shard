@@ -54,6 +54,18 @@ LLM_MODEL=claude-sonnet-4-6  # or gpt-4o for OpenAI
 SUMMARY_HOUR=8
 ```
 
+## Authentication
+
+Set `AUTH_PASSWORD` in your environment to enable the login gate. Leave it empty to disable auth (default for local development).
+
+Empty means *no gate*, not *a weak gate*: anyone who can reach the port has full access to `/app`. The backend logs a warning at startup when neither `AUTH_PASSWORD` nor `AUTH_PROXY_HEADER` is set, and the self-host stack binds to loopback until you change both together.
+
+```bash
+AUTH_PASSWORD=mypassword docker compose up
+```
+
+The management UI at `/app` requires login; the public status page at `/` is always accessible.
+
 ## What a deploy does
 
 The `deploy` job runs only on a push to `main`, and only after backend checks, both database

@@ -2,6 +2,34 @@
 
 Shard is a personal multi-identity task management platform built for developers and power users. Below are the features that set it apart.
 
+## Everything, in one list
+
+- **Multiple views**: Board (kanban with WIP limits), table, Gantt chart, and calendar per project
+- **Time tracking**: Inline start/stop timer on tasks with elapsed time display
+- **Customizable dashboard**: Toggle widget visibility with server-persisted preferences
+- **LLM assistant**: Built-in AI chat with tool use (Claude, OpenAI, or stub), including batch task creation
+- **Real-time sync**: WebSocket live updates + offline queue with IndexedDB
+- **Cycles/sprints**: Time-box work into named cycles with progress tracking
+- **Labels & decisions**: Color-coded tags and structured decision records per project
+- **Comments & attachments**: Threaded markdown comments, file upload/download (max 20 MB)
+- **Recurring tasks**: Daily, weekly, monthly, or custom-interval recurrence
+- **Task templates**: Reusable structures with subtasks and labels
+- **Analytics**: Activity heatmap, burn-down charts, velocity, status trends, and identity-level charts
+- **Outbound notifications**: Webhooks (HMAC-signed) and emails with retry backoff
+- **Public share pages**: Per-identity shareable pages with optional PIN protection and expiry
+- **Command palette**: Fuzzy search across tasks and projects (`Ctrl+K` / `Cmd+K`)
+- **Keyboard shortcuts**: Single-key and chord navigation (`?` for help)
+- **Search**: Full-text search with pluggable backend
+- **Bulk operations**: Multi-select tasks for batch status/priority/pin changes
+- **Data import**: Trello JSON, Linear JSON, and GitHub Issues import with auto label creation
+- **Weekly digest**: Scheduled email summary with per-project progress and top active projects
+- **PWA support**: Installable progressive web app with offline caching and service worker
+- **Saved filters & JSON import/export**: Bookmark filters, move data in/out
+- **Multi-database**: SQLite (default), PostgreSQL, or MySQL
+- **Optional auth**: Password-protect the UI; leave unset for local use
+
+The rest of this page describes the ones worth more than a line.
+
 ---
 
 ## 1. Bidirectional GitHub / GitLab Issue Sync
