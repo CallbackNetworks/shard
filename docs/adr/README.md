@@ -144,3 +144,4 @@
 | [0140](0140-an-upgrade-stops-first-and-keeps-what-it-replaces.md) | 升級要先停、先留一份可以回去的資料，再跑 migration | Accepted | 2026-09-01 |
 | [0141](0141-extension-is-declared-data-not-loaded-code.md) | 擴充點是宣告出來的資料，不是載入進來的程式碼：不做 plugin 機制 | Accepted | 2026-09-01 |
 | [0142](0142-an-unset-status-is-open-in-sql-too.md) | 沒設定的狀態在 SQL 裡也算「還開著」：NULL NOT IN 會把整列丟掉 | Accepted | 2026-09-02 |
+| [0143](0143-a-share-link-is-a-door-in-not-a-subscription-out.md) | 分享連結是進來的門，不是出去的訂閱：訪客不能自己註冊 webhook | Accepted | 2026-09-02 |
