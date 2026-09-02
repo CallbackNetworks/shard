@@ -1,6 +1,8 @@
 # Shard
 
+[![CI](https://github.com/CallbackNetworks/shard/actions/workflows/ci.yml/badge.svg)](https://github.com/CallbackNetworks/shard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/docker-callbacknetwork%2Fshard-blue)](https://hub.docker.com/r/callbacknetwork/shard-backend)
 
 A personal multi-identity task management platform with CI/CD integration, AI agent support, and bidirectional issue sync. Built for developers who manage work across multiple roles, repositories, and tools.
 
@@ -269,10 +271,18 @@ docker compose up --build
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING](.github/CONTRIBUTING.md) for the
-development setup and quality bar, and the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
-Before deploying beyond localhost, read the hardening notes in
-[SECURITY](.github/SECURITY.md).
+Contributions are welcome — issues and pull requests go to
+**[github.com/CallbackNetworks/shard](https://github.com/CallbackNetworks/shard)**.
+
+That repository is a **mirror**: development happens on a private Gitea instance and is
+pushed from there, so nothing is merged on GitHub directly. A pull request is applied
+upstream and appears on GitHub on the next sync, with your commit and authorship intact.
+It means a merge button on GitHub would be undone by the next push, so please do not
+expect one — the review still happens in the pull request.
+
+See [CONTRIBUTING](.github/CONTRIBUTING.md) for the development setup and quality bar,
+and the [Code of Conduct](.github/CODE_OF_CONDUCT.md). Before deploying beyond
+localhost, read the hardening notes in [SECURITY](.github/SECURITY.md).
 
 ## License
 

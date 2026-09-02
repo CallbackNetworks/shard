@@ -3,6 +3,21 @@
 Thanks for your interest in improving Shard. This guide covers how to set up the
 project, the quality bar, and how changes are reviewed.
 
+## Where this repository lives
+
+GitHub is a **push mirror**. Development happens on a private Gitea instance, and every
+push from there overwrites the GitHub branches — which means a commit made *on* GitHub,
+including a merge commit from GitHub's own merge button, is erased by the next sync.
+
+So: open issues and pull requests here, and expect them to be **applied upstream rather
+than merged here**. Your commits keep their authorship and appear on GitHub on the next
+sync, usually within the hour. If your pull request closes without a GitHub merge commit,
+that is why — check `main` for your change.
+
+The CI you see on a pull request is the real suite: with no repository variables set it
+runs entirely on GitHub-hosted runners, and the publish and deploy jobs skip themselves
+(see [ADR-0135](../docs/adr/0135-the-pipeline-runs-on-somebody-elses-machine-too.md)).
+
 ## Development environment
 
 Everything runs in Docker with hot-reload — **do not install Python or Node

@@ -84,7 +84,14 @@ which its runner does not advertise, and they queue — the original failure mod
 It is a one-time setup with a loud symptom on the very next push, and the alternative
 was leaving that failure permanently pointed at everybody else instead.
 
-**Negative.** The check jobs have never actually run on a GitHub-hosted runner; nothing
-in this change could verify that, since the repository lives on Gitea. They use only
-`docker compose` and GNU coreutils, both present on `ubuntu-latest`, but the first
-public pull request is where that gets tested.
+**Verified.** The GitHub mirror ran the workflow on its first sync, with no repository
+variables set: all seven check jobs green on `ubuntu-latest` — including the self-host
+install from a clean tree — and `publish`, `publish-public` and `deploy` skipped. Six
+minutes wall-clock, against roughly an hour on the single self-hosted runner, because
+GitHub schedules the jobs in parallel.
+
+**Negative.** There are now two CI systems running the same workflow on every push, and
+they can disagree — a hosted runner is a fresh machine, the self-hosted one is a shared
+host with a week of other containers on it. That is mostly a feature (the shared host is
+where the flakes come from) but it does mean a red badge on GitHub and a green run on
+Gitea is a state that can happen, and the badge is what the public sees.

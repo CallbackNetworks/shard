@@ -24,6 +24,9 @@ which `docker compose up -d --build` on its own does not — see
 
 ### Added
 
+- The project is mirrored to **[github.com/CallbackNetworks/shard](https://github.com/CallbackNetworks/shard)**,
+  where issues and pull requests are welcome. GitHub runs the full check suite on its own
+  runners with no configuration; publishing and deploying skip themselves there.
 - `scripts/upgrade.sh` stops the app and snapshots the database before migrating, keeps
   the last five, and prints the command that restores one (ADR-0140).
 - `scripts/diagnose.sh` — one command that collects what a bug report needs: version,
