@@ -25,18 +25,26 @@ from tests.factories import make_project, make_task
 PAST = datetime.now(UTC) - timedelta(days=3)
 FUTURE = datetime.now(UTC) + timedelta(days=3)
 
-# Two open tasks are past due. The failed one is *not* late — it is failed, and
+# Three open tasks are past due. The failed one is *not* late — it is failed, and
 # already counted under its own status. The done one finished, late or not. The
 # open one due later has not come round yet.
+#
+# The unset-status row is the case this file was missing (ADR-0142). ``Node.status``
+# is nullable with no column default, so NULL is a value the database really holds —
+# and it is the only one at which the SQL and Python forms of this rule disagreed,
+# because ``NULL NOT IN ('done', 'failed')`` is NULL rather than true. Every other
+# case here is answered identically by a filter that has the bug and one that does
+# not, which is why six rows of them missed it.
 CASES = [
     ("open and late", "todo", PAST),
     ("in flight and late", "in_progress", PAST),
+    ("unset status, and late", None, PAST),
     ("failed and late", "failed", PAST),
     ("done and late", "done", PAST),
     ("open, due later", "todo", FUTURE),
     ("open, no due date", "todo", None),
 ]
-EXPECTED_OVERDUE = 3  # two open tasks past due, plus one task-like `incident`
+EXPECTED_OVERDUE = 4  # three open tasks past due, plus one task-like `incident`
 
 
 @pytest.fixture()
@@ -100,6 +108,30 @@ def test_a_failed_task_is_not_overdue(db, dated_project):
     assert graph.is_overdue(failed, now) is False
 
 
+def test_a_task_with_no_status_is_still_open(db, dated_project):
+    """The other exact disagreement: NULL is open, and SQL did not think so.
+
+    ``Node.status`` is nullable and carries no default, so this is not a hypothetical
+    row — production holds ten of them. ``is_overdue`` and the frontend both read an
+    unset status as open (``None`` is not in the closed list); the SQL filter dropped
+    the row entirely, because three-valued logic makes ``NULL NOT IN (...)`` unknown
+    rather than true. Same word, same task, two answers — ADR-0089's defect at the one
+    value ADR-0089 did not test.
+    """
+    from app.models import Node
+
+    now = datetime.now(UTC)
+    unset = next(
+        node for tid in graph.subtree_task_ids(db, dated_project.id) if (node := db.get(Node, tid)).status is None
+    )
+    assert unset.due_date is not None
+    assert graph.is_overdue(unset, now) is True
+    assert graph.is_closed(unset.status) is False
+
+    reached = db.query(Node).filter(Node.id == unset.id, *graph.overdue_clause(now)).count()
+    assert reached == 1, "the SQL form of the rule must keep the row its Python form keeps"
+
+
 def test_the_query_and_the_predicate_agree(db, dated_project):
     """``overdue_clause`` (SQL) and ``is_overdue`` (Python) are one rule, stated twice."""
     from app.models import Node
@@ -152,3 +184,33 @@ def test_the_public_share_page_agrees(client, db, dated_project):
 
     body = client.get(f"/share/node/{token}").json()
     assert body["summary"]["overdue_tasks"] == EXPECTED_OVERDUE
+
+
+def test_no_hand_written_copy_of_the_closed_status_filter():
+    """A fifth copy of "still open" as SQL must not appear (ADR-0142).
+
+    ``overdue_clause`` read the rule from ``CLOSED_STATUSES``; three other queries —
+    the critical path, the due-date reminder sweep and the daily summary's "due today"
+    — spelled ``["done", "failed"]`` out by hand. Being literals they were invisible to
+    a search for the constant, and each carried the NULL bug independently, so an unset
+    task could never be reminded about or escalated.
+
+    Scanned rather than asserted behaviourally because the defect is duplication, not a
+    wrong answer: a fifth copy written tomorrow would be correct on the day it lands.
+    """
+    import pathlib
+
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    offenders = []
+    for path in app_dir.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if "status.notin_(" in line or 'notin_(["done"' in line:
+                # core.py owns the rule; everything else must call it.
+                if path.name == "core.py" and "graph" in path.parts:
+                    continue
+                offenders.append(f"{path.relative_to(app_dir)}:{lineno}: {line.strip()}")
+    assert not offenders, (
+        "these spell out the closed-status filter instead of calling "
+        "graph.open_status_clause(), which also means they drop unset-status rows:\n  " + "\n  ".join(offenders)
+    )

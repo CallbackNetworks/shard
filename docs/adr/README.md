@@ -143,3 +143,4 @@
 | [0139](0139-the-self-host-stack-keeps-its-data-in-a-volume.md) | 自架的資料放 named volume：volume 從 image 繼承擁有者，就不再綁主機的 uid | Accepted | 2026-09-01 |
 | [0140](0140-an-upgrade-stops-first-and-keeps-what-it-replaces.md) | 升級要先停、先留一份可以回去的資料，再跑 migration | Accepted | 2026-09-01 |
 | [0141](0141-extension-is-declared-data-not-loaded-code.md) | 擴充點是宣告出來的資料，不是載入進來的程式碼：不做 plugin 機制 | Accepted | 2026-09-01 |
+| [0142](0142-an-unset-status-is-open-in-sql-too.md) | 沒設定的狀態在 SQL 裡也算「還開著」：NULL NOT IN 會把整列丟掉 | Accepted | 2026-09-02 |

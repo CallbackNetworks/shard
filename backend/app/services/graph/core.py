@@ -50,9 +50,33 @@ REL_CONFLICTS_WITH = "conflicts_with"  # decision <-> decision that contradicts 
 CLOSED_STATUSES = ["done", "failed"]
 
 
+def is_closed(status) -> bool:
+    """Whether a status means the work is finished with, for a value in hand.
+
+    ``Node.status`` is nullable and carries no default, so an unset status is a real
+    value in the database rather than a theoretical one. It is *open*: nobody said the
+    work was done or failed. Python already read it that way — ``None in [...]`` is
+    False — and so does the frontend, so this only makes the reading explicit.
+    """
+    return status in CLOSED_STATUSES
+
+
+def open_status_clause():
+    """SQL criterion for :func:`is_closed` being False, NULL included (ADR-0142).
+
+    ``Node.status.notin_(CLOSED_STATUSES)`` is not that criterion. SQL's three-valued
+    logic evaluates ``NULL NOT IN ('done', 'failed')`` to NULL, which is not true, so
+    every unset-status row is *dropped* by the filter — while the Python and JavaScript
+    forms of the identical rule keep it. That is the one value at which the four
+    implementations of "still open" disagreed, and it is not a value the database has
+    to be coaxed into holding: production carries ten of them.
+    """
+    return or_(Node.status.is_(None), Node.status.notin_(CLOSED_STATUSES))
+
+
 def overdue_clause(now):
     """SQLAlchemy criteria for "this task is overdue", for use in ``.filter(*...)``."""
-    return (Node.due_date < now, Node.status.notin_(CLOSED_STATUSES))
+    return (Node.due_date < now, open_status_clause())
 
 
 def is_overdue(task, now):
@@ -62,7 +86,7 @@ def is_overdue(task, now):
     stored timezones come back naive and would raise on comparison.
     """
     due = getattr(task, "due_date", None)
-    if due is None or task.status in CLOSED_STATUSES:
+    if due is None or is_closed(task.status):
         return False
     return due.replace(tzinfo=None) < now.replace(tzinfo=None)
 

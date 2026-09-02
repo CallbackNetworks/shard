@@ -24,6 +24,15 @@ describe('what "overdue" means', () => {
     expect(isOverdue({ ...past, status: 'failed' }, NOW)).toBe(false)
   })
 
+  // The backend's SQL form of this rule disagreed here and nowhere else: `status
+  // NOT IN ('done','failed')` is NULL for a NULL status, so every unset-status row
+  // was dropped by the query while this function kept it (ADR-0142). `status` is a
+  // nullable column with no default, so an unset one is a real row, not a theory.
+  it('is a task whose status was never set — unset is open, not closed', () => {
+    expect(isOverdue({ ...past, status: null }, NOW)).toBe(true)
+    expect(isOverdue({ ...past }, NOW)).toBe(true)
+  })
+
   it('is not a task with no due date, or one still ahead', () => {
     expect(isOverdue({ status: 'todo' }, NOW)).toBe(false)
     expect(isOverdue({ ...future, status: 'todo' }, NOW)).toBe(false)

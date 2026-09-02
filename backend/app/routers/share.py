@@ -290,9 +290,7 @@ def _build_payload(
     # replaced — so a failed, past-due task was overdue here and nowhere else, on the only
     # page the owner does not read. `test_overdue_agreement` now asks this surface too.
     overdue_tasks = sum(
-        1
-        for t in all_tasks_flat
-        if t["status"] not in graph.CLOSED_STATUSES and (due := _as_utc(t["due_date"])) and due < now
+        1 for t in all_tasks_flat if not graph.is_closed(t["status"]) and (due := _as_utc(t["due_date"])) and due < now
     )
 
     return {

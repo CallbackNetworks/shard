@@ -64,7 +64,7 @@ async def _check_and_fire(db: Session) -> None:
         .filter(
             graph.task_type_filter(db),
             Node.due_date != None,
-            Node.status.notin_(["done", "failed"]),
+            graph.open_status_clause(),
             Node.due_date <= due_soon_cutoff,
         )
         .all()
@@ -244,7 +244,7 @@ async def _send_daily_summary(db: Session) -> None:
             graph.task_type_filter(db),
             Node.due_date >= now.replace(hour=0, minute=0, second=0),
             Node.due_date <= now.replace(hour=23, minute=59, second=59),
-            Node.status.notin_(["done", "failed"]),
+            graph.open_status_clause(),
         )
         .all()
     )

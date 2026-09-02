@@ -128,7 +128,7 @@ def test_a_custom_type_reaches_the_due_date_reminder(client, db, sample_identity
         .filter(
             graph.task_type_filter(db),
             Node.due_date != None,  # noqa: E711 — SQLAlchemy needs the operator form
-            Node.status.notin_(graph.CLOSED_STATUSES),
+            graph.open_status_clause(),  # the sweep's own criterion, NULL included (ADR-0142)
             Node.due_date <= cutoff,
         )
         .all()
