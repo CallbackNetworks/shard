@@ -162,6 +162,18 @@ services:
       - BASE_URL=${E2E_BASE_URL:-http://frontend:5173}
       - API_URL=${E2E_API_URL:-http://backend:8000}
       - API_KEY=${API_KEY:-}
+      # Where the guide-shot spec writes (ADR-0148). Two destinations for one
+      # capture: the app serves its own tutorial images out of the SPA build, and
+      # the repo docs keep theirs — the frontend image's build context is
+      # ./frontend, so a file under docs/ can never reach the running app.
+      - GUIDE_SHOT_DIR=${GUIDE_SHOT_DIR:-/out/guide}
+      - DOCS_SHOT_DIR=${DOCS_SHOT_DIR:-/out/docs}
+    volumes:
+      # Bind-mounted so a capture survives the container. Without this the spec
+      # runs green and writes into a layer that is discarded on exit — which is a
+      # screenshot job that reports success and produces nothing.
+      - ${GUIDE_SHOT_HOST_DIR:-./frontend/public/guide}:/out/guide
+      - ${DOCS_SHOT_HOST_DIR:-./docs/screenshots}:/out/docs
     networks:
       - app-network
 

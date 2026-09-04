@@ -1,6 +1,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
 import { Markdown } from 'tiptap-markdown'
 
 /**
@@ -14,6 +15,12 @@ export default function MarkdownPreview({ content, className }) {
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Link.configure({ openOnClick: true }),
+      // StarterKit has no image node, so `![alt](src)` used to render as the
+      // literal text of its own markdown — which is what the guide is made of
+      // (ADR-0148), and is also what a task description with a screenshot in it
+      // has always done. `html: false` below still holds, so this accepts the
+      // markdown form and not an <img> tag pasted into a description.
+      Image.configure({ inline: false, allowBase64: false }),
       Markdown.configure({ html: false }),
     ],
     content: content || '',

@@ -15,7 +15,7 @@ import { CommandHero, PriorityWall, OpsSidebar } from '../components/dashboard/C
 import StatCards from '../components/dashboard/StatCards'
 import DueSoonPanel from '../components/dashboard/DueSoonPanel'
 import MyWorkSection from '../components/dashboard/MyWorkSection'
-import GettingStarted from '../components/dashboard/GettingStarted'
+import OnboardingChecklist from '../components/onboarding/OnboardingChecklist'
 import WidgetColumn from '../components/dashboard/WidgetColumn'
 import { BRAND, DARK } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
@@ -200,10 +200,10 @@ export default function Dashboard() {
   // tied to the filter buttons) stay fixed in position — still individually hide-able above.
   const widgetsById = {
     'command-hero': { label: widgetLabels['command-hero'], node: <CommandHero command={command} /> },
-    'priority-wall': { label: widgetLabels['priority-wall'], node: <PriorityWall command={command} /> },
+    'priority-wall': { label: widgetLabels['priority-wall'], node: <div data-tour="priority-wall"><PriorityWall command={command} /></div> },
     'agent-tasks': { label: widgetLabels['agent-tasks'], node: <AgentTasksPanel /> },
     'due-soon': { label: widgetLabels['due-soon'], node: <DueSoonPanel projects={projects} /> },
-    'ops-sidebar': { label: widgetLabels['ops-sidebar'], node: <OpsSidebar command={command} /> },
+    'ops-sidebar': { label: widgetLabels['ops-sidebar'], node: <div data-tour="ops-sidebar"><OpsSidebar command={command} /></div> },
   }
 
   const projectsSection = w('projects-grid') && (
@@ -270,7 +270,6 @@ export default function Dashboard() {
     ? t('dashboard.goodAfternoon')
     : t('dashboard.goodEvening')
 
-  const isEmptyState = projects.length === 0 && activities.length === 0
 
   return (
     <div className={s.dashboardRoot}>
@@ -318,6 +317,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setShowForm(v => !v)}
+            data-tour="new-project"
             className={s.newProjectBtn}
             onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#eab308' }}
             onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
@@ -378,8 +378,18 @@ export default function Dashboard() {
       )}
 
       {/* Stat cards */}
+      {/* The checklist replaces `GettingStarted`, which appeared only while there
+          were zero projects and so introduced exactly one of the six things worth
+          knowing (ADR-0148). This one is derived from live data and removes itself
+          when complete. */}
+      {!isLoading && (
+        <OnboardingChecklist projects={projects} decisions={decisions} />
+      )}
+
       {w('stat-cards') && !isLoading && projects.length > 0 && (
-        <StatCards projects={projects} activities={activities} />
+        <div data-tour="stat-cards">
+          <StatCards projects={projects} activities={activities} />
+        </div>
       )}
 
       {/* Tab bar */}
@@ -461,8 +471,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        ) : isEmptyState ? (
-          <GettingStarted onNewProject={() => setShowForm(true)} isMobile={isMobile} />
         ) : (
           <div className={`${s.commandLayout} ${isMobile ? s.commandLayoutMobile : s.commandLayoutDesktop}`}>
             {showWidgetConfig ? (

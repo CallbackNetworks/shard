@@ -12,7 +12,7 @@ several roles, repositories and tools.
 > several *identities* are your own roles, not other users. Run your own instance;
 > share a read-only page when somebody else needs to see something.
 
-![Shard command center](docs/screenshots/01-command-center.png)
+![Shard overview](docs/screenshots/01-overview.png)
 
 *New here? [**Concepts**](docs/concepts.md) explains the handful of words that make the
 rest make sense. Every screen, annotated: [**Visual Tour**](docs/screenshots.md).*

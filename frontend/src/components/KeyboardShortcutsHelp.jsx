@@ -1,6 +1,9 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link, useNavigate } from 'react-router'
+import { BookOpen, PlayCircle } from 'lucide-react'
 import { DARK, RADIUS, FONT } from '../constants/theme'
+import { useTour } from './tour/TourContext'
 
 const SHORTCUTS = [
   { keys: ['c'],      i18nKey: 'shortcuts.createTask' },
@@ -40,6 +43,8 @@ function KeyBadge({ children }) {
 
 export default function KeyboardShortcutsHelp({ open, onClose }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { start: startTour } = useTour()
 
   // Close on Escape
   useEffect(() => {
@@ -129,7 +134,35 @@ export default function KeyboardShortcutsHelp({ open, onClose }) {
           ))}
         </div>
 
-        <div style={{ marginTop: 20, textAlign: 'right' }}>
+        {/* `?` is the gesture for "I need help", and until now the only thing behind
+            it was a key list — useful once you already know what the keys are for.
+            The guide and the tour are the two answers to the question actually being
+            asked, so this is where they belong (ADR-0148). */}
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${DARK.border}`, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <Link
+            to="/guide"
+            onClick={onClose}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              border: `1px solid ${DARK.borderMid}`, borderRadius: RADIUS.md,
+              color: DARK.textMid, fontSize: FONT.md, padding: '6px 12px', textDecoration: 'none',
+            }}
+          >
+            <BookOpen size={13} /> {t('guide.title')}
+          </Link>
+          <button
+            onClick={() => { onClose(); startTour(); navigate('/') }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'transparent', border: `1px solid ${DARK.borderMid}`, borderRadius: RADIUS.md,
+              color: DARK.textMid, fontSize: FONT.md, padding: '6px 12px', cursor: 'pointer',
+            }}
+          >
+            <PlayCircle size={13} /> {t('guide.replayTour')}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 16, textAlign: 'right' }}>
           <button
             onClick={onClose}
             style={{

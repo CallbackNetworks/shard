@@ -1,6 +1,7 @@
 import {
   Activity, BarChart2, FileText, GitFork, GitMerge, Key, LayoutGrid,
   MessageCircle, Network, Settings2, Target, Users, Zap, ScrollText, Shapes, Boxes, Inbox, Layers,
+  BookOpen,
 } from 'lucide-react'
 
 // Single source of truth for the sidebar rail modules. Consumed by the
@@ -50,6 +51,10 @@ export const NAV_GROUPS = [
     labelKey: 'nav.groupSystem',
     items: [
       { to: '/identities', icon: Users, labelKey: 'nav.identities' },
+      // Locked, like the Overview and Settings. The help is the one row that must
+      // still be there for somebody who has hidden rows they did not understand —
+      // which is the state that makes a person look for the help in the first place.
+      { to: '/guide', icon: BookOpen, labelKey: 'nav.guide', locked: true, tour: 'guide' },
       { to: '/settings', icon: Settings2, labelKey: 'nav.settings', locked: true },
     ],
   },

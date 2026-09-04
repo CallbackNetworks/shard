@@ -47,6 +47,10 @@ vi.mock('../../components/AgentTasksPanel', () => ({
   default: () => <div>AgentTasksPanel</div>,
 }))
 
+vi.mock('../../components/onboarding/OnboardingChecklist', () => ({
+  default: () => <div>OnboardingChecklist</div>,
+}))
+
 vi.mock('../../components/IdentityChartsView', () => ({
   default: () => <div>IdentityChartsView</div>,
 }))
@@ -140,8 +144,12 @@ describe('Dashboard Command Center', () => {
     expect(navigate).toHaveBeenCalledWith('/projects/p1?focus=motion')
   })
 
+  // Was asserting `dashboard.gettingStarted`, the panel that appeared only while
+  // there were zero projects. The onboarding checklist replaced it and is always
+  // present until finished (ADR-0148), so the empty case is now just "the page
+  // renders" — which is what this test was actually for.
   it('handles empty projects without crashing', () => {
     setup({ projectData: [], activityData: [] })
-    expect(screen.getByText('dashboard.gettingStarted')).toBeTruthy()
+    expect(screen.getByText('dashboard.title')).toBeTruthy()
   })
 })

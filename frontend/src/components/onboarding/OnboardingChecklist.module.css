@@ -1,0 +1,182 @@
+/* The onboarding checklist (ADR-0148). Sits above the tabs on the Overview and
+   removes itself once complete or dismissed. */
+.root {
+  border: 1px solid var(--kt-line);
+  background: var(--kt-surface);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.headings {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  color: var(--kt-ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--kt-muted);
+  font-size: 12px;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.guideLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.14s;
+}
+
+.guideLink:hover,
+.guideLink:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.dismiss {
+  display: flex;
+  padding: 5px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--kt-muted);
+  cursor: pointer;
+}
+
+.dismiss:hover,
+.dismiss:focus-visible {
+  color: var(--kt-ink);
+  border-color: var(--kt-line);
+}
+
+.meter {
+  height: 3px;
+  margin-top: 14px;
+  background: rgba(var(--kt-ink-rgb), 0.07);
+}
+
+.meterFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.count {
+  margin-top: 6px;
+  color: var(--kt-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.steps {
+  display: grid;
+  /* `auto-fit` with a min, not an explicit track list: six steps have to fold to
+     one column on a phone without anyone declaring where (ADR-0134). */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 2px 18px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 0;
+  min-width: 0;
+}
+
+.stepBtn {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepNext .stepLabel {
+  color: var(--kt-ink);
+  font-weight: 700;
+}
+
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.2);
+  color: var(--kt-bg);
+}
+
+.markDone {
+  border-color: var(--kt-status-done, #22c55e);
+  background: var(--kt-status-done, #22c55e);
+}
+
+.stepText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stepLabel {
+  color: var(--kt-muted);
+  font-size: 12px;
+}
+
+.stepLabelDone {
+  color: rgba(var(--kt-ink-rgb), 0.35);
+  text-decoration: line-through;
+}
+
+.stepHint {
+  color: var(--kt-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.8;
+}
+
+.stepArrow {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
+}

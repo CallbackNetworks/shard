@@ -11,12 +11,15 @@ import GlobalActivityTicker from './components/GlobalActivityTicker'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { IdentityFocusProvider } from './context/IdentityFocusContext'
+import { TourProvider } from './components/tour/TourContext'
+import TourOverlay from './components/tour/TourOverlay'
 import { BRAND, DARK, FONT } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import './styles/global.css'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Guide = lazy(() => import('./pages/Guide'))
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
 const Integrations = lazy(() => import('./pages/Integrations'))
 const ApiKeys = lazy(() => import('./pages/ApiKeys'))
@@ -196,6 +199,11 @@ function Layout() {
               <Route path="t/:typeKey" element={<TypeNodesPage />} />
               <Route path="unfiled" element={<Unfiled />} />
               <Route path="containers" element={<Containers />} />
+              {/* The chapter is in the URL: a guide is a thing people link each
+                  other to, and "read the section on decisions" has to be a link
+                  rather than directions (ADR-0148). */}
+              <Route path="guide" element={<Guide />} />
+              <Route path="guide/:chapter" element={<Guide />} />
             </Routes>
           </Suspense>
         </div>
@@ -206,6 +214,7 @@ function Layout() {
       <PWAInstallPrompt />
       <KeyboardShortcutsHelp open={shortcutsHelpOpen} onClose={() => setShortcutsHelpOpen(false)} />
       <OfflineIndicator />
+      <TourOverlay />
     </div>
   )
 }
@@ -223,7 +232,7 @@ export default function App() {
             <Routes>
               <Route path="/share/n/:token" element={<ShareView />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/*" element={<IdentityFocusProvider><Layout /></IdentityFocusProvider>} />
+              <Route path="/*" element={<IdentityFocusProvider><TourProvider><Layout /></TourProvider></IdentityFocusProvider>} />
             </Routes>
           </Suspense>
         </AuthProvider>

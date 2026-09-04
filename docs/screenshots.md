@@ -1,226 +1,130 @@
 # Visual Tour
 
 A guided look at Shard — a personal, multi-identity task platform with a dark,
-high-density "mission control" aesthetic. All screenshots use the default dark
-theme and amber accent, with the navigation rail expanded.
+high-density "mission control" aesthetic.
+
+**These images are generated, not curated.** `scripts/screenshots.sh` drives the
+running dev stack with Playwright and writes both this directory and
+`frontend/public/guide/`, which is the copy the in-app guide (`/guide`) serves.
+Two copies of one capture, because `frontend/Dockerfile.prod`'s build context is
+`./frontend` — an image under `docs/` can never reach the SPA build (ADR-0148).
+
+Regenerate after any change that alters a layout:
+
+```bash
+docker compose up          # the stack must be running
+scripts/screenshots.sh
+```
 
 ---
 
-## Command Center
+## Overview
 
-The home dashboard aggregates everything that needs attention: live stat cards,
-a command hero, priority lanes (Critical / In Motion / Waiting / Done today),
-agent workload, and a briefing panel of goals and open decisions. A live
-activity ticker runs across the top and a signal timeline along the bottom.
+The home screen collects everything asking for attention: stat cards, the command
+hero, priority lanes (Critical / In Motion / Waiting / Done today), agent workload,
+and a briefing of goals and open decisions.
 
-![Command Center](screenshots/01-command-center.png)
+Every number and every line on it is a way to reach the thing it names (ADR-0147).
+
+![Overview](screenshots/01-overview.png)
+
+Clicking a stat card narrows the task list to what that number counted. The
+narrowing is named on the page and lives in the URL, so it survives a reload and can
+be handed to someone else.
+
+![Overview narrowed to overdue work](screenshots/02-overview-overdue.png)
 
 ---
 
-## Project Views
+## Project views
 
-Every project can be viewed five ways, switchable from the tab bar. Issues,
-cycles, dependencies, WIP limits, owners and inline editing are shared across
-all of them, and the view you pick lives in the URL, so a filtered board can be
-bookmarked and handed to someone else.
+The same tasks, five ways. The view and the filters live in the URL, so a filtered
+board can be bookmarked and shared.
 
-### Board (Kanban with WIP limits)
-![Project board](screenshots/02-project-board.png)
+### Issues
+![Issue list](screenshots/03-project-issues.png)
+
+### Board (kanban with WIP limits)
+![Board](screenshots/04-project-board.png)
 
 ### Timeline (Gantt with dependencies)
-Bars are drag-resizable; dashed connectors are `depends_on` edges, and subtasks
-are indented under their parent instead of being hidden.
+Dashed connectors are `depends_on` edges; subtasks are indented under their parent
+rather than hidden.
 
-![Project timeline](screenshots/03-project-gantt.png)
+![Timeline](screenshots/05-project-timeline.png)
 
 ### Calendar
-![Project calendar](screenshots/04-project-calendar.png)
+![Calendar](screenshots/06-project-calendar.png)
 
 ### Table
-![Project table](screenshots/05-project-table.png)
-
----
-
-## Decision Room
-
-Decisions are a first-class node type, not a tag — they carry their own
-relations, so the record can say what it replaces, what it rests on, what it
-contradicts, and which work it governs.
-
-The list files every record under the container it actually lives in, with
-lineage chains drawn as connected cards and a pending-review queue grouped by
-project, identity, area or goal.
-
-![Decision room](screenshots/14-decisions.png)
-
-The graph mode is a deterministic left-to-right layout, not a force simulation:
-column 0 holds the foundations, following an arrow rightwards follows a premise
-to its conclusion, and the work a decision governs sits below it. Relations are
-told apart by stroke and glyph rather than colour, because colour is spent on
-status here.
-
-![Decision graph](screenshots/15-decision-graph.png)
-
----
-
-## Hierarchy
-
-A bird's-eye map of how personas, projects, tasks, goals and decisions relate.
-Four layouts (territory, sankey, tree, network) all read the same container
-forest, so an extra level inserted anywhere shows up in each of them.
-
-![Hierarchy map](screenshots/08-structure-map.png)
+![Table](screenshots/07-project-table.png)
 
 ---
 
 ## Analytics
 
-Totals, a year-long activity heatmap, status trend lines, burn-down, velocity
-and estimate calibration — filterable per project and per time window, with CSV
-export on each panel.
-
-![Analytics](screenshots/06-analytics.png)
+![Analytics](screenshots/08-analytics.png)
 
 ---
 
-## Activity Log
+## Structure
 
-A filterable, real-time stream of every mutation across projects — log,
-timeline and wall renderings, with signal filters by type.
+The container hierarchy, drawn four ways from one forest. Parenting resolves within
+the visible set: a filtered-out parent promotes its children rather than taking them
+with it (ADR-0069).
 
-![Activity log](screenshots/07-activity.png)
-
----
-
-## Automation
-
-### Workflow Rules
-A trigger → condition → action rules engine. Triggers are graph-shaped
-(`node.created`, `node.updated`, `edge.added`, …), each rule reports what it
-actually did — including the runs it deliberately skipped — and any rule can be
-dry-run against a real task before it is switched on.
-
-![Workflow rules](screenshots/09-workflow-rules.png)
-
-### Integrations
-Outbound webhooks and email, with CI/CD provider auto-detection, HMAC-signed
-deliveries, per-integration success rate and a delivery log.
-
-![Integrations](screenshots/10-integrations.png)
+![Structure map](screenshots/09-structure-map.png)
 
 ---
 
-## AI Assistant
+## Decisions
 
-A built-in chat assistant with tool use (Claude, OpenAI, or any endpoint
-speaking either wire protocol). It queries and mutates the same data the UI
-does; each tool call is shown inline and can be expanded to its raw result.
+Decision records are their own node type with their own relations — `supersedes`,
+`governs`, `requires`, `conflicts_with` — filed under the ancestry they live in
+(ADR-0118, ADR-0126, ADR-0127, ADR-0128).
 
-![AI assistant](screenshots/11-assistant.png)
-
----
-
-## Personas
-
-Manage separate identities (work, open source, freelance) with independent
-projects, share pages and analytics. Any persona can also be focused from the
-rail, which narrows every surface to that persona's work.
-
-![Personas](screenshots/12-identities.png)
+![Decisions](screenshots/10-decisions.png)
 
 ---
 
-## The graph underneath
+## Activity
 
-Projects, tasks, identities, cycles and decisions are all nodes of a typed
-graph, and the app exposes that directly rather than hiding it.
-
-### Any node has a page
-Fields declared by the node's own type, the containers it lives in, the
-relations it holds, and the decisions that govern it.
-
-![Node page](screenshots/16-node-page.png)
-
-### Types are data, not code
-Node types and edge types are editable at runtime: roles decide behaviour
-(`container`, `task`, `shareable`, `calendar`), declared fields decide what the
-generic editor draws, and an edge type declares what may sit at each end.
-Built-in declarations are frozen; anything you add is yours.
-
-![Node and edge types](screenshots/17-item-types.png)
-
-### Data explorer
-Browse the raw graph — filter by type, follow edges from either end, and open
-any node.
-
-![Data explorer](screenshots/18-node-explorer.png)
+![Activity](screenshots/11-activity.png)
 
 ---
 
-## Public Share Page
+## Assistant
 
-Any shareable container gets a read-only public page: progress, tasks, cycles,
-comments, an iCal feed, optional guest notes, an optional PIN and expiry — plus
-the decisions behind the work, so a reader who was not in the room can see why
-it is shaped this way.
+Provider-agnostic and switchable at runtime: Claude, OpenAI, or any endpoint
+speaking either protocol (ADR-0096, ADR-0097).
 
-![Public share page](screenshots/19-share-page.png)
+![Assistant](screenshots/12-assistant.png)
 
 ---
 
-## Personalization
+## Automation and integrations
 
-The Settings page exposes a wide set of user-adjustable preferences: theme,
-accent color, display font, interface scale, default project view and task
-priority, reduced motion, date/time formatting, list density, live-refresh
-cadence, rail expansion, and sidebar module visibility/order.
-
-![Settings](screenshots/13-settings.png)
-
-### Preferences in action
-
-A few settings shown before / after — every change applies live.
-
-**Timestamps — relative vs. absolute**
-
-| Relative (default) | Absolute |
-|---|---|
-| ![Relative timestamps](screenshots/t1-timestamps-relative.png) | ![Absolute timestamps](screenshots/t2-timestamps-absolute.png) |
-
-**List density — standard vs. full**
-
-| Standard | Full |
-|---|---|
-| ![Standard density](screenshots/t3-density-standard.png) | ![Full density](screenshots/t4-density-full.png) |
-
-**Week starts on — Sunday vs. Monday**
-
-| Sunday | Monday |
-|---|---|
-| ![Week starts Sunday](screenshots/t5-week-start-sunday.png) | ![Week starts Monday](screenshots/t6-week-start-monday.png) |
-
-**Accent color** — picking an accent swatch recolors the entire app (logo, stat
-numbers, buttons, tickers), not just the Settings page. Interface scale and
-reduced motion apply globally the same way.
+![Workflow rules](screenshots/13-workflow-rules.png)
+![Integrations](screenshots/14-integrations.png)
 
 ---
 
-## Adding a screenshot
+## Identities
 
-Optimise it **before** the first commit — `pngquant` (48 colours is enough for
-this UI) followed by `oxipng -o4` typically takes a full-page capture from
-~800KB to under 300KB with no visible loss.
+![Identities](screenshots/15-identities.png)
 
-This has to happen up front because git keeps every version of a blob forever:
-recompressing an image that is already committed *grows* the repository rather
-than shrinking it, since the original stays in the pack. The saving is only
-available on the way in.
+---
 
-Capture with the rail expanded and reduced motion on — the pages animate their
-headings on mount, and a capture taken too early catches the animation instead
-of the page. Wait for content the page only has once loaded, not for a fixed
-number of seconds.
+## The graph itself
 
-Name the file for what it shows (`08-structure-map.png`), not whatever the
-capture tool called it, and reference it from this page. An unreferenced
-screenshot is dead weight nobody will dare delete later.
+Node types are editable data, not a fixed list in the code. A type declares roles
+and fields, and the roles are what the engine reads (ADR-0074, ADR-0119, ADR-0132).
+
+![Item types](screenshots/16-item-types.png)
+![Node explorer](screenshots/17-node-explorer.png)
+
+---
+
+## Settings
+
+![Settings](screenshots/18-settings.png)

@@ -1,0 +1,112 @@
+/* The spotlight overlay (ADR-0148). Portalled to <body>, so these coordinates are
+   viewport coordinates and nothing between here and the root can offset them —
+   which is the whole reason for the portal (ADR-0122, ADR-0129). */
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+}
+
+/* Four of these surround the cut-out. Each takes pointer events so the rest of the
+   page is inert during a step; the hole between them takes none, which is what
+   keeps the highlighted control usable while it is being explained. */
+.scrim {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.62);
+  pointer-events: auto;
+}
+
+.ring {
+  position: fixed;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent);
+  pointer-events: none;
+}
+
+.bubble {
+  position: fixed;
+  pointer-events: auto;
+  border: 1px solid var(--kt-line);
+  background: var(--kt-elev);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  padding: 16px;
+  /* No entrance animation. A transform on this element would make it the containing
+     block for anything fixed inside it, and — more to the point here — a bubble that
+     animates into place on every step reads as the page moving rather than the
+     explanation advancing. */
+}
+
+.count {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 6px 0 0;
+  color: var(--kt-ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.body {
+  margin: 8px 0 0;
+  color: var(--kt-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.actionsRight {
+  display: flex;
+  gap: 8px;
+}
+
+.skip,
+.back,
+.next {
+  border: 1px solid var(--kt-line);
+  background: transparent;
+  color: var(--kt-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+
+.skip {
+  border-color: transparent;
+}
+
+.skip:hover,
+.back:hover,
+.skip:focus-visible,
+.back:focus-visible {
+  color: var(--kt-ink);
+  border-color: var(--kt-line);
+}
+
+.next {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.next:hover,
+.next:focus-visible {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}

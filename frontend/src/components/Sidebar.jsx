@@ -29,6 +29,7 @@ export default function Sidebar({ onOpenPalette }) {
     <aside
       className={focusOpen ? 'kt-sidebar kt-mini-rail is-menu-open' : 'kt-sidebar kt-mini-rail'}
       aria-label="Sidebar navigation"
+      data-tour="rail"
     >
       <div className="kt-mini-brand" title="Shard">
         <span className="kt-rail-logo">S</span>
@@ -38,6 +39,7 @@ export default function Sidebar({ onOpenPalette }) {
       <button
         onClick={onOpenPalette}
         aria-label={t('search')}
+        data-tour="search"
         className="kt-mini-search"
         title={`${t('search')} / ⌘K`}
       >
@@ -56,13 +58,14 @@ export default function Sidebar({ onOpenPalette }) {
         {groups.map(group => (
           <div key={group.labelKey} className="kt-mini-group">
             <div className="kt-rail-grouplabel" aria-hidden="true">{t(group.labelKey)}</div>
-            {group.items.map(({ to, icon: Icon, labelKey }) => (
+            {group.items.map(({ to, icon: Icon, labelKey, tour }) => (
               <Link
                 key={to}
                 to={to}
                 className={isActive(to) ? 'kt-mini-nav-button is-active' : 'kt-mini-nav-button'}
                 aria-label={t(labelKey)}
                 title={t(labelKey)}
+                data-tour={tour}
               >
                 <span className="kt-rail-ico"><Icon size={16} /></span>
                 <span className="kt-rail-label">{t(labelKey)}</span>

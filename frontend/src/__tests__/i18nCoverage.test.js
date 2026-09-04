@@ -38,6 +38,9 @@ const NO_PROSE = new Set([
   'components/overview/PinButton.jsx',
   'components/dashboard/TaskRow.jsx',
   'components/dashboard/WidgetColumn.jsx',
+  // State and a provider. Every string the tour shows is a key in `tourSteps.js`,
+  // translated by TourOverlay, which is on this list's other side.
+  'components/tour/TourContext.jsx',
   'components/TaskIcons.jsx',
   'App.jsx',
 ])

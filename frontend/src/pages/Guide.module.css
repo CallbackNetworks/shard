@@ -1,0 +1,176 @@
+/* The guide page (ADR-0148). Two columns: a chapter rail that stays put and the
+   prose. Below the breakpoint the rail becomes a horizontal strip above the text
+   rather than a collapsed drawer — five chapters is a list you scan, not one you
+   navigate. */
+.root {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  padding: 4px 0 48px;
+}
+
+/* An explicit track list cannot drop a column the way `repeat(auto-fill)` can, so
+   the narrow case has to be declared (ADR-0134). Everything under ~900px gets one
+   column; the guide is read on a phone more often than most of this app. */
+@media (max-width: 900px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+.nav {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--kt-line);
+  background: var(--kt-surface);
+  padding: 12px;
+}
+
+@media (max-width: 900px) {
+  .nav {
+    position: static;
+  }
+}
+
+.navHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navItem {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 7px 8px;
+  color: var(--kt-muted);
+  font-size: 12px;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.14s, background 0.14s, border-color 0.14s;
+}
+
+.navItem:hover,
+.navItem:focus-visible {
+  color: var(--kt-ink);
+  background: rgba(var(--kt-ink-rgb), 0.04);
+}
+
+.navItemActive {
+  color: var(--kt-ink);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-left-color: var(--accent);
+}
+
+.navNum {
+  flex-shrink: 0;
+  color: rgba(var(--kt-ink-rgb), 0.25);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.navLabel {
+  min-width: 0;
+}
+
+.tourBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.tourBtn:hover,
+.tourBtn:focus-visible {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.content {
+  min-width: 0;
+  max-width: 78ch;
+}
+
+/* The screenshots are captured at 1440px and drawn at whatever the column is, so
+   they must scale rather than overflow — and they are click targets, which needs
+   to be visible before the click. The border matters: several of these images are
+   of a dark UI on a dark page, and without one the picture has no edge. */
+.prose :global(.tiptap) img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 18px 0;
+  border: 1px solid var(--kt-line);
+  cursor: zoom-in;
+  transition: border-color 0.14s;
+}
+
+.prose :global(.tiptap) img:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--kt-line));
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.86);
+  cursor: zoom-out;
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border: 1px solid var(--kt-line);
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  padding: 8px;
+  border: 1px solid var(--kt-line);
+  background: var(--kt-surface);
+  color: var(--kt-ink);
+  cursor: pointer;
+}
+
+.empty {
+  padding: 40px;
+  color: var(--kt-muted);
+  text-align: center;
+}
