@@ -19,7 +19,7 @@ from app.services.activity import log_activity
 from app.services.datetimes import ensure_aware
 from app.services.notifier import fire_notifications, retry_delivery
 from app.services.runtime_settings import get_system_settings
-from app.services.task_mutations import finalize_task_create
+from app.services.task_mutations import AgentKeyError, finalize_task_create, validate_agent_key
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,27 @@ async def _check_recurring(db: Session) -> None:
 
         try:
             template_project_id = graph.project_id_of_task(db, template.id)
-            # Clone the template task
+            # Clone the template task. ``assigned_agent_key_id`` travels with the copy
+            # (ADR-0149): the free-text ``assignee`` was carried and the agent one was
+            # not, so a schedule aimed at an agent produced work aimed at nobody --
+            # every generated copy arrived unassigned while the template still named
+            # its agent, which is the one state this design says cannot happen.
+            # A key revoked since the rule was written is dropped rather than copied
+            # forward: an id pointing at nothing reads as an assignment on every
+            # surface that shows one.
+            agent_key_id = template.assigned_agent_key_id
+            if agent_key_id:
+                try:
+                    validate_agent_key(db, agent_key_id)
+                except AgentKeyError as exc:
+                    logger.warning(
+                        "Recurrence rule %s names agent key %s, which is not usable (%s); "
+                        "the generated task is unassigned",
+                        rule.id,
+                        agent_key_id,
+                        exc,
+                    )
+                    agent_key_id = None
             new_task = graph.create_task(
                 db,
                 project_id=template_project_id,
@@ -142,6 +162,7 @@ async def _check_recurring(db: Session) -> None:
                 status="todo",
                 priority=template.priority,
                 assignee=template.assignee,
+                assigned_agent_key_id=agent_key_id,
                 callback_token=str(uuid.uuid4()),
             )
 

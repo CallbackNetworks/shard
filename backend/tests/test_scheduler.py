@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import Integration, Node, RecurrenceRule, WebhookDelivery
+from app.models import ApiKey, Integration, Node, RecurrenceRule, WebhookDelivery
 from app.services.scheduler import (
     _check_and_fire,
     _check_recurring,
@@ -244,6 +244,77 @@ class TestCheckRecurring:
         db.refresh(rule)
         assert rule.last_run_at is not None
         assert _ensure_aware(rule.next_run_at) > _now()
+
+    @pytest.mark.asyncio
+    async def test_generated_task_keeps_the_agent_it_was_assigned_to(self, db):
+        """The agent assignment travels with the copy (ADR-0149).
+
+        ``assignee`` was carried and ``assigned_agent_key_id`` was not, so a schedule
+        aimed at an agent generated work aimed at nobody -- and because the free-text
+        half kept working, nothing about the template looked wrong.
+        """
+        key = ApiKey(name="agent-b", scopes=["read", "write"], active=True)
+        db.add(key)
+        db.flush()
+
+        p = make_project(db, name="P")
+        db.add(p)
+        db.flush()
+        template = make_task(
+            db,
+            project_id=p.id,
+            title="Nightly check",
+            status="todo",
+            assignee="agent-b",
+            assigned_agent_key_id=key.id,
+        )
+        db.add(template)
+        db.flush()
+
+        db.add(
+            RecurrenceRule(
+                template_task_id=template.id,
+                frequency="daily",
+                next_run_at=_now() - timedelta(minutes=5),
+                active=True,
+            )
+        )
+        db.commit()
+
+        await _check_recurring(db)
+
+        generated = db.query(Node).filter(Node.title == "Nightly check", Node.id != template.id).one()
+        assert (generated.data or {}).get("assigned_agent_key_id") == key.id
+        assert (generated.data or {}).get("assignee") == "agent-b"
+
+    @pytest.mark.asyncio
+    async def test_a_revoked_agent_key_is_not_copied_forward(self, db):
+        """An id pointing at nothing reads as an assignment on every surface that shows one."""
+        key = ApiKey(name="agent-gone", scopes=["read"], active=False)
+        db.add(key)
+        db.flush()
+
+        p = make_project(db, name="P")
+        db.add(p)
+        db.flush()
+        template = make_task(db, project_id=p.id, title="Stale owner", status="todo", assigned_agent_key_id=key.id)
+        db.add(template)
+        db.flush()
+
+        db.add(
+            RecurrenceRule(
+                template_task_id=template.id,
+                frequency="daily",
+                next_run_at=_now() - timedelta(minutes=5),
+                active=True,
+            )
+        )
+        db.commit()
+
+        await _check_recurring(db)
+
+        generated = db.query(Node).filter(Node.title == "Stale owner", Node.id != template.id).one()
+        assert (generated.data or {}).get("assigned_agent_key_id") is None
 
     @pytest.mark.asyncio
     async def test_skips_future_next_run(self, db):
