@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { IdentityFocusProvider } from './context/IdentityFocusContext'
 import { TourProvider } from './components/tour/TourContext'
 import TourOverlay from './components/tour/TourOverlay'
+import PageTourLauncher from './components/tour/PageTourLauncher'
 import { BRAND, DARK, FONT } from './constants/theme'
 import useRealtimeSync from './hooks/useRealtimeSync'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
@@ -216,6 +217,7 @@ function Layout() {
       <PWAInstallPrompt />
       <KeyboardShortcutsHelp open={shortcutsHelpOpen} onClose={() => setShortcutsHelpOpen(false)} />
       <OfflineIndicator />
+      <PageTourLauncher />
       <TourOverlay />
     </div>
   )

@@ -96,7 +96,7 @@ export default function Settings() {
 
       <div className="kt-settings-grid">
       {/* Preferences (client-side, always available) */}
-      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card" data-tour="settings-preferences" style={{ padding: 20, marginBottom: 16 }}>
         <SectionTitle
           icon={<SlidersHorizontal size={16} color="#818cf8" />}
           title={t('settings.preferences')}
@@ -258,7 +258,7 @@ export default function Settings() {
       </div>
 
       {/* Sidebar modules: show/hide + reorder */}
-      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card" data-tour="settings-modules" style={{ padding: 20, marginBottom: 16 }}>
         <SectionTitle
           icon={<PanelLeft size={16} color="#818cf8" />}
           title={t('settings.sidebarModules')}
@@ -321,7 +321,7 @@ export default function Settings() {
       </div>
 
       {/* Calendar feed (personal global iCal subscription) */}
-      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card" data-tour="settings-calendar" style={{ padding: 20, marginBottom: 16 }}>
         <SectionTitle
           icon={<CalendarClock size={16} color="#818cf8" />}
           title={t('settings.calendarFeed')}
@@ -417,10 +417,10 @@ export default function Settings() {
           </div>
 
           {/* Backup */}
-          <BackupPanel settings={settings} onUpdateSystem={(patch) => systemMut.mutate(patch)} />
+          <div data-tour="settings-backup"><BackupPanel settings={settings} onUpdateSystem={(patch) => systemMut.mutate(patch)} /></div>
 
           {/* AI Assistant */}
-          <LlmSettingsPanel settings={settings} />
+          <div data-tour="settings-llm"><LlmSettingsPanel settings={settings} /></div>
 
           {/* Password Change */}
           {settings.auth_enabled && <PasswordForm />}

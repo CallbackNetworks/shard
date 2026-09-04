@@ -242,7 +242,7 @@ export default function GraphTypes() {
 
       <div className="kt-settings-grid">
         {/* Node types */}
-        <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        <div className="kt-card" data-tour="types-nodes" style={{ padding: 20, marginBottom: 16 }}>
           <SectionTitle
             icon={<Shapes size={16} color="#818cf8" />}
             title={t('graphTypes.nodeTypes')}
@@ -306,7 +306,7 @@ export default function GraphTypes() {
         </div>
 
         {/* Edge types */}
-        <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+        <div className="kt-card" data-tour="types-edges" style={{ padding: 20, marginBottom: 16 }}>
           <SectionTitle
             icon={<Spline size={16} color="#818cf8" />}
             title={t('graphTypes.edgeTypes')}

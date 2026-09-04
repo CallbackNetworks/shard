@@ -160,7 +160,7 @@ export default function WebhookLogs() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div data-tour="logs-filters" style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setOffset(0) }} className="kt-input" style={{ width: 'auto' }}>
           <option value="">{t('webhookLogs.allStatuses')}</option>
           <option value="success">{t('success')}</option>
@@ -175,7 +175,7 @@ export default function WebhookLogs() {
       </div>
 
       {/* Table */}
-      <div className="kt-panel" style={{ overflow: 'hidden' }}>
+      <div className="kt-panel" data-tour="logs-table" style={{ overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#4b5563', fontSize: 13 }}>Loading...</div>
         ) : deliveries.length === 0 ? (

@@ -233,7 +233,7 @@ export default function Templates() {
             {t('templates.subtitle')}
           </div>
         </div>
-        <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
+        <button onClick={() => setShowForm(true)} data-tour="templates-new" className="kt-btn kt-btn-primary">
           <Plus size={13} /> {t('templates.new')}
         </button>
       </div>
@@ -278,7 +278,7 @@ export default function Templates() {
               )
             }
             return (
-              <div className="kt-stack">
+              <div className="kt-stack" data-tour="templates-list">
                 {filtered.map((tpl, i) => (
                   <div key={tpl.id} style={{
                     animation: 'fadeUpIn 0.35s ease forwards',

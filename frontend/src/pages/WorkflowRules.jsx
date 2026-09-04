@@ -368,7 +368,7 @@ export default function WorkflowRules() {
           <h1 className="kt-page-title">Workflow Rules</h1>
           <p className="kt-page-subtitle">Automate task actions with if-this-then-that rules</p>
         </div>
-        <button onClick={() => setModal({ mode: 'create' })} className="kt-btn kt-btn-primary">
+        <button onClick={() => setModal({ mode: 'create' })} data-tour="rules-new" className="kt-btn kt-btn-primary">
           <Plus size={13} /> New Rule
         </button>
       </div>
@@ -387,7 +387,7 @@ export default function WorkflowRules() {
           )}
         />
       ) : (
-        <div className="kt-stack">
+        <div className="kt-stack" data-tour="rules-list">
           {rules.map((rule, ruleIdx) => (
             <div key={rule.id} className="kt-card" style={{
               padding: '14px 18px',

@@ -218,7 +218,7 @@ export default function Activity() {
       </div>
 
       <div className={isMobile ? 'kt-activity-shell kt-activity-shell-mobile' : 'kt-activity-shell'}>
-        <aside className="kt-activity-console">
+        <aside className="kt-activity-console" data-tour="activity-console">
           <div className="kt-activity-console-title">
             <Filter size={13} />
             Signal Filter
@@ -250,8 +250,8 @@ export default function Activity() {
           </div>
         </aside>
 
-        <section className="kt-activity-log">
-          <div className="kt-activity-view-toggle" role="group" aria-label="Activity view mode">
+        <section className="kt-activity-log" data-tour="activity-feed">
+          <div className="kt-activity-view-toggle" data-tour="activity-views" role="group" aria-label="Activity view mode">
             {VIEW_MODES.map(mode => (
               <button
                 key={mode}

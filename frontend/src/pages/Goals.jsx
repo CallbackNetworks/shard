@@ -441,6 +441,7 @@ export default function Goals() {
         </div>
         <button
           onClick={() => setShowForm(true)}
+          data-tour="goals-new"
           className="kt-btn kt-btn-primary"
         >
           <Plus size={13} /> {t('goals.create')}
@@ -448,7 +449,9 @@ export default function Goals() {
       </div>
 
       {/* Status filter tabs */}
-      <StatusTabs active={statusFilter} onChange={setStatusFilter} counts={counts} />
+      <div data-tour="goals-tabs">
+        <StatusTabs active={statusFilter} onChange={setStatusFilter} counts={counts} />
+      </div>
 
       {/* Content */}
       {isLoading ? (
@@ -465,7 +468,7 @@ export default function Goals() {
           )}
         />
       ) : (
-        <div className="kt-stack">
+        <div className="kt-stack" data-tour="goals-list">
           {goals.map((goal, i) => (
             <div key={goal.id} style={{
               animation: 'fadeUpIn 0.35s ease forwards',

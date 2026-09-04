@@ -106,6 +106,7 @@ export default function Identities() {
           <p className="kt-page-subtitle">{t('identities.subtitle')}</p>
         </div>
         <button onClick={() => setShowCreate(true)}
+          data-tour="identities-new"
           className="kt-btn kt-btn-primary">
           <Plus size={14} />{t('identities.new')}
         </button>
@@ -122,7 +123,7 @@ export default function Identities() {
       {identities.length === 0 && !showCreate ? (
         <EmptyState message={t('identities.empty')} hint={t('identities.emptyHint')} />
       ) : (
-        <div className="kt-stack" style={{ gap: 12 }}>
+        <div className="kt-stack" data-tour="identities-list" style={{ gap: 12 }}>
           {identities.map(identity => {
             const linked = linkedProjectIds(identity.id)
             const isEditing = editingId === identity.id

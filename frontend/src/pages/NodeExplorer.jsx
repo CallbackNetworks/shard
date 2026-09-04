@@ -157,7 +157,7 @@ export default function NodeExplorer() {
       <div className={s.layout}>
         {/* Left: what to look at. Types carry their real totals, so the number beside
             a type never disagrees with the number of rows you can reach. */}
-        <div className={`kt-card ${s.filters}`}>
+        <div className={`kt-card ${s.filters}`} data-tour="explorer-types">
           <div className={s.filterHead}>{t('nodeExplorer.filterType')}</div>
           <button
             className={`${s.typeRow} ${!selectedType ? s.typeRowActive : ''}`}
@@ -178,7 +178,7 @@ export default function NodeExplorer() {
           ))}
 
           <div className={s.filterHead} style={{ marginTop: 16 }}>{t('nodeExplorer.filterShape')}</div>
-          <label className={s.looseToggle}>
+          <label className={s.looseToggle} data-tour="explorer-loose">
             <input type="checkbox" checked={loose} onChange={e => setLoose(e.target.checked)} />
             <span>{t('nodeExplorer.looseOnly')}</span>
           </label>
@@ -187,7 +187,7 @@ export default function NodeExplorer() {
 
         {/* Middle: find it. */}
         <div className={`kt-card ${s.results}`}>
-          <div className={s.searchRow}>
+          <div className={s.searchRow} data-tour="explorer-search">
             <Search size={13} color={DARK.textDim} className={s.searchIcon} />
             <input
               ref={searchRef}
@@ -277,7 +277,7 @@ export default function NodeExplorer() {
         </div>
 
         {/* Right: what it is connected to, and the one control that connects it. */}
-        <div className={`kt-card ${s.detail}`}>
+        <div className={`kt-card ${s.detail}`} data-tour="explorer-detail">
           {!selectedNode ? (
             <div className={s.dim}>{t('nodeExplorer.selectHint')}</div>
           ) : (

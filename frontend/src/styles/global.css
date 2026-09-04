@@ -1992,6 +1992,13 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   color: var(--kt-ink);
   font: inherit;
 }
+/* The filter buttons sit in their own wrapper so a tour step can point at them as a
+   group; it has to reproduce the row it was lifted out of, or they stack. */
+.kt-map-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .kt-map-toolbar button,
 .kt-map-inspector button {
   min-height: 34px;

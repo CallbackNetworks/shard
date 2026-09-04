@@ -8,13 +8,16 @@
   pointer-events: none;
 }
 
-/* Four of these surround the cut-out. Each takes pointer events so the rest of the
-   page is inert during a step; the hole between them takes none, which is what
-   keeps the highlighted control usable while it is being explained. */
+/* Four of these surround the cut-out, and none of them takes a pointer event
+   (ADR-0152). They used to, which made the tour a full-page click blackhole: on a
+   fresh database every visit is a first visit, so the integration suite met this
+   overlay on `/` and every click in it timed out against a scrim nobody could see
+   was there. Dimming is the whole job — the page underneath stays live, so a person
+   can try the control being described instead of only looking at it. */
 .scrim {
   position: fixed;
   background: rgba(0, 0, 0, 0.62);
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .ring {
@@ -37,7 +40,28 @@
      explanation advancing. */
 }
 
+/* The tour's own name beside the counter: with eighteen of them, "step 2 of 4" no
+   longer says which four. */
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tourName {
+  color: var(--kt-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .count {
+  flex-shrink: 0;
   color: var(--accent);
   font-size: 10px;
   font-weight: 800;

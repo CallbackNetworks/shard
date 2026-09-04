@@ -85,6 +85,28 @@ Decision records are their own node type with their own relations — `supersede
 
 ![Decisions](screenshots/10-decisions.png)
 
+The graph view is deterministic rather than a force layout: column zero is the
+foundations, following an arrow rightwards follows a premise to its conclusion, and
+governed work sits below (ADR-0128).
+
+![Decision graph](screenshots/22-decisions-graph.png)
+
+---
+
+## Goals and templates
+
+A goal's progress is computed from every project linked to it, so it cannot disagree
+with the projects it is made of.
+
+![Goals](screenshots/20-goals.png)
+![Templates](screenshots/21-templates.png)
+
+---
+
+## Cycles
+
+![Cycles](screenshots/19-project-cycles.png)
+
 ---
 
 ## Activity
@@ -107,6 +129,21 @@ speaking either protocol (ADR-0096, ADR-0097).
 ![Workflow rules](screenshots/13-workflow-rules.png)
 ![Integrations](screenshots/14-integrations.png)
 
+Every delivery attempt is logged with a widening retry schedule, because a webhook's
+failure mode is silence (ADR-0085).
+
+![Delivery log](screenshots/23-webhook-logs.png)
+
+---
+
+## Sharing
+
+A read-only public page for a project or an identity, optionally behind a PIN and an
+expiry date. It carries the project's decision records too, because the person most
+likely to ask "why is it like this?" is the one who was not in the room (ADR-0120).
+
+![The public share page](screenshots/25-share-page.png)
+
 ---
 
 ## Identities
@@ -125,6 +162,29 @@ and fields, and the roles are what the engine reads (ADR-0074, ADR-0119, ADR-013
 
 ---
 
+## Agents and the API
+
+Anything reachable in the browser is reachable with an API key or over MCP — a
+capability that is browser-only is treated as a defect (ADR-0084, ADR-0085).
+
+![API keys](screenshots/24-api-keys.png)
+
+---
+
 ## Settings
 
 ![Settings](screenshots/18-settings.png)
+
+---
+
+## Finding your way
+
+`Ctrl-K` searches everything; `G` then `P` turns the same box into a project
+switcher, most recently visited first (ADR-0067).
+
+![The command palette](screenshots/26-command-palette.png)
+
+The in-app guide is a chapter per module, and its sidebar lists every one of the
+eighteen page tours with a tick beside the ones already taken (ADR-0148, ADR-0152).
+
+![The guide](screenshots/27-guide.png)

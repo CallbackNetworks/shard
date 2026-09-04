@@ -496,7 +496,7 @@ export default function Decisions() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <div className="kt-map-segment" aria-label={t('decisions.mode')}>
+          <div className="kt-map-segment" data-tour="decisions-mode" aria-label={t('decisions.mode')}>
             <button type="button" onClick={() => setMode('list')} className={mode === 'list' ? 'is-active' : ''}>
               <List size={12} /> {t('decisions.modeList')}
             </button>
@@ -504,7 +504,7 @@ export default function Decisions() {
               <Network size={12} /> {t('decisions.modeGraph')}
             </button>
           </div>
-          <button onClick={() => setShowForm(true)} className="kt-btn kt-btn-primary">
+          <button onClick={() => setShowForm(true)} data-tour="decisions-new" className="kt-btn kt-btn-primary">
             <Plus size={13} /> {t('decisions.new')}
           </button>
         </div>
@@ -533,7 +533,7 @@ export default function Decisions() {
           // into a graph-only sidebar would be two copies of one control.
           mode === 'graph' ? 'is-graph' : '',
         ].filter(Boolean).join(' ')}>
-          <aside className="kt-decision-console">
+          <aside className="kt-decision-console" data-tour="decisions-console">
             <div className="kt-decision-console-title">
               <GitFork size={13} />
               {t('decisions.room')}
@@ -580,7 +580,7 @@ export default function Decisions() {
           </aside>
 
           {mode === 'graph' ? (
-            <section className="kt-decision-outcomes kt-decision-graph-pane">
+            <section className="kt-decision-outcomes kt-decision-graph-pane" data-tour="decisions-groups">
               <div className="kt-decision-section-head">
                 <span>{t('decisions.modeGraph')}</span>
                 <b>{room.counts.total}</b>
@@ -616,7 +616,7 @@ export default function Decisions() {
                 {renderSection('queue', soloLineages(room.queue), t('decisions.noPendingQueue'))}
               </section>
 
-              <section className="kt-decision-outcomes">
+              <section className="kt-decision-outcomes" data-tour="decisions-groups">
                 <div className="kt-decision-section-head">
                   <span>{t('decisions.lineage')}</span>
                   <b>{chains.length}</b>

@@ -1,0 +1,56 @@
+/* Bottom-left, beside the rail (ADR-0152). `--rail-w` and not a literal: the rail's
+   width is a persisted preference, so a hardcoded offset sits on top of it as soon
+   as somebody expands the rail (ADR-0088). */
+.launcher {
+  position: fixed;
+  /* Above the activity ticker, which is fixed to the bottom edge at `min-height:
+     40px` and runs the full width from the rail rightwards. The assistant's round
+     button sits at 20px and clips a corner of it; a pill with words in it covers a
+     readable strip of the feed instead, which is a different bargain. */
+  bottom: 56px;
+  left: calc(var(--rail-w, 72px) + 16px);
+  z-index: 280;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 1px solid var(--kt-line);
+  background: var(--kt-elev);
+  color: var(--kt-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32);
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+
+.launcher:hover,
+.launcher:focus-visible {
+  color: var(--kt-ink);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Below the width where the rail collapses to icons, the label is the first thing
+   worth dropping — the compass plus the dot still says there is something here, and
+   a pill wide enough to read is a pill wide enough to cover the content. */
+@media (max-width: 900px) {
+  .launcher {
+    left: 12px;
+    bottom: 76px;
+    padding: 9px;
+  }
+  .label {
+    display: none;
+  }
+}

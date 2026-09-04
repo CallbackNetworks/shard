@@ -90,6 +90,7 @@ test.describe('guide screenshots', () => {
   test.describe.configure({ mode: 'serial' })
 
   let projectId: string
+  let taskIds: string[] = []
 
   test.beforeAll(async ({ request }) => {
     // The pictures are only worth taking against work that looks like work. A shot
@@ -108,7 +109,29 @@ test.describe('guide screenshots', () => {
       { title: 'Schedule the retro', status: 'todo', priority: 'medium' },
     ]
     for (const seed of seeds) {
-      await request.post(`${API}/api/nodes`, { data: { type: 'task', container_id: projectId, ...seed } })
+      const res = await request.post(`${API}/api/nodes`, { data: { type: 'task', container_id: projectId, ...seed } })
+      taskIds.push((await res.json()).id)
+    }
+
+    // A cycle with tasks in it. The first capture of the Cycles tab was a picture of
+    // "No cycles yet" filed under a chapter explaining burndown and velocity — an
+    // empty screen photographs perfectly and teaches nothing, which is the failure
+    // this file's own header warns about.
+    const cycle = await request.post(`${API}/api/nodes`, {
+      data: {
+        type: 'cycle',
+        container_id: projectId,
+        title: 'Sprint 14',
+        start_date: new Date(now - 6 * 86400000).toISOString(),
+        due_date: new Date(now + 8 * 86400000).toISOString(),
+        status: 'active',
+      },
+    })
+    if (cycle.ok()) {
+      const cycleId = (await cycle.json()).id
+      for (const taskId of taskIds.slice(0, 3)) {
+        await request.post(`${API}/api/projects/${projectId}/cycles/${cycleId}/tasks/${taskId}`)
+      }
     }
   })
 
@@ -137,6 +160,10 @@ test.describe('guide screenshots', () => {
   })
 
   test('the rest of the app', async ({ page }) => {
+    // The numbering is capture order and nothing else — it is deliberately *not*
+    // reading order. `docs/screenshots.md` and `README.md` reference these by name,
+    // so renumbering to match a rewritten guide would rename eighteen files to move
+    // some pictures around inside one page, and break two documents doing it.
     const pages: Array<[string, string]> = [
       ['/analytics', '08-analytics'],
       ['/structure', '09-structure-map'],
@@ -149,10 +176,66 @@ test.describe('guide screenshots', () => {
       ['/graph-types', '16-item-types'],
       ['/explorer', '17-node-explorer'],
       ['/settings', '18-settings'],
+      // Added with the rewritten guide (ADR-0152): every one of these was a chapter
+      // describing a screen the reader had never been shown.
+      ['/goals', '20-goals'],
+      ['/templates', '21-templates'],
+      ['/webhook-logs', '23-webhook-logs'],
+      ['/api-keys', '24-api-keys'],
+      ['/guide', '27-guide'],
     ]
     for (const [path, name] of pages) {
       await open(page, path)
       await shoot(page, name)
     }
+  })
+
+  /**
+   * The decision graph, reached the way a person reaches it.
+   *
+   * `/decisions?mode=graph` looks like it should work and does not: the mode is
+   * component state, not URL state, so that address renders the list and the capture
+   * silently produced a picture of the wrong view under the right filename — which is
+   * the exact failure this whole spec exists to prevent, arriving from inside it.
+   */
+  test('the decision graph', async ({ page }) => {
+    await open(page, '/decisions')
+    await page.getByRole('button', { name: /^Graph$/i }).click()
+    await page.waitForTimeout(1200)
+    await shoot(page, '22-decisions-graph')
+  })
+
+  test('the project cycles tab', async ({ page }) => {
+    await open(page, `/projects/${projectId}?tab=cycles`)
+    await shoot(page, '19-project-cycles')
+  })
+
+  /**
+   * The public share page, captured through the door a visitor uses.
+   *
+   * Not `/projects/{id}` with something hidden: the whole point of the sharing
+   * chapter is what a person outside your account sees, and a picture of the owner's
+   * page with a caption claiming otherwise is the kind of documentation that is
+   * wrong in the one way nobody checks. The token is minted here and the page is
+   * opened at its real address.
+   */
+  test('the public share page', async ({ page, request }) => {
+    const res = await request.post(`${API}/api/nodes/${projectId}/share/rotate-token`)
+    if (!res.ok()) test.skip(true, `share token could not be minted: ${res.status()}`)
+    const token = (await res.json()).share_token
+    await page.goto(`/share/n/${token}`)
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(1200)
+    await shoot(page, '25-share-page')
+  })
+
+  test('the command palette', async ({ page }) => {
+    await open(page, '/')
+    // The palette is a keyboard gesture, so it is opened by the gesture. Reaching
+    // into the app's state to force it open would photograph a state a user cannot
+    // produce, and would keep passing if the shortcut broke.
+    await page.keyboard.press('Control+k')
+    await page.waitForTimeout(600)
+    await shoot(page, '26-command-palette')
   })
 })

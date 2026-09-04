@@ -375,7 +375,7 @@ export default function Analytics() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+      <div data-tour="analytics-filters" style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
         <select value={selectedProjectId} onChange={e => { setSelectedProjectId(e.target.value); setSelectedCycleId('') }} className="kt-input" style={{ width: 'auto', cursor: 'pointer' }}>
           <option value="">{t('analytics.allProjects')}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -395,7 +395,7 @@ export default function Analytics() {
 
       {/* Overview cards */}
       {overview && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <div data-tour="analytics-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
           <StatCard icon={<BarChart2 size={13}/>} label={t('analytics.totalTasks')} value={overview.total_tasks} delay={0} />
           <StatCard icon={<Activity size={13}/>} label={t('analytics.done')} value={overview.done_tasks} color={STATUS_COLOR.done} delay={0.08} />
           <StatCard icon={<TrendingUp size={13}/>} label={t('analytics.inProgress')} value={overview.in_progress_tasks} color={STATUS_COLOR.in_progress} delay={0.16} />
@@ -413,7 +413,7 @@ export default function Analytics() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div data-tour="analytics-charts" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Activity Heatmap */}
         {(() => {
           const mostActive = heatmap.length > 0

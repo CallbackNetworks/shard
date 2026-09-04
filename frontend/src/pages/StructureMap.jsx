@@ -407,7 +407,7 @@ export default function StructureMap() {
           <Search size={14} />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder={t('structure.search')} />
         </label>
-        <div className="kt-map-segment" aria-label={t('structure.styleMode')}>
+        <div className="kt-map-segment" data-tour="structure-style" aria-label={t('structure.styleMode')}>
           {STYLE_MODES.map(key => (
             <button key={key} type="button" onClick={() => setLayoutStyle(key)} className={layoutStyle === key ? 'is-active' : ''}>
               {t(`structure.style.${key}`)}
@@ -423,11 +423,13 @@ export default function StructureMap() {
             ))}
           </div>
         )}
-        {FILTERS.map(key => (
-          <button key={key} onClick={() => setMode(key)} className={mode === key ? 'is-active' : ''}>
-            {t(`structure.filter.${key}`)}
-          </button>
-        ))}
+        <div className="kt-map-filters" data-tour="structure-filters">
+          {FILTERS.map(key => (
+            <button key={key} onClick={() => setMode(key)} className={mode === key ? 'is-active' : ''}>
+              {t(`structure.filter.${key}`)}
+            </button>
+          ))}
+        </div>
         {!isTerritory && (
           <div className="kt-map-controls" aria-label={t('structure.viewControls')}>
             <button type="button" onClick={() => zoomBy(0.14)} title={t('structure.zoomIn')} aria-label={t('structure.zoomIn')}>
@@ -443,7 +445,7 @@ export default function StructureMap() {
         )}
       </div>
 
-      <div className="kt-map-stats">
+      <div className="kt-map-stats" data-tour="structure-stats">
         <Stat label={t('structure.identities')} value={graph.stats.identities} />
         <Stat label={t('structure.projects')} value={graph.stats.projects} />
         <Stat label={t('structure.signalTasks')} value={graph.stats.tasks} />
@@ -472,7 +474,7 @@ export default function StructureMap() {
       {projects.length === 0 ? (
         <EmptyState message={t('dashboard.noProjectsEmpty')} hint={t('dashboard.createFirstProject')} />
       ) : (
-        <div className="kt-map-surface">
+        <div className="kt-map-surface" data-tour="structure-canvas">
           {isTerritory ? (
             <TerritoryCanvas
               model={territoryModel}

@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useLocation } from 'react-router'
 import { BookOpen, PlayCircle } from 'lucide-react'
 import { DARK, RADIUS, FONT } from '../constants/theme'
 import { useTour } from './tour/TourContext'
+import { tourForPath, tourById } from './tour/tours'
 
 const SHORTCUTS = [
   { keys: ['c'],      i18nKey: 'shortcuts.createTask' },
@@ -44,6 +45,7 @@ function KeyBadge({ children }) {
 export default function KeyboardShortcutsHelp({ open, onClose }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { start: startTour } = useTour()
 
   // Close on Escape
@@ -150,15 +152,24 @@ export default function KeyboardShortcutsHelp({ open, onClose }) {
           >
             <BookOpen size={13} /> {t('guide.title')}
           </Link>
+          {/* Whichever tour belongs to the page the question was asked from, falling
+              back to the introduction. `?` is pressed while standing somewhere, and
+              always replaying the front-door tour answers a question nobody asked
+              from any of the other seventeen screens (ADR-0152). */}
           <button
-            onClick={() => { onClose(); startTour(); navigate('/') }}
+            onClick={() => {
+              const tour = tourForPath(location.pathname) || tourById('overview')
+              onClose()
+              if (tour.route && tour.route !== location.pathname) navigate(tour.route)
+              startTour(tour.id)
+            }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               background: 'transparent', border: `1px solid ${DARK.borderMid}`, borderRadius: RADIUS.md,
               color: DARK.textMid, fontSize: FONT.md, padding: '6px 12px', cursor: 'pointer',
             }}
           >
-            <PlayCircle size={13} /> {t('guide.replayTour')}
+            <PlayCircle size={13} /> {t('tour.launch')}
           </button>
         </div>
 

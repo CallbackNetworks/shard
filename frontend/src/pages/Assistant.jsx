@@ -33,7 +33,7 @@ export default function Assistant() {
   return (
     <div className="kt-assistant-page" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {showSidebar && (
-        <div className="kt-assistant-rail" style={{
+        <div className="kt-assistant-rail" data-tour="assistant-rail" style={{
           width: isMobile ? '100%' : 260, flexShrink: 0,
           borderRight: isMobile ? 'none' : `1px solid ${DARK.border}`,
           display: 'flex', flexDirection: 'column', background: DARK.bg,
@@ -106,7 +106,7 @@ export default function Assistant() {
         </div>
       )}
 
-      <div className="kt-assistant-stage" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="kt-assistant-stage" data-tour="assistant-stage" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div className="kt-page-header" style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '22px 24px 16px', borderBottom: `1px solid ${DARK.border}`, marginBottom: 0,

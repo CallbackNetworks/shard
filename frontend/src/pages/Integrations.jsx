@@ -461,7 +461,7 @@ export default function Integrations() {
             className={`kt-btn ${s.flexCenter}`}>
             <BookOpen size={14} /> {t('integrations.fromTemplate')}
           </button>
-          <button onClick={() => setModal({ mode: 'create' })} className="kt-btn kt-btn-primary">
+          <button onClick={() => setModal({ mode: 'create' })} data-tour="integrations-new" className="kt-btn kt-btn-primary">
             {t('integrations.new')}
           </button>
         </div>
@@ -487,7 +487,7 @@ export default function Integrations() {
           )}
         />
       ) : (
-        <div className={`kt-stack ${s.cardList}`}>
+        <div className={`kt-stack ${s.cardList}`} data-tour="integrations-list">
           {integrations.map((intg, intgIdx) => (
             <div key={intg.id} className={`kt-card ${s.card}`}
               style={{ animationDelay: `${intgIdx * 0.06}s` }}>

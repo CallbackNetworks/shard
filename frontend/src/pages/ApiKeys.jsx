@@ -224,7 +224,7 @@ export default function ApiKeys() {
           <h1 className="kt-page-title">{t('apiKeys.title')}</h1>
           <p className="kt-page-subtitle">{t('apiKeys.subtitle')}</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="kt-btn kt-btn-primary">
+        <button onClick={() => setShowCreate(true)} data-tour="keys-new" className="kt-btn kt-btn-primary">
           {t('apiKeys.new')}
         </button>
       </div>
@@ -292,7 +292,7 @@ export default function ApiKeys() {
           </button>
         </div>
       ) : (
-        <div className="kt-stack" style={{ gap: 12 }}>
+        <div className="kt-stack" data-tour="keys-list" style={{ gap: 12 }}>
           {apiKeys.map((ak, akIdx) => (
             <div key={ak.id} className="kt-card" style={{
               padding: '16px 20px',

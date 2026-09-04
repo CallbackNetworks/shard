@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router'
 import { useTour } from './TourContext'
+import { stepKeys } from './tours'
 import s from './TourOverlay.module.css'
 
 // How long to keep looking for a step's anchor before deciding it is not there.
@@ -22,7 +23,7 @@ function rectOf(el) {
 }
 
 /**
- * The spotlight (ADR-0148).
+ * The spotlight (ADR-0148, ADR-0152).
  *
  * Rendered through a portal to `document.body`, and this is load-bearing rather
  * than tidy: an entrance animation with `fill-mode: both` leaves a transform on the
@@ -32,23 +33,50 @@ function rectOf(el) {
  * with a popover and ADR-0129 with a modal; a full-screen overlay is the version of
  * it that is impossible to miss and equally impossible to debug from the code.
  *
- * The hole is four <div>s around the target rather than an SVG mask or a giant
- * `box-shadow`: it means the area inside the cut-out receives no pointer events at
- * all, so the highlighted control stays clickable during the step that describes it.
+ * **The scrim does not take pointer events.** It used to, and ADR-0151 is the bill:
+ * every `locator.click()` in the integration suite timed out against a fresh prod
+ * stack, because a fresh database is a first visit and the tour was covering the
+ * whole page. That ADR set a preference in the e2e global setup so the other twenty
+ * tests could run and said plainly that the real fix had not been made. This is it —
+ * the tour dims the page it is describing and never blocks it, so the control being
+ * explained is not the only thing on screen you can still use. A person who wants to
+ * *try* the thing mid-step can, which is the behaviour a tutorial should have had
+ * from the start.
  */
 export default function TourOverlay() {
   const { t } = useTranslation()
-  const { active, step, index, steps, advance, back, finish } = useTour()
+  const { active, tour, step, index, total, advance, back, stop } = useTour()
   const navigate = useNavigate()
   const location = useLocation()
   const [rect, setRect] = useState(null)
   const [missing, setMissing] = useState(false)
+  // Which tour we have already navigated for. Without it the effect below fights
+  // the user: they click a rail row mid-tour and are dragged back, every time.
+  const routedFor = useRef(null)
 
-  // Get to the step's page before looking for its anchor.
+  // Get to the tour's page once, when it starts. A tour with no `route` (the project
+  // one) is only ever offered from a page that already matches it.
   useEffect(() => {
-    if (!active || !step?.route) return
-    if (location.pathname !== step.route) navigate(step.route)
-  }, [active, step, location.pathname, navigate])
+    if (!active) { routedFor.current = null; return }
+    if (!tour?.route) return
+    if (routedFor.current === tour.id) return
+    routedFor.current = tour.id
+    if (location.pathname !== tour.route) navigate(tour.route)
+  }, [active, tour, location.pathname, navigate])
+
+  // Leaving the page ends the tour. With a scrim that no longer traps clicks this
+  // is reachable, and it is the honest reading of the act: a tour of this screen is
+  // over when you are not on this screen. Silently continuing would point a
+  // highlight at whatever now happens to sit at those coordinates.
+  const startedAt = useRef(null)
+  useEffect(() => {
+    if (!active) { startedAt.current = null; return }
+    // The page this tour belongs on — `tour.route` and not wherever we happen to be
+    // standing when it starts, because the effect above is about to navigate there
+    // and reading the pre-navigation path would make the tour stop itself on step one.
+    if (startedAt.current === null) { startedAt.current = tour?.route || location.pathname; return }
+    if (startedAt.current !== location.pathname) stop()
+  }, [active, tour, location.pathname, stop])
 
   // Find the anchor, then track it. useLayoutEffect so the first paint of a step
   // already has its position — measured in an effect, every step visibly jumps from
@@ -88,14 +116,15 @@ export default function TourOverlay() {
   }, [active, step])
 
   // A step whose anchor is not there is skipped, not shown empty. Widgets on the
-  // Overview are individually hideable, so this is a normal state, not a defect.
+  // Overview are individually hideable and several pages only render a panel once
+  // they hold something, so this is a normal state, not a defect.
   useEffect(() => { if (missing) advance() }, [missing, advance])
 
   const onKey = useCallback((e) => {
-    if (e.key === 'Escape') finish()
-    else if (e.key === 'ArrowRight' || e.key === 'Enter') advance()
+    if (e.key === 'Escape') stop()
+    else if (e.key === 'ArrowRight') advance()
     else if (e.key === 'ArrowLeft') back()
-  }, [finish, advance, back])
+  }, [stop, advance, back])
 
   useEffect(() => {
     if (!active) return undefined
@@ -105,6 +134,7 @@ export default function TourOverlay() {
 
   if (!active || !step || !rect) return null
 
+  const { titleKey, bodyKey } = stepKeys(tour, step)
   const vw = window.innerWidth
   const vh = window.innerHeight
   // The declared placement is a preference. A bubble that would sit off-screen is
@@ -131,12 +161,16 @@ export default function TourOverlay() {
     bubble.top = Math.min(Math.max(8, rect.top), vh - 200)
   }
 
-  const last = index === steps.length - 1
+  const last = index === total - 1
 
   return createPortal(
-    <div className={s.root} role="dialog" aria-modal="true" aria-label={t('tour.title')}>
-      {/* Four panes, not a mask: the gap between them is a real hole, so the
-          highlighted control is still clickable while it is being described. */}
+    /* `role="dialog"` without `aria-modal`, deliberately: the page underneath is
+       still live and still reachable, so claiming otherwise to a screen reader would
+       be the one description of this overlay that is now false. */
+    <div className={s.root} role="dialog" aria-label={t('tour.title')}>
+      {/* Four panes, not a mask or a giant box-shadow: the gap between them is a
+          real hole, so the highlighted control is drawn at full brightness. None of
+          them takes pointer events (ADR-0152). */}
       <div className={s.scrim} style={{ top: 0, left: 0, width: '100%', height: Math.max(0, rect.top) }} />
       <div className={s.scrim} style={{ top: rect.top + rect.height, left: 0, width: '100%', bottom: 0 }} />
       <div className={s.scrim} style={{ top: rect.top, left: 0, width: Math.max(0, rect.left), height: rect.height }} />
@@ -144,11 +178,14 @@ export default function TourOverlay() {
       <div className={s.ring} style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }} />
 
       <div className={s.bubble} style={{ ...bubble, width: BUBBLE_W }}>
-        <div className={s.count}>{t('tour.progress', { current: index + 1, total: steps.length })}</div>
-        <h2 className={s.title}>{t(step.titleKey)}</h2>
-        <p className={s.body}>{t(step.bodyKey)}</p>
+        <div className={s.head}>
+          <span className={s.tourName}>{t(tour.nameKey)}</span>
+          <span className={s.count}>{t('tour.progress', { current: index + 1, total })}</span>
+        </div>
+        <h2 className={s.title}>{t(titleKey)}</h2>
+        <p className={s.body}>{t(bodyKey)}</p>
         <div className={s.actions}>
-          <button type="button" className={s.skip} onClick={finish}>{t('tour.skip')}</button>
+          <button type="button" className={s.skip} onClick={stop}>{t('tour.skip')}</button>
           <div className={s.actionsRight}>
             {index > 0 && (
               <button type="button" className={s.back} onClick={back}>{t('tour.back')}</button>

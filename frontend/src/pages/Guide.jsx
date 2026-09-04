@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, Link } from 'react-router'
-import { BookOpen, PlayCircle, X } from 'lucide-react'
+import { BookOpen, PlayCircle, Check, X } from 'lucide-react'
 import MarkdownPreview from '../components/MarkdownPreview'
 import { guideChapters } from '../guide'
 import { useTour } from '../components/tour/TourContext'
+import { LINKABLE_TOURS } from '../components/tour/tours'
 import s from './Guide.module.css'
 
 /**
@@ -22,7 +23,7 @@ export default function Guide() {
   const { t, i18n } = useTranslation()
   const { chapter: slug } = useParams()
   const navigate = useNavigate()
-  const { start: startTour } = useTour()
+  const { start: startTour, hasSeen } = useTour()
   const chapters = guideChapters(i18n.language)
   const active = chapters.find(c => c.slug === slug) || chapters[0]
   const [lightbox, setLightbox] = useState(null)
@@ -78,7 +79,7 @@ export default function Guide() {
           <BookOpen size={14} />
           <span>{t('guide.title')}</span>
         </div>
-        <nav className={s.navList}>
+        <nav className={s.navList} data-tour="guide-chapters">
           {chapters.map((c, i) => (
             <Link
               key={c.slug}
@@ -90,16 +91,33 @@ export default function Guide() {
             </Link>
           ))}
         </nav>
-        {/* The guide and the tour are two answers to the same question, so the way
-            into the other one belongs on each. Replaying the tour from here is the
-            only way back to it once it has been completed or skipped. */}
-        <button type="button" className={s.tourBtn} onClick={() => { startTour(); navigate('/') }}>
-          <PlayCircle size={14} />
-          {t('guide.replayTour')}
-        </button>
+
+        {/* The guide and the tours are two answers to the same question — one you
+            read, one that points at the thing while you stand in front of it — so
+            the way into the other belongs on each. This list is also the only place
+            the whole set is visible: the launcher on a page offers that page's tour
+            and says nothing about the seventeen others, which is fine when you are
+            already somewhere and useless when you are looking for where to start.
+            Starting one navigates, because a tour of a page is a thing that happens
+            on that page. */}
+        <div className={s.tourList} data-tour="guide-tours">
+          <div className={s.tourListHead}>{t('guide.tours')}</div>
+          {LINKABLE_TOURS.map(tr => (
+            <button
+              key={tr.id}
+              type="button"
+              className={s.tourRow}
+              onClick={() => { navigate(tr.route); startTour(tr.id) }}
+            >
+              {hasSeen(tr.id) ? <Check size={12} className={s.tourDone} /> : <PlayCircle size={12} />}
+              <span className={s.tourName}>{t(tr.nameKey)}</span>
+              <span className={s.tourSteps}>{tr.steps.length}</span>
+            </button>
+          ))}
+        </div>
       </aside>
 
-      <article className={s.content} onClick={openFromEvent} onKeyDown={onContentKeyDown}>
+      <article className={s.content} data-tour="guide-content" onClick={openFromEvent} onKeyDown={onContentKeyDown}>
         <MarkdownPreview content={active.body} className={s.prose} />
       </article>
 

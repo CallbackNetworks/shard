@@ -293,7 +293,7 @@ export default function ProjectDetail() {
           </div>
 
           <div className={s.headerActions}>
-            <div className={s.progressInfo}>
+            <div className={s.progressInfo} data-tour="project-progress">
               <div className={s.progressText}>{project.done_tasks}/{project.total_tasks} {t('project.done')}</div>
               {/* Counts roll up the whole subtree (ADR-0065), so say when part of the
                   work is not on the list below — the sub-container panel names where. */}
@@ -310,6 +310,7 @@ export default function ProjectDetail() {
                 view count all live in the shared share panel (ADR-0073). */}
             <button
               onClick={() => setShareSettingsOpen(v => !v)}
+              data-tour="project-share"
               className={`${s.archiveBtn}${project.share_expires_at || project.share_pin_set ? ` ${s.archiveBtnActive}` : ''}`}
               title={[
                 project.share_pin_set ? t('project.sharePinProtected') : null,
@@ -330,6 +331,7 @@ export default function ProjectDetail() {
             <LabelManager labels={labels} projectId={id} />
             <button
               onClick={() => setShowAgentInstr(v => !v)}
+              data-tour="project-agent"
               className={`${s.agentBtn} ${showAgentInstr ? s.agentBtnActive : s.agentBtnInactive}`}
             >
               <Bot size={12} /> {t('project.agent')}
@@ -342,6 +344,7 @@ export default function ProjectDetail() {
             </button>
             <button
               onClick={() => setShowForm(v => !v)}
+              data-tour="project-new-issue"
               className={s.newIssueBtn}
             >
               <Plus size={13} /> {t('project.newIssue')}
@@ -367,7 +370,7 @@ export default function ProjectDetail() {
         <AgentInstructionsPanel open={showAgentInstr} project={project} />
 
         {/* Tabs */}
-        <div className={s.tabRow}>
+        <div className={s.tabRow} data-tour="project-tabs">
           <button className={`${s.tab} ${tab === 'issues' ? s.tabActive : ''}`} onClick={() => setTab('issues')}>{t('project.issues')}</button>
           <button className={`${s.tab} ${tab === 'board' ? s.tabActive : ''}`} onClick={() => setTab('board')}>{t('project.board')}</button>
           <button className={`${s.tab} ${tab === 'timeline' ? s.tabActive : ''}`} onClick={() => setTab('timeline')}>{t('project.timeline')}</button>
@@ -407,7 +410,7 @@ export default function ProjectDetail() {
             them: it is rendered above every task tab so switching view can
             never silently drop the filter you set. Cycles are not tasks. */}
         {tab !== 'cycles' && (
-          <TaskFiltersPanel
+          <div data-tour="project-filters"><TaskFiltersPanel
             projectId={id}
             filters={{ status: filter, priority: filterPriority, label: filterLabel, assignee: filterAssignee, due: filterDue, agent: filterAgent }}
             setFilters={applyFilterPatch}
@@ -432,7 +435,7 @@ export default function ProjectDetail() {
             onExport={exportTasksToFile}
             showImport={showImport}
             onToggleImport={() => setShowImport(v => !v)}
-          />
+          /></div>
         )}
 
         {/* Issues */}
@@ -454,7 +457,7 @@ export default function ProjectDetail() {
             )}
 
             {filteredTopTasks.length > 0 && (
-              <div className={s.tableHeader}>
+              <div className={s.tableHeader} data-tour="project-rows">
                 <span className={s.colSpacer12} /><span className={s.colSpacer22} /><span className={s.colSpacer14} />
                 <span className={`${s.colHeader} ${s.colHeaderId}`}>{t('project.colId')}</span>
                 <span className={`${s.colHeader} ${s.colHeaderTitle}`}>{t('project.colTitle')}</span>

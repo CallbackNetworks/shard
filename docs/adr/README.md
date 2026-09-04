@@ -153,3 +153,4 @@
 | [0149](0149-recurring-work-is-scheduled-here-and-run-there.md) | 週期性工作的「排程」存在 Shard、「執行」在 agent 那邊：不做時間觸發器，也不做認領 | Accepted | 2026-09-04 |
 | [0150](0150-a-picker-is-built-from-the-rule-the-write-path-enforces.md) | 選擇器要用「寫入時真正執行的那條規則」蓋出來：關係方向可選、Data 四頁併兩頁 | Accepted | 2026-09-04 |
 | [0151](0151-onboarding-must-not-block-the-app-under-it.md) | 入門導覽不能擋住它底下的 app：導覽的 scrim 讓每個 e2e 點擊超時，連紅三個 run | Accepted | 2026-09-04 |
+| [0152](0152-help-is-asked-for-where-you-are-standing.md) | 求助是站在某個地方問的：導覽變成一頁一個、說明頁重寫成一模組一章、scrim 不再擋住底下的 app | Accepted | 2026-09-04 |

@@ -50,7 +50,7 @@ export default function Sidebar({ onOpenPalette }) {
 
       {/* Its own grid row, above the scrolling nav: the focus control must
           stay reachable no matter how far the module list runs. */}
-      <div className="kt-mini-focus-slot">
+      <div className="kt-mini-focus-slot" data-tour="focus">
         <FocusSwitcher open={focusOpen} onOpenChange={setFocusOpen} />
       </div>
 
