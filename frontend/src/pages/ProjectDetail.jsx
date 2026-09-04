@@ -18,6 +18,7 @@ import NodeShareFacet from '../components/NodeShareFacet'
 import WebhookPanel from '../components/WebhookPanel'
 import BuildHistoryPanel from '../components/BuildHistoryPanel'
 import ChildContainersPanel from '../components/ChildContainersPanel'
+import useFocusRow from '../hooks/useFocusRow'
 import GanttChart from '../components/GanttChart'
 import BoardView from '../components/BoardView'
 import CalendarView from '../components/CalendarView'
@@ -191,6 +192,52 @@ export default function ProjectDetail() {
     openQuickAdd()
     patchParams({ new: null })
   }, [searchParams, openQuickAdd, patchParams])
+
+  /* ── ?focus=<taskId> — arriving at one row (ADR-0147) ────────────────────
+     Every Overview entry that names a task links here. The row is marked with
+     `data-focus-id` in all five views, so landing is one document query — but the
+     row can legitimately be absent, and each reason has a different answer:
+
+       pass 0  a filter (or the search box) is hiding it     -> relax them and retry
+       pass 1  the current view cannot draw it at all         -> switch to the issue list
+       pass 2  it is genuinely not on this page               -> the node page, which
+                                                                 can always draw it
+
+     The ladder is a state machine rather than a chain of effects because none of
+     these rungs changes `focus` — without an explicit pass counter the hook's effect
+     would not re-run and only the first rung would ever be tried.
+
+     `focus` is stripped once the row is found, like `?new=` above: a reload or a
+     Back should not re-scroll and re-flash a row the user has since scrolled away
+     from. `replace` throughout, so none of this leaves rungs in the history. */
+  const focusId = searchParams.get('focus')
+  const [focusPass, setFocusPass] = useState(0)
+  // A new link resets the ladder; without this a second jump inherits the previous
+  // one's exhausted pass count and skips straight to the node page.
+  useEffect(() => { setFocusPass(0) }, [focusId])
+
+  const handleFocusMissing = useCallback(() => {
+    if (!focusId) return
+    const filtered = activeFilterCount > 0 || filter !== 'all' || searchQ.trim() !== ''
+    if (focusPass === 0 && filtered) {
+      patchParams({ status: null, priority: null, label: null, assignee: null, due: null, agent: null, q: null })
+      setFocusPass(1)
+      return
+    }
+    if (focusPass <= 1 && tab !== 'issues') {
+      setTab('issues')
+      setFocusPass(2)
+      return
+    }
+    navigate(`/n/${focusId}`, { replace: true })
+  }, [focusId, focusPass, activeFilterCount, filter, searchQ, tab, patchParams, setTab, navigate])
+
+  useFocusRow(focusId, {
+    pass: focusPass,
+    enabled: !isLoading && !!project,
+    onLanded: () => patchParams({ focus: null }),
+    onMissing: handleFocusMissing,
+  })
 
   if (isLoading) return (
     <div className={s.loadingWrapper}>
@@ -451,6 +498,7 @@ export default function ProjectDetail() {
                       onCreateSubtask={handleCreateSubtask}
                       allTasks={tasks}
                       projectLabels={labels}
+                      focusId={focusId}
                     />
                   </div>
                 </div>

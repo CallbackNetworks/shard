@@ -1,11 +1,11 @@
-import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { getAncestry, getNodeTypes } from '../../api/client'
+import { getAncestry } from '../../api/client'
 import { qk } from '../../api/queryKeys'
 import { nodeHref } from '../../utils/nodeHref'
 import s from './AncestryTrail.module.css'
+import { useNodeTypeMap } from '../../hooks/useNodeTypeMap'
 
 // The one strip that says where a node lives (ADR-0094). Every page that shows a
 // single node shows it through this component — a project page, a container page and
@@ -29,8 +29,7 @@ export default function AncestryTrail({ nodeId, entry: given, className, maxTrai
     enabled: !!nodeId && !given,
     staleTime: 30000,
   })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
-  const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
+  const typeByKey = useNodeTypeMap()
 
   const entry = given || ancestry?.[nodeId]
   const trails = entry?.trails || []

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 import { BRAND, DARK, STATUS_COLOR } from '../../constants/theme'
 import s from '../../pages/Dashboard.module.css'
 import { countOverdue } from '../../utils/overdue'
@@ -68,8 +69,22 @@ function CountUpValue({ value }) {
 }
 
 /* ── Summary stat cards ───────────────────────────────────────────── */
+/**
+ * The four numbers at the top of the Overview (ADR-0147).
+ *
+ * Each one is a question with an answer elsewhere in the app — "12 overdue" is only
+ * useful if it is a way to *see* the twelve — and every one of them used to be
+ * un-clickable text. The targets are URLs on this same page (`?tab=…&only=…`)
+ * rather than a separate screen: the reader asked to see a slice of their own work,
+ * not to leave the place they were reading it from.
+ *
+ * A card whose number is zero keeps its target. Landing on an empty list is a real
+ * answer to "what is overdue" and a card that silently stops responding at zero is
+ * the more confusing of the two.
+ */
 export default function StatCards({ projects, activities }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
 
   const allTasks = projects.flatMap(p => p.tasks || [])
   const totalTasks = allTasks.length
@@ -90,18 +105,21 @@ export default function StatCards({ projects, activities }) {
       value: totalTasks,
       color: DARK.text,
       delay: 0,
+      to: '?tab=tasks',
     },
     {
       label: t('dashboard.completedToday'),
       value: completedToday,
       color: DARK.success,
       delay: 0.06,
+      to: '?tab=tasks&only=done',
     },
     {
       label: t('dashboard.overdueCount'),
       value: overdueTasks,
       color: overdueTasks > 0 ? STATUS_COLOR.failed : DARK.text,
       delay: 0.12,
+      to: '?tab=tasks&only=overdue',
     },
     {
       label: t('dashboard.completionRate'),
@@ -109,15 +127,21 @@ export default function StatCards({ projects, activities }) {
       color: completionRate === 100 ? BRAND : DARK.text,
       delay: 0.18,
       sparkline: true,
+      to: '?tab=progress',
     },
   ]
 
   return (
     <div className={s.statCardsGrid}>
       {cards.map((card, idx) => (
-        <div
+        // A button, not a <div onClick>: four of the page's most obvious targets
+        // sitting above the fold, and as divs none of them was reachable by Tab.
+        <button
+          type="button"
           key={idx}
-          className={s.statCard}
+          onClick={() => navigate(card.to)}
+          title={t('dashboard.statCardHint', { label: card.label })}
+          className={`${s.statCard} ${s.statCardLink}`}
           style={{ animationDelay: `${card.delay}s` }}
         >
           <div className={s.statCardLabel}>{card.label}</div>
@@ -125,7 +149,7 @@ export default function StatCards({ projects, activities }) {
             <CountUpValue value={card.value} />
           </div>
           {card.sparkline && <Sparkline activities={activities} />}
-        </div>
+        </button>
       ))}
     </div>
   )

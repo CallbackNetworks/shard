@@ -42,7 +42,7 @@ function SortableRow({ task, parent, cycleByTask, onUpdate, tdStyle }) {
   }
 
   return (
-    <tr ref={setNodeRef} style={style}>
+    <tr ref={setNodeRef} data-focus-id={task.id} style={style}>
       <td style={{ ...tdStyle, width: 24, cursor: 'grab', color: 'rgba(var(--kt-ink-rgb), 0.2)', textAlign: 'center' }}
           {...listeners} {...attributes}>
         ⠿

@@ -294,6 +294,7 @@ export default function CalendarView({ tasks, onUpdateTask, projectId: _projectI
                 {dayTasks.map((task) => (
                   <div
                     key={task.id}
+                    data-focus-id={task.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, task.id)}
                     style={{

@@ -5,6 +5,7 @@ import { Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import TaskRow from './TaskRow'
 import s from '../../pages/Dashboard.module.css'
 import { isDueWithin } from '../../utils/overdue'
+import { taskHref } from '../../utils/nodeHref'
 
 export default function DueSoonPanel({ projects }) {
   const { t } = useTranslation()
@@ -44,7 +45,7 @@ export default function DueSoonPanel({ projects }) {
               t={task}
               i={i}
               total={dueSoonTasks.length}
-              onClick={() => navigate(`/projects/${task.projectId}`)}
+              onClick={() => navigate(taskHref(task))}
             />
           ))}
         </div>

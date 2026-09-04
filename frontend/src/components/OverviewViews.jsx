@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ExternalLink } from 'lucide-react'
 import { DARK, STATUS_COLOR, PRIORITY } from '../constants/theme'
 import { formatMinutes } from '../utils/formatTime'
 import { isOverdue as taskIsOverdue, countOverdue } from '../utils/overdue'
@@ -288,17 +289,43 @@ export function ViewHealth({ projects, pinned, onTogglePin }) {
 const STATUS_COLOR_MAP = STATUS_COLOR
 const STATUS_LABEL_KEY = { done: 'done', in_progress: 'inProgress', failed: 'failed', todo: 'todo' }
 
-export function ViewTasks({ projects }) {
+/**
+ * Which slice of the work a stat card asked for (ADR-0147).
+ *
+ * The Overview's numbers are the entry points people actually click — "12 overdue"
+ * is a question, and before this the answer was a number you could look at and not
+ * follow. Each key is one card, and `overdue` reads `utils/overdue` rather than
+ * spelling the rule out again: it has one definition (ADR-0089) and this would have
+ * been the twelfth copy.
+ */
+const TASK_SLICES = {
+  overdue: (t) => taskIsOverdue(t),
+  active: (t) => t.status !== 'done' && t.status !== 'failed',
+  failed: (t) => t.status === 'failed',
+  in_progress: (t) => t.status === 'in_progress',
+  done: (t) => t.status === 'done',
+}
+
+export function ViewTasks({ projects, only = 'all', onOpenTask }) {
   // `t` is the map callback's task in this file, so the translator is `tr`.
   const { t: tr, i18n } = useTranslation()
   const locale = i18n.language
   const [open, setOpen] = useState({})
   const [expandedTask, setExpandedTask] = useState(null)
+  const slice = TASK_SLICES[only]
   return (
     <div style={{ paddingTop: 8 }}>
       {projects.map(p => {
         const allTasks = p.tasks || []
-        const topTasks = allTasks.filter(t => !t.parent_id)
+        // The slice is applied before the parent filter, not after: narrowing to
+        // "overdue" and then keeping only top-level tasks would drop every overdue
+        // subtask, which is exactly the class of vanishing work ADR-0094 fixed.
+        const sliced = slice ? allTasks.filter(slice) : allTasks
+        const topTasks = slice ? sliced : sliced.filter(t => !t.parent_id)
+        // A narrowed view lists the projects that have any of it. Left in, a project
+        // with nothing overdue renders as a header claiming "0 tasks" — a wall of
+        // headings between the reader and the handful of rows they asked for.
+        if (slice && topTasks.length === 0) return null
         const isOpen = open[p.id] !== false
         const u      = urgencyScore(p)
         const color  = urgencyColor(u)
@@ -332,7 +359,7 @@ export function ViewTasks({ projects }) {
                   </div>
                 )}
               </div>
-              <span style={{ fontSize: 11, color: DIM, flexShrink: 0 }}>{topTasks.length} tasks</span>
+              <span style={{ fontSize: 11, color: DIM, flexShrink: 0 }}>{tr('overview.taskCount', { count: topTasks.length })}</span>
             </div>
             {/* Task rows */}
             {isOpen && topTasks.map((t, i) => {
@@ -385,6 +412,22 @@ export function ViewTasks({ projects }) {
                       }}>
                         {STATUS_LABEL_KEY[t.status] ? tr(STATUS_LABEL_KEY[t.status]) : t.status}
                       </span>
+                      {/* Expanding shows the detail; it does not take you to the work.
+                          The row had only the first of those, so the tasks tab was a
+                          place to read a list and never a way into it (ADR-0147).
+                          `stopPropagation` because the row itself toggles. */}
+                      <button
+                        type="button"
+                        title={tr('overview.openTask')}
+                        aria-label={tr('overview.openTask')}
+                        onClick={(e) => { e.stopPropagation(); onOpenTask?.({ ...t, projectId: p.id }) }}
+                        style={{
+                          background: 'none', border: 'none', padding: '0 2px', cursor: 'pointer',
+                          color: DIM, display: 'flex', alignItems: 'center', flexShrink: 0,
+                        }}
+                      >
+                        <ExternalLink size={12} />
+                      </button>
                     </div>
                   </div>
 

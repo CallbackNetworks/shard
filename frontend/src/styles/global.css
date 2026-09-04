@@ -4438,3 +4438,38 @@ select.kt-select option {
   background: var(--kt-elev);
   color: var(--kt-ink);
 }
+
+/* ── Focused row (ADR-0147) ──
+   A deep link from the Overview lands on one row among many, so arriving has to
+   be visible: `useFocusRow` scrolls the row into view and adds this class for a
+   moment. It paints its own background rather than animating one, because a row
+   already carries a status colour on its left border and a striped background —
+   an animation on `background` would fight both.
+
+   The outline is drawn with `box-shadow: inset`, not `outline`: the board card
+   and the table row clip their own overflow, and a real outline is drawn outside
+   the border box where both of them cut it off. Colour is `--accent` (brand,
+   ADR-0088) — arriving is not a state in the status machine. */
+.kt-focus-flash {
+  animation: kt-focus-flash 1.8s ease-out;
+  border-radius: inherit;
+}
+@keyframes kt-focus-flash {
+  0%, 55% {
+    background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+/* Reduced motion keeps the highlight and drops the fade: the point of the flash
+   is "this is the one you asked for", which is information, not decoration. */
+@media (prefers-reduced-motion: reduce) {
+  .kt-focus-flash {
+    animation: none;
+    background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+}

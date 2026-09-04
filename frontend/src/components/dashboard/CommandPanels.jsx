@@ -4,10 +4,30 @@ import { Clock, Activity, AlertTriangle, CheckCircle2, Radio } from 'lucide-reac
 import { densityCount } from '../../utils/uiPrefs'
 import ActivityFeed from './ActivityFeed'
 import s from '../../pages/Dashboard.module.css'
+import { taskHref, activityHref, nodeHref } from '../../utils/nodeHref'
+import { useNodeTypeMap } from '../../hooks/useNodeTypeMap'
+
+/**
+ * The hero's numbers are the same four questions the stat cards ask, phrased as a
+ * headline — so they lead to the same slices (ADR-0147). Before this the whole
+ * panel was un-clickable text, including "latest signal", which names one specific
+ * thing that just happened and was the one line on the page most obviously asking
+ * to be followed.
+ */
+function HeroCount({ to, count, label, navigate }) {
+  return (
+    <button type="button" className={s.commandSublineLink} onClick={() => navigate(to)}>
+      {count} {label}
+    </button>
+  )
+}
 
 export function CommandHero({ command }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const typeByKey = useNodeTypeMap()
   const { metrics } = command
+  const signalHref = activityHref(metrics.latestActivity, typeByKey)
   return (
     <div className={s.commandHero}>
       <div className={s.commandHeroMain}>
@@ -15,18 +35,28 @@ export function CommandHero({ command }) {
           <Radio size={12} />
           {t('dashboard.commandCenter')}
         </div>
-        <div className={s.commandHeadline}>
+        <button type="button" className={`${s.commandHeadline} ${s.commandHeadlineLink}`} onClick={() => navigate('?tab=tasks&only=active')}>
           <span>{metrics.activeTasks}</span>
           <em>ACTIVE</em>
-        </div>
+        </button>
         <div className={s.commandSubline}>
-          {metrics.overdue} {t('overdue')} / {metrics.failed} {t('failed')} / {metrics.inMotion} {t('dashboard.inMotion')}
+          <HeroCount to="?tab=tasks&only=overdue" count={metrics.overdue} label={t('overdue')} navigate={navigate} />
+          <span aria-hidden="true">/</span>
+          <HeroCount to="?tab=tasks&only=failed" count={metrics.failed} label={t('failed')} navigate={navigate} />
+          <span aria-hidden="true">/</span>
+          <HeroCount to="?tab=tasks&only=in_progress" count={metrics.inMotion} label={t('dashboard.inMotion')} navigate={navigate} />
         </div>
       </div>
       <div className={s.commandMetrics}>
         <div className={s.commandMetricWide}>
           <small>{t('dashboard.latestSignal')}</small>
-          <strong>{metrics.latestSignal}</strong>
+          {signalHref ? (
+            <button type="button" className={s.commandSignalLink} onClick={() => navigate(signalHref)}>
+              {metrics.latestSignal}
+            </button>
+          ) : (
+            <strong>{metrics.latestSignal}</strong>
+          )}
         </div>
       </div>
     </div>
@@ -48,7 +78,7 @@ function PriorityLane({ title, tone, icon, tasks, empty, navigate }) {
           <button
             key={`${task.projectId}-${task.id}`}
             className={s.priorityTask}
-            onClick={() => navigate(`/projects/${task.projectId}`)}
+            onClick={() => navigate(taskHref(task))}
             style={{ animationDelay: `${index * 0.045}s` }}
           >
             <span className={s.priorityTaskTitle}>{task.title}</span>
@@ -112,8 +142,31 @@ function BriefingList({ items, renderItem, empty }) {
   )
 }
 
+/**
+ * A briefing line is a named record — a goal, an open decision — and naming one
+ * without offering a way to open it is the whole defect (ADR-0147). `nodeHref`
+ * decides the destination rather than this component, so a goal and a decision are
+ * routed by the same rule that routes them from the ancestry strip and the palette.
+ */
+function BriefingRow({ node, state, typeByKey, navigate }) {
+  const href = node?.id ? nodeHref(node, typeByKey) : null
+  const Row = href ? 'button' : 'div'
+  return (
+    <Row
+      type={href ? 'button' : undefined}
+      onClick={href ? () => navigate(href) : undefined}
+      className={`${s.briefingItem} ${href ? s.briefingItemLink : ''}`}
+    >
+      <span>{node.title || node.name || node.description || node.id}</span>
+      <em>{state}</em>
+    </Row>
+  )
+}
+
 export function OpsSidebar({ command }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const typeByKey = useNodeTypeMap()
   const { briefing } = command
 
   return (
@@ -131,10 +184,13 @@ export function OpsSidebar({ command }) {
               items={briefing.activeGoals}
               empty={t('dashboard.noGoalSignals')}
               renderItem={(goal, index) => (
-                <div key={goal.id || index} className={s.briefingItem}>
-                  <span>{goal.title || goal.name || goal.description || 'Goal'}</span>
-                  <em>{goal.status || 'active'}</em>
-                </div>
+                <BriefingRow
+                  key={goal.id || index}
+                  node={{ ...goal, type: goal.type || 'goal' }}
+                  state={goal.status || 'active'}
+                  typeByKey={typeByKey}
+                  navigate={navigate}
+                />
               )}
             />
           </section>
@@ -144,10 +200,13 @@ export function OpsSidebar({ command }) {
               items={briefing.pendingDecisions}
               empty={t('dashboard.noDecisionSignals')}
               renderItem={(decision, index) => (
-                <div key={decision.id || index} className={s.briefingItem}>
-                  <span>{decision.name || decision.title || 'Decision'}</span>
-                  <em>{decision.decision_status || 'proposed'}</em>
-                </div>
+                <BriefingRow
+                  key={decision.id || index}
+                  node={{ ...decision, type: decision.type || 'decision' }}
+                  state={decision.decision_status || 'proposed'}
+                  typeByKey={typeByKey}
+                  navigate={navigate}
+                />
               )}
             />
           </section>

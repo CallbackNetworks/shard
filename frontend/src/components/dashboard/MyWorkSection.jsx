@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { densityCount } from '../../utils/uiPrefs'
 import TaskRow from './TaskRow'
 import s from '../../pages/Dashboard.module.css'
+import { taskHref } from '../../utils/nodeHref'
 
 /* ── Identity group row ───────────────────────────────────────────── */
 function IdentityGroup({ ident, tasks, navigate }) {
@@ -35,7 +36,7 @@ function IdentityGroup({ ident, tasks, navigate }) {
       </div>
       {visibleTasks.map((task, i) => (
         <TaskRow key={task.id + ident.id} t={task} i={i} total={visibleTasks.length}
-          onClick={() => navigate(`/projects/${task.projectId}`)} />
+          onClick={() => navigate(taskHref(task))} />
       ))}
       {tasks.length > 8 && !showAll && (
         <button
@@ -106,7 +107,7 @@ export default function MyWorkSection({ projects }) {
           )}
           {ungroupedTasks.slice(0, densityCount(8)).map((task, i) => (
             <TaskRow key={task.id} t={task} i={i} total={Math.min(ungroupedTasks.length, 8)}
-              onClick={() => navigate(`/projects/${task.projectId}`)} />
+              onClick={() => navigate(taskHref(task))} />
           ))}
         </div>
       )}

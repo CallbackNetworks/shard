@@ -48,3 +48,30 @@ export function orderTasksByParent(tasks) {
   for (const task of list) if (!seen.has(task.id)) push(task, 0, null)
   return out
 }
+
+/**
+ * Does `rootId`'s subtree contain `targetId`? (ADR-0147)
+ *
+ * A deep link can name a subtask, and `IssueRow` renders its children only while
+ * expanded — so the row the link points at is genuinely not in the document, and
+ * the scroll would find nothing and quietly give up. The row asks this on mount to
+ * decide its own initial expansion, which is why it takes ids rather than tasks:
+ * the caller has a `focus` param, not a task object.
+ *
+ * Walks parent-upward from the target rather than child-downward from the root:
+ * a `parent_id` chain is one lookup per level, and it terminates on a cycle by
+ * counting rather than by trusting the data.
+ */
+export function subtreeContains(tasks, rootId, targetId) {
+  if (!rootId || !targetId) return false
+  if (rootId === targetId) return true
+  const byId = new Map((tasks || []).map(t => [t.id, t]))
+  let node = byId.get(targetId)
+  let hops = 0
+  while (node?.parent_id && hops < 64) {
+    if (node.parent_id === rootId) return true
+    node = byId.get(node.parent_id)
+    hops += 1
+  }
+  return false
+}

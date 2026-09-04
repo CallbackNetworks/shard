@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 import { BRAND, DARK, STATUS_COLOR } from '../../constants/theme'
+import { useNodeTypeMap } from '../../hooks/useNodeTypeMap'
+import { activityHref } from '../../utils/nodeHref'
 import s from '../../pages/Dashboard.module.css'
 
 const ACTION_COLORS = {
@@ -23,8 +26,20 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d`
 }
 
+/**
+ * The live-signals feed (ADR-0147).
+ *
+ * Every row already knew what it happened to — `ActivityLogOut` carries `task_id`,
+ * `project_id` and the resolved `node_type` — and rendered it as text you could not
+ * click. A row whose subject is reachable is a button; a row whose subject is not
+ * (a delete, a system event naming nothing) stays a plain div rather than becoming a
+ * button that goes nowhere, which is the whole difference between "this line is a
+ * link" and "the app ignores clicks here for reasons you cannot see".
+ */
 export default function ActivityFeed({ activities }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const typeByKey = useNodeTypeMap()
   if (!activities || activities.length === 0) {
     return (
       <div className={s.activityEmpty}>
@@ -36,11 +51,18 @@ export default function ActivityFeed({ activities }) {
     <div>
       {activities.map((a, i) => {
         const color = ACTION_COLORS[a.action] || DARK.textMid
+        const href = activityHref(a, typeByKey)
+        const Row = href ? 'button' : 'div'
         return (
-          <div key={a.id || i} className={s.activityItem} style={{
-            borderBottom: i < activities.length - 1 ? `1px solid ${DARK.border}` : 'none',
-            animationDelay: `${i * 0.04}s`,
-          }}>
+          <Row
+            key={a.id || i}
+            type={href ? 'button' : undefined}
+            onClick={href ? () => navigate(href) : undefined}
+            className={`${s.activityItem} ${href ? s.activityItemLink : ''}`}
+            style={{
+              borderBottom: i < activities.length - 1 ? `1px solid ${DARK.border}` : 'none',
+              animationDelay: `${i * 0.04}s`,
+            }}>
             <div className={s.activityDot} style={{ background: color, boxShadow: `0 0 6px ${color}88` }} />
             <div className={s.activityContent}>
               <div className={s.activityDetail}>{a.detail}</div>
@@ -49,7 +71,7 @@ export default function ActivityFeed({ activities }) {
                 <span>{t('dashboard.timeAgo', { time: timeAgo(a.created_at) })}</span>
               </div>
             </div>
-          </div>
+          </Row>
         )
       })}
     </div>

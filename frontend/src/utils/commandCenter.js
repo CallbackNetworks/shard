@@ -102,6 +102,10 @@ export function deriveCommandCenter(projects = [], activities = [], goals = [], 
   const totalTasks = tasks.length
   const completion = totalTasks ? Math.round((doneTasks.length / totalTasks) * 100) : 0
   const latestSignal = activities[0]?.detail || activities[0]?.action || 'SYSTEM READY'
+  // The row behind that sentence, not just its text (ADR-0147). The hero names one
+  // specific thing that just happened, so it should be a way to reach it — which
+  // needs the activity's own ids, and only the string was ever carried out of here.
+  const latestActivity = activities[0] || null
   const activeProjects = projects.filter(project => project.status === 'active')
   const pendingDecisions = decisions.filter(decision => decision.decision_status === 'proposed')
   const activeGoals = goals.filter(goal => !goal.status || ['active', 'in_progress', 'open'].includes(goal.status))
@@ -117,6 +121,7 @@ export function deriveCommandCenter(projects = [], activities = [], goals = [], 
       totalTasks,
       doneTasks: doneTasks.length,
       latestSignal,
+      latestActivity,
     },
     lanes: {
       critical,

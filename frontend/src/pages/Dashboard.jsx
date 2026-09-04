@@ -21,10 +21,21 @@ import { BRAND, DARK } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { deriveCommandCenter } from '../utils/commandCenter'
 import { groupProjectsByOwner } from '../utils/projectGroups'
+import { taskHref } from '../utils/nodeHref'
 import { DEFAULT_WIDGET_ORDER, normalizeWidgetOrder, reorderWidgets } from '../utils/widgetLayout'
 import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
 import s from './Dashboard.module.css'
+
+// Which `?only=` value shows which heading. Kept beside the tab that reads it
+// rather than inside ViewTasks: the view filters, the page explains.
+const SLICE_LABEL_KEY = {
+  overdue: 'dashboard.sliceOverdue',
+  active: 'dashboard.sliceActive',
+  failed: 'dashboard.sliceFailed',
+  in_progress: 'dashboard.sliceInProgress',
+  done: 'dashboard.sliceDone',
+}
 
 const DEFAULT_WIDGETS = { 'stat-cards': true, 'command-hero': true, 'priority-wall': true, 'agent-tasks': true, 'due-soon': true, 'ops-sidebar': true, 'projects-grid': true }
 const WIDGET_CONFIG_IDS = ['stat-cards', 'command-hero', 'priority-wall', 'agent-tasks', 'due-soon', 'ops-sidebar', 'projects-grid']
@@ -116,8 +127,33 @@ export default function Dashboard() {
     next.delete('new')
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
-  const [filter, setFilter] = useState('active')
-  const [tab, setTab] = useState('projects')
+  /* Which tab you are on and which slice of work you asked for is where you are,
+     not private component state — the same rule ProjectDetail already follows
+     (ADR-0083), applied here because ADR-0147 needs it: a stat card saying "12
+     overdue" can only be a link to the overdue work if "the tasks tab, narrowed
+     to overdue" is a URL. It also means a bookmark, a tour step and the Back
+     button all land on the tab they were pointed at. */
+  const filter = searchParams.get('scope') || 'active'
+  const tab = searchParams.get('tab') || 'projects'
+  const only = searchParams.get('only') || 'all'
+  // `all`/`''` are the absence of a setting, so they are dropped rather than
+  // written — same convention as the project page, so the URL carries only what
+  // is actually set.
+  const patchDashParams = useCallback((patch, { replace = true } = {}) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      for (const [key, value] of Object.entries(patch)) {
+        if (value == null || value === '' || value === 'all') next.delete(key)
+        else next.set(key, value)
+      }
+      return next
+    }, { replace })
+  }, [setSearchParams])
+  // Switching tab is a navigation, so it pushes; narrowing replaces. Changing tab
+  // drops `only`: it names a slice of the tasks tab and would otherwise survive
+  // onto a tab that does not read it, where nothing shows it is still set.
+  const setTab = useCallback((next) => patchDashParams({ tab: next, only: null }, { replace: false }), [patchDashParams])
+  const setFilter = useCallback((next) => patchDashParams({ scope: next }), [patchDashParams])
   const [pinned, setPinned] = useState(() => getPinnedIds())
   const handleTogglePin = useCallback((projectId) => {
     setPinned(togglePin(projectId))
@@ -376,7 +412,25 @@ export default function Dashboard() {
         ) : tab === 'health' ? (
           <ViewHealth projects={active} pinned={pinned} onTogglePin={handleTogglePin} />
         ) : tab === 'tasks' ? (
-          <ViewTasks projects={active} />
+          <>
+            {/* A narrowed list has to say so. `?only=` arrives from a stat card the
+                reader may have clicked several screens ago, and a silently filtered
+                list that looks like the whole list is the bug ADR-0083 describes —
+                so the slice is named where the rows are, with the way out beside it. */}
+            {only !== 'all' && (
+              <div className={s.sliceChip}>
+                <span>{t(SLICE_LABEL_KEY[only] || 'dashboard.sliceAll')}</span>
+                <button type="button" onClick={() => patchDashParams({ only: null })}>
+                  {t('dashboard.sliceClear')}
+                </button>
+              </div>
+            )}
+          <ViewTasks
+            projects={active}
+            only={only}
+            onOpenTask={(task) => navigate(taskHref(task))}
+          />
+          </>
         ) : tab === 'compare' ? (
           <ViewCompare projects={active} />
         ) : tab === 'charts' ? (

@@ -200,7 +200,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             const hasDates = task.start_date && task.due_date
             const barWidth = hasDates ? getWidth(task.start_date, task.due_date) : 0
             return (
-              <div key={task.id} style={{ display: 'flex', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.05)', height: ROW_H }}>
+              <div key={task.id} data-focus-id={task.id} style={{ display: 'flex', borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.05)', height: ROW_H }}>
                 <div style={{
                   width: TASK_NAME_W, minWidth: TASK_NAME_W, flexShrink: 0,
                   padding: '0 16px', display: 'flex', alignItems: 'center',

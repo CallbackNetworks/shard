@@ -6,6 +6,7 @@ import { regenerateToken, createExternalIssue } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
 import { PriorityIcon, PriorityChip, StatusIcon, LabelChip, PrBadge, TypeBadge } from './TaskIcons'
+import { subtreeContains } from '../utils/taskTree'
 import TaskEditForm from './TaskEditForm'
 import CommentsPanel from './CommentsPanel'
 import Button from './shared/Button'
@@ -87,11 +88,15 @@ function DueDateCell({ task, hovered, onUpdate }) {
 export default memo(function IssueRow({
   task, projectId, projectCode, onUpdate, onDelete,
   showProject, projectName, onCreateSubtask,
-  allTasks = [], projectLabels = [], depth = 0,
+  allTasks = [], projectLabels = [], depth = 0, focusId = null,
 }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  // A deep link can name a subtask, and this row renders its children only while
+  // expanded — so without this the row the link points at is not in the document at
+  // all and the scroll finds nothing (ADR-0147). Lazy initial state, not an effect:
+  // by the time an effect ran the row would already have been searched for and missed.
+  const [expanded, setExpanded] = useState(() => subtreeContains(allTasks, task.id, focusId))
   const [showDescription, setShowDescription] = useState(false)
   const [showSubtaskForm, setShowSubtaskForm] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
@@ -151,6 +156,7 @@ export default memo(function IssueRow({
   return (
     <>
       <div
+        data-focus-id={task.id}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
@@ -550,6 +556,7 @@ export default memo(function IssueRow({
           allTasks={allTasks}
           projectLabels={projectLabels}
           depth={depth + 1}
+          focusId={focusId}
         />
       ))}
     </>

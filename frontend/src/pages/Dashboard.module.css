@@ -202,6 +202,27 @@
   animation: fadeIn 0.3s ease backwards;
 }
 
+/* A feed row whose subject is reachable is a <button> (ADR-0147), so it has to be
+   un-styled back to looking like the row it replaced — a button brings its own
+   background, border, centred text and inherited-nothing font. `text-align: left`
+   is the one that shows immediately; the rest show up as a 1px shift between a
+   clickable row and a non-clickable one in the same list. */
+.activityItemLink {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s;
+}
+.activityItemLink:hover,
+.activityItemLink:focus-visible {
+  background: rgba(var(--kt-ink-rgb), 0.045);
+}
+
 .activityDot {
   width: 5px;
   height: 5px;
@@ -321,6 +342,25 @@
   box-shadow: none;
   position: relative;
   overflow: hidden;
+}
+
+/* A stat card is a button now (ADR-0147) — reset the chrome a <button> brings and
+   restore the block layout the card was designed as. `text-align: left` and
+   `width: 100%` are the two that show up immediately; `font: inherit` is the one
+   that silently shrinks every number if you forget it. */
+.statCardLink {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s;
+}
+.statCardLink:hover,
+.statCardLink:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--kt-line));
+  background: color-mix(in srgb, var(--accent) 5%, var(--kt-surface));
 }
 
 .statCard::before {
@@ -988,6 +1028,13 @@
   color: var(--kt-muted);
   font-size: 13px;
   text-transform: uppercase;
+  /* Three links and two separators now, rather than one sentence (ADR-0147).
+     `flex-wrap` because the three counts plus their labels are translated, and
+     zh-TW's are shorter while a longer locale would push the row past the column. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .commandMetrics {
@@ -1031,7 +1078,8 @@
   grid-column: 1 / -1;
 }
 
-.commandMetricWide strong {
+.commandMetricWide strong,
+.commandMetricWide .commandSignalLink {
   display: block;
   margin-top: 6px;
   color: var(--kt-muted);
@@ -1248,6 +1296,56 @@
   padding: 6px 8px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.055);
   background: rgba(var(--kt-ink-rgb), 0.018);
+}
+
+/* Same button reset as the activity row and the stat card (ADR-0147). `width: 100%`
+   matters more here than elsewhere: the parent is a grid and a <button> is not a
+   grid item that stretches by default, so without it every clickable briefing row
+   sits narrower than the non-clickable ones beside it. */
+.briefingItemLink {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s;
+}
+.briefingItemLink:hover,
+.briefingItemLink:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+/* The hero's counts and its "latest signal" are links now, drawn as the text they
+   replaced rather than as buttons: the headline is a 40px numeral and a button's
+   own background under it would read as a chip. */
+.commandHeadlineLink,
+.commandSublineLink,
+.commandSignalLink {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.commandSublineLink {
+  border-bottom: 1px solid transparent;
+}
+.commandSublineLink:hover,
+.commandSublineLink:focus-visible,
+.commandSignalLink:hover,
+.commandSignalLink:focus-visible {
+  color: var(--accent);
+  border-bottom-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.commandHeadlineLink:hover span,
+.commandHeadlineLink:focus-visible span {
+  color: var(--accent);
+}
+.commandSignalLink {
+  font-weight: 700;
 }
 
 .briefingItem span {
@@ -1468,4 +1566,34 @@
 @keyframes spin {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.55; transform: scale(0.92); }
+}
+
+/* The "you are looking at a slice" chip (ADR-0147). A stat card can narrow the
+   tasks tab from several screens away, so the narrowing has to be visible where
+   the rows are, with the way out attached to it rather than only in the URL. */
+.sliceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 2px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.sliceChip button {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font: inherit;
+  color: var(--kt-muted);
+  cursor: pointer;
+}
+.sliceChip button:hover,
+.sliceChip button:focus-visible {
+  color: var(--kt-ink);
 }

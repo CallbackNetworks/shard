@@ -145,6 +145,7 @@ function SortableBoardCard({ task, parent, projectCode, onUpdate, onDelete }) {
   return (
     <div
       ref={setNodeRef}
+      data-focus-id={task.id}
       {...listeners}
       {...attributes}
       onMouseEnter={() => setHovered(true)}

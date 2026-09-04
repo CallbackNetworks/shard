@@ -17,6 +17,7 @@ import EmptyState from '../components/shared/EmptyState'
 import AncestryTrail from '../components/shared/AncestryTrail'
 import { hasNodeRole } from '../constants/nodeRoles'
 import { nodeHref } from '../utils/nodeHref'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 
 // Universal node page (ADR-0037): one URL per node, edges grouped by rel_type
 // and direction, neighbors navigable, provenance at the bottom.
@@ -105,7 +106,7 @@ export default function NodePage() {
   const [showEvents, setShowEvents] = useState(false)
 
   const typeMeta = nodeTypes.find(nt => nt.key === node?.type)
-  const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
+  const typeByKey = useNodeTypeMap()
   const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
   const invalidate = () => {

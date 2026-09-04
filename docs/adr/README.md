@@ -148,3 +148,4 @@
 | [0144](0144-the-install-check-runs-where-the-installer-runs.md) | 檢查安裝的 job 要跑在安裝的人所在的地方：DooD 下主機路徑不是 job 的路徑 | Accepted | 2026-09-02 |
 | [0145](0145-the-audit-gate-blocks-on-what-can-be-fixed.md) | 稽核關卡只擋修得動的東西：門檻降到 high，tiptap 大版升級另外欠著 | Accepted | 2026-09-03 |
 | [0146](0146-a-check-that-could-not-run-is-not-a-check-that-failed.md) | 跑不起來的檢查不等於沒通過的檢查：npm 掛掉不該擋部署 | Accepted | 2026-09-04 |
+| [0147](0147-an-entry-is-a-way-to-reach-what-it-names.md) | 一個條目就是通往它所指之物的路：Overview 的數字與列都要到得了它指名的東西 | Accepted | 2026-09-04 |

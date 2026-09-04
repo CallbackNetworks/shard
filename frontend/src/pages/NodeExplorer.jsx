@@ -13,6 +13,7 @@ import { nodeHref } from '../utils/nodeHref'
 import useAncestry from '../hooks/useAncestry'
 import AncestryTrail from '../components/shared/AncestryTrail'
 import EgoNetwork from '../components/shared/EgoNetwork'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 
 function TypeChip({ typeMeta, typeKey }) {
   const color = typeMeta?.color || '#818cf8'
@@ -45,7 +46,7 @@ export default function NodeExplorer() {
   const typeMeta = nodeTypes.find(nt => nt.key === effectiveType)
   const readOnly = !!typeMeta?.is_builtin // entity-backed builtins reject generic create/delete
 
-  const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
+  const typeByKey = useNodeTypeMap()
   const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
   const { data: nodes = [], isLoading: nodesLoading } = useQuery({

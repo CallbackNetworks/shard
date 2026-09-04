@@ -1221,5 +1221,15 @@
   "graphTypes.anyWithRole": "任何具備 {{role}} 角色者",
   "graphTypes.endpointOr": " 或 ",
   "graphTypes.containmentRule": "容器或任務 → 它可以容納的對象",
-  "graphTypes.endpointHint": "這個關係的兩端各自允許什麼。"
+  "graphTypes.endpointHint": "這個關係的兩端各自允許什麼。",
+  "overview.taskCount": "{{count}} 項任務",
+  "overview.openTask": "在所屬專案中開啟",
+  "dashboard.statCardHint": "顯示{{label}}",
+  "dashboard.sliceAll": "全部任務",
+  "dashboard.sliceOverdue": "逾期",
+  "dashboard.sliceActive": "進行中的工作",
+  "dashboard.sliceFailed": "失敗",
+  "dashboard.sliceInProgress": "執行中",
+  "dashboard.sliceDone": "已完成",
+  "dashboard.sliceClear": "清除"
 }

@@ -1221,5 +1221,16 @@
   "graphTypes.anyWithRole": "any {{role}}",
   "graphTypes.endpointOr": " or ",
   "graphTypes.containmentRule": "container or task → anything it may hold",
-  "graphTypes.endpointHint": "What may sit at each end of this relation."
+  "graphTypes.endpointHint": "What may sit at each end of this relation.",
+  "overview.taskCount_one": "{{count}} task",
+  "overview.taskCount_other": "{{count}} tasks",
+  "overview.openTask": "Open in its project",
+  "dashboard.statCardHint": "Show {{label}}",
+  "dashboard.sliceAll": "All tasks",
+  "dashboard.sliceOverdue": "Overdue",
+  "dashboard.sliceActive": "Active",
+  "dashboard.sliceFailed": "Failed",
+  "dashboard.sliceInProgress": "In progress",
+  "dashboard.sliceDone": "Done",
+  "dashboard.sliceClear": "Clear"
 }

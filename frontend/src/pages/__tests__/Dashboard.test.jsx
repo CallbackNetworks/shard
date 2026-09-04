@@ -34,6 +34,13 @@ vi.mock('../../api/client', () => ({
   getIdentityHubStats: vi.fn(),
   getGoals: vi.fn(),
   getDecisions: vi.fn(),
+  getPreference: vi.fn(),
+  setPreference: vi.fn(),
+  getAncestry: vi.fn(),
+  // The hero and the briefing route by node type now (ADR-0147), so the page
+  // reaches the type registry. `useQuery` is mocked below and never calls a
+  // queryFn — this export exists so the module-level reference resolves.
+  getNodeTypes: vi.fn(),
 }))
 
 vi.mock('../../components/AgentTasksPanel', () => ({
@@ -124,10 +131,13 @@ describe('Dashboard Command Center', () => {
     expect(screen.getByText('Shipped change')).toBeTruthy()
   })
 
-  it('navigates to the project when a lane task is clicked', () => {
+  // Was `/projects/p1`. Landing on the project was the whole of the old behaviour
+  // and the whole of the defect: a board of forty cards with nothing saying which
+  // one you clicked (ADR-0147).
+  it('opens the clicked lane task, not just its project', () => {
     setup()
     fireEvent.click(screen.getByText('Build flow').closest('button'))
-    expect(navigate).toHaveBeenCalledWith('/projects/p1')
+    expect(navigate).toHaveBeenCalledWith('/projects/p1?focus=motion')
   })
 
   it('handles empty projects without crashing', () => {
