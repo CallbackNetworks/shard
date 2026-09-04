@@ -1407,6 +1407,24 @@ has no such second copy and declares whatever it likes.
 The relationship vocabulary. `is_containment` marks relations that participate in `contains`
 -style traversal; `is_symmetric` marks undirected ones.
 
+#### `GET /graph-types/edges/options/{node_type}`
+Which relations a node of this type can actually be an end of, and which way round
+(ADR-0150). `/graph-types/edges` states each relation's declaration; this answers the
+question a caller about to write an edge actually has — *given this node, what can I link
+it to?* — by running the same predicate `graph.add_edge` enforces, once per direction.
+
+```json
+[{ "rel_type": "owns", "direction": "incoming", "label": "Owns",
+   "description": "Identity -> the container it owns: whose work this is, not where it lives...",
+   "is_containment": false, "is_symmetric": false, "other_types": ["identity"] }]
+```
+
+`direction` is `outgoing` (write `this -> other`) or `incoming` (write `other -> this`); a
+symmetric relation yields one option, since the reverse row is the same edge. `other_types`
+resolves the far end to concrete type keys, so a caller never needs its own copy of the role
+table. An undeclared type is not an error — it gets the free-form answer (ADR-0078), because
+a type declaring no roles may nest freely.
+
 ---
 
 ### WebSocket
@@ -1548,6 +1566,12 @@ On a **built-in** relation, `description`, `allowed_source` and `allowed_target`
 in code, so an edit here would change real behaviour and then be silently reverted by the
 next declaration resync. Structural flags (`is_containment`, `is_symmetric`) were already
 frozen. A relation you created is entirely yours.
+
+#### `GET /api/v1/edge-types/options/{node_type}` — requires `read`
+The relations a node of this type can take part in, per direction — the v1 twin of
+`/graph-types/edges/options/{node_type}` above, same payload. Call it before
+`POST /api/v1/nodes/{id}/edges`: most relations are legal in one direction only, and
+picking the wrong way round is the mistake `contains` does *not* refuse (ADR-0150).
 
 #### `POST /api/v1/nodes/{id}/edges` — requires `write`
 ```json

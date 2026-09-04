@@ -2,6 +2,9 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
+  // Suppresses the first-visit tour, whose scrim otherwise intercepts every click
+  // (ADR-0148 → ADR-0151). See the file for what this stops covering.
+  globalSetup: './global-setup.ts',
   // The guide-shot capture lives in this directory but is not a check: it writes
   // PNGs into the working tree and needs seeded data to produce anything worth
   // looking at (ADR-0148). Opted in by `scripts/screenshots.sh`, which sets
