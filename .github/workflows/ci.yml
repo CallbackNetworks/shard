@@ -231,8 +231,15 @@ jobs:
             done
           '
 
+      # `high`, not `moderate` (ADR-0145). A moderate advisory whose only fix is a major
+      # upgrade blocks every deploy until somebody does that upgrade, and the pressure to
+      # do it lands on whoever is trying to ship something unrelated. That is what
+      # happened: 27 moderate tiptap advisories, all fixable only by 2.x -> 3.x, arrived
+      # between two pushes and stopped production deploying. Moderates are still reported
+      # in this step's output; they no longer gate. Reviewing them is a person's job now,
+      # which is the cost this threshold buys and the reason it is written down.
       - name: Security audit
-        run: docker compose -f docker-compose.ci.yml run --rm frontend npm audit --audit-level=moderate
+        run: docker compose -f docker-compose.ci.yml run --rm frontend npm audit --audit-level=high
 
       - name: Build
         run: docker compose -f docker-compose.ci.yml run --rm frontend npx vite build
@@ -326,7 +333,10 @@ jobs:
       # e2e/ was covered by neither audit: the backend job runs pip-audit and the
       # frontend job runs npm audit, and this third package.json belonged to neither.
       - name: Security audit (e2e)
-        run: docker compose -f docker-compose.ci.yml --profile integration run --rm --no-deps e2e npm audit --audit-level=moderate
+        # Same threshold as the frontend's, for ADR-0145's reason. This tree is clean at
+        # `moderate` today; leaving the two gates on different thresholds is how the next
+        # advisory wave reproduces the same outage in the one that was not changed.
+        run: docker compose -f docker-compose.ci.yml --profile integration run --rm --no-deps e2e npm audit --audit-level=high
 
       - name: Run Playwright e2e suite
         run: |

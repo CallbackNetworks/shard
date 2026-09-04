@@ -146,3 +146,4 @@
 | [0142](0142-an-unset-status-is-open-in-sql-too.md) | 沒設定的狀態在 SQL 裡也算「還開著」：NULL NOT IN 會把整列丟掉 | Accepted | 2026-09-02 |
 | [0143](0143-a-share-link-is-a-door-in-not-a-subscription-out.md) | 分享連結是進來的門，不是出去的訂閱：訪客不能自己註冊 webhook | Accepted | 2026-09-02 |
 | [0144](0144-the-install-check-runs-where-the-installer-runs.md) | 檢查安裝的 job 要跑在安裝的人所在的地方：DooD 下主機路徑不是 job 的路徑 | Accepted | 2026-09-02 |
+| [0145](0145-the-audit-gate-blocks-on-what-can-be-fixed.md) | 稽核關卡只擋修得動的東西：門檻降到 high，tiptap 大版升級另外欠著 | Accepted | 2026-09-03 |
