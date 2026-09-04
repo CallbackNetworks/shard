@@ -238,8 +238,13 @@ jobs:
       # between two pushes and stopped production deploying. Moderates are still reported
       # in this step's output; they no longer gate. Reviewing them is a person's job now,
       # which is the cost this threshold buys and the reason it is written down.
+      #
+      # Wrapped, because `npm audit` also exits non-zero when it cannot reach npm at all,
+      # and a 503 from the registry is not a finding about this repository (ADR-0146).
       - name: Security audit
-        run: docker compose -f docker-compose.ci.yml run --rm frontend npm audit --audit-level=high
+        run: |
+          scripts/npm-audit-gate.sh \
+            docker compose -f docker-compose.ci.yml run --rm frontend npm audit --audit-level=high
 
       - name: Build
         run: docker compose -f docker-compose.ci.yml run --rm frontend npx vite build
@@ -336,7 +341,9 @@ jobs:
         # Same threshold as the frontend's, for ADR-0145's reason. This tree is clean at
         # `moderate` today; leaving the two gates on different thresholds is how the next
         # advisory wave reproduces the same outage in the one that was not changed.
-        run: docker compose -f docker-compose.ci.yml --profile integration run --rm --no-deps e2e npm audit --audit-level=high
+        run: |
+          scripts/npm-audit-gate.sh \
+            docker compose -f docker-compose.ci.yml --profile integration run --rm --no-deps e2e npm audit --audit-level=high
 
       - name: Run Playwright e2e suite
         run: |
