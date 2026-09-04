@@ -285,6 +285,102 @@ GET /api/v1/nodes/{node_id}/contained-tasks
 GET /api/v1/graph/map?types=project,task&include=data&limit=500
 ```
 
+## Recurring work, and giving it to another agent
+
+Shard holds the *schedule*; it does not run the agent. That split is deliberate — see
+[ADR-0149](adr/0149-recurring-work-is-scheduled-here-and-run-there.md) — and it answers the
+question most people ask first, which is whether the workflow rules engine can do this.
+**It cannot**: all five of its triggers (`node.created`, `node.updated`, `node.deleted`,
+`edge.added`, `edge.removed`) require that something already changed. Nothing fires because
+time passed, so no rule can say "every Monday".
+
+What does repeat on a timer is a **task**. Make one recurring and the scheduler generates a
+fresh copy each time the rule comes round.
+
+### Make a task repeat
+
+```
+POST /api/v1/projects/{project_id}/tasks/{task_id}/recurrence
+Content-Type: application/json
+
+{
+  "frequency": "weekly",
+  "day_of_week": 1,
+  "next_run_at": "2026-09-08T09:00:00Z"
+}
+```
+
+`frequency` is `daily`, `weekly`, `monthly` or `interval`. `day_of_week` is 0=Mon..6=Sun
+(weekly only), `day_of_month` is 1..31 (monthly only), and `interval_value` is "every N
+days" for `interval`. `end_date` stops it; `next_run_at` is required and sets the first run.
+
+`GET` reads it, `PATCH` changes it (`{"active": false}` pauses without losing the rule),
+`DELETE` removes it. One rule per task — a second `POST` is a 409. Over MCP this is the
+single `manage_recurrence(action, project_id, task_id, config)` tool.
+
+### Address it to a specific agent
+
+Set `assigned_agent_key_id` on the **template** task. It names an API key — an agent — and
+is validated against a live one, unlike the free-text `assignee` field, which is for people.
+
+```
+PATCH /api/v1/nodes/{template_task_id}
+{ "assigned_agent_key_id": "<the other agent's api key id>" }
+```
+
+Every generated copy carries that assignment forward. So work is addressed to one agent at
+the moment it is created, and **there are no unowned tasks to race over** — you do not need
+to claim or lock anything. A key that has been revoked in the meantime is dropped rather
+than copied forward, and the generated task arrives unassigned.
+
+The copy carries title, description, priority, assignee and the agent key. It does **not**
+carry labels, due date or estimate.
+
+### Find out it happened
+
+Shard will not call your agent — it has no way to start one. Subscribe to `task.created`
+and start the agent yourself when the webhook arrives:
+
+```
+POST /api/v1/subscriptions
+Content-Type: application/json
+
+{
+  "name": "wake-agent-b",
+  "callback_url": "https://your-runner/hook",
+  "events": ["task.created"],
+  "secret": "<shared secret, so you can verify X-Signature>"
+}
+```
+
+Add `"project_id"` to scope the subscription to one project.
+
+A task the scheduler generated carries `source: "scheduler"` in the payload, which is how
+you tell scheduled work apart from a task somebody just typed. Deliveries are HMAC-signed
+(`X-Signature`), logged, and retried on failure at 1, 5, 30, 120 and 360 minutes.
+
+**A retry can wake the same agent twice for the same task.** If your work has a side effect
+that must not happen twice (sending mail, opening a PR), make that action idempotent on your
+side — Shard has no claim or lease mechanism, and would not help here if it did, since both
+sessions hold the same key.
+
+Then have the agent ask what is waiting for it. **There is no server-side filter on
+`assigned_agent_key_id`** — list and check the field yourself, which is on every `TaskOut`:
+
+```
+GET /api/v1/projects/{project_id}/tasks?status_filter=todo
+```
+
+The webhook payload names the task directly, so the usual flow is to read that rather than
+poll. Polling is the fallback for a runner that missed a delivery.
+
+### What this is not for
+
+A check that usually finds nothing wrong should not generate a task — an hourly "is CI red?"
+leaves 24 cards a day behind. There is currently no timer that fires an event without
+creating a task; if you need one, say so, because that is the observation that would reopen
+ADR-0149.
+
 ## Tool Schema Discovery
 
 For HTTP-based agents that need tool definitions in function-calling format:
@@ -342,9 +438,10 @@ GET /api/v1/projects/{project_id}/labels
 ### Workflow rules
 
 The platform has automated workflow rules (e.g., "when all subtasks are done, mark parent as
-done"). They are user-configured and are not exposed on the External API — a status you write
-may be changed again by a rule immediately afterwards, so re-read the task if the exact final
-state matters.
+done") — a status you write may be changed again by a rule immediately afterwards, so re-read
+the task if the exact final state matters. They are reachable at `/api/v1/workflow-rules`
+(ADR-0085), so you can read what is configured rather than guess. Their triggers are all
+reactive; for work that repeats on a clock see **Recurring work** above.
 
 ## Agent Configuration
 

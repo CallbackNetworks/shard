@@ -150,3 +150,4 @@
 | [0146](0146-a-check-that-could-not-run-is-not-a-check-that-failed.md) | 跑不起來的檢查不等於沒通過的檢查：npm 掛掉不該擋部署 | Accepted | 2026-09-04 |
 | [0147](0147-an-entry-is-a-way-to-reach-what-it-names.md) | 一個條目就是通往它所指之物的路：Overview 的數字與列都要到得了它指名的東西 | Accepted | 2026-09-04 |
 | [0148](0148-the-product-explains-itself-in-the-product.md) | 產品要在產品裡把自己說清楚：圖文說明頁、聚光燈導覽、入門清單，圖片是產生的 | Accepted | 2026-09-04 |
+| [0149](0149-recurring-work-is-scheduled-here-and-run-there.md) | 週期性工作的「排程」存在 Shard、「執行」在 agent 那邊：不做時間觸發器，也不做認領 | Accepted | 2026-09-04 |
