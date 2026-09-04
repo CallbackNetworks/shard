@@ -371,8 +371,11 @@ async def _manage_types(kind: str, action: str, key: str | None = None, config: 
     return json.dumps(result) if not isinstance(result, str) else result
 
 
-async def _list_edge_types() -> str:
-    result = await _get("/edge-types")
+async def _list_edge_types(for_type: str | None = None) -> str:
+    # Narrowed by node type this answers the question a caller writing an edge actually
+    # has — given this node, what can I link it to, and which way round (ADR-0150) —
+    # rather than the whole vocabulary it then has to apply itself.
+    result = await _get(f"/edge-types/options/{for_type}" if for_type else "/edge-types")
     return json.dumps(result) if not isinstance(result, str) else result
 
 
@@ -1141,12 +1144,17 @@ async def manage_types(
     description=(
         "List the relation vocabulary: every edge type, what it means, and which node "
         "types/roles may sit at each end. Call this before manage_edges — the endpoint "
-        "rules are enforced on write, so an edge with the wrong relation is refused."
+        "rules are enforced on write, so an edge with the wrong relation is refused. "
+        "Pass for_type (a node type key) to get only the relations a node of that type "
+        "can actually be an end of, each with a 'direction': 'outgoing' means write "
+        "this -> other, 'incoming' means write other -> this. Most relations are legal "
+        "in one direction only, and picking the wrong way round is the common mistake "
+        "'contains' does not refuse."
     )
 )
-async def list_edge_types() -> str:
-    """No arguments; returns the relations an edge may declare."""
-    return await _list_edge_types()
+async def list_edge_types(for_type: str | None = None) -> str:
+    """Omit for_type for the whole vocabulary; pass one to narrow it to that node type."""
+    return await _list_edge_types(for_type=for_type)
 
 
 @mcp.tool(

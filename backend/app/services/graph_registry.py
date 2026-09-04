@@ -489,6 +489,64 @@ def relation_vocabulary(db: Session) -> list[dict]:
     ]
 
 
+def relation_options(db: Session, node_type: str) -> list[dict]:
+    """Every relation a node of ``node_type`` can actually take part in, per direction.
+
+    The authority behind the relation picker (ADR-0150). Three things were being
+    re-derived in the client and got all three wrong: which relations this node may
+    use at all, which way round the edge goes, and what may sit at the far end. So
+    the picker offered all nine relations on every node — on a project only two of
+    them could ever succeed — pointed every edge outward, and searched every node in
+    the database for a target. The worst case was silent rather than a 400:
+    ``contains`` carries no allow-list, so "this task belongs to that project",
+    expressed the only way the UI allowed, stored ``task contains project`` and ran
+    every rollup backwards.
+
+    Computed with ``graph.relation_accepts``, the same predicate ``add_edge``
+    enforces, so an option offered here is an edge the write path takes. ``direction``
+    says which end this node is: ``outgoing`` writes ``this -> other``, ``incoming``
+    writes ``other -> this``. A symmetric relation (ADR-0127) yields one option, not
+    two — the reverse row *is* this edge.
+
+    ``other_types`` resolves the far end to concrete type keys rather than echoing the
+    ``{"types": [...], "roles": [...]}`` declaration: a client filtering candidates by
+    a role would need its own copy of the role table, which is the second vocabulary
+    ADR-0056 is about. The wording of each option is *not* built here — the label is
+    the user's and the direction is a translated template (ADR-0058 draws engine names
+    server-side; "contained by" is not an engine name).
+    """
+    edge_types = db.query(EdgeType).all()
+    type_keys = [k for (k,) in db.query(NodeType.key).order_by(NodeType.key).all()]
+
+    def option(et: EdgeType, direction: str, others: list[str]) -> dict:
+        return {
+            "rel_type": et.key,
+            "direction": direction,
+            "label": et.label,
+            "description": et.description,
+            "is_containment": bool(et.is_containment),
+            "is_symmetric": bool(et.is_symmetric),
+            "other_types": others,
+        }
+
+    options: list[dict] = []
+    for et in edge_types:
+        outgoing = [k for k in type_keys if graph.relation_accepts(db, et.key, node_type, k)]
+        if outgoing:
+            options.append(option(et, "outgoing", outgoing))
+        if et.is_symmetric:
+            continue
+        incoming = [k for k in type_keys if graph.relation_accepts(db, et.key, k, node_type)]
+        if incoming:
+            options.append(option(et, "incoming", incoming))
+
+    # Containment first, then by key, then outgoing before incoming — the same order
+    # the node page already groups existing relations by, so the picker and the list
+    # above it read in one direction.
+    options.sort(key=lambda o: (not o["is_containment"], o["rel_type"], o["direction"] != "outgoing"))
+    return options
+
+
 def seed_builtin_types(db: Session) -> None:
     """Insert any missing built-in node/edge types. Idempotent; never overwrites."""
     existing_nodes = {k for (k,) in db.query(NodeType.key).all()}

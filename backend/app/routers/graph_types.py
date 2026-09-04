@@ -17,6 +17,7 @@ from app.schemas import (
     NodeTypeCreate,
     NodeTypeOut,
     NodeTypeUpdate,
+    RelationOptionOut,
 )
 from app.services import graph, node_data
 from app.services import graph_registry as type_registry
@@ -94,6 +95,15 @@ def delete_node_type(key: str, db: Session = Depends(get_db)):
 @router.get("/edges", response_model=list[EdgeTypeOut])
 def list_edge_types(db: Session = Depends(get_db)):
     return type_registry.edge_types_with_usage(db)
+
+
+# Registered before the parameterised edge routes: a literal segment matched second is
+# a route nothing can reach (ADR-0086). Nothing shares GET here today, but the pair is
+# what makes that invisible.
+@router.get("/edges/options/{node_type}", response_model=list[RelationOptionOut])
+def list_relation_options(node_type: str, db: Session = Depends(get_db)):
+    """Which relations a node of ``node_type`` can actually be an end of (ADR-0150)."""
+    return type_registry.relation_options(db, node_type)
 
 
 @router.post("/edges", response_model=EdgeTypeOut, status_code=status.HTTP_201_CREATED)

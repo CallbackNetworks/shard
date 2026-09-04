@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ApiKey
 from app.routers.external_api.auth import _auth_errors, _get_api_key, _require_scope
-from app.schemas import EdgeTypeCreate, EdgeTypeOut, EdgeTypeUpdate
+from app.schemas import EdgeTypeCreate, EdgeTypeOut, EdgeTypeUpdate, RelationOptionOut
 from app.services import graph_registry as type_registry
 from app.services.graph_registry import relation_vocabulary
 
@@ -74,6 +74,29 @@ def api_edge_types(
 def api_list_edge_type_rows(db: Session = Depends(get_db), api_key: ApiKey = Depends(_get_api_key)):
     _require_scope(api_key, "read")
     return type_registry.edge_types_with_usage(db)
+
+
+@sub_router.get(
+    "/edge-types/options/{node_type}",
+    response_model=list[RelationOptionOut],
+    summary="Relations a node type can take part in",
+    description="""Which relations a node of this type may actually be an end of, and
+which way round. `/edge-types` states each relation's declaration; this answers the
+question a caller about to write an edge actually has — *given this node, what can I
+link it to?* — by running the same predicate the write path enforces, once per
+direction. `direction` is `outgoing` (write `this -> other`) or `incoming` (write
+`other -> this`); a symmetric relation yields one option, since the reverse row is the
+same edge. `other_types` resolves the far end to concrete type keys, so a caller never
+needs its own copy of the role table. Requires `read` scope.""",
+    responses=_auth_errors,
+)
+def api_relation_options(
+    node_type: str,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(_get_api_key),
+):
+    _require_scope(api_key, "read")
+    return type_registry.relation_options(db, node_type)
 
 
 @sub_router.post(

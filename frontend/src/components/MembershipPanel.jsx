@@ -10,6 +10,7 @@ import {
   getNodeTypes, getNode, getNodeEdges, getEdgeTypes, attachNodeEdge, detachNodeEdge,
 } from '../api/client'
 import NodeCombobox from './shared/NodeCombobox'
+import RelationPicker from './shared/RelationPicker'
 import GoverningDecisions from './GoverningDecisions'
 import { hasNodeRole } from '../constants/nodeRoles'
 
@@ -60,16 +61,10 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
   // Other relations: custom edge types on this task (ADR-0037 proposal 5).
   const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
   const { data: taskEdges = [] } = useQuery({ queryKey: qk.nodeEdges(task.id), queryFn: () => getNodeEdges(task.id) })
-  const customEdgeTypes = edgeTypes.filter(et => !et.is_builtin)
   const otherEdges = taskEdges.filter(e => !CORE_RELS.has(e.rel_type))
-  const [relPick, setRelPick] = useState('')
   const relLabel = (key) => edgeTypes.find(et => et.key === key)?.label || key
 
   const invalidateEdges = () => qc.invalidateQueries({ queryKey: qk.nodeEdges(task.id) })
-  const handleLinkRelation = async (node) => {
-    await attachNodeEdge(task.id, { target_id: node.id, rel_type: relPick })
-    invalidateEdges()
-  }
   const handleUnlinkRelation = async (edge) => {
     if (edge.source_id === task.id) await detachNodeEdge(task.id, edge.target_id, edge.rel_type)
     else await detachNodeEdge(edge.source_id, task.id, edge.rel_type)
@@ -130,6 +125,7 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
         <select
           value={pick}
           onChange={e => setPick(e.target.value)}
+          aria-label={t('membership.pickProject')}
           style={{ flex: 1, padding: '4px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(var(--kt-ink-rgb), 0.05)', color: 'var(--kt-ink)', outline: 'none' }}
         >
           <option value="">{t('membership.pickProject')}</option>
@@ -175,11 +171,10 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
         </div>
       )}
 
-      {(customEdgeTypes.length > 0 || otherEdges.length > 0) && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            {t('membership.otherRelations')}
-          </div>
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          {t('membership.otherRelations')}
+        </div>
           {otherEdges.map(e => {
             const outgoing = e.source_id === task.id
             const other = outgoing ? e.target : e.source
@@ -197,30 +192,19 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
               </div>
             )
           })}
-          {customEdgeTypes.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
-              <select
-                value={relPick}
-                onChange={e => setRelPick(e.target.value)}
-                aria-label={t('membership.pickRelation')}
-                style={{ padding: '4px 8px', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 5, fontSize: 11, background: 'rgba(var(--kt-ink-rgb), 0.05)', color: 'var(--kt-ink)', outline: 'none' }}
-              >
-                <option value="">{t('membership.pickRelation')}</option>
-                {customEdgeTypes.map(et => (
-                  <option key={et.key} value={et.key}>{et.label}</option>
-                ))}
-              </select>
-              {relPick && (
-                <NodeCombobox
-                  placeholder={t('membership.linkRelation')}
-                  excludeIds={[task.id]}
-                  onSelect={handleLinkRelation}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
+          {/* The same picker the node page uses (ADR-0150). It used to list only
+              *custom* edge types and always point the edge outward, so this panel
+              could not express a relation a built-in already covered from the other
+              side. */}
+          <div style={{ marginTop: 6 }}>
+            <RelationPicker
+              nodeId={task.id}
+              nodeType={task.type || 'task'}
+              onLinked={invalidateEdges}
+              compact
+            />
+          </div>
+      </div>
     </div>
   )
 }

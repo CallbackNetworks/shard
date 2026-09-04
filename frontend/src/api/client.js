@@ -519,14 +519,27 @@ export const getNodeShareChatLog = (id) => api.get(`/nodes/${id}/share-chat-log`
 // hide, plus the kinds/stores/columns a declaration may name. Served, never mirrored.
 export const getFieldVocabulary = () => api.get('/graph-types/fields/vocabulary').then(r => r.data)
 export const getEdgeTypes = () => api.get('/graph-types/edges').then(r => r.data)
+// Which relations a node of this type can actually be an end of, and which way round
+// (ADR-0150). Derived server-side from the same predicate the write path enforces, so
+// the picker never re-implements the endpoint rules — the client asking the question
+// itself is how it came to offer nine relations on a node that could use two.
+export const getRelationOptions = (nodeType) =>
+  api.get(`/graph-types/edges/options/${nodeType}`).then(r => r.data)
 export const createEdgeType = (data) => api.post('/graph-types/edges', data).then(r => r.data)
+// The PATCH route has existed since ADR-0079 with no client function, so a relation's
+// endpoint declarations could be written by an API caller and by nothing a person could
+// click (ADR-0150). Built-ins refuse the frozen fields at the door (ADR-0121).
+export const updateEdgeType = (key, data) => api.patch(`/graph-types/edges/${key}`, data).then(r => r.data)
 export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)
 
 // Generic graph nodes (ADR-0033)
-export const getNodes = (type, query) => {
+export const getNodes = (type, query, { unfiled, limit, offset } = {}) => {
   const params = {}
   if (type) params.type = type
   if (query) params.query = query
+  if (unfiled) params.unfiled = true
+  if (limit) params.limit = limit
+  if (offset) params.offset = offset
   return api.get('/nodes', { params }).then(r => r.data)
 }
 export const getNode = (id) => api.get(`/nodes/${id}`).then(r => r.data)

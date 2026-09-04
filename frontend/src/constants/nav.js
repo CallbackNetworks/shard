@@ -1,6 +1,6 @@
 import {
   Activity, BarChart2, FileText, GitFork, GitMerge, Key, LayoutGrid,
-  MessageCircle, Network, Settings2, Target, Users, Zap, ScrollText, Shapes, Boxes, Inbox, Layers,
+  MessageCircle, Network, Settings2, Target, Users, Zap, ScrollText, Shapes, Boxes,
   BookOpen,
 } from 'lucide-react'
 
@@ -40,11 +40,15 @@ export const NAV_GROUPS = [
   },
   {
     labelKey: 'nav.groupData',
+    // Two rows, not four (ADR-0150). `/unfiled` and `/containers` were each a door onto
+    // a slice of what `/explorer` now covers whole: unfiled is a filter there, and the
+    // container-type list was a strictly weaker copy of the left column of
+    // `/graph-types`. Both paths still resolve — a bookmark is not a rail row — they
+    // just no longer each cost a permanent line in a rail whose height is the point
+    // (ADR-0066).
     items: [
-      { to: '/unfiled', icon: Inbox, labelKey: 'nav.unfiled' },
-      { to: '/containers', icon: Layers, labelKey: 'nav.containers' },
-      { to: '/graph-types', icon: Shapes, labelKey: 'nav.graphTypes' },
       { to: '/explorer', icon: Boxes, labelKey: 'nav.nodeExplorer' },
+      { to: '/graph-types', icon: Shapes, labelKey: 'nav.graphTypes' },
     ],
   },
   {

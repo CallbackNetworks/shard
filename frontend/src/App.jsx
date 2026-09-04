@@ -39,8 +39,6 @@ const NodeExplorer = lazy(() => import('./pages/NodeExplorer'))
 const NodePage = lazy(() => import('./pages/NodePage'))
 const ContainerView = lazy(() => import('./pages/ContainerView'))
 const TypeNodesPage = lazy(() => import('./pages/TypeNodesPage'))
-const Unfiled = lazy(() => import('./pages/Unfiled'))
-const Containers = lazy(() => import('./pages/Containers'))
 const ShareView = lazy(() => import('./pages/ShareView'))
 const Login = lazy(() => import('./pages/Login'))
 
@@ -197,8 +195,12 @@ function Layout() {
               <Route path="n/:id" element={<NodePage />} />
               <Route path="c/:id" element={<ContainerView />} />
               <Route path="t/:typeKey" element={<TypeNodesPage />} />
-              <Route path="unfiled" element={<Unfiled />} />
-              <Route path="containers" element={<Containers />} />
+              {/* Both pages were folded into the two that remain (ADR-0150): unfiled is
+                  a filter on the data page, and the container-type list was a weaker copy
+                  of the type registry's own. The paths stay so a bookmark still lands
+                  somewhere true — a retired page must not become a 404. */}
+              <Route path="unfiled" element={<Navigate to="/explorer?loose=1" replace />} />
+              <Route path="containers" element={<Navigate to="/graph-types" replace />} />
               {/* The chapter is in the URL: a guide is a thing people link each
                   other to, and "read the section on decisions" has to be a link
                   rather than directions (ADR-0148). */}

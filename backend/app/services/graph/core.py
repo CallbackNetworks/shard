@@ -476,6 +476,42 @@ def _accepts_endpoints(db: Session, et: EdgeType, source_type: str, target_type:
     )
 
 
+def unfiled_node_ids(db: Session) -> select:
+    """Nodes that are genuinely loose in the graph (ADR-0150).
+
+    "No incoming containment edge" is not the same question, and answering it instead is
+    what made the Unfiled page an inbox that could never be emptied: the top of a
+    hierarchy has no parent *by definition*, so an organization holding twenty-one
+    projects sat in the inbox permanently under a hint reading "link it into the graph"
+    — advice that, followed, files a root under something else.
+
+    A root is a node nothing contains that nevertheless *contains something*. Loose is
+    both: nothing above it and nothing below it. That distinction needs no type or role,
+    which is why it holds for a custom layer nobody has told the app about.
+    """
+    contained = (
+        select(Edge.target_id).join(EdgeType, EdgeType.key == Edge.rel_type).where(EdgeType.is_containment.is_(True))
+    )
+    parents = (
+        select(Edge.source_id).join(EdgeType, EdgeType.key == Edge.rel_type).where(EdgeType.is_containment.is_(True))
+    )
+    return select(Node.id).where(Node.id.not_in(contained), Node.id.not_in(parents))
+
+
+def relation_accepts(db: Session, rel_type: str, source_type: str, target_type: str) -> bool:
+    """Would ``rel_type`` accept a ``source_type -> target_type`` edge?
+
+    The public form of the predicate ``add_edge`` enforces. It exists so a *picker*
+    can be built from the same rule the write path applies rather than from a second
+    copy in the client: ADR-0056's lesson is that a vocabulary served once and
+    re-derived somewhere else drifts into offering values the engine rejects, and
+    until ADR-0150 the relation picker was exactly that — every relation offered on
+    every node, most of them a guaranteed 400.
+    """
+    et = db.get(EdgeType, rel_type)
+    return et is None or _accepts_endpoints(db, et, source_type, target_type)
+
+
 def _suggest_relations(db: Session, source_type: str, target_type: str, exclude: str) -> list[str]:
     """Relations that *would* accept this pair of endpoints, for the error message.
 

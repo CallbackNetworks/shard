@@ -3,13 +3,13 @@ import { qk } from '../api/queryKeys'
 import { useNavigate, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, History, Link2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, History, Link2, Pencil, Trash2, X } from 'lucide-react'
 import {
   getNode, getNodeEdges, getNodeEvents, getNodeTypes, getEdgeTypes,
-  updateNode, deleteNode, attachNodeEdge, detachNodeEdge,
+  updateNode, deleteNode, detachNodeEdge,
 } from '../api/client'
 import { DARK, STATUS_COLOR } from '../constants/theme'
-import NodeCombobox from '../components/shared/NodeCombobox'
+import RelationPicker from '../components/shared/RelationPicker'
 import NodeShareFacet from '../components/NodeShareFacet'
 import NodeFieldsPanel from '../components/NodeFieldsPanel'
 import GoverningDecisions from '../components/GoverningDecisions'
@@ -102,7 +102,6 @@ export default function NodePage() {
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
-  const [attach, setAttach] = useState({ relType: 'contains', open: false })
   const [showEvents, setShowEvents] = useState(false)
 
   const typeMeta = nodeTypes.find(nt => nt.key === node?.type)
@@ -122,10 +121,6 @@ export default function NodePage() {
   const deleteMut = useMutation({
     mutationFn: () => deleteNode(id),
     onSuccess: () => navigate(-1),
-  })
-  const attachMut = useMutation({
-    mutationFn: (targetId) => attachNodeEdge(id, { target_id: targetId, rel_type: attach.relType }),
-    onSuccess: invalidate,
   })
   const detachMut = useMutation({
     mutationFn: ({ sourceId, targetId, relType }) => detachNodeEdge(sourceId, targetId, relType),
@@ -288,28 +283,17 @@ export default function NodePage() {
           )
         })}
 
-        {/* Attach */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
-          <select
-            className="kt-input" style={{ width: 'auto' }}
-            aria-label={t('nodePage.relType')}
-            value={attach.relType}
-            onChange={e => setAttach(a => ({ ...a, relType: e.target.value }))}
-          >
-            {edgeTypes.map(et => <option key={et.key} value={et.key}>{et.label}</option>)}
-          </select>
-          <NodeCombobox
-            placeholder={t('nodePage.attachPlaceholder')}
+        {/* Attach. One picker (ADR-0150) — it asks the server which relations this
+            node type can be an end of, and in which direction, instead of listing the
+            whole vocabulary and learning from the 400. */}
+        <div style={{ marginTop: 6 }}>
+          <RelationPicker
+            nodeId={id}
+            nodeType={node.type}
             excludeIds={[...edgeIds]}
-            onSelect={(n) => attachMut.mutate(n.id)}
+            onLinked={invalidate}
           />
-          <Plus size={13} color={DARK.textDim} />
         </div>
-        {attachMut.isError && (
-          <div style={{ fontSize: 12, color: DARK.danger, marginTop: 6 }}>
-            {attachMut.error?.response?.data?.detail || t('nodePage.attachFailed')}
-          </div>
-        )}
       </div>
 
       {/* Provenance */}

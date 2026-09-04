@@ -1,33 +1,47 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { qk } from '../api/queryKeys'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Boxes, List, Network, Plus, Trash2, Link2, X } from 'lucide-react'
+import { Boxes, List, Network, Plus, Search, Trash2, Link2, X } from 'lucide-react'
 import {
   getNodeTypes, getEdgeTypes, getNodes, getNode, createNode, deleteNode,
-  getNodeEdges, attachNodeEdge, detachNodeEdge, getGraphMap,
+  getNodeEdges, detachNodeEdge, getGraphMap,
 } from '../api/client'
 import { DARK } from '../constants/theme'
 import { nodeHref } from '../utils/nodeHref'
 import useAncestry from '../hooks/useAncestry'
 import AncestryTrail from '../components/shared/AncestryTrail'
 import EgoNetwork from '../components/shared/EgoNetwork'
+import RelationPicker from '../components/shared/RelationPicker'
 import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
+import s from './NodeExplorer.module.css'
+
+const PAGE = 100
 
 function TypeChip({ typeMeta, typeKey }) {
   const color = typeMeta?.color || '#818cf8'
   return (
-    <span style={{
-      fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
-      textTransform: 'uppercase', letterSpacing: 0.4,
-      color, background: `${color}22`, border: `1px solid ${color}44`,
-    }}>
+    <span className={s.typeChip} style={{ '--chip': color }}>
       {typeMeta?.label || typeKey}
     </span>
   )
 }
 
+// The one page for looking at the graph as data (ADR-0150). It replaces three doors
+// that each showed a slice and none of which let you find anything:
+//
+//   * this page listed one type at a time with **no search box**, took the endpoint's
+//     default page of 100, drew it, and printed *that* as the count — so a database
+//     holding 144 tasks said "100 nodes" and 44 of them were unreachable from here;
+//   * `/unfiled` asked "has no incoming containment edge", which is also true of every
+//     root, so an organization holding twenty-one projects sat in an inbox forever
+//     under a hint telling you to file it under something;
+//   * `/containers` spent a permanent rail row on a two-card menu of container *types*,
+//     a strict subset of what the type registry page already draws.
+//
+// So: one search across every type, the true totals beside each type, real paging, and
+// the selected node's relations editable in place through the shared picker.
 export default function NodeExplorer() {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -35,28 +49,56 @@ export default function NodeExplorer() {
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes })
   const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes })
 
-  const [selectedType, setSelectedType] = useState('')
+  // What is being looked at lives in the URL (ADR-0083), which is also what lets the
+  // retired `/unfiled` page become a link into this one rather than a second page.
+  const [params, setParams] = useSearchParams()
+  const selectedType = params.get('type') || ''
+  const loose = params.get('loose') === '1'
+  const setParam = (key, value) => setParams(prev => {
+    const next = new URLSearchParams(prev)
+    if (value) next.set(key, value)
+    else next.delete(key)
+    return next
+  }, { replace: true })
+  const setSelectedType = (v) => setParam('type', v)
+  const setLoose = (v) => setParam('loose', v ? '1' : '')
+  const [text, setText] = useState('')
+  const [search, setSearch] = useState('')
+  const [limit, setLimit] = useState(PAGE)
   const [selectedId, setSelectedId] = useState(null)
   const [newTitle, setNewTitle] = useState('')
   const [relView, setRelView] = useState('list')
-  const [attach, setAttach] = useState({ targetType: '', targetId: '', relType: 'contains' })
+  const searchRef = useRef(null)
 
-  // Default the type picker to the first available type once loaded.
-  const effectiveType = selectedType || nodeTypes[0]?.key || ''
-  const typeMeta = nodeTypes.find(nt => nt.key === effectiveType)
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(text.trim()), 200)
+    return () => clearTimeout(id)
+  }, [text])
+  // Any change to what is being asked starts the paging over; keeping the old limit
+  // would silently hand back a page of a different query.
+  useEffect(() => { setLimit(PAGE) }, [search, selectedType, loose])
+
+  // No type is the default, not `nodeTypes[0]`. The old default was whichever type the
+  // registry happened to return first — here, Cycle: nineteen sprints, which is nobody's
+  // reason for opening this page.
+  const typeMeta = nodeTypes.find(nt => nt.key === selectedType)
   const readOnly = !!typeMeta?.is_builtin // entity-backed builtins reject generic create/delete
 
   const typeByKey = useNodeTypeMap()
   const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
-  const { data: nodes = [], isLoading: nodesLoading } = useQuery({
-    queryKey: qk.nodes(effectiveType),
-    queryFn: () => getNodes(effectiveType),
-    enabled: !!effectiveType,
+  const { data: nodes = [], isLoading: nodesLoading, isFetching } = useQuery({
+    queryKey: qk.nodes(selectedType || 'all', search, loose ? 'loose' : 'any', limit),
+    queryFn: () => getNodes(selectedType, search, { unfiled: loose, limit }),
   })
-  // The selection is read from the server rather than found in the list above: the
-  // graph re-centres onto neighbours, and a neighbour is usually of another type —
-  // looking it up in the current type's page of results would lose it on every hop.
+
+  // The honest denominator. `usage_count` is a COUNT on the server, so it does not move
+  // when the page size does — which is the entire difference between this line and the
+  // one it replaces.
+  const totalForType = typeMeta?.usage_count
+  const narrowed = !!search || loose
+  const maybeMore = nodes.length >= limit
+
   const { data: selectedNode } = useQuery({
     queryKey: qk.node(selectedId),
     queryFn: () => getNode(selectedId),
@@ -67,11 +109,6 @@ export default function NodeExplorer() {
     queryFn: () => getNodeEdges(selectedId),
     enabled: !!selectedId,
   })
-  const { data: targetNodes = [] } = useQuery({
-    queryKey: qk.nodes(attach.targetType),
-    queryFn: () => getNodes(attach.targetType),
-    enabled: !!attach.targetType,
-  })
   // One slice feeds the whole neighbourhood drawing, including the second hop —
   // walking it edge-endpoint by edge-endpoint would be a request per neighbour.
   const { data: slice, isLoading: sliceLoading } = useQuery({
@@ -81,31 +118,29 @@ export default function NodeExplorer() {
     staleTime: 30000,
   })
 
-  const ancestry = useAncestry(nodes.map(n => n.id), `nodes:${effectiveType}`)
+  const ancestry = useAncestry(nodes.map(n => n.id), `nodes:${selectedType}:${search}:${loose}`)
 
-  const createMut = useMutation({
-    mutationFn: createNode,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.nodes(effectiveType) }); setNewTitle('') },
-  })
-  const deleteMut = useMutation({
-    mutationFn: deleteNode,
-    onSuccess: (_d, id) => {
-      qc.invalidateQueries({ queryKey: qk.nodes(effectiveType) })
-      qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
-      if (id === selectedId) setSelectedId(null)
-    },
-  })
+  const invalidateList = () => qc.invalidateQueries({ queryKey: qk.nodes() })
   const invalidateEdges = () => {
     qc.invalidateQueries({ queryKey: qk.nodeEdges(selectedId) })
     qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
     qc.invalidateQueries({ queryKey: qk.ancestry() })
+    invalidateList()
   }
-  const attachMut = useMutation({
-    mutationFn: ({ id, body }) => attachNodeEdge(id, body),
-    onSuccess: () => { invalidateEdges(); setAttach(a => ({ ...a, targetId: '' })) },
+  const createMut = useMutation({
+    mutationFn: createNode,
+    onSuccess: () => { invalidateList(); setNewTitle('') },
+  })
+  const deleteMut = useMutation({
+    mutationFn: deleteNode,
+    onSuccess: (_d, id) => {
+      invalidateList()
+      qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
+      if (id === selectedId) setSelectedId(null)
+    },
   })
   const detachMut = useMutation({
-    mutationFn: ({ id, targetId, relType }) => detachNodeEdge(id, targetId, relType),
+    mutationFn: ({ sourceId, targetId, relType }) => detachNodeEdge(sourceId, targetId, relType),
     onSuccess: invalidateEdges,
   })
 
@@ -119,75 +154,113 @@ export default function NodeExplorer() {
         <Boxes size={22} color="#818cf8" />
       </div>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* Left: type picker + node list */}
-        <div className="kt-card" style={{ padding: 20, flex: '1 1 340px', minWidth: 300 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 }}>
-            <select
-              className="kt-input" style={{ width: 'auto', minWidth: 160 }}
-              value={effectiveType}
-              onChange={e => { setSelectedType(e.target.value); setSelectedId(null) }}
+      <div className={s.layout}>
+        {/* Left: what to look at. Types carry their real totals, so the number beside
+            a type never disagrees with the number of rows you can reach. */}
+        <div className={`kt-card ${s.filters}`}>
+          <div className={s.filterHead}>{t('nodeExplorer.filterType')}</div>
+          <button
+            className={`${s.typeRow} ${!selectedType ? s.typeRowActive : ''}`}
+            onClick={() => { setSelectedType(''); setSelectedId(null) }}
+          >
+            <span className={s.typeName}>{t('nodeExplorer.allTypes')}</span>
+          </button>
+          {nodeTypes.map(nt => (
+            <button
+              key={nt.key}
+              className={`${s.typeRow} ${selectedType === nt.key ? s.typeRowActive : ''}`}
+              onClick={() => { setSelectedType(nt.key); setSelectedId(null) }}
             >
-              {nodeTypes.map(nt => (
-                <option key={nt.key} value={nt.key}>{nt.label}{nt.is_builtin ? '' : ' *'}</option>
-              ))}
-            </select>
-            <span style={{ fontSize: 12, color: DARK.textDim }}>{t('nodeExplorer.count', { n: nodes.length })}</span>
+              <span className={s.typeDot} style={{ '--chip': nt.color || '#818cf8' }} />
+              <span className={s.typeName}>{nt.label}</span>
+              <span className={s.typeCount}>{nt.usage_count ?? 0}</span>
+            </button>
+          ))}
+
+          <div className={s.filterHead} style={{ marginTop: 16 }}>{t('nodeExplorer.filterShape')}</div>
+          <label className={s.looseToggle}>
+            <input type="checkbox" checked={loose} onChange={e => setLoose(e.target.checked)} />
+            <span>{t('nodeExplorer.looseOnly')}</span>
+          </label>
+          <p className={s.looseHint}>{t('nodeExplorer.looseHint')}</p>
+        </div>
+
+        {/* Middle: find it. */}
+        <div className={`kt-card ${s.results}`}>
+          <div className={s.searchRow}>
+            <Search size={13} color={DARK.textDim} className={s.searchIcon} />
+            <input
+              ref={searchRef}
+              className="kt-input"
+              style={{ paddingLeft: 28 }}
+              placeholder={t('nodeExplorer.searchPlaceholder')}
+              aria-label={t('nodeExplorer.searchPlaceholder')}
+              value={text}
+              onChange={e => setText(e.target.value)}
+            />
           </div>
 
-          {!readOnly && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <div className={s.countRow}>
+            {/* Two different sentences, because they are two different facts. Without a
+                narrowing filter the type's own total is known and shown; with one, only
+                what came back is known, and claiming a total would be the old lie in a
+                new place. */}
+            {narrowed || !selectedType
+              ? t('nodeExplorer.countShown', { n: nodes.length })
+              : t('nodeExplorer.countOf', { n: nodes.length, total: totalForType ?? nodes.length })}
+            {isFetching && <span className={s.fetching}>{t('loading')}</span>}
+          </div>
+
+          {!readOnly && selectedType && (
+            <div className={s.createRow}>
               <input
-                className="kt-input" style={{ flex: 1 }}
+                className="kt-input"
                 placeholder={t('nodeExplorer.titlePlaceholder')}
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && newTitle && effectiveType) createMut.mutate({ type: effectiveType, title: newTitle }) }}
+                onKeyDown={e => { if (e.key === 'Enter' && newTitle) createMut.mutate({ type: selectedType, title: newTitle }) }}
               />
               <button
                 className="kt-btn kt-btn-primary"
-                disabled={!newTitle || !effectiveType || createMut.isPending}
-                onClick={() => createMut.mutate({ type: effectiveType, title: newTitle })}
+                disabled={!newTitle || createMut.isPending}
+                onClick={() => createMut.mutate({ type: selectedType, title: newTitle })}
               >
                 <Plus size={12} /> {t('nodeExplorer.add')}
               </button>
             </div>
           )}
-          {readOnly && (
-            <p style={{ margin: '0 0 12px', fontSize: 12, color: DARK.textDim }}>{t('nodeExplorer.readOnlyHint')}</p>
+          {readOnly && selectedType && (
+            <p className={s.readOnlyHint}>{t('nodeExplorer.readOnlyHint')}</p>
           )}
 
           {nodesLoading ? (
-            <div style={{ fontSize: 12, color: DARK.textDim }}>{t('loading')}</div>
+            <div className={s.dim}>{t('loading')}</div>
           ) : nodes.length === 0 ? (
-            <div style={{ fontSize: 12, color: DARK.textDim }}>{t('nodeExplorer.empty')}</div>
+            <div className={s.dim}>{t('nodeExplorer.empty')}</div>
           ) : (
             nodes.map(n => (
               <div
                 key={n.id}
                 onClick={() => setSelectedId(n.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 8px', cursor: 'pointer',
-                  borderBottom: `1px solid ${DARK.border}`,
-                  background: n.id === selectedId ? 'rgba(129,140,248,0.1)' : 'transparent',
-                }}
+                className={`${s.row} ${n.id === selectedId ? s.rowActive : ''}`}
               >
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, color: DARK.text }}>
-                    {n.title || <em style={{ color: DARK.textDim }}>{t('nodeExplorer.untitled')}</em>}
+                <TypeChip typeMeta={typeByKey.get(n.type)} typeKey={n.type} />
+                <span className={s.rowBody}>
+                  <span className={s.rowTitle}>
+                    {n.title || <em className={s.dim}>{t('nodeExplorer.untitled')}</em>}
                   </span>
-                  {/* Where it lives, on the row (ADR-0094) — the whole list used to read
-                      as a flat bag of titles with the hierarchy nowhere on screen. The
-                      chips are links, so a click on one must not also select the row. */}
+                  {/* Where it lives, on the row (ADR-0094) — the list used to read as a
+                      flat bag of titles with the hierarchy nowhere on screen. The chips
+                      are links, so a click on one must not also select the row. */}
                   <span onClick={e => e.stopPropagation()}>
-                    <AncestryTrail nodeId={n.id} entry={ancestry[n.id]} maxTrails={1} />
+                    <AncestryTrail nodeId={n.id} entry={ancestry[n.id]} maxTrails={1} showOwners={false} />
                   </span>
                 </span>
-                {!readOnly && (
+                {!typeByKey.get(n.type)?.is_builtin && (
                   <button
                     onClick={e => { e.stopPropagation(); if (window.confirm(t('nodeExplorer.deleteConfirm'))) deleteMut.mutate(n.id) }}
                     aria-label="delete" disabled={deleteMut.isPending}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 4 }}
+                    className={s.iconBtn}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -195,28 +268,32 @@ export default function NodeExplorer() {
               </div>
             ))
           )}
+
+          {maybeMore && (
+            <button className={`kt-btn ${s.more}`} onClick={() => setLimit(l => l + PAGE)}>
+              {t('nodeExplorer.loadMore')}
+            </button>
+          )}
         </div>
 
-        {/* Right: selected node edges */}
-        <div className="kt-card" style={{ padding: 20, flex: '1 1 340px', minWidth: 300 }}>
+        {/* Right: what it is connected to, and the one control that connects it. */}
+        <div className={`kt-card ${s.detail}`}>
           {!selectedNode ? (
-            <div style={{ fontSize: 12, color: DARK.textDim }}>{t('nodeExplorer.selectHint')}</div>
+            <div className={s.dim}>{t('nodeExplorer.selectHint')}</div>
           ) : (
             <>
               <div style={{ marginBottom: 14 }}>
                 <AncestryTrail nodeId={selectedNode.id} className="kt-ancestry" />
-                <Link to={nodeHref(selectedNode, typeByKey)} style={{ fontSize: 15, fontWeight: 700, color: DARK.text, textDecoration: 'none' }}>
+                <Link to={nodeHref(selectedNode, typeByKey)} className={s.detailTitle}>
                   {selectedNode.title || t('nodeExplorer.untitled')}
                 </Link>
-                <div><code style={{ fontSize: 11, color: DARK.textDim }}>{selectedNode.type} · {selectedNode.id}</code></div>
+                <div><code className={s.detailMeta}>{selectedNode.type} · {selectedNode.id}</code></div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: DARK.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  {t('nodeExplorer.edges')}
-                </div>
-                <span style={{ fontSize: 11, color: DARK.textDim }}>{edges.length}</span>
-                <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+              <div className={s.detailHead}>
+                <span className={s.filterHead}>{t('nodeExplorer.edges')}</span>
+                <span className={s.dim}>{edges.length}</span>
+                <div className={s.viewToggle}>
                   <button
                     className="kt-btn" aria-pressed={relView === 'list'} title={t('nodeExplorer.viewList')}
                     onClick={() => setRelView('list')}
@@ -235,7 +312,7 @@ export default function NodeExplorer() {
               </div>
 
               {relView === 'graph' && sliceLoading ? (
-                <div style={{ fontSize: 12, color: DARK.textDim, padding: '12px 0' }}>{t('loading')}</div>
+                <div className={s.dim} style={{ padding: '12px 0' }}>{t('loading')}</div>
               ) : relView === 'graph' ? (
                 <EgoNetwork
                   slice={slice}
@@ -245,7 +322,7 @@ export default function NodeExplorer() {
                   onRecenter={setSelectedId}
                 />
               ) : edges.length === 0 ? (
-                <div style={{ fontSize: 12, color: DARK.textDim, marginBottom: 12 }}>{t('nodeExplorer.noEdges')}</div>
+                <div className={s.dim} style={{ marginBottom: 12 }}>{t('nodeExplorer.noEdges')}</div>
               ) : (
                 edges.map(e => {
                   const outgoing = e.source_id === selectedNode.id
@@ -255,87 +332,44 @@ export default function NodeExplorer() {
                   const other = outgoing ? e.target : e.source
                   const otherId = outgoing ? e.target_id : e.source_id
                   return (
-                    <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: `1px solid ${DARK.border}`, fontSize: 12 }}>
+                    <div key={e.id} className={s.edgeRow}>
                       <Link2 size={12} color={DARK.textDim} />
-                      <span style={{ color: '#818cf8', fontWeight: 600 }}>{edgeTypeByKey.get(e.rel_type)?.label || e.rel_type}</span>
-                      <span style={{ color: DARK.textDim }}>{outgoing ? '→' : '←'}</span>
+                      <span className={s.relName}>{edgeTypeByKey.get(e.rel_type)?.label || e.rel_type}</span>
+                      <span className={s.dim}>{outgoing ? '→' : '←'}</span>
                       {other ? (
                         <>
                           <TypeChip typeMeta={typeByKey.get(other.type)} typeKey={other.type} />
-                          <button
-                            onClick={() => setSelectedId(other.id)}
-                            title={other.id}
-                            style={{
-                              flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none',
-                              cursor: 'pointer', padding: 0, fontSize: 12, color: DARK.text,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}
-                          >
+                          <button onClick={() => setSelectedId(other.id)} title={other.id} className={s.neighbour}>
                             {other.title || t('nodeExplorer.untitled')}
                           </button>
                         </>
                       ) : (
-                        <code style={{ flex: 1, color: DARK.textMid, fontSize: 11 }}>{otherId}</code>
+                        <code className={s.rawId}>{otherId}</code>
                       )}
-                      {outgoing && (
-                        <button
-                          onClick={() => detachMut.mutate({ id: selectedNode.id, targetId: e.target_id, relType: e.rel_type })}
-                          aria-label="detach"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 2 }}
-                        >
-                          <X size={13} />
-                        </button>
-                      )}
+                      {/* Detaching used to be offered on outgoing edges only, so a
+                          relation created from the other end could be seen here and
+                          never removed. `remove_edge` takes the pair either way round. */}
+                      <button
+                        onClick={() => detachMut.mutate(outgoing
+                          ? { sourceId: selectedNode.id, targetId: e.target_id, relType: e.rel_type }
+                          : { sourceId: e.source_id, targetId: selectedNode.id, relType: e.rel_type })}
+                        aria-label="detach"
+                        className={s.iconBtn}
+                      >
+                        <X size={13} />
+                      </button>
                     </div>
                   )
                 })
               )}
 
-              {/* Attach edge */}
               <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: DARK.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
-                  {t('nodeExplorer.attachEdge')}
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <select
-                    className="kt-input" style={{ width: 'auto' }}
-                    value={attach.relType}
-                    onChange={e => setAttach({ ...attach, relType: e.target.value })}
-                  >
-                    {edgeTypes.map(et => <option key={et.key} value={et.key}>{et.label}</option>)}
-                  </select>
-                  <select
-                    className="kt-input" style={{ width: 'auto' }}
-                    value={attach.targetType}
-                    onChange={e => setAttach({ ...attach, targetType: e.target.value, targetId: '' })}
-                  >
-                    <option value="">{t('nodeExplorer.targetType')}</option>
-                    {nodeTypes.map(nt => <option key={nt.key} value={nt.key}>{nt.label}</option>)}
-                  </select>
-                  <select
-                    className="kt-input" style={{ width: 'auto', minWidth: 140 }}
-                    value={attach.targetId}
-                    onChange={e => setAttach({ ...attach, targetId: e.target.value })}
-                    disabled={!attach.targetType}
-                  >
-                    <option value="">{t('nodeExplorer.targetNode')}</option>
-                    {targetNodes.filter(n => n.id !== selectedNode.id).map(n => (
-                      <option key={n.id} value={n.id}>{n.title || n.id}</option>
-                    ))}
-                  </select>
-                  <button
-                    className="kt-btn kt-btn-primary"
-                    disabled={!attach.targetId || attachMut.isPending}
-                    onClick={() => attachMut.mutate({ id: selectedNode.id, body: { target_id: attach.targetId, rel_type: attach.relType } })}
-                  >
-                    <Plus size={12} /> {t('nodeExplorer.attach')}
-                  </button>
-                </div>
-                {attachMut.isError && (
-                  <div style={{ fontSize: 12, color: DARK.danger, marginTop: 6 }}>
-                    {attachMut.error?.response?.data?.detail || t('nodePage.attachFailed')}
-                  </div>
-                )}
+                <div className={s.filterHead} style={{ marginBottom: 6 }}>{t('nodeExplorer.attachEdge')}</div>
+                <RelationPicker
+                  nodeId={selectedNode.id}
+                  nodeType={selectedNode.type}
+                  onLinked={invalidateEdges}
+                />
               </div>
             </>
           )}

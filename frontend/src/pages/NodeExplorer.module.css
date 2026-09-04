@@ -1,0 +1,227 @@
+/* Three columns: what to look at, finding it, what it connects to (ADR-0150).
+   `minmax(0, …)` on the two flexible tracks rather than a bare fraction — an explicit
+   track list cannot drop a column the way `auto-fill` can, so a long node title would
+   otherwise push the grid wider than the viewport (ADR-0134). */
+.layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.filters,
+.results,
+.detail {
+  padding: 16px;
+}
+
+.filterHead {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--kt-faint);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.typeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--kt-ink);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+
+.typeRow:hover { background: var(--kt-hover); }
+.typeRowActive { background: rgba(129, 140, 248, 0.12); }
+
+.typeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--chip);
+  flex-shrink: 0;
+}
+
+.typeName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The type's real total, from a server-side COUNT. The page it replaces printed the
+   length of the page it had drawn, so 144 tasks read as "100 nodes". */
+.typeCount {
+  font-size: 11px;
+  color: var(--kt-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.looseToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--kt-ink);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.looseHint {
+  margin: 4px 8px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--kt-faint);
+}
+
+.searchRow { position: relative; }
+
+.searchIcon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.countRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 6px;
+  font-size: 11px;
+  color: var(--kt-faint);
+}
+
+.fetching { opacity: 0.7; }
+
+.createRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.createRow input { flex: 1; }
+
+.readOnlyHint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--kt-faint);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--kt-line);
+}
+
+.row:hover { background: var(--kt-hover); }
+.rowActive { background: rgba(129, 140, 248, 0.1); }
+
+.rowBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowTitle {
+  display: block;
+  font-size: 13px;
+  color: var(--kt-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typeChip {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--chip);
+  background: color-mix(in srgb, var(--chip) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip) 27%, transparent);
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--kt-muted);
+  padding: 4px;
+  display: flex;
+}
+
+.more { width: 100%; margin-top: 12px; }
+
+.dim { font-size: 12px; color: var(--kt-faint); }
+
+.detailTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--kt-ink);
+  text-decoration: none;
+}
+
+.detailMeta { font-size: 11px; color: var(--kt-faint); }
+
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.detailHead .filterHead { margin-bottom: 0; }
+
+.viewToggle {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.edgeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--kt-line);
+  font-size: 12px;
+}
+
+.relName { color: #818cf8; font-weight: 600; }
+
+.neighbour {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  color: var(--kt-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rawId { flex: 1; color: var(--kt-muted); font-size: 11px; }

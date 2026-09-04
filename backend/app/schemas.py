@@ -1242,6 +1242,18 @@ class EdgeTypeOut(BaseModel):
     usage_count: int = 0
 
 
+class RelationOptionOut(BaseModel):
+    """One relation a given node type may take part in, in one direction (ADR-0150)."""
+
+    rel_type: str
+    direction: Literal["outgoing", "incoming"]
+    label: str
+    description: str | None = None
+    is_containment: bool
+    is_symmetric: bool
+    other_types: list[str]
+
+
 # --- Generic graph nodes / edges (ADR-0033) ---
 
 

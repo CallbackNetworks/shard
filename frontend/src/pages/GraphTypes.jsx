@@ -5,8 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Shapes, Spline, Plus, Trash2, Lock, Pencil, Check, X } from 'lucide-react'
 import {
   getNodeTypes, createNodeType, updateNodeType, deleteNodeType,
-  getEdgeTypes, createEdgeType, deleteEdgeType, getFieldVocabulary,
+  getEdgeTypes, createEdgeType, updateEdgeType, deleteEdgeType, getFieldVocabulary,
 } from '../api/client'
+import EdgeEndpointsEditor from '../components/graph/EdgeEndpointsEditor'
 import NodeTypeFieldsEditor, { FieldSummary } from '../components/graph/NodeTypeFieldsEditor'
 import { DARK } from '../constants/theme'
 import { NODE_ROLE_DEFS, hasNodeRole, toggleNodeRole } from '../constants/nodeRoles'
@@ -198,6 +199,9 @@ export default function GraphTypes() {
   const [nodeForm, setNodeForm] = useState(emptyNodeForm)
   const [edgeForm, setEdgeForm] = useState({ key: '', label: '', is_containment: false })
   const [editingKey, setEditingKey] = useState(null)
+  // Separate from `editingKey`: the two registries have separate key spaces, so one
+  // shared piece of state could open two editors at once.
+  const [editingEdgeKey, setEditingEdgeKey] = useState(null)
 
   const nodeCreate = useMutation({
     mutationFn: createNodeType,
@@ -214,6 +218,10 @@ export default function GraphTypes() {
   const edgeCreate = useMutation({
     mutationFn: createEdgeType,
     onSuccess: () => { qc.invalidateQueries({ queryKey: qk.edgeTypes() }); setEdgeForm({ key: '', label: '', is_containment: false }) },
+  })
+  const edgeUpdate = useMutation({
+    mutationFn: ({ key, data }) => updateEdgeType(key, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.edgeTypes() }); setEditingEdgeKey(null) },
   })
   const edgeDelete = useMutation({
     mutationFn: deleteEdgeType,
@@ -308,20 +316,39 @@ export default function GraphTypes() {
             <div style={{ fontSize: 12, color: DARK.textDim }}>{t('loading')}</div>
           ) : (
             edgeTypes.map(item => (
-              <TypeRow
-                key={item.key}
-                item={item}
-                onDelete={(k) => confirmDelete(edgeDelete, k)}
-                deleting={edgeDelete.isPending}
-                sub={(
-                  <span title={item.description || t('graphTypes.endpointHint')}>
-                    <EdgeEndpoints item={item} typeByKey={nodeTypeByKey} />
-                  </span>
-                )}
-              >
-                {item.is_containment && <RoleBadge label={t('graphTypes.roleContainment')} />}
-                {item.is_symmetric && <RoleBadge label={t('graphTypes.roleSymmetric')} />}
-              </TypeRow>
+              item.key === editingEdgeKey ? (
+                <div key={item.key} style={{ borderBottom: `1px solid ${DARK.border}`, padding: '9px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: DARK.text }}>{item.label}</span>
+                    <code style={{ fontSize: 11, color: DARK.textDim }}>{item.key}</code>
+                  </div>
+                  <EdgeEndpointsEditor
+                    item={item}
+                    nodeTypes={nodeTypes}
+                    saving={edgeUpdate.isPending}
+                    onSave={(data) => edgeUpdate.mutate({ key: item.key, data })}
+                    onCancel={() => setEditingEdgeKey(null)}
+                  />
+                </div>
+              ) : (
+                <TypeRow
+                  key={item.key}
+                  item={item}
+                  onDelete={(k) => confirmDelete(edgeDelete, k)}
+                  deleting={edgeDelete.isPending}
+                  // Built-in declarations are frozen at both API doors (ADR-0121), so
+                  // offering the pencil would be offering a 400.
+                  onEdit={item.is_builtin ? undefined : (it) => setEditingEdgeKey(it.key)}
+                  sub={(
+                    <span title={item.description || t('graphTypes.endpointHint')}>
+                      <EdgeEndpoints item={item} typeByKey={nodeTypeByKey} />
+                    </span>
+                  )}
+                >
+                  {item.is_containment && <RoleBadge label={t('graphTypes.roleContainment')} />}
+                  {item.is_symmetric && <RoleBadge label={t('graphTypes.roleSymmetric')} />}
+                </TypeRow>
+              )
             ))
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>

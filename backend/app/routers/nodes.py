@@ -121,15 +121,22 @@ def graph_ancestry(
 def list_nodes(
     type: str | None = Query(default=None),
     query: str | None = Query(default=None, description="case-insensitive title substring filter"),
+    unfiled: bool = Query(default=False, description="only nodes that are loose in the graph"),
     limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
+    """List nodes. ``offset`` exists because the cap was silently the answer (ADR-0150):
+    the explorer asked for the default 100, drew them, and reported *that* as the count,
+    so a database with 144 tasks showed 100 and said "100 nodes"."""
     q = db.query(Node)
     if type is not None:
         q = q.filter(Node.type == type)
     if query:
         q = q.filter(Node.title.ilike(f"%{query}%"))
-    return q.order_by(Node.position, Node.created_at).limit(limit).all()
+    if unfiled:
+        q = q.filter(Node.id.in_(graph.unfiled_node_ids(db)))
+    return q.order_by(Node.position, Node.created_at).offset(offset).limit(limit).all()
 
 
 @router.post("", response_model=None, status_code=status.HTTP_201_CREATED)

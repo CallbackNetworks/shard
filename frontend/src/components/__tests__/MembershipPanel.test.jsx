@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getNodes: vi.fn(),
   getNodeEdges: vi.fn(),
   getEdgeTypes: vi.fn(),
+  getRelationOptions: vi.fn(),
   getDecisionsGoverning: vi.fn(),
   addTaskMembership: vi.fn(() => Promise.resolve()),
   removeTaskMembership: vi.fn(() => Promise.resolve()),
@@ -40,6 +41,7 @@ vi.mock('../../api/client', () => ({
   getNodes: mocks.getNodes,
   getNodeEdges: mocks.getNodeEdges,
   getEdgeTypes: mocks.getEdgeTypes,
+  getRelationOptions: mocks.getRelationOptions,
   getDecisionsGoverning: mocks.getDecisionsGoverning,
   addTaskMembership: mocks.addTaskMembership,
   removeTaskMembership: mocks.removeTaskMembership,
@@ -53,11 +55,12 @@ const projects = [
   { id: 'pC', name: 'Gamma' },
 ]
 
-function mockQueries({ nodeTypes = [], edgeTypes = [], taskEdges = [], governing = [] } = {}) {
+function mockQueries({ nodeTypes = [], edgeTypes = [], taskEdges = [], governing = [], relationOptions = [] } = {}) {
   mocks.useQuery.mockImplementation(({ queryKey }) => {
     if (queryKey[0] === 'governing-decisions') return { data: governing }
     if (queryKey[0] === 'node-types') return { data: nodeTypes }
     if (queryKey[0] === 'edge-types') return { data: edgeTypes }
+    if (queryKey[0] === 'relation-options') return { data: relationOptions, isLoading: false }
     if (queryKey[0] === 'node-edges') return { data: taskEdges }
     if (queryKey[0] === 'node-search') return { data: [], isFetching: false }
     return { data: projects }
@@ -87,7 +90,10 @@ describe('MembershipPanel', () => {
 
   it('only offers projects that are not already linked and not the current one', () => {
     renderPanel({ projectId: "pA", task })
-    const options = Array.from(screen.getByRole('combobox').querySelectorAll('option')).map(o => o.textContent)
+    // Scoped by label: since ADR-0150 the relation picker is a second combobox in
+    // this panel, and a bare getByRole('combobox') would pick whichever came first.
+    const select = screen.getByLabelText('membership.pickProject')
+    const options = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
     expect(options).toContain('Gamma')
     expect(options).not.toContain('Alpha')
     expect(options).not.toContain('Beta')
@@ -107,7 +113,7 @@ describe('MembershipPanel', () => {
 
   it('links the task into another project', () => {
     renderPanel({ projectId: "pA", task })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'pC' } })
+    fireEvent.change(screen.getByLabelText('membership.pickProject'), { target: { value: 'pC' } })
     fireEvent.click(screen.getByText('membership.link'))
     expect(mocks.addTaskMembership).toHaveBeenCalledWith('pA', 't1', 'pC')
   })
@@ -142,14 +148,23 @@ describe('MembershipPanel', () => {
     })
     renderPanel({ projectId: 'pA', task })
     expect(screen.getByText('decisions.governedBy')).toBeInTheDocument()
-    // Drawn by the decision strip, not also as a raw edge in "other relations".
+    // Drawn by the decision strip, not also as a raw edge row below it.
     expect(screen.getAllByText('Use PostgreSQL')).toHaveLength(1)
-    expect(screen.queryByText('membership.otherRelations')).not.toBeInTheDocument()
+    expect(screen.queryByText('Governs')).not.toBeInTheDocument()
   })
 
-  it('hides the other-relations section without custom edge types or edges', () => {
+  it('offers the relation picker even when the task has no other relations yet', () => {
+    // Deliberate change (ADR-0150). The section used to be hidden unless a *custom*
+    // edge type existed or an edge was already there — so the control that creates a
+    // relation was visible only once you had one, and the empty state, which is the
+    // state where somebody is looking for it, showed nothing at all. Same shape as the
+    // `governs` picker ADR-0122/0128 had to un-hide for the same reason.
+    mockQueries({ relationOptions: [
+      { rel_type: 'depends_on', direction: 'outgoing', label: 'Depends on', other_types: ['task'], is_containment: false, is_symmetric: false },
+    ] })
     renderPanel({ projectId: 'pA', task })
-    expect(screen.queryByText('membership.otherRelations')).not.toBeInTheDocument()
+    expect(screen.getByText('membership.otherRelations')).toBeInTheDocument()
+    expect(screen.getByLabelText('relationPicker.relation')).toBeInTheDocument()
   })
 
   it('lists non-core edges with labels and unlinks respecting direction (ADR-0037)', () => {
@@ -184,11 +199,25 @@ describe('MembershipPanel', () => {
     expect(mocks.detachNodeEdge).toHaveBeenCalledWith('nY', 't1', 'references')
   })
 
-  it('attaches a custom relation from the task after picking the type', () => {
-    mockQueries({ edgeTypes: [{ key: 'references', label: 'References', is_builtin: false }] })
+  it('offers each relation once per direction it is legal in (ADR-0150)', () => {
+    // The old picker listed custom edge types only and always wrote `task -> other`,
+    // so a relation whose task end is the *target* — `governs`, `owns` — could not be
+    // created here at all, and one that was legal both ways looked like one choice.
+    mockQueries({ relationOptions: [
+      { rel_type: 'references', direction: 'outgoing', label: 'References', other_types: ['topic'], is_containment: false, is_symmetric: false },
+      { rel_type: 'governs', direction: 'incoming', label: 'Governs', other_types: ['decision'], is_containment: false, is_symmetric: false },
+    ] })
     renderPanel({ projectId: 'pA', task })
-    // Pick the relation type; the node combobox then appears.
-    fireEvent.change(screen.getByLabelText('membership.pickRelation'), { target: { value: 'references' } })
-    expect(screen.getByPlaceholderText('membership.linkRelation')).toBeInTheDocument()
+    const select = screen.getByLabelText('relationPicker.relation')
+    const groups = Array.from(select.querySelectorAll('optgroup')).map(g => g.label)
+    expect(groups).toEqual(['relationPicker.thisToOther', 'relationPicker.otherToThis'])
+    const options = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
+    expect(options).toContain('→ References')
+    expect(options).toContain('← Governs')
+
+    // The node search appears only once a relation is chosen, and it is the direction
+    // of that choice that decides which end of the edge this node is.
+    fireEvent.change(select, { target: { value: 'governs:incoming' } })
+    expect(screen.getByPlaceholderText('relationPicker.findNode')).toBeInTheDocument()
   })
 })

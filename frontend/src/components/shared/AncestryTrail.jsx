@@ -21,7 +21,16 @@ const MAX_TRAILS_SHOWN = 2
 // whole list in one request (`useAncestry`) and hands each row its entry, because one
 // request per row is how a list ends up not asking at all — the reason the endpoint is
 // batched in the first place.
-export default function AncestryTrail({ nodeId, entry: given, className, maxTrails = MAX_TRAILS_SHOWN }) {
+// `showOwners` is off in list rows. Both axes belong on a page about one node, but in a
+// result list the trail is a locator and the owner strip is a second line per row —
+// which, over a page of a hundred, is what turns a list into a scroll (ADR-0150).
+export default function AncestryTrail({
+  nodeId,
+  entry: given,
+  className,
+  maxTrails = MAX_TRAILS_SHOWN,
+  showOwners = true,
+}) {
   const { t } = useTranslation()
   const { data: ancestry } = useQuery({
     queryKey: qk.ancestry(nodeId),
@@ -33,7 +42,7 @@ export default function AncestryTrail({ nodeId, entry: given, className, maxTrai
 
   const entry = given || ancestry?.[nodeId]
   const trails = entry?.trails || []
-  const owners = entry?.owners || []
+  const owners = showOwners ? entry?.owners || [] : []
   if (trails.length === 0 && owners.length === 0) return null
 
   const shown = trails.slice(0, maxTrails)

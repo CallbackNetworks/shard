@@ -69,10 +69,16 @@ describe('Sidebar', () => {
 
   // ADR-0066: container types are unbounded, so the rail carries one fixed
   // door to their listing rather than one entry per type.
-  it('reaches every container type through a single fixed nav entry', () => {
+  it('reaches every node, of every type, through a single fixed nav entry', () => {
+    // ADR-0066's rule, one level further out (ADR-0150): the DATA group used to spend
+    // four rows on four views of one dataset — a container-type menu, an inbox, the type
+    // registry and the explorer. Two of those were slices of the third, so the rail
+    // charged four permanent lines for what one page answers.
     setup()
-    const link = screen.getByText('nav.containers').closest('a')
-    expect(link.getAttribute('href')).toBe('/containers')
+    const link = screen.getByText('nav.nodeExplorer').closest('a')
+    expect(link.getAttribute('href')).toBe('/explorer')
+    expect(screen.queryByText('nav.containers')).not.toBeInTheDocument()
+    expect(screen.queryByText('nav.unfiled')).not.toBeInTheDocument()
   })
 
   // The whole point of the redesign: every rail row is a declared module, so
