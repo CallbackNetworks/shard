@@ -70,21 +70,16 @@
   font-variant-numeric: tabular-nums;
 }
 
-.looseToggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--kt-ink);
-  cursor: pointer;
-  padding: 4px 8px;
-}
-
-.looseHint {
-  margin: 4px 8px 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--kt-faint);
+/* Loose is a shape, not a state, so it gets a glyph rather than a status hue — the
+   status family's four colours mean the state machine and nothing else (ADR-0088). */
+.looseGlyph {
+  font-size: 9px;
+  line-height: 1;
+  width: 7px;
+  text-align: center;
+  color: var(--kt-muted);
+  flex-shrink: 0;
+  margin-right: 6px;
 }
 
 .searchRow { position: relative; }
@@ -277,8 +272,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Zero edges is the interesting value, and `loose` only finds the subset that is also
-   contained by nothing — a node with one stray edge is invisible to that filter. */
+/* Zero edges is the strongest form of "attached to nothing", so it is the value that
+   gets the colour. It is a strict subset of `loose`, not a wider net (ADR-0154). */
 .zeroEdges { color: var(--kt-status-failed, #fb7185); }
 
 .selectAll {

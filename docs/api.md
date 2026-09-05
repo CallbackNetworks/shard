@@ -1367,12 +1367,16 @@ The filter lives in `services/node_listing` and both doors call it, so this and
 | `sort` | `position` (default), `recent`, `created`, `title`. Anything else is a 422, not a silent fallback |
 
 #### `GET /nodes/facets?type=&query=&status=&unfiled=`
-`{total, status: [{value, count}]}` under the same narrowing. `total` is a server-side
-COUNT of the filtered set, so paging knows where it ends instead of inferring it from a
-full page. The status list is **counted from the data, never a fixed vocabulary** (ADR-0056):
-task, project and decision have three different state machines and a custom type has
-whatever has been written into it. The counts deliberately ignore `status` itself — they
-have to be counts of the set you would get *by switching to* each value.
+`{total, status: [{value, count}], loose}` under the same narrowing. `total` is a
+server-side COUNT of the filtered set, so paging knows where it ends instead of inferring
+it from a full page. The status list is **counted from the data, never a fixed vocabulary**
+(ADR-0056): task, project and decision have three different state machines and a custom
+type has whatever has been written into it.
+
+Each count leaves **its own** filter off and applies every other one, because a number
+beside a filter has to be the size of the set you would get *by switching to* it — applied,
+it would collapse to whatever is already selected and there would be nothing to switch to.
+So `status` counts ignore `status` and `loose` ignores `unfiled` (ADR-0154).
 
 #### `GET /graph/edge-counts?ids=a,b,c`
 How many edges each node has, either direction. Batched by id for the same reason ancestry

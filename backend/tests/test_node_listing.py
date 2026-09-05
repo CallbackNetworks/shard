@@ -129,6 +129,24 @@ class TestTheCountIsCounted:
         assert facets["total"] == 2
         assert {f["value"]: f["count"] for f in facets["status"]} == {"todo": 2, "done": 2}
 
+    def test_loose_is_counted_before_it_is_applied(self, client, db, sample_identity, sample_project):
+        """It was a checkbox with no number (ADR-0154), so the only way to learn whether
+        anything was loose was to tick it — on the one filter whose whole job is to
+        surface what you did not know was there."""
+        _mk(db, id="adrift-1", type=graph.NODE_TASK, title="adrift one")
+        facets = client.get("/api/nodes/facets").json()
+        assert facets["loose"] >= 2  # the unfiled project and the stray task
+        assert facets["loose"] < facets["total"]
+
+    def test_the_loose_count_ignores_only_its_own_filter(self, client, db, sample_project):
+        """Every other narrowing still applies, or the number beside the row would not
+        describe the set you would land in by ticking it."""
+        _mk(db, id="filed-todo", type=graph.NODE_TASK, title="counted", status="todo")
+        both = client.get("/api/nodes/facets?query=counted").json()
+        assert both["total"] == 1 and both["loose"] == 1
+        # Narrowing to a status the loose node does not have empties the loose count too.
+        assert client.get("/api/nodes/facets?query=counted&status=done").json()["loose"] == 0
+
     def test_facets_is_not_swallowed_by_the_id_route(self, client):
         """Routing is first-match and neither declaration reveals the conflict — only
         the order in the file does (ADR-0086)."""

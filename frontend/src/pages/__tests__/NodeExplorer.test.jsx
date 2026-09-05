@@ -45,7 +45,7 @@ const edges = [{
   source: { id: 'n1', type: 'topic', title: 'Roadmap' },
   target: { id: 'p1', type: 'project', title: 'Shard' },
 }]
-const facets = { total: 7, status: [{ value: 'todo', count: 5 }, { value: null, count: 2 }] }
+const facets = { total: 7, status: [{ value: 'todo', count: 5 }, { value: null, count: 2 }], loose: 6 }
 
 const last = {}
 const queries = {}
@@ -171,6 +171,26 @@ describe('NodeExplorer', () => {
     setup()
     expect(screen.getByText('todo')).toBeTruthy()
     expect(screen.getByText('nodeExplorer.statusNone')).toBeTruthy()
+  })
+
+  it('says how many nodes are loose before you tick the box', () => {
+    // It used to be a section of its own — heading, tick box, three-line note — carrying
+    // no number, so the only way to learn whether anything was loose was to filter to it.
+    // On the one filter whose whole job is to surface what you did not know was there.
+    setup()
+    const row = screen.getByText('nodeExplorer.looseOnly').closest('label')
+    expect(row.textContent).toContain('6')
+    expect(row.querySelector('input[type=checkbox]').checked).toBe(false)
+  })
+
+  it('is not made redundant by the edge count on the rows', () => {
+    // 21 of this database's 32 loose nodes have exactly one edge — an `owns` from an
+    // identity — so they are indistinguishable from healthy nodes in that column, and
+    // they are the half worth finding: owned by somebody, filed by nobody.
+    setup({ route: '/explorer?loose=1' })
+    expect(getNodes).not.toHaveBeenCalled()
+    queries.nodes.queryFn()
+    expect(getNodes).toHaveBeenCalledWith('', '', expect.objectContaining({ unfiled: true }))
   })
 
   it('says how many edges each row has', () => {

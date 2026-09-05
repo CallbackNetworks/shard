@@ -6,10 +6,9 @@
   "graphTypes.symmetricHint": "Symmetric — it reads the same from either end",
   "nodeExplorer.allTypes": "All types",
   "nodeExplorer.countShown": "{{n}} shown",
-  "nodeExplorer.filterShape": "Shape",
   "nodeExplorer.filterType": "Type",
-  "nodeExplorer.looseHint": "Nothing above it and nothing below it. A root — something that holds work but sits at the top — is not loose.",
-  "nodeExplorer.looseOnly": "Loose only",
+  "nodeExplorer.looseHint": "Nothing above it and nothing below it, on either axis. A root — something that holds or owns work but sits at the top — is not loose.",
+  "nodeExplorer.looseOnly": "Loose",
   "nodeExplorer.searchPlaceholder": "Search by title, or paste an id...",
   "relationPicker.choose": "Choose a relation...",
   "relationPicker.findNode": "Find a node to link...",
@@ -1390,7 +1389,6 @@
   "tour.guide.content.title": "The chapter itself",
   "tour.guide.content.body": "Screenshots are taken from the running app rather than drawn by hand, so a picture here is never of a version that no longer exists. Click any of them to see it full size.",
   "nodeExplorer.countRange": "{{from}}–{{to}} of {{total}}",
-  "nodeExplorer.filterStatus": "Status",
   "nodeExplorer.statusNone": "(no status)",
   "nodeExplorer.sort": "Sort",
   "nodeExplorer.sort_recent": "Recently updated",
@@ -1408,5 +1406,6 @@
   "nodeExplorer.bulkDeleteConfirm": "Delete {{n}} nodes and everything that belongs to them?",
   "nodeExplorer.bulkResult": "{{ok}} done, {{failed}} refused.",
   "nodeExplorer.createFailed": "Could not create that node.",
-  "nodeExplorer.builtinHint": "{{type}} has a page of its own with more on it; here it is one row of data like any other."
+  "nodeExplorer.builtinHint": "{{type}} has a page of its own with more on it; here it is one row of data like any other.",
+  "nodeExplorer.filterNarrow": "Filter"
 }

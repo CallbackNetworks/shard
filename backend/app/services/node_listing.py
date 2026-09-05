@@ -82,12 +82,14 @@ def listing_query(
     unfiled: bool = False,
     sort: str = DEFAULT_SORT,
     apply_status: bool = True,
+    apply_unfiled: bool = True,
 ) -> Query:
     """The filtered, ordered node query. Callers add their own scope, offset and limit.
 
-    ``apply_status=False`` is what the facet count uses: the counts beside the status
-    filter have to be counts of the set you would get *by switching to* that status, so
-    they are computed with every other narrowing applied and this one left off.
+    The two ``apply_*`` flags are what the facet counts use: a count beside a filter has
+    to be the size of the set you would get *by switching to* it, so it is computed with
+    every other narrowing applied and that one left off. Applied, each count would
+    collapse to whatever is already selected and there would be nothing to switch to.
     """
     if sort not in SORTS:
         raise Unprocessable(f"unknown sort '{sort}' — one of {', '.join(SORTS)}")
@@ -100,7 +102,7 @@ def listing_query(
         title_match = Node.title.ilike(f"%{term}%")
         # An id is what this page hands you; being unable to hand it back was the gap.
         q = q.filter(or_(title_match, Node.id.ilike(f"{term}%")) if len(term) >= ID_QUERY_MIN else title_match)
-    if unfiled:
+    if unfiled and apply_unfiled:
         q = q.filter(Node.id.in_(graph.unfiled_node_ids(db)))
     if apply_status:
         wanted = parse_statuses(status)
@@ -131,6 +133,15 @@ def facets(
     active/archived, a decision is proposed/accepted/deprecated/superseded, and a
     custom type's states are whatever has been written. Counting the actual column is
     the only answer that stays true for a type nobody has told the app about.
+
+    ``loose`` is counted the same way and for the same reason (ADR-0154). It was a
+    checkbox in a section of its own carrying no number, so the only way to learn
+    whether anything was loose was to tick it — on the one filter whose entire job is to
+    surface things you did not know were there. And it is not derivable from the edge
+    count now drawn on each row: of the 32 loose nodes in this database, 11 have no
+    edges at all and 21 have exactly one, an ``owns`` from an identity. Those 21 —
+    owned by somebody, filed by nobody — are indistinguishable from healthy nodes in
+    that column, and they are the half worth finding.
     """
     base = listing_query(db, type=type, query=query, status=status, unfiled=unfiled, apply_status=False)
     counted = base.order_by(None).with_entities(Node.status, func.count(Node.id)).group_by(Node.status).all()
@@ -138,4 +149,5 @@ def facets(
         {"value": value, "count": count} for value, count in sorted(counted, key=lambda row: (-row[1], row[0] or ""))
     ]
     total = listing_query(db, type=type, query=query, status=status, unfiled=unfiled).order_by(None).count()
-    return {"total": total, "status": by_status}
+    loose = listing_query(db, type=type, query=query, status=status, unfiled=True).order_by(None).count()
+    return {"total": total, "status": by_status, "loose": loose}

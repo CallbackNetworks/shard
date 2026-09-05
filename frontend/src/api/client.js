@@ -548,11 +548,12 @@ export const getNodes = (type, query, { unfiled, limit, offset, status, sort } =
   if (offset) params.offset = offset
   return api.get('/nodes', { params }).then(r => r.data)
 }
-// `{total, status: [{value, count}]}` under the same narrowing. The total is the honest
-// denominator a capped page cannot supply, and the status list is served rather than
+// `{total, status: [{value, count}], loose}` under the same narrowing. The total is the
+// honest denominator a capped page cannot supply; the status list is served rather than
 // mirrored because there is no fixed vocabulary to mirror (ADR-0056): a task, a project
 // and a decision have three different state machines, and a custom type has whatever
-// has been written into it.
+// has been written into it. Each count leaves its own filter off, so it is the size of
+// the set you would get by switching to it.
 export const getNodeFacets = ({ type, query, status, unfiled } = {}) => {
   const params = {}
   if (type) params.type = type

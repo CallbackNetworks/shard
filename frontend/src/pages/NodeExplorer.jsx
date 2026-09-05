@@ -64,7 +64,7 @@ function StatusDot({ status }) {
 //   3. **Accept what it just showed you.** The detail pane prints `type · id`; pasting
 //      that id into the search box matched nothing, because `query` was a title filter.
 //   4. **Act on more than one row.** `?loose=1` exists to find work nothing holds, and
-//      the only way to file forty-four of them was forty-four selections.
+//      the only way to file forty-one of them was forty-one selections.
 //
 // And one thing it refused to do for no reason: create and delete were hidden for every
 // built-in type behind a comment claiming they were rejected. They are not — `POST
@@ -158,9 +158,12 @@ export default function NodeExplorer() {
 
   const pageIds = useMemo(() => nodes.map(n => n.id), [nodes])
   const ancestry = useAncestry(pageIds, `nodes:${selectedType}:${search}:${loose}:${statusFilter}:${sort}:${offset}`)
-  // "Is this wired into anything" is the question the page exists to answer; `loose` is
-  // only its extreme case (nothing above *and* nothing below), and a node with one
-  // stray edge is invisible to it.
+  // "Is this wired into anything" is the question the page exists to answer, and the
+  // count is the per-row severity of it — not a substitute for the `loose` filter, which
+  // is the broader question, not the narrower one. Measured here: zero-edge is a strict
+  // *subset* of loose (11 of 32), because the other 21 are projects an identity `owns`
+  // and nobody filed — one edge each, indistinguishable in this column, and the half
+  // worth finding (ADR-0154).
   const { data: edgeCounts = {} } = useQuery({
     queryKey: qk.edgeCounts(pageIds.join(',')),
     queryFn: () => getEdgeCounts(pageIds),
@@ -293,33 +296,35 @@ export default function NodeExplorer() {
             </button>
           ))}
 
-          {/* Served, never mirrored (ADR-0056). The list is a COUNT over the column
-              under the current narrowing, so it stays true for a custom type nobody
-              has told the app about — and `none` is on it, because a NULL status is
-              a real state and the set most worth looking at (ADR-0141). */}
-          {statusFacets.length > 1 && (
-            <>
-              <div className={s.filterHead} style={{ marginTop: 16 }}>{t('nodeExplorer.filterStatus')}</div>
-              {statusFacets.map(f => {
-                const value = f.value === null ? 'none' : f.value
-                return (
-                  <label key={value} className={s.facetRow}>
-                    <input type="checkbox" checked={statuses.has(value)} onChange={() => toggleStatus(value)} />
-                    <StatusDot status={f.value} />
-                    <span className={s.typeName}>{f.value === null ? t('nodeExplorer.statusNone') : f.value}</span>
-                    <span className={s.typeCount}>{f.count}</span>
-                  </label>
-                )
-              })}
-            </>
-          )}
+          {/* One list, one grammar: everything that narrows the set is a row with a
+              count (ADR-0154). Loose used to be a section of its own — heading, tick
+              box and a three-line note — carrying no number, so the only way to learn
+              whether anything was loose was to tick it, on the one filter whose whole
+              job is to surface what you did not know was there. Its note moved to the
+              row's tooltip; the long version lives in the guide.
 
-          <div className={s.filterHead} style={{ marginTop: 16 }}>{t('nodeExplorer.filterShape')}</div>
-          <label className={s.looseToggle} data-tour="explorer-loose">
+              The status rows are served, never mirrored (ADR-0056): a COUNT over the
+              column under the current narrowing, so the list stays true for a custom
+              type nobody has told the app about — and `none` is on it, because a NULL
+              status is a real state and often the set most worth looking at (ADR-0141). */}
+          <div className={s.filterHead} style={{ marginTop: 16 }}>{t('nodeExplorer.filterNarrow')}</div>
+          <label className={s.facetRow} data-tour="explorer-loose" title={t('nodeExplorer.looseHint')}>
             <input type="checkbox" checked={loose} onChange={e => setLoose(e.target.checked)} />
-            <span>{t('nodeExplorer.looseOnly')}</span>
+            <span className={s.looseGlyph}>◇</span>
+            <span className={s.typeName}>{t('nodeExplorer.looseOnly')}</span>
+            <span className={s.typeCount}>{facets?.loose ?? ''}</span>
           </label>
-          <p className={s.looseHint}>{t('nodeExplorer.looseHint')}</p>
+          {statusFacets.length > 1 && statusFacets.map(f => {
+            const value = f.value === null ? 'none' : f.value
+            return (
+              <label key={value} className={s.facetRow}>
+                <input type="checkbox" checked={statuses.has(value)} onChange={() => toggleStatus(value)} />
+                <StatusDot status={f.value} />
+                <span className={s.typeName}>{f.value === null ? t('nodeExplorer.statusNone') : f.value}</span>
+                <span className={s.typeCount}>{f.count}</span>
+              </label>
+            )
+          })}
         </div>
 
         {/* Middle: find it. */}

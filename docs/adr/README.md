@@ -155,3 +155,4 @@
 | [0151](0151-onboarding-must-not-block-the-app-under-it.md) | 入門導覽不能擋住它底下的 app：導覽的 scrim 讓每個 e2e 點擊超時，連紅三個 run | Accepted | 2026-09-04 |
 | [0152](0152-help-is-asked-for-where-you-are-standing.md) | 求助是站在某個地方問的：導覽變成一頁一個、說明頁重寫成一模組一章、scrim 不再擋住底下的 app | Accepted | 2026-09-04 |
 | [0153](0153-a-listing-answers-a-question.md) | 一份清單要回答的是一個問題，不是印出一張資料表：排序／狀態／id 搜尋／整批歸檔，清單規則兩個門共用 | Accepted | 2026-09-05 |
+| [0154](0154-a-filter-shows-its-count-before-you-apply-it.md) | 一個篩選要在被套用之前就說出自己有幾筆：孤立併進篩選清單並帶計數；順帶更正 ADR-0153 一句量反的話 | Accepted | 2026-09-05 |

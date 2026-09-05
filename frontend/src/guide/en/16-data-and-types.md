@@ -22,15 +22,20 @@ One page onto all of it.
 server, so the number beside a type is the real total rather than the number of rows
 that happen to be on this page.
 
-**Loose only** is a filter with a specific meaning: nothing above it and nothing
-below it. Not filed anywhere, and holding nothing. A top-level organization is *not*
-loose even though nothing contains it — it holds work. This is the box for things
-you made and forgot to put anywhere.
+**Filter** below it is one list of ways to narrow what you are looking at, each row
+with a count, so you can see what is there before you tick anything.
 
-**Status** below it lists the states the matching items are actually in, with a count
-each — including *(no status)*, which is a real state and usually the interesting one.
-The list is counted from the data rather than fixed, so a type you invented shows
-whatever states you have written into it. Tick as many as you like.
+**Loose** has a specific meaning: nothing above it and nothing below it, on either
+axis. Not filed anywhere, and holding or owning nothing. A top-level organization is
+*not* loose even though nothing contains it — it holds work. This is the row for
+things you made and forgot to put anywhere, and its count is the number worth
+knowing: it is not the same as the relation count on the rows. Something owned by a
+person but filed nowhere has a relation and is still lost.
+
+The rows under it are the **states** the matching items are actually in — including
+*(no status)*, which is a real state and usually the interesting one. That list is
+counted from the data rather than fixed, so a type you invented shows whatever states
+you have written into it. Tick as many as you like.
 
 **Middle: search and results.** Type to match titles — or paste an item's id, which
 is what the right-hand pane prints, so what the page shows you is something you can
@@ -40,8 +45,8 @@ at (*1–100 of 144*), counted on the server under every filter you have applied
 
 Each row carries what the item *is*, not just its name: a status dot, where it lives,
 how many relations it has, and when it last changed. **A relation count of zero is
-red**, because that is the thing you came here to find — and it catches more than
-*Loose only* does, which only finds items with nothing above *and* nothing below.
+red** — attached to nothing at all. That is the loudest case, not the whole of it: most
+lost items have a relation and are still lost, which is what the *Loose* filter is for.
 
 **Sort** sits beside the count. *Recently updated* is the default; the thing you just
 made is at the top rather than at the end of the last page.
@@ -50,7 +55,7 @@ made is at the top rather than at the end of the last page.
 selection into one container with a single pick, or delete it. Each item is applied
 separately and the result says how many went through and how many were refused — a
 selection can hold different types, and different types have different legal parents.
-This is what *Loose only* is for: find the forty things nobody filed, and file them.
+This is what *Loose* is for: find the thirty things nobody filed, and file them.
 
 Every item type can be created and deleted from here, built-in ones included. A task
 or a project has a page of its own with much more on it, and you will usually want
