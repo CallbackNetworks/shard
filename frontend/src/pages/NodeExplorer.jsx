@@ -3,21 +3,24 @@ import { qk } from '../api/queryKeys'
 import { Link, useSearchParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Boxes, List, Network, Plus, Search, Trash2, Link2, X } from 'lucide-react'
+import { Boxes, List, Network, Plus, Search, Trash2, Link2, X, Unlink } from 'lucide-react'
 import {
   getNodeTypes, getEdgeTypes, getNodes, getNode, createNode, deleteNode,
-  getNodeEdges, detachNodeEdge, getGraphMap,
+  getNodeEdges, detachNodeEdge, getGraphMap, getNodeFacets, getEdgeCounts, attachNodeEdge,
 } from '../api/client'
-import { DARK } from '../constants/theme'
+import { DARK, STATUS_COLOR } from '../constants/theme'
 import { nodeHref } from '../utils/nodeHref'
+import { formatTimestamp } from '../utils/datetime'
 import useAncestry from '../hooks/useAncestry'
 import AncestryTrail from '../components/shared/AncestryTrail'
 import EgoNetwork from '../components/shared/EgoNetwork'
 import RelationPicker from '../components/shared/RelationPicker'
+import NodeCombobox from '../components/shared/NodeCombobox'
 import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 import s from './NodeExplorer.module.css'
 
 const PAGE = 100
+const SORTS = ['recent', 'created', 'title', 'position']
 
 function TypeChip({ typeMeta, typeKey }) {
   const color = typeMeta?.color || '#818cf8'
@@ -26,6 +29,15 @@ function TypeChip({ typeMeta, typeKey }) {
       {typeMeta?.label || typeKey}
     </span>
   )
+}
+
+// A status is a value the column happens to hold, not a member of a fixed vocabulary:
+// task, project and decision have three different state machines and a custom type has
+// whatever has been written into it. Only the four the design system names get a colour
+// (ADR-0088); the rest get the neutral one rather than an invented hue.
+function StatusDot({ status }) {
+  if (!status) return null
+  return <span className={s.statusDot} style={{ '--chip': STATUS_COLOR[status] || 'var(--kt-muted)' }} title={status} />
 }
 
 // The one page for looking at the graph as data (ADR-0150). It replaces three doors
@@ -40,8 +52,25 @@ function TypeChip({ typeMeta, typeKey }) {
 //   * `/containers` spent a permanent rail row on a two-card menu of container *types*,
 //     a strict subset of what the type registry page already draws.
 //
-// So: one search across every type, the true totals beside each type, real paging, and
-// the selected node's relations editable in place through the shared picker.
+// ADR-0153 finished the job it started. Four things a page about data has to do and
+// this one could not:
+//
+//   1. **Say what a row is.** Every row already arrived carrying `status`, `priority`,
+//      `due_date` and `updated_at` on `NodeOut`, and the row drew a title. Which of a
+//      hundred tasks is done, and which has not moved in a year, was not on screen.
+//   2. **Be ordered by the question being asked.** The only order was `position,
+//      created_at`, so the node you just made sorted *last* — past the first page,
+//      findable only by already knowing its title.
+//   3. **Accept what it just showed you.** The detail pane prints `type · id`; pasting
+//      that id into the search box matched nothing, because `query` was a title filter.
+//   4. **Act on more than one row.** `?loose=1` exists to find work nothing holds, and
+//      the only way to file forty-four of them was forty-four selections.
+//
+// And one thing it refused to do for no reason: create and delete were hidden for every
+// built-in type behind a comment claiming they were rejected. They are not — `POST
+// /nodes` and `DELETE /nodes/{id}` are *the* write surface for every first-class entity
+// (ADR-0040→0043) and the delete carries the full teardown (ADR-0131). So the loose
+// filter could show you the orphans and nothing on the page could clear them.
 export default function NodeExplorer() {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -51,53 +80,92 @@ export default function NodeExplorer() {
 
   // What is being looked at lives in the URL (ADR-0083), which is also what lets the
   // retired `/unfiled` page become a link into this one rather than a second page.
+  // All six controls, not two: a view worth arriving at is a view worth linking to, and
+  // the search text and the selection are most of what makes one view differ from another.
   const [params, setParams] = useSearchParams()
   const selectedType = params.get('type') || ''
   const loose = params.get('loose') === '1'
-  const setParam = (key, value) => setParams(prev => {
+  const search = params.get('q') || ''
+  const statusFilter = params.get('status') || ''
+  const sort = SORTS.includes(params.get('sort')) ? params.get('sort') : 'recent'
+  const selectedId = params.get('sel') || null
+  const setParam = (patch) => setParams(prev => {
     const next = new URLSearchParams(prev)
-    if (value) next.set(key, value)
-    else next.delete(key)
+    for (const [key, value] of Object.entries(patch)) {
+      if (value) next.set(key, value)
+      else next.delete(key)
+    }
     return next
   }, { replace: true })
-  const setSelectedType = (v) => setParam('type', v)
-  const setLoose = (v) => setParam('loose', v ? '1' : '')
-  const [text, setText] = useState('')
-  const [search, setSearch] = useState('')
-  const [limit, setLimit] = useState(PAGE)
-  const [selectedId, setSelectedId] = useState(null)
+  const setSelectedType = (v) => setParam({ type: v, sel: '' })
+  const setLoose = (v) => setParam({ loose: v ? '1' : '', sel: '' })
+  const setSelectedId = (v) => setParam({ sel: v || '' })
+
+  const [text, setText] = useState(search)
+  const [offset, setOffset] = useState(0)
   const [newTitle, setNewTitle] = useState('')
   const [relView, setRelView] = useState('list')
+  const [picked, setPicked] = useState(() => new Set())
+  const [bulkResult, setBulkResult] = useState(null)
   const searchRef = useRef(null)
 
   useEffect(() => {
-    const id = setTimeout(() => setSearch(text.trim()), 200)
+    if (text.trim() === search) return
+    const id = setTimeout(() => setParam({ q: text.trim() }), 200)
     return () => clearTimeout(id)
-  }, [text])
-  // Any change to what is being asked starts the paging over; keeping the old limit
-  // would silently hand back a page of a different query.
-  useEffect(() => { setLimit(PAGE) }, [search, selectedType, loose])
+  }, [text]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Any change to what is being asked starts the paging over and drops the selection
+  // set: keeping either would silently apply to a page of a different query.
+  useEffect(() => {
+    setOffset(0)
+    setPicked(new Set())
+    setBulkResult(null)
+  }, [search, selectedType, loose, statusFilter, sort])
 
   // No type is the default, not `nodeTypes[0]`. The old default was whichever type the
   // registry happened to return first — here, Cycle: nineteen sprints, which is nobody's
   // reason for opening this page.
   const typeMeta = nodeTypes.find(nt => nt.key === selectedType)
-  const readOnly = !!typeMeta?.is_builtin // entity-backed builtins reject generic create/delete
 
   const typeByKey = useNodeTypeMap()
   const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
+  const listArgs = { unfiled: loose, limit: PAGE, offset, status: statusFilter, sort }
   const { data: nodes = [], isLoading: nodesLoading, isFetching } = useQuery({
-    queryKey: qk.nodes(selectedType || 'all', search, loose ? 'loose' : 'any', limit),
-    queryFn: () => getNodes(selectedType, search, { unfiled: loose, limit }),
+    queryKey: qk.nodes(selectedType || 'all', search, loose ? 'loose' : 'any', statusFilter, sort, offset),
+    queryFn: () => getNodes(selectedType, search, listArgs),
+    placeholderData: (prev) => prev,
   })
 
-  // The honest denominator. `usage_count` is a COUNT on the server, so it does not move
-  // when the page size does — which is the entire difference between this line and the
-  // one it replaces.
-  const totalForType = typeMeta?.usage_count
-  const narrowed = !!search || loose
-  const maybeMore = nodes.length >= limit
+  // The honest denominator, under *every* narrowing. `usage_count` gave the per-type
+  // total and nothing else, so the moment you typed in the search box the page went
+  // back to reporting the length of the page it had drawn — the ADR-0150 lie in a
+  // smaller place. This is a server-side COUNT of the filtered set, which is also what
+  // lets paging know where it ends instead of inferring it from a full page.
+  const { data: facets } = useQuery({
+    queryKey: qk.nodeFacets(selectedType || 'all', search, loose ? 'loose' : 'any', statusFilter),
+    queryFn: () => getNodeFacets({ type: selectedType, query: search, status: statusFilter, unfiled: loose }),
+  })
+  const total = facets?.total
+  const statusFacets = facets?.status || []
+  const statuses = useMemo(() => new Set(statusFilter ? statusFilter.split(',') : []), [statusFilter])
+  const toggleStatus = (value) => {
+    const next = new Set(statuses)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    setParam({ status: [...next].join(','), sel: '' })
+  }
+
+  const pageIds = useMemo(() => nodes.map(n => n.id), [nodes])
+  const ancestry = useAncestry(pageIds, `nodes:${selectedType}:${search}:${loose}:${statusFilter}:${sort}:${offset}`)
+  // "Is this wired into anything" is the question the page exists to answer; `loose` is
+  // only its extreme case (nothing above *and* nothing below), and a node with one
+  // stray edge is invisible to it.
+  const { data: edgeCounts = {} } = useQuery({
+    queryKey: qk.edgeCounts(pageIds.join(',')),
+    queryFn: () => getEdgeCounts(pageIds),
+    enabled: pageIds.length > 0,
+  })
 
   const { data: selectedNode } = useQuery({
     queryKey: qk.node(selectedId),
@@ -118,9 +186,11 @@ export default function NodeExplorer() {
     staleTime: 30000,
   })
 
-  const ancestry = useAncestry(nodes.map(n => n.id), `nodes:${selectedType}:${search}:${loose}`)
-
-  const invalidateList = () => qc.invalidateQueries({ queryKey: qk.nodes() })
+  const invalidateList = () => {
+    qc.invalidateQueries({ queryKey: qk.nodes() })
+    qc.invalidateQueries({ queryKey: qk.nodeFacets() })
+    qc.invalidateQueries({ queryKey: qk.edgeCounts() })
+  }
   const invalidateEdges = () => {
     qc.invalidateQueries({ queryKey: qk.nodeEdges(selectedId) })
     qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
@@ -144,6 +214,52 @@ export default function NodeExplorer() {
     onSuccess: invalidateEdges,
   })
 
+  // A batch is applied one row at a time and reports what happened to each, which is
+  // the contract the importer already uses (ADR-0092): one refused row must not abandon
+  // the other forty-three, and "12 filed, 2 refused" is the only honest summary of a
+  // selection whose members have different types and therefore different legal parents.
+  // Deliberately not a new endpoint — every edge and every delete here is already one
+  // call on both doors, so a bulk route would be a convenience, not a capability, and
+  // ADR-0085's rule is about capabilities.
+  const runBatch = async (ids, act) => {
+    let ok = 0
+    const failed = []
+    for (const id of ids) {
+      try {
+        await act(id)
+        ok += 1
+      } catch (err) {
+        failed.push(err?.response?.data?.detail || String(err))
+      }
+    }
+    setBulkResult({ ok, failed })
+    setPicked(new Set())
+    invalidateList()
+    qc.invalidateQueries({ queryKey: qk.ancestry() })
+    qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
+  }
+  const bulkMut = useMutation({ mutationFn: ({ ids, act }) => runBatch(ids, act) })
+
+  const togglePick = (id) => setPicked(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+  const allPicked = nodes.length > 0 && nodes.every(n => picked.has(n.id))
+  const toggleAll = () => setPicked(allPicked ? new Set() : new Set(pageIds))
+
+  // A containment source must hold `container` or `task`, or declare no roles at all —
+  // the rule `add_edge` enforces, asked of the registry rather than restated here.
+  const canContain = (n) => {
+    const roles = typeByKey.get(n.type)?.roles || []
+    return roles.length === 0 || roles.includes('container') || roles.includes('task')
+  }
+
+  const from = total === 0 ? 0 : offset + 1
+  const to = offset + nodes.length
+  const hasMore = total === undefined ? nodes.length === PAGE : to < total
+
   return (
     <div className="kt-page">
       <div className="kt-page-header">
@@ -161,7 +277,7 @@ export default function NodeExplorer() {
           <div className={s.filterHead}>{t('nodeExplorer.filterType')}</div>
           <button
             className={`${s.typeRow} ${!selectedType ? s.typeRowActive : ''}`}
-            onClick={() => { setSelectedType(''); setSelectedId(null) }}
+            onClick={() => setSelectedType('')}
           >
             <span className={s.typeName}>{t('nodeExplorer.allTypes')}</span>
           </button>
@@ -169,13 +285,34 @@ export default function NodeExplorer() {
             <button
               key={nt.key}
               className={`${s.typeRow} ${selectedType === nt.key ? s.typeRowActive : ''}`}
-              onClick={() => { setSelectedType(nt.key); setSelectedId(null) }}
+              onClick={() => setSelectedType(nt.key)}
             >
               <span className={s.typeDot} style={{ '--chip': nt.color || '#818cf8' }} />
               <span className={s.typeName}>{nt.label}</span>
               <span className={s.typeCount}>{nt.usage_count ?? 0}</span>
             </button>
           ))}
+
+          {/* Served, never mirrored (ADR-0056). The list is a COUNT over the column
+              under the current narrowing, so it stays true for a custom type nobody
+              has told the app about — and `none` is on it, because a NULL status is
+              a real state and the set most worth looking at (ADR-0141). */}
+          {statusFacets.length > 1 && (
+            <>
+              <div className={s.filterHead} style={{ marginTop: 16 }}>{t('nodeExplorer.filterStatus')}</div>
+              {statusFacets.map(f => {
+                const value = f.value === null ? 'none' : f.value
+                return (
+                  <label key={value} className={s.facetRow}>
+                    <input type="checkbox" checked={statuses.has(value)} onChange={() => toggleStatus(value)} />
+                    <StatusDot status={f.value} />
+                    <span className={s.typeName}>{f.value === null ? t('nodeExplorer.statusNone') : f.value}</span>
+                    <span className={s.typeCount}>{f.count}</span>
+                  </label>
+                )
+              })}
+            </>
+          )}
 
           <div className={s.filterHead} style={{ marginTop: 16 }}>{t('nodeExplorer.filterShape')}</div>
           <label className={s.looseToggle} data-tour="explorer-loose">
@@ -201,17 +338,26 @@ export default function NodeExplorer() {
           </div>
 
           <div className={s.countRow}>
-            {/* Two different sentences, because they are two different facts. Without a
-                narrowing filter the type's own total is known and shown; with one, only
-                what came back is known, and claiming a total would be the old lie in a
-                new place. */}
-            {narrowed || !selectedType
+            {/* One sentence now, because there is one fact. The old page had two — the
+                type's own total when nothing was narrowing, and "n shown" the moment
+                anything was, which is a count of the page rather than of the answer. */}
+            {total === undefined
               ? t('nodeExplorer.countShown', { n: nodes.length })
-              : t('nodeExplorer.countOf', { n: nodes.length, total: totalForType ?? nodes.length })}
+              : t('nodeExplorer.countRange', { from, to, total })}
             {isFetching && <span className={s.fetching}>{t('loading')}</span>}
+            {/* Beside the count rather than at the foot of the filter column: sort
+                describes the list you are reading, not what is being kept out of it. */}
+            <select
+              className={`kt-input ${s.sortSelect}`}
+              aria-label={t('nodeExplorer.sort')}
+              value={sort}
+              onChange={e => setParam({ sort: e.target.value })}
+            >
+              {SORTS.map(key => <option key={key} value={key}>{t(`nodeExplorer.sort_${key}`)}</option>)}
+            </select>
           </div>
 
-          {!readOnly && selectedType && (
+          {selectedType && (
             <div className={s.createRow}>
               <input
                 className="kt-input"
@@ -229,8 +375,48 @@ export default function NodeExplorer() {
               </button>
             </div>
           )}
-          {readOnly && selectedType && (
-            <p className={s.readOnlyHint}>{t('nodeExplorer.readOnlyHint')}</p>
+          {createMut.isError && (
+            <p className={s.error}>{createMut.error?.response?.data?.detail || t('nodeExplorer.createFailed')}</p>
+          )}
+          {typeMeta?.is_builtin && (
+            <p className={s.readOnlyHint}>{t('nodeExplorer.builtinHint', { type: typeMeta.label })}</p>
+          )}
+
+          {/* The batch bar. `?loose=1` is a triage filter and triage one row at a time
+              is not triage — the forty-four orphans it finds were forty-four selections
+              and forty-four pickers. */}
+          {picked.size > 0 && (
+            <div className={s.bulkBar}>
+              <span className={s.bulkCount}>{t('nodeExplorer.selected', { n: picked.size })}</span>
+              <span className={s.bulkLabel}>{t('nodeExplorer.fileInto')}</span>
+              <NodeCombobox
+                placeholder={t('nodeExplorer.fileIntoPlaceholder')}
+                filter={canContain}
+                excludeIds={[...picked]}
+                onSelect={(container) => bulkMut.mutate({
+                  ids: [...picked],
+                  act: (id) => attachNodeEdge(container.id, { target_id: id, rel_type: 'contains' }),
+                })}
+              />
+              <button
+                className="kt-btn"
+                disabled={bulkMut.isPending}
+                onClick={() => {
+                  if (window.confirm(t('nodeExplorer.bulkDeleteConfirm', { n: picked.size }))) {
+                    bulkMut.mutate({ ids: [...picked], act: (id) => deleteNode(id) })
+                  }
+                }}
+              >
+                <Trash2 size={12} /> {t('nodeExplorer.deleteSelected')}
+              </button>
+              <button className="kt-btn" onClick={() => setPicked(new Set())}>{t('nodeExplorer.clearSelection')}</button>
+            </div>
+          )}
+          {bulkResult && (
+            <p className={bulkResult.failed.length ? s.error : s.readOnlyHint}>
+              {t('nodeExplorer.bulkResult', { ok: bulkResult.ok, failed: bulkResult.failed.length })}
+              {bulkResult.failed[0] ? ` — ${bulkResult.failed[0]}` : ''}
+            </p>
           )}
 
           {nodesLoading ? (
@@ -238,41 +424,70 @@ export default function NodeExplorer() {
           ) : nodes.length === 0 ? (
             <div className={s.dim}>{t('nodeExplorer.empty')}</div>
           ) : (
-            nodes.map(n => (
-              <div
-                key={n.id}
-                onClick={() => setSelectedId(n.id)}
-                className={`${s.row} ${n.id === selectedId ? s.rowActive : ''}`}
-              >
-                <TypeChip typeMeta={typeByKey.get(n.type)} typeKey={n.type} />
-                <span className={s.rowBody}>
-                  <span className={s.rowTitle}>
-                    {n.title || <em className={s.dim}>{t('nodeExplorer.untitled')}</em>}
+            <>
+              <label className={s.selectAll}>
+                <input type="checkbox" checked={allPicked} onChange={toggleAll} />
+                <span>{t('nodeExplorer.selectAll', { n: nodes.length })}</span>
+              </label>
+              {nodes.map(n => (
+                <div
+                  key={n.id}
+                  onClick={() => setSelectedId(n.id)}
+                  className={`${s.row} ${n.id === selectedId ? s.rowActive : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label={n.title || n.id}
+                    checked={picked.has(n.id)}
+                    onClick={e => e.stopPropagation()}
+                    onChange={() => togglePick(n.id)}
+                  />
+                  <TypeChip typeMeta={typeByKey.get(n.type)} typeKey={n.type} />
+                  <span className={s.rowBody}>
+                    <span className={s.rowTitle}>
+                      <StatusDot status={n.status} />
+                      {n.title || <em className={s.dim}>{t('nodeExplorer.untitled')}</em>}
+                    </span>
+                    {/* Where it lives, on the row (ADR-0094) — the list used to read as a
+                        flat bag of titles with the hierarchy nowhere on screen. The chips
+                        are links, so a click on one must not also select the row. The
+                        trail cap is the component's own default: a node with two parents
+                        is an anomaly, and this is the page you would come to to find one. */}
+                    <span onClick={e => e.stopPropagation()}>
+                      <AncestryTrail nodeId={n.id} entry={ancestry[n.id]} showOwners={false} />
+                    </span>
                   </span>
-                  {/* Where it lives, on the row (ADR-0094) — the list used to read as a
-                      flat bag of titles with the hierarchy nowhere on screen. The chips
-                      are links, so a click on one must not also select the row. */}
-                  <span onClick={e => e.stopPropagation()}>
-                    <AncestryTrail nodeId={n.id} entry={ancestry[n.id]} maxTrails={1} showOwners={false} />
+                  {/* The facts that were on the wire all along and nowhere on screen. */}
+                  <span className={s.rowMeta} title={n.updated_at}>
+                    <span className={edgeCounts[n.id] === 0 ? s.zeroEdges : undefined}>
+                      <Unlink size={10} style={{ verticalAlign: -1 }} /> {edgeCounts[n.id] ?? '·'}
+                    </span>
+                    <span>{formatTimestamp(n.updated_at)}</span>
                   </span>
-                </span>
-                {!typeByKey.get(n.type)?.is_builtin && (
                   <button
-                    onClick={e => { e.stopPropagation(); if (window.confirm(t('nodeExplorer.deleteConfirm'))) deleteMut.mutate(n.id) }}
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (window.confirm(t('nodeExplorer.deleteConfirm', { title: n.title || n.id }))) deleteMut.mutate(n.id)
+                    }}
                     aria-label="delete" disabled={deleteMut.isPending}
                     className={s.iconBtn}
                   >
                     <Trash2 size={13} />
                   </button>
-                )}
-              </div>
-            ))
+                </div>
+              ))}
+            </>
           )}
 
-          {maybeMore && (
-            <button className={`kt-btn ${s.more}`} onClick={() => setLimit(l => l + PAGE)}>
-              {t('nodeExplorer.loadMore')}
-            </button>
+          {(offset > 0 || hasMore) && (
+            <div className={s.pager}>
+              <button className="kt-btn" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - PAGE))}>
+                {t('nodeExplorer.prev')}
+              </button>
+              <button className="kt-btn" disabled={!hasMore} onClick={() => setOffset(o => o + PAGE)}>
+                {t('nodeExplorer.next')}
+              </button>
+            </div>
           )}
         </div>
 
@@ -287,6 +502,8 @@ export default function NodeExplorer() {
                 <Link to={nodeHref(selectedNode, typeByKey)} className={s.detailTitle}>
                   {selectedNode.title || t('nodeExplorer.untitled')}
                 </Link>
+                {/* Printed so it can be copied, and now accepted back: `query` matches an
+                    id prefix from eight characters (ADR-0153). */}
                 <div><code className={s.detailMeta}>{selectedNode.type} · {selectedNode.id}</code></div>
               </div>
 

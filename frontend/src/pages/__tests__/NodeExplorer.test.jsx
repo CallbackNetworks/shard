@@ -1,10 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { MemoryRouter, Routes, Route } from 'react-router'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (k, opts) => (opts && 'total' in opts ? `${k}:${opts.n}/${opts.total}` : opts && 'n' in opts ? `${k}:${opts.n}` : k),
+    t: (k, opts) => (opts ? `${k}:${Object.values(opts).join('/')}` : k),
     i18n: { language: 'en', changeLanguage: vi.fn() },
   }),
 }))
@@ -22,19 +22,21 @@ vi.mock('../../api/client', () => ({
   getNodeTypes: vi.fn(), getEdgeTypes: vi.fn(), getNodes: vi.fn(), getNode: vi.fn(), createNode: vi.fn(),
   deleteNode: vi.fn(), getNodeEdges: vi.fn(), attachNodeEdge: vi.fn(), detachNodeEdge: vi.fn(),
   getGraphMap: vi.fn(), getAncestry: vi.fn(), getRelationOptions: vi.fn(),
+  getNodeFacets: vi.fn(), getEdgeCounts: vi.fn(),
 }))
 
 import NodeExplorer from '../NodeExplorer'
 import { qk } from '../../api/queryKeys'
+import { getNodes } from '../../api/client'
 
 const nodeTypes = [
   { key: 'topic', label: 'Topic', is_builtin: false, roles: [], usage_count: 7 },
-  { key: 'project', label: 'Project', is_builtin: true, roles: ['container'] },
+  { key: 'project', label: 'Project', is_builtin: true, roles: ['container'], usage_count: 9 },
 ]
 const edgeTypes = [{ key: 'contains', label: 'Contains', is_builtin: true, is_containment: true, is_symmetric: false }]
 const topicNodes = [
-  { id: 'n1', type: 'topic', title: 'Roadmap' },
-  { id: 'n2', type: 'topic', title: 'Backlog' },
+  { id: 'n1', type: 'topic', title: 'Roadmap', status: 'todo', updated_at: '2026-09-01T00:00:00' },
+  { id: 'n2', type: 'topic', title: 'Backlog', status: null, updated_at: '2026-09-02T00:00:00' },
 ]
 // `EdgeOut` embeds each endpoint (`source`/`target`) precisely so a client need not
 // resolve the id it is handed. This panel printed the id anyway.
@@ -43,20 +45,30 @@ const edges = [{
   source: { id: 'n1', type: 'topic', title: 'Roadmap' },
   target: { id: 'p1', type: 'project', title: 'Shard' },
 }]
+const facets = { total: 7, status: [{ value: 'todo', count: 5 }, { value: null, count: 2 }] }
 
 const last = {}
+const queries = {}
 
-// A row is a title plus the strip saying where the node lives, so the title and its
-// wrapper both carry the same text; the assertions want the title.
-const row = (text) => screen.getAllByText(text).find(el => el.tagName === 'SPAN' && el.children.length === 0)
+// A row is a title plus a status dot plus the strip saying where the node lives, so
+// several nested elements carry the same text; the assertions want the innermost.
+const row = (text) => {
+  const all = screen.getAllByText(text)
+  return all.find(el => !all.some(other => other !== el && el.contains(other)))
+}
 
 // The create form belongs to a chosen type — a node needs one, and "all types" is not
 // one. `?type=` carries that choice (ADR-0083), so a test about creating starts there.
-function setup({ route = '/explorer' } = {}) {
-  mockUseQuery.mockImplementation(({ queryKey }) => {
+function setup({ route = '/explorer', nodes = topicNodes } = {}) {
+  for (const k of Object.keys(queries)) delete queries[k]
+  mockUseQuery.mockImplementation((opts) => {
+    const { queryKey } = opts
+    queries[queryKey[0]] = opts
     if (queryKey[0] === 'node-types') return { data: nodeTypes }
     if (queryKey[0] === 'edge-types') return { data: edgeTypes }
-    if (queryKey[0] === 'nodes') return { data: topicNodes, isLoading: false }
+    if (queryKey[0] === 'nodes') return { data: nodes, isLoading: false }
+    if (queryKey[0] === 'node-facets') return { data: facets }
+    if (queryKey[0] === 'edge-counts') return { data: { n1: 3, n2: 0 } }
     // Keyed on the id so nothing is "selected" before a row is clicked. The selection
     // is fetched rather than found in the list because the graph re-centres onto
     // neighbours, which are usually of another type.
@@ -78,6 +90,9 @@ function setup({ route = '/explorer' } = {}) {
 }
 
 describe('NodeExplorer', () => {
+  // Call history only — `mockReset` would drop the implementations `setup` installs.
+  beforeEach(() => { vi.clearAllMocks() })
+
   it('renders title and node list for the default type', () => {
     setup()
     expect(screen.getByText('nodeExplorer.title')).toBeTruthy()
@@ -94,9 +109,20 @@ describe('NodeExplorer', () => {
     expect(screen.queryByPlaceholderText('nodeExplorer.titlePlaceholder')).toBeNull()
   })
 
-  it('shows a create form once a custom (non-builtin) type is chosen', () => {
+  it('shows a create form once a type is chosen', () => {
     setup({ route: '/explorer?type=topic' })
     expect(screen.getByPlaceholderText('nodeExplorer.titlePlaceholder')).toBeTruthy()
+  })
+
+  it('offers create and delete for a built-in type too', () => {
+    // The page hid both behind `is_builtin` under a comment claiming built-ins reject a
+    // generic create/delete. They do not: `POST /nodes` and `DELETE /nodes/{id}` are the
+    // write surface for every first-class entity (ADR-0040→0043) and the delete runs the
+    // full teardown (ADR-0131). The cost of the wrong guess was that `?loose=1` could
+    // show you orphaned built-ins and nothing on the page could clear them.
+    setup({ route: '/explorer?type=project' })
+    expect(screen.getByPlaceholderText('nodeExplorer.titlePlaceholder')).toBeTruthy()
+    expect(screen.getAllByLabelText('delete').length).toBe(topicNodes.length)
   })
 
   it('create button is disabled until a title is entered', () => {
@@ -114,13 +140,61 @@ describe('NodeExplorer', () => {
     expect(last.arg).toMatchObject({ type: 'topic', title: 'New topic' })
   })
 
-  it('reports the type total, not the length of the page it drew', () => {
+  it('reports the server-side total, not the length of the page it drew', () => {
     // The defect this page existed with: it asked for the endpoint's default 100, drew
     // them, and printed that as the count — so 144 tasks read as "100 nodes" and 44 of
-    // them could not be reached from here at all.
-    setup({ route: '/explorer?type=topic' })
-    // Two rows are drawn; the type holds seven. The count says seven.
-    expect(screen.getByText('nodeExplorer.countOf:2/7')).toBeTruthy()
+    // them could not be reached from here at all. `usage_count` fixed that for a bare
+    // type and left every narrowed view guessing; the count is a COUNT of the filtered
+    // set now, so it survives a search box too.
+    setup({ route: '/explorer?type=topic&q=road' })
+    expect(screen.getByText('nodeExplorer.countRange:1/2/7')).toBeTruthy()
+  })
+
+  it('asks for the recently-updated order by default', () => {
+    // The only order was `position, created_at`, so the node you just made sorted last
+    // — findable, past the first page, only by already knowing its title.
+    setup()
+    queries.nodes.queryFn()
+    expect(getNodes).toHaveBeenCalledWith('', '', expect.objectContaining({ sort: 'recent', offset: 0 }))
+  })
+
+  it('passes the chosen sort and status filter to the server', () => {
+    setup({ route: '/explorer?sort=title&status=todo,none' })
+    queries.nodes.queryFn()
+    expect(getNodes).toHaveBeenCalledWith('', '', expect.objectContaining({ sort: 'title', status: 'todo,none' }))
+  })
+
+  it('lists the statuses the data actually holds, including the absent one', () => {
+    // Served, never mirrored (ADR-0056): task, project and decision have three different
+    // state machines and a custom type has whatever has been written, so there is no
+    // fixed list to hardcode. A NULL status is a real state and gets a row of its own.
+    setup()
+    expect(screen.getByText('todo')).toBeTruthy()
+    expect(screen.getByText('nodeExplorer.statusNone')).toBeTruthy()
+  })
+
+  it('says how many edges each row has', () => {
+    // `?loose=1` only finds nodes with nothing above *and* nothing below; a node holding
+    // one stray edge is invisible to it, and this is the number that shows it.
+    setup()
+    expect(screen.getByText('3')).toBeTruthy()
+    expect(screen.getByText('0')).toBeTruthy()
+  })
+
+  it('files a selection into one container with a single pick', () => {
+    setup()
+    fireEvent.click(screen.getByLabelText('Roadmap'))
+    fireEvent.click(screen.getByLabelText('Backlog'))
+    expect(screen.getByText('nodeExplorer.selected:2')).toBeTruthy()
+  })
+
+  it('keeps the search text and the selection in the URL', () => {
+    // ADR-0083's rule applied to all six controls: `type` and `loose` were in the URL and
+    // the two that most distinguish one view from another were component state, so the
+    // page could not be linked to or survive a reload.
+    setup({ route: '/explorer?q=road&sel=n1' })
+    expect(screen.getByLabelText('nodeExplorer.searchPlaceholder').value).toBe('road')
+    expect(screen.getByText('nodeExplorer.edges')).toBeTruthy()
   })
 
   it('selecting a node reveals its edges', () => {

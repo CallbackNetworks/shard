@@ -533,14 +533,51 @@ export const updateEdgeType = (key, data) => api.patch(`/graph-types/edges/${key
 export const deleteEdgeType = (key) => api.delete(`/graph-types/edges/${key}`)
 
 // Generic graph nodes (ADR-0033)
-export const getNodes = (type, query, { unfiled, limit, offset } = {}) => {
+// `status` is comma-separated and takes the literal `none` for a NULL status; `sort` is
+// one of position/recent/created/title. `query` matches a title substring or, from eight
+// characters, an id prefix — the explorer prints ids, so it has to accept them back
+// (ADR-0153).
+export const getNodes = (type, query, { unfiled, limit, offset, status, sort } = {}) => {
   const params = {}
   if (type) params.type = type
   if (query) params.query = query
+  if (status) params.status = status
+  if (sort) params.sort = sort
   if (unfiled) params.unfiled = true
   if (limit) params.limit = limit
   if (offset) params.offset = offset
   return api.get('/nodes', { params }).then(r => r.data)
+}
+// `{total, status: [{value, count}]}` under the same narrowing. The total is the honest
+// denominator a capped page cannot supply, and the status list is served rather than
+// mirrored because there is no fixed vocabulary to mirror (ADR-0056): a task, a project
+// and a decision have three different state machines, and a custom type has whatever
+// has been written into it.
+export const getNodeFacets = ({ type, query, status, unfiled } = {}) => {
+  const params = {}
+  if (type) params.type = type
+  if (query) params.query = query
+  if (status) params.status = status
+  if (unfiled) params.unfiled = true
+  return api.get('/nodes/facets', { params }).then(r => r.data)
+}
+// Both id-batched reads share one server cap (`MAX_IDS`, 200, `services/ancestry.py`).
+// A caller asking about more than that silently got an answer for a prefix of its
+// list, and a missing entry does not read as "you asked for too much" — it reads as
+// "this node lives nowhere" / "this node is connected to nothing", which are claims.
+// Chunking lives here so the cap is honoured once, for every caller.
+const ID_BATCH = 200
+
+// Batched for the same reason ancestry is: the caller is a page of rows, and one
+// request per row is how a list ends up not asking at all (ADR-0094).
+export const getEdgeCounts = (ids) => {
+  const list = [...new Set((ids || []).filter(Boolean))]
+  if (list.length === 0) return Promise.resolve({})
+  const batches = []
+  for (let i = 0; i < list.length; i += ID_BATCH) batches.push(list.slice(i, i + ID_BATCH))
+  return Promise.all(
+    batches.map(batch => api.get('/graph/edge-counts', { params: { ids: batch.join(',') } }).then(r => r.data))
+  ).then(parts => Object.assign({}, ...parts))
 }
 export const getNode = (id) => api.get(`/nodes/${id}`).then(r => r.data)
 export const getNodeEvents = (id) => api.get(`/nodes/${id}/events`).then(r => r.data)
@@ -557,16 +594,11 @@ export const getGraphMap = ({ types, includeData } = {}) => {
 // Where nodes live and whose they are (ADR-0094). Batched by id: the caller is always a
 // list (a header asking about one node, a dashboard asking about every card it draws), and
 // one-per-node would have made the dashboard's question cost a request per project.
-// The server caps one request at `MAX_IDS` (200, `services/ancestry.py`), so a caller
-// asking about more than that silently got an answer for a prefix of its list — and a
-// missing entry reads as "this node lives nowhere", not as "you asked for too much".
-// Chunking lives here so the cap is honoured once, for every caller.
-const ANCESTRY_BATCH = 200
 export const getAncestry = (ids) => {
   const list = [...new Set((ids || []).filter(Boolean))]
   if (list.length === 0) return Promise.resolve({})
   const batches = []
-  for (let i = 0; i < list.length; i += ANCESTRY_BATCH) batches.push(list.slice(i, i + ANCESTRY_BATCH))
+  for (let i = 0; i < list.length; i += ID_BATCH) batches.push(list.slice(i, i + ID_BATCH))
   return Promise.all(
     batches.map(batch => api.get('/graph/ancestry', { params: { ids: batch.join(',') } }).then(r => r.data))
   ).then(parts => Object.assign({}, ...parts))

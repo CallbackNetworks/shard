@@ -37,7 +37,7 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import ancestry, graph, node_admin, node_data, share_admin, webhook_credentials
+from app.services import ancestry, graph, node_admin, node_data, node_listing, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -152,24 +152,32 @@ def api_graph_ancestry(
 @sub_router.get(
     "/nodes",
     summary="List nodes",
-    description="Lists nodes, optionally filtered by type and title substring. A project-scoped key "
-    "sees only nodes governed by its project. Requires `read` scope.",
+    description="Lists nodes, optionally filtered by type, title-or-id substring, status and "
+    "whether the node is loose in the graph; `sort` is one of position, recent, created, title. "
+    "A project-scoped key sees only nodes governed by its project. Requires `read` scope.",
     response_model=list[NodeOut],
     responses=_auth_errors,
 )
 def api_list_nodes(
     type: str | None = Query(default=None),
-    query: str | None = Query(default=None, description="case-insensitive title substring filter"),
+    query: str | None = Query(default=None, description="title substring, or an id prefix from 8 characters"),
+    status: str | None = Query(default=None, description="comma-separated statuses; 'none' matches a NULL status"),
+    unfiled: bool = Query(default=False, description="only nodes that are loose in the graph"),
+    sort: str = Query(default=node_listing.DEFAULT_SORT, description=f"one of {', '.join(node_listing.SORTS)}"),
     limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(_get_api_key),
 ):
+    """The filter itself is ``services/node_listing`` (ADR-0153).
+
+    This was a second hand-written copy of the internal listing, and it had already
+    fallen behind: ADR-0150 taught that one to answer "what is loose in the graph" and
+    to page past its own cap, and an agent could ask neither. What stays here is what
+    genuinely differs — the scope check and the key's reach.
+    """
     _require_scope(api_key, "read")
-    q = db.query(Node)
-    if type is not None:
-        q = q.filter(Node.type == type)
-    if query:
-        q = q.filter(Node.title.ilike(f"%{query}%"))
+    q = node_listing.listing_query(db, type=type, query=query, status=status, unfiled=unfiled, sort=sort)
     # Same rule as /graph/map: the key's scope narrows the query, not its result, so
     # `limit` counts rows the caller may actually see.
     visible_ids = _visible_node_ids(db, api_key)
@@ -177,7 +185,7 @@ def api_list_nodes(
         if not visible_ids:
             return []
         q = q.filter(Node.id.in_(visible_ids))
-    return q.order_by(Node.position, Node.created_at).limit(limit).all()
+    return q.offset(offset).limit(limit).all()
 
 
 @sub_router.post(

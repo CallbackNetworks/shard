@@ -30,7 +30,7 @@ from app.schemas import (
     TaskOut,
     WebhookEventOut,
 )
-from app.services import ancestry, graph, node_admin, node_data, share_admin, webhook_credentials
+from app.services import ancestry, graph, node_admin, node_data, node_listing, share_admin, webhook_credentials
 from app.services.enrichment import enrich_container_subtree, enrich_task
 from app.services.graph_dispatch import (
     dispatch_edge_added,
@@ -117,26 +117,53 @@ def graph_ancestry(
     return ancestry.ancestry_for(db, node_ids)
 
 
+@graph_router.get("/edge-counts", response_model=dict[str, int])
+def graph_edge_counts(
+    ids: str = Query(description="comma-separated node ids"),
+    db: Session = Depends(get_db),
+):
+    """How many edges each of these nodes has, either direction (ADR-0153).
+
+    Batched for the same reason ancestry is: the caller is a page of rows. Deliberately
+    internal — ``/api/v1`` already serves every edge of every node, so this is a
+    rendering aid rather than a capability, and ADR-0085's rule is about capabilities.
+    """
+    node_ids = [i.strip() for i in ids.split(",") if i.strip()][: ancestry.MAX_IDS]
+    return graph.edge_counts(db, node_ids)
+
+
 @router.get("", response_model=list[NodeOut])
 def list_nodes(
     type: str | None = Query(default=None),
-    query: str | None = Query(default=None, description="case-insensitive title substring filter"),
+    query: str | None = Query(default=None, description="title substring, or an id prefix from 8 characters"),
+    status: str | None = Query(default=None, description="comma-separated statuses; 'none' matches a NULL status"),
     unfiled: bool = Query(default=False, description="only nodes that are loose in the graph"),
+    sort: str = Query(default=node_listing.DEFAULT_SORT, description=f"one of {', '.join(node_listing.SORTS)}"),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """List nodes. ``offset`` exists because the cap was silently the answer (ADR-0150):
-    the explorer asked for the default 100, drew them, and reported *that* as the count,
-    so a database with 144 tasks showed 100 and said "100 nodes"."""
-    q = db.query(Node)
-    if type is not None:
-        q = q.filter(Node.type == type)
-    if query:
-        q = q.filter(Node.title.ilike(f"%{query}%"))
-    if unfiled:
-        q = q.filter(Node.id.in_(graph.unfiled_node_ids(db)))
-    return q.order_by(Node.position, Node.created_at).offset(offset).limit(limit).all()
+    """List nodes. The filter is ``services/node_listing`` so this door and ``/api/v1``
+    cannot answer the same question differently (ADR-0153); ``offset`` exists because
+    the cap was silently the answer (ADR-0150)."""
+    q = node_listing.listing_query(db, type=type, query=query, status=status, unfiled=unfiled, sort=sort)
+    return q.offset(offset).limit(limit).all()
+
+
+@router.get("/facets")
+def node_facets(
+    type: str | None = Query(default=None),
+    query: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    unfiled: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """``{total, status: [{value, count}]}`` for the same narrowing ``GET /nodes`` takes.
+
+    Registered above ``/{node_id}`` on purpose — routing is first-match, and a literal
+    declared after a parameterised one is simply unreachable (ADR-0086).
+    """
+    return node_listing.facets(db, type=type, query=query, status=status, unfiled=unfiled)
 
 
 @router.post("", response_model=None, status_code=status.HTTP_201_CREATED)

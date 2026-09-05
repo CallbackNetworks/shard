@@ -1355,7 +1355,30 @@ any CI job still posting to it starts failing silently from the runner's point o
 #### `GET /graph/map?types=&include=data&limit=`
 One-shot `{nodes, edges}` slice of the whole graph (ADR-0037), used by the structure map.
 
-#### `GET /nodes?type=&query=&limit=` · `GET /nodes/{id}`
+#### `GET /nodes?type=&query=&status=&unfiled=&sort=&limit=&offset=` · `GET /nodes/{id}`
+The filter lives in `services/node_listing` and both doors call it, so this and
+`/api/v1/nodes` cannot answer the same question differently (ADR-0153).
+
+| Parameter | Means |
+|-----------|-------|
+| `query` | title substring — **or an id prefix, from 8 characters**. The explorer prints ids, so it has to accept them back; a shorter term is a title match only, because a one-character id prefix is a sample of the alphabet rather than a search |
+| `status` | comma-separated union. `none` matches a **NULL** status — a real state (ADR-0142), and one an omitted filter cannot be distinguished from |
+| `unfiled` | only nodes loose in the graph: nothing above and nothing below, across **both** of ADR-0078's axes — a node that `owns` things is a root, not an orphan (ADR-0153) |
+| `sort` | `position` (default), `recent`, `created`, `title`. Anything else is a 422, not a silent fallback |
+
+#### `GET /nodes/facets?type=&query=&status=&unfiled=`
+`{total, status: [{value, count}]}` under the same narrowing. `total` is a server-side
+COUNT of the filtered set, so paging knows where it ends instead of inferring it from a
+full page. The status list is **counted from the data, never a fixed vocabulary** (ADR-0056):
+task, project and decision have three different state machines and a custom type has
+whatever has been written into it. The counts deliberately ignore `status` itself — they
+have to be counts of the set you would get *by switching to* each value.
+
+#### `GET /graph/edge-counts?ids=a,b,c`
+How many edges each node has, either direction. Batched by id for the same reason ancestry
+is: the caller is a page of rows (ADR-0094). Internal only — `/api/v1` already serves every
+edge of every node, so this is a rendering aid, not a capability.
+
 #### `GET /nodes/{id}/edges` · `GET /nodes/{id}/contained-tasks`
 #### `GET /nodes/{id}/events`
 Provenance: every graph event touching this node, newest first (ADR-0033).
@@ -1518,8 +1541,12 @@ top-level project, goal, or identity (ADR-0042).
 
 ### Nodes — the write surface
 
-#### `GET /api/v1/nodes?type=&query=&limit=`
-Lists nodes visible to the key.
+#### `GET /api/v1/nodes?type=&query=&status=&unfiled=&sort=&limit=&offset=`
+Lists nodes visible to the key. Same parameters and same meanings as the internal
+`GET /nodes` above — one service backs both (ADR-0153). It was a hand-written second copy
+that had already fallen behind: ADR-0150 taught the internal listing `unfiled` and `offset`
+and this one stayed where it was, so an agent could not ask the question the page in front
+of it asks.
 
 #### `GET /api/v1/nodes/{id}`
 

@@ -44,7 +44,7 @@
 }
 
 .typeRow:hover { background: var(--kt-hover); }
-.typeRowActive { background: rgba(129, 140, 248, 0.12); }
+.typeRowActive { background: color-mix(in srgb, var(--kt-hit) 12%, transparent); }
 
 .typeDot {
   width: 8px;
@@ -99,11 +99,18 @@
 
 .countRow {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   margin: 10px 0 6px;
   font-size: 11px;
   color: var(--kt-faint);
+}
+
+.sortSelect {
+  margin-left: auto;
+  width: auto;
+  font-size: 11px;
+  padding: 3px 6px;
 }
 
 .fetching { opacity: 0.7; }
@@ -132,7 +139,7 @@
 }
 
 .row:hover { background: var(--kt-hover); }
-.rowActive { background: rgba(129, 140, 248, 0.1); }
+.rowActive { background: color-mix(in srgb, var(--kt-hit) 10%, transparent); }
 
 .rowBody {
   flex: 1;
@@ -170,7 +177,13 @@
   display: flex;
 }
 
-.more { width: 100%; margin-top: 12px; }
+/* Prev/Next, not "load more": the count row now knows the real total, so the page can
+   say where it is in the answer instead of growing the request until it stops. */
+.pager {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
 
 .dim { font-size: 12px; color: var(--kt-faint); }
 
@@ -225,3 +238,77 @@
 }
 
 .rawId { flex: 1; color: var(--kt-muted); font-size: 11px; }
+
+/* A status is a value the column holds, not a member of a fixed vocabulary, so only the
+   four the design system names carry a hue and the rest fall back to neutral (ADR-0088). */
+.statusDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--chip);
+  margin-right: 6px;
+  flex-shrink: 0;
+  vertical-align: 1px;
+}
+
+.facetRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: var(--kt-ink);
+  cursor: pointer;
+}
+
+.facetRow:hover { background: var(--kt-hover); }
+
+/* The facts that arrived on every row all along and were drawn nowhere: how many edges
+   the node has, and when it last moved. Tabular so a column of them scans. */
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--kt-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zero edges is the interesting value, and `loose` only finds the subset that is also
+   contained by nothing — a node with one stray edge is invisible to that filter. */
+.zeroEdges { color: var(--kt-status-failed, #fb7185); }
+
+.selectAll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--kt-faint);
+  cursor: pointer;
+  border-bottom: 1px solid var(--kt-line);
+}
+
+.bulkBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 30%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 8%, transparent);
+  border-radius: 4px;
+}
+
+.bulkCount { font-size: 12px; font-weight: 700; color: var(--kt-ink); }
+.bulkLabel { font-size: 12px; color: var(--kt-faint); }
+
+.error {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--kt-status-failed, #fb7185);
+}

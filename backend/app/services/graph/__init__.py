@@ -53,6 +53,7 @@ from app.services.graph.core import (
     dependent_ids,
     descendants_of,
     detect_cycle,
+    edge_counts,
     ensure_node,
     find_node_by_callback_token,
     find_node_by_share_token,

@@ -10,7 +10,7 @@ import uuid
 from collections import defaultdict, deque
 from datetime import datetime
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Edge, EdgeType, GraphEvent, Node, NodeType
@@ -488,14 +488,44 @@ def unfiled_node_ids(db: Session) -> select:
     A root is a node nothing contains that nevertheless *contains something*. Loose is
     both: nothing above it and nothing below it. That distinction needs no type or role,
     which is why it holds for a custom layer nobody has told the app about.
+
+    "Below it" spans both of ADR-0078's axes, not just containment (ADR-0153). The first
+    version asked about ``is_containment`` alone, and production's own hierarchy is built
+    the other way: identities own their projects rather than containing them. So every
+    identity in the database landed back in the inbox — one of them owning twenty-one
+    projects — under the same hint about linking it into the graph, which is the exact
+    failure quoted above, surviving one relation over. Only the *outgoing* direction
+    counts: being owned is whose you are, not where you live, so a project somebody owns
+    and nobody filed is still loose, which is most of what this filter is for.
     """
-    contained = (
-        select(Edge.target_id).join(EdgeType, EdgeType.key == Edge.rel_type).where(EdgeType.is_containment.is_(True))
-    )
-    parents = (
-        select(Edge.source_id).join(EdgeType, EdgeType.key == Edge.rel_type).where(EdgeType.is_containment.is_(True))
-    )
+    containment = select(EdgeType.key).where(EdgeType.is_containment.is_(True))
+    contained = select(Edge.target_id).where(Edge.rel_type.in_(containment))
+    parents = select(Edge.source_id).where(Edge.rel_type.in_(containment.union(select(literal(REL_OWNS)))))
     return select(Node.id).where(Node.id.not_in(contained), Node.id.not_in(parents))
+
+
+def edge_counts(db: Session, node_ids: list[str]) -> dict[str, int]:
+    """How many edges each of these nodes has, either direction. Batched by id.
+
+    The same reason ancestry is batched (ADR-0094): the caller is always a list. A
+    listing that wants to say "this one is connected to nothing" would otherwise ask
+    once per row, which is how a page ends up not asking at all — and "is it wired into
+    anything" is the question the data page exists to answer, with ``unfiled`` only its
+    extreme case (nothing above *and* nothing below).
+    """
+    if not node_ids:
+        return {}
+    counts = dict.fromkeys(node_ids, 0)
+    wanted = set(node_ids)
+    rows = db.query(Edge.source_id, Edge.target_id).filter(
+        or_(Edge.source_id.in_(node_ids), Edge.target_id.in_(node_ids))
+    )
+    for source_id, target_id in rows:
+        if source_id in wanted:
+            counts[source_id] += 1
+        if target_id in wanted:
+            counts[target_id] += 1
+    return counts
 
 
 def relation_accepts(db: Session, rel_type: str, source_type: str, target_type: str) -> bool:
