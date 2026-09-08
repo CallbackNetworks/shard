@@ -9,6 +9,7 @@ import {
 } from '../api/client'
 import { BRAND, DARK } from '../constants/theme'
 import NodeShareFacet from '../components/NodeShareFacet'
+import NodeRelationsPanel from '../components/NodeRelationsPanel'
 import NodeFieldsPanel from '../components/NodeFieldsPanel'
 import EmptyState from '../components/shared/EmptyState'
 
@@ -155,7 +156,7 @@ export default function Identities() {
                     <button onClick={() => setSettingsId(settingsId === identity.id ? null : identity.id)}
                       title={t('identities.settings')} aria-label={t('identities.settings')}
                       style={{
-                        background: settingsId === identity.id ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                        background: settingsId === identity.id ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.06)',
                         border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                         color: settingsId === identity.id ? BRAND : DARK.text,
                       }}>
@@ -164,7 +165,7 @@ export default function Identities() {
                     <button onClick={() => setLinkingId(isLinking ? null : identity.id)}
                       title={t('identities.projects')} aria-label={t('identities.projects')}
                       style={{
-                        background: isLinking ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                        background: isLinking ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.06)',
                         border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 0, padding: '6px 8px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center',
                         color: isLinking ? BRAND : DARK.text,
                       }}>
@@ -228,7 +229,7 @@ export default function Identities() {
                             style={{
                               display: 'flex', alignItems: 'center', gap: 4,
                               fontSize: 12, padding: '4px 10px', borderRadius: 0, cursor: 'pointer',
-                              background: isLinked ? identity.color + '18' : 'rgba(var(--kt-ink-rgb), 0.05)',
+                              background: isLinked ? identity.color + '18' : 'rgba(var(--kt-ink-rgb), 0.095)',
                               color: isLinked ? identity.color : 'rgba(var(--kt-ink-rgb), 0.4)',
                               border: isLinked ? `1px solid ${identity.color}55` : '1px solid rgba(var(--kt-ink-rgb), 0.1)',
                               fontWeight: isLinked ? 600 : 400,
@@ -239,6 +240,21 @@ export default function Identities() {
                           </button>
                         )
                       })}
+                    </div>
+
+                    {/* Projects are one relation an identity has; `owns`, `contains`
+                        and anything custom are the rest, and this card offered no way
+                        to see or set them (ADR-0155). An identity card links nowhere,
+                        so the Data page was the only door. */}
+                    <div style={{ marginTop: 12 }}>
+                      <NodeRelationsPanel
+                        nodeId={identity.id}
+                        nodeType={identity.type || 'identity'}
+                        compact
+                        collapsible
+                        defaultOpen={false}
+                        onChanged={() => qc.invalidateQueries({ queryKey: qk.identities() })}
+                      />
                     </div>
                   </div>
                 )}

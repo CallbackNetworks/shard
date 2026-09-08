@@ -25,6 +25,10 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../api/client', () => ({
   getNode: vi.fn(), getNodeTypes: vi.fn(), getContainedTasks: vi.fn(),
   updateTask: vi.fn(), deleteTask: vi.fn(),
+  // Read by the shared relations panel this page now mounts (ADR-0155).
+  getEdgeTypes: vi.fn(), getNodeEdges: vi.fn(), getGraphMap: vi.fn(),
+  getRelationOptions: vi.fn(), attachNodeEdge: vi.fn(), detachNodeEdge: vi.fn(),
+  getNodes: vi.fn(), getAncestry: vi.fn(),
 }))
 
 // The heavy dnd-based views are not under test here; replace them with probes.

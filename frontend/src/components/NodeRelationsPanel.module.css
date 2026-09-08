@@ -1,0 +1,104 @@
+.panel {
+  margin-bottom: 16px;
+}
+
+/* Doubled for specificity, deliberately: `.kt-card` sets `overflow: hidden`, and the
+   picker's node search drops a 240px absolutely-positioned list from the last element
+   in this card — so on every card-shaped mount the list was cut off at the card's
+   edge (the ADR-0122/0129 mechanism again, a different containing block each time). */
+.panel.panel {
+  overflow: visible;
+}
+
+.plain {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--kt-ink);
+}
+
+.icon { color: #818cf8; flex-shrink: 0; }
+
+.title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--kt-faint);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.count { font-size: 11px; color: var(--kt-muted); }
+
+.viewToggle { display: flex; gap: 4px; margin-left: auto; }
+
+.dim { font-size: 12px; color: var(--kt-muted); }
+
+.group { margin-bottom: 12px; }
+
+.relHead {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--kt-faint);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--kt-line);
+  font-size: 12px;
+}
+
+.dir { color: var(--kt-muted); font-size: 11px; width: 12px; text-align: center; flex-shrink: 0; }
+
+.neighbour {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  color: var(--kt-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status { font-size: 11px; flex-shrink: 0; }
+
+.rawId { flex: 1; color: var(--kt-muted); font-size: 11px; }
+
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--kt-muted);
+  padding: 2px;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.picker { margin-top: 10px; }

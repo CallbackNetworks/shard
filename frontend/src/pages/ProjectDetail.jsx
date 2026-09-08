@@ -18,6 +18,7 @@ import NodeShareFacet from '../components/NodeShareFacet'
 import WebhookPanel from '../components/WebhookPanel'
 import BuildHistoryPanel from '../components/BuildHistoryPanel'
 import ChildContainersPanel from '../components/ChildContainersPanel'
+import NodeRelationsPanel from '../components/NodeRelationsPanel'
 import useFocusRow from '../hooks/useFocusRow'
 import GanttChart from '../components/GanttChart'
 import BoardView from '../components/BoardView'
@@ -393,6 +394,18 @@ export default function ProjectDetail() {
           the header total but are not on this page's list. */}
       <div className={s.childContainers}>
         <ChildContainersPanel nodeId={id} />
+
+        {/* And what the project itself is attached to (ADR-0155). `nodeHref` sends a
+            project to this page, never to `/n/{id}`, so until now nothing in the app
+            linked a project to its own relations — filing it under an identity meant
+            finding it on the Data page. Closed by default; the work comes first. */}
+        <NodeRelationsPanel
+          nodeId={id}
+          nodeType="project"
+          collapsible
+          defaultOpen={false}
+          onChanged={() => qc.invalidateQueries({ queryKey: qk.project(id) })}
+        />
       </div>
 
       {/* New issue form */}

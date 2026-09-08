@@ -124,7 +124,9 @@ describe('NodePage', () => {
 
   it('detaches an incoming edge with the neighbor as source', () => {
     setup()
-    const detachButtons = screen.getAllByLabelText('nodePage.detach')
+    // The far end is named in the label (ADR-0155): six identical "Detach" buttons
+    // is what a screen reader was given before.
+    const detachButtons = screen.getAllByLabelText(/^nodePage\.detach /)
     fireEvent.click(detachButtons[1]) // the incoming references edge
     expect(last.arg).toEqual({ sourceId: 't9', targetId: 'n1', relType: 'references' })
   })

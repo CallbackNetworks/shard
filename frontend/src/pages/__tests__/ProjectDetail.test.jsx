@@ -57,6 +57,10 @@ vi.mock('../../api/client', () => ({
   // above answers every non-project key with an empty list, so the strip renders
   // nothing and these only have to exist.
   getAncestry: vi.fn(), getNodeTypes: vi.fn(),
+  // Same for the relations panel this page now mounts (ADR-0155).
+  getEdgeTypes: vi.fn(), getNodeEdges: vi.fn(), getGraphMap: vi.fn(),
+  getRelationOptions: vi.fn(), attachNodeEdge: vi.fn(), detachNodeEdge: vi.fn(),
+  getNodes: vi.fn(),
 }))
 
 // Each view reports the ids it received, so the assertions can be about the

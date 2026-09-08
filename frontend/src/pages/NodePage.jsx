@@ -1,23 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { qk } from '../api/queryKeys'
 import { useNavigate, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, History, Link2, Pencil, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, History, Pencil, Trash2, X } from 'lucide-react'
 import {
-  getNode, getNodeEdges, getNodeEvents, getNodeTypes, getEdgeTypes,
-  updateNode, deleteNode, detachNodeEdge,
+  getNode, getNodeEvents, getNodeTypes,
+  updateNode, deleteNode,
 } from '../api/client'
 import { DARK, STATUS_COLOR } from '../constants/theme'
-import RelationPicker from '../components/shared/RelationPicker'
+import NodeRelationsPanel from '../components/NodeRelationsPanel'
+import TypeChip from '../components/shared/TypeChip'
 import NodeShareFacet from '../components/NodeShareFacet'
 import NodeFieldsPanel from '../components/NodeFieldsPanel'
 import GoverningDecisions from '../components/GoverningDecisions'
 import EmptyState from '../components/shared/EmptyState'
 import AncestryTrail from '../components/shared/AncestryTrail'
 import { hasNodeRole } from '../constants/nodeRoles'
-import { nodeHref } from '../utils/nodeHref'
-import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 
 // Universal node page (ADR-0037): one URL per node, edges grouped by rel_type
 // and direction, neighbors navigable, provenance at the bottom.
@@ -28,66 +27,6 @@ function fmtDateTime(iso) {
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 }
 
-function TypeChip({ typeMeta, typeKey }) {
-  const color = typeMeta?.color || '#818cf8'
-  return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3, flexShrink: 0,
-      textTransform: 'uppercase', letterSpacing: 0.5,
-      color, background: `${color}22`, border: `1px solid ${color}44`,
-    }}>
-      {typeMeta?.label || typeKey}
-    </span>
-  )
-}
-
-function NeighborRow({ edge, refNode, outgoing, onOpen, onDetach, detaching }) {
-  const { t } = useTranslation()
-  const statusColor = refNode?.status ? (STATUS_COLOR[refNode.status] || DARK.textDim) : null
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 4px',
-      borderBottom: `1px solid ${DARK.border}`, fontSize: 13,
-    }}>
-      <span style={{ color: DARK.textDim, fontSize: 11, width: 14, textAlign: 'center' }}>{outgoing ? '→' : '←'}</span>
-      {refNode ? (
-        <>
-          <NeighborBadge type={refNode.type} />
-          <button
-            onClick={() => onOpen(refNode)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left',
-              flex: 1, fontSize: 13, color: DARK.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}
-          >
-            {refNode.title || <em style={{ color: DARK.textDim }}>{t('nodePage.untitled')}</em>}
-          </button>
-          {statusColor && (
-            <span style={{ fontSize: 11, color: statusColor, flexShrink: 0 }}>{refNode.status}</span>
-          )}
-        </>
-      ) : (
-        <code style={{ flex: 1, color: DARK.textMid, fontSize: 11 }}>{outgoing ? edge.target_id : edge.source_id}</code>
-      )}
-      <button
-        onClick={onDetach}
-        disabled={detaching}
-        aria-label={t('nodePage.detach')}
-        title={t('nodePage.detach')}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.textMid, padding: 2 }}
-      >
-        <X size={13} />
-      </button>
-    </div>
-  )
-}
-
-function NeighborBadge({ type }) {
-  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
-  const nt = nodeTypes.find(x => x.key === type)
-  return <TypeChip typeMeta={nt} typeKey={type} />
-}
-
 export default function NodePage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -95,18 +34,14 @@ export default function NodePage() {
   const qc = useQueryClient()
 
   const { data: node, isLoading, isError } = useQuery({ queryKey: qk.node(id), queryFn: () => getNode(id) })
-  const { data: edges = [] } = useQuery({ queryKey: qk.nodeEdges(id), queryFn: () => getNodeEdges(id), enabled: !!node })
   const { data: events = [] } = useQuery({ queryKey: qk.nodeEvents(id), queryFn: () => getNodeEvents(id), enabled: !!node })
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
-  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [showEvents, setShowEvents] = useState(false)
 
   const typeMeta = nodeTypes.find(nt => nt.key === node?.type)
-  const typeByKey = useNodeTypeMap()
-  const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: qk.node(id) })
@@ -122,27 +57,6 @@ export default function NodePage() {
     mutationFn: () => deleteNode(id),
     onSuccess: () => navigate(-1),
   })
-  const detachMut = useMutation({
-    mutationFn: ({ sourceId, targetId, relType }) => detachNodeEdge(sourceId, targetId, relType),
-    onSuccess: invalidate,
-  })
-
-  // Group edges by rel_type, containment types first, direction split inside.
-  const groups = useMemo(() => {
-    const byRel = new Map()
-    for (const e of edges) {
-      if (!byRel.has(e.rel_type)) byRel.set(e.rel_type, { out: [], inc: [] })
-      const g = byRel.get(e.rel_type)
-      if (e.source_id === id) g.out.push(e)
-      else g.inc.push(e)
-    }
-    const keys = [...byRel.keys()].sort((a, b) => {
-      const ca = edgeTypeByKey.get(a)?.is_containment ? 0 : 1
-      const cb = edgeTypeByKey.get(b)?.is_containment ? 0 : 1
-      return ca - cb || a.localeCompare(b)
-    })
-    return keys.map(k => ({ relType: k, ...byRel.get(k) }))
-  }, [edges, id, edgeTypeByKey])
 
   if (isLoading) return <div className="kt-page"><div style={{ fontSize: 12, color: DARK.textDim }}>{t('loading')}</div></div>
   if (isError || !node) {
@@ -152,9 +66,6 @@ export default function NodePage() {
       </div>
     )
   }
-
-  const openNeighbor = (ref) => navigate(nodeHref(ref, typeByKey))
-  const edgeIds = new Set([id, ...edges.flatMap(e => [e.source_id, e.target_id])])
 
   return (
     <div className="kt-page">
@@ -248,53 +159,11 @@ export default function NodePage() {
         <NodeShareFacet node={node} subscribable={hasNodeRole(typeMeta, 'subscribable')} />
       )}
 
-      {/* Relations */}
-      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <Link2 size={15} color="#818cf8" />
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: DARK.text }}>{t('nodePage.relations')}</h3>
-          <span style={{ fontSize: 11, color: DARK.textDim }}>{edges.length}</span>
-        </div>
-
-        {groups.length === 0 && (
-          <div style={{ fontSize: 12, color: DARK.textDim, marginBottom: 10 }}>{t('nodePage.noRelations')}</div>
-        )}
-        {groups.map(g => {
-          const et = edgeTypeByKey.get(g.relType)
-          return (
-            <div key={g.relType} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: DARK.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>
-                {et?.label || g.relType}
-              </div>
-              {[...g.out.map(e => ({ e, outgoing: true })), ...g.inc.map(e => ({ e, outgoing: false }))].map(({ e, outgoing }) => (
-                <NeighborRow
-                  key={e.id}
-                  edge={e}
-                  refNode={outgoing ? e.target : e.source}
-                  outgoing={outgoing}
-                  onOpen={openNeighbor}
-                  detaching={detachMut.isPending}
-                  onDetach={() => detachMut.mutate(outgoing
-                    ? { sourceId: id, targetId: e.target_id, relType: e.rel_type }
-                    : { sourceId: e.source_id, targetId: id, relType: e.rel_type })}
-                />
-              ))}
-            </div>
-          )
-        })}
-
-        {/* Attach. One picker (ADR-0150) — it asks the server which relations this
-            node type can be an end of, and in which direction, instead of listing the
-            whole vocabulary and learning from the 400. */}
-        <div style={{ marginTop: 6 }}>
-          <RelationPicker
-            nodeId={id}
-            nodeType={node.type}
-            excludeIds={[...edgeIds]}
-            onLinked={invalidate}
-          />
-        </div>
-      </div>
+      {/* Relations. One panel, mounted on every page that shows a node (ADR-0155) —
+          this page used to be the only one that had it, and `nodeHref` never sends a
+          project or a container here, so the pages people actually stand on had no way
+          to say what their node was attached to. */}
+      <NodeRelationsPanel nodeId={id} nodeType={node.type} onChanged={invalidate} />
 
       {/* Provenance */}
       <div className="kt-card" style={{ padding: 20 }}>

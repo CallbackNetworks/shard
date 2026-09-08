@@ -3,33 +3,24 @@ import { qk } from '../api/queryKeys'
 import { Link, useSearchParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Boxes, List, Network, Plus, Search, Trash2, Link2, X, Unlink } from 'lucide-react'
+import { Boxes, Plus, Search, Trash2, Unlink } from 'lucide-react'
 import {
-  getNodeTypes, getEdgeTypes, getNodes, getNode, createNode, deleteNode,
-  getNodeEdges, detachNodeEdge, getGraphMap, getNodeFacets, getEdgeCounts, attachNodeEdge,
+  getNodeTypes, getNodes, getNode, createNode, deleteNode,
+  getNodeFacets, getEdgeCounts, attachNodeEdge,
 } from '../api/client'
 import { DARK, STATUS_COLOR } from '../constants/theme'
 import { nodeHref } from '../utils/nodeHref'
 import { formatTimestamp } from '../utils/datetime'
 import useAncestry from '../hooks/useAncestry'
 import AncestryTrail from '../components/shared/AncestryTrail'
-import EgoNetwork from '../components/shared/EgoNetwork'
-import RelationPicker from '../components/shared/RelationPicker'
+import NodeRelationsPanel from '../components/NodeRelationsPanel'
 import NodeCombobox from '../components/shared/NodeCombobox'
+import TypeChip from '../components/shared/TypeChip'
 import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 import s from './NodeExplorer.module.css'
 
 const PAGE = 100
 const SORTS = ['recent', 'created', 'title', 'position']
-
-function TypeChip({ typeMeta, typeKey }) {
-  const color = typeMeta?.color || '#818cf8'
-  return (
-    <span className={s.typeChip} style={{ '--chip': color }}>
-      {typeMeta?.label || typeKey}
-    </span>
-  )
-}
 
 // A status is a value the column happens to hold, not a member of a fixed vocabulary:
 // task, project and decision have three different state machines and a custom type has
@@ -76,7 +67,6 @@ export default function NodeExplorer() {
   const qc = useQueryClient()
 
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes })
-  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes })
 
   // What is being looked at lives in the URL (ADR-0083), which is also what lets the
   // retired `/unfiled` page become a link into this one rather than a second page.
@@ -104,7 +94,6 @@ export default function NodeExplorer() {
   const [text, setText] = useState(search)
   const [offset, setOffset] = useState(0)
   const [newTitle, setNewTitle] = useState('')
-  const [relView, setRelView] = useState('list')
   const [picked, setPicked] = useState(() => new Set())
   const [bulkResult, setBulkResult] = useState(null)
   const searchRef = useRef(null)
@@ -128,7 +117,6 @@ export default function NodeExplorer() {
   const typeMeta = nodeTypes.find(nt => nt.key === selectedType)
 
   const typeByKey = useNodeTypeMap()
-  const edgeTypeByKey = useMemo(() => new Map(edgeTypes.map(et => [et.key, et])), [edgeTypes])
 
   const listArgs = { unfiled: loose, limit: PAGE, offset, status: statusFilter, sort }
   const { data: nodes = [], isLoading: nodesLoading, isFetching } = useQuery({
@@ -175,20 +163,6 @@ export default function NodeExplorer() {
     queryFn: () => getNode(selectedId),
     enabled: !!selectedId,
   })
-  const { data: edges = [] } = useQuery({
-    queryKey: qk.nodeEdges(selectedId),
-    queryFn: () => getNodeEdges(selectedId),
-    enabled: !!selectedId,
-  })
-  // One slice feeds the whole neighbourhood drawing, including the second hop —
-  // walking it edge-endpoint by edge-endpoint would be a request per neighbour.
-  const { data: slice, isLoading: sliceLoading } = useQuery({
-    queryKey: qk.graphMap('explorer'),
-    queryFn: () => getGraphMap(),
-    enabled: relView === 'graph' && !!selectedId,
-    staleTime: 30000,
-  })
-
   const invalidateList = () => {
     qc.invalidateQueries({ queryKey: qk.nodes() })
     qc.invalidateQueries({ queryKey: qk.nodeFacets() })
@@ -196,7 +170,7 @@ export default function NodeExplorer() {
   }
   const invalidateEdges = () => {
     qc.invalidateQueries({ queryKey: qk.nodeEdges(selectedId) })
-    qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
+    qc.invalidateQueries({ queryKey: qk.graphMap() })
     qc.invalidateQueries({ queryKey: qk.ancestry() })
     invalidateList()
   }
@@ -208,15 +182,10 @@ export default function NodeExplorer() {
     mutationFn: deleteNode,
     onSuccess: (_d, id) => {
       invalidateList()
-      qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
+      qc.invalidateQueries({ queryKey: qk.graphMap() })
       if (id === selectedId) setSelectedId(null)
     },
   })
-  const detachMut = useMutation({
-    mutationFn: ({ sourceId, targetId, relType }) => detachNodeEdge(sourceId, targetId, relType),
-    onSuccess: invalidateEdges,
-  })
-
   // A batch is applied one row at a time and reports what happened to each, which is
   // the contract the importer already uses (ADR-0092): one refused row must not abandon
   // the other forty-three, and "12 filed, 2 refused" is the only honest summary of a
@@ -239,7 +208,7 @@ export default function NodeExplorer() {
     setPicked(new Set())
     invalidateList()
     qc.invalidateQueries({ queryKey: qk.ancestry() })
-    qc.invalidateQueries({ queryKey: qk.graphMap('explorer') })
+    qc.invalidateQueries({ queryKey: qk.graphMap() })
   }
   const bulkMut = useMutation({ mutationFn: ({ ids, act }) => runBatch(ids, act) })
 
@@ -512,87 +481,17 @@ export default function NodeExplorer() {
                 <div><code className={s.detailMeta}>{selectedNode.type} · {selectedNode.id}</code></div>
               </div>
 
-              <div className={s.detailHead}>
-                <span className={s.filterHead}>{t('nodeExplorer.edges')}</span>
-                <span className={s.dim}>{edges.length}</span>
-                <div className={s.viewToggle}>
-                  <button
-                    className="kt-btn" aria-pressed={relView === 'list'} title={t('nodeExplorer.viewList')}
-                    onClick={() => setRelView('list')}
-                    style={{ opacity: relView === 'list' ? 1 : 0.55 }}
-                  >
-                    <List size={12} /> {t('nodeExplorer.viewList')}
-                  </button>
-                  <button
-                    className="kt-btn" aria-pressed={relView === 'graph'} title={t('nodeExplorer.viewGraph')}
-                    onClick={() => setRelView('graph')}
-                    style={{ opacity: relView === 'graph' ? 1 : 0.55 }}
-                  >
-                    <Network size={12} /> {t('nodeExplorer.viewGraph')}
-                  </button>
-                </div>
-              </div>
-
-              {relView === 'graph' && sliceLoading ? (
-                <div className={s.dim} style={{ padding: '12px 0' }}>{t('loading')}</div>
-              ) : relView === 'graph' ? (
-                <EgoNetwork
-                  slice={slice}
-                  centerId={selectedNode.id}
-                  typeByKey={typeByKey}
-                  edgeTypeByKey={edgeTypeByKey}
-                  onRecenter={setSelectedId}
-                />
-              ) : edges.length === 0 ? (
-                <div className={s.dim} style={{ marginBottom: 12 }}>{t('nodeExplorer.noEdges')}</div>
-              ) : (
-                edges.map(e => {
-                  const outgoing = e.source_id === selectedNode.id
-                  // The endpoint's name travels with the edge (`EdgeOut.source`/`target`,
-                  // embedded to spare clients an N+1). This row printed the raw id instead,
-                  // so the one page whose subject *is* the relation named neither end of it.
-                  const other = outgoing ? e.target : e.source
-                  const otherId = outgoing ? e.target_id : e.source_id
-                  return (
-                    <div key={e.id} className={s.edgeRow}>
-                      <Link2 size={12} color={DARK.textDim} />
-                      <span className={s.relName}>{edgeTypeByKey.get(e.rel_type)?.label || e.rel_type}</span>
-                      <span className={s.dim}>{outgoing ? '→' : '←'}</span>
-                      {other ? (
-                        <>
-                          <TypeChip typeMeta={typeByKey.get(other.type)} typeKey={other.type} />
-                          <button onClick={() => setSelectedId(other.id)} title={other.id} className={s.neighbour}>
-                            {other.title || t('nodeExplorer.untitled')}
-                          </button>
-                        </>
-                      ) : (
-                        <code className={s.rawId}>{otherId}</code>
-                      )}
-                      {/* Detaching used to be offered on outgoing edges only, so a
-                          relation created from the other end could be seen here and
-                          never removed. `remove_edge` takes the pair either way round. */}
-                      <button
-                        onClick={() => detachMut.mutate(outgoing
-                          ? { sourceId: selectedNode.id, targetId: e.target_id, relType: e.rel_type }
-                          : { sourceId: e.source_id, targetId: selectedNode.id, relType: e.rel_type })}
-                        aria-label="detach"
-                        className={s.iconBtn}
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  )
-                })
-              )}
-
-              <div style={{ marginTop: 16 }}>
-                <div className={s.filterHead} style={{ marginBottom: 6 }}>{t('nodeExplorer.attachEdge')}</div>
-                <RelationPicker
-                  nodeId={selectedNode.id}
-                  nodeType={selectedNode.type}
-                  onLinked={invalidateEdges}
-                />
-              </div>
+              {/* One relations panel, the same one the project page, the container
+                  view, the identity card and `/n/{id}` now draw (ADR-0155). This pane
+                  was the third hand-written copy of the list. */}
+              <NodeRelationsPanel
+                nodeId={selectedNode.id}
+                nodeType={selectedNode.type}
+                heading={t('nodeExplorer.edges')}
+                onOpenNeighbour={ref => setSelectedId(ref.id)}
+                onChanged={invalidateEdges}
+                compact
+              />
             </>
           )}
         </div>

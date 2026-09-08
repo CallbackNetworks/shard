@@ -34,6 +34,7 @@ const NO_PROSE = new Set([
   'components/shared/EmptyState.jsx',
   'components/shared/FormField.jsx',
   'components/shared/TabBar.jsx',
+  'components/shared/TypeChip.jsx',
   'components/settings/primitives.jsx',
   'components/overview/PinButton.jsx',
   'components/dashboard/TaskRow.jsx',

@@ -31,7 +31,12 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
   // `GoverningDecisions` became writable with ADR-0128, so this panel's tree now holds a
   // mutation as well as queries.
-  useMutation: (options) => ({ mutate: (payload) => { mocks.mutate?.(payload); options?.onSuccess?.() } }),
+  // The relations panel (ADR-0155) detaches through a mutation rather than a bare
+  // handler, so the stub has to actually run `mutationFn` — a stub that only fires
+  // `onSuccess` reports a successful write that never reached the API.
+  useMutation: (options) => ({
+    mutate: (payload) => { mocks.mutate?.(payload); options?.mutationFn?.(payload); options?.onSuccess?.() },
+  }),
 }))
 
 vi.mock('../../api/client', () => ({
@@ -192,10 +197,10 @@ describe('MembershipPanel', () => {
     expect(screen.getByText('Design doc')).toBeInTheDocument()
 
     // Outgoing edge: task is the source.
-    fireEvent.click(screen.getByLabelText('unlink relation Spec'))
+    fireEvent.click(screen.getByLabelText('nodePage.detach Spec'))
     expect(mocks.detachNodeEdge).toHaveBeenCalledWith('t1', 'nX', 'references')
     // Incoming edge: neighbor is the source.
-    fireEvent.click(screen.getByLabelText('unlink relation Design doc'))
+    fireEvent.click(screen.getByLabelText('nodePage.detach Design doc'))
     expect(mocks.detachNodeEdge).toHaveBeenCalledWith('nY', 't1', 'references')
   })
 

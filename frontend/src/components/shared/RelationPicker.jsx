@@ -32,7 +32,7 @@ import NodeCombobox from './NodeCombobox'
 export default function RelationPicker({
   nodeId,
   nodeType,
-  excludeIds = [],
+  linkedByRel,
   onLinked,
   compact = false,
 }) {
@@ -72,6 +72,12 @@ export default function RelationPicker({
     [current],
   )
 
+  // Already-linked nodes are dropped *per relation*, not globally. `NodePage` used to
+  // exclude every node it had any edge to, which makes the second relation between one
+  // pair unexpressible — and ADR-0095 exists precisely because `identity contains
+  // project` and `identity owns project` are both legal and do not mean the same thing.
+  const linked = current ? (linkedByRel?.get(current.rel_type) ?? null) : null
+
   if (isLoading) return <div style={{ fontSize: 12, color: DARK.textDim }}>{t('loading')}</div>
   if (options.length === 0) {
     return <div style={{ fontSize: 12, color: DARK.textDim }}>{t('relationPicker.noOptions')}</div>
@@ -107,8 +113,8 @@ export default function RelationPicker({
         {current && (
           <NodeCombobox
             placeholder={t('relationPicker.findNode')}
-            filter={n => allowed.has(n.type)}
-            excludeIds={[nodeId, ...excludeIds]}
+            filter={n => allowed.has(n.type) && !linked?.has(n.id)}
+            excludeIds={[nodeId]}
             onSelect={n => attachMut.mutate(n)}
           />
         )}

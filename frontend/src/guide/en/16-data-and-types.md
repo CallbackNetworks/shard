@@ -70,6 +70,12 @@ same question the save does, and it offers both directions — so "this task bel
 to that project" and "this project contains that task" are both reachable, and you
 cannot pick something that gets stored backwards without an error.
 
+**The same panel is on every item's own page.** A project, a container, a persona and
+any other item all carry it — collapsed, with the number of relations on the header,
+so you can see at a glance whether anything is attached and open it when you want to
+change that. This page is a good place to work through many items at once; it is no
+longer the only place to connect one.
+
 ## Item types
 
 ![Item types](/guide/16-item-types.png)

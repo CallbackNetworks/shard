@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import { qk } from '../api/queryKeys'
 import Button from './shared/Button'
-import { Link } from 'react-router'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   getProjects, addTaskMembership, removeTaskMembership,
-  getNodeTypes, getNode, getNodeEdges, getEdgeTypes, attachNodeEdge, detachNodeEdge,
+  getNodeTypes, getNode, attachNodeEdge, detachNodeEdge,
 } from '../api/client'
 import NodeCombobox from './shared/NodeCombobox'
-import RelationPicker from './shared/RelationPicker'
+import NodeRelationsPanel from './NodeRelationsPanel'
 import GoverningDecisions from './GoverningDecisions'
 import { hasNodeRole } from '../constants/nodeRoles'
 
@@ -58,19 +57,6 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
     qc.invalidateQueries({ queryKey: qk.containedTasks(cid) })
   }
 
-  // Other relations: custom edge types on this task (ADR-0037 proposal 5).
-  const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
-  const { data: taskEdges = [] } = useQuery({ queryKey: qk.nodeEdges(task.id), queryFn: () => getNodeEdges(task.id) })
-  const otherEdges = taskEdges.filter(e => !CORE_RELS.has(e.rel_type))
-  const relLabel = (key) => edgeTypes.find(et => et.key === key)?.label || key
-
-  const invalidateEdges = () => qc.invalidateQueries({ queryKey: qk.nodeEdges(task.id) })
-  const handleUnlinkRelation = async (edge) => {
-    if (edge.source_id === task.id) await detachNodeEdge(task.id, edge.target_id, edge.rel_type)
-    else await detachNodeEdge(edge.source_id, task.id, edge.rel_type)
-    invalidateEdges()
-  }
-
   const handleAdd = async () => {
     const target = pick.trim()
     if (!target) return
@@ -92,7 +78,7 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
       borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-      background: 'rgba(var(--kt-ink-rgb), 0.02)',
+      background: 'rgba(var(--kt-ink-rgb), 0.038)',
     }}>
       {/* What decided this task, before where it lives. The relation had a read
           endpoint and no reader (ADR-0118); a task could be governed by a superseded
@@ -171,39 +157,19 @@ export default function MembershipPanel({ projectId, task, depth = 0 }) {
         </div>
       )}
 
+      {/* Everything the dedicated controls above do not cover, listed and created by
+          the one panel every node page now draws (ADR-0155). This was the third
+          hand-written copy of that list; the picker was already shared (ADR-0150). */}
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {t('membership.otherRelations')}
-        </div>
-          {otherEdges.map(e => {
-            const outgoing = e.source_id === task.id
-            const other = outgoing ? e.target : e.source
-            const label = other?.title || (outgoing ? e.target_id : e.source_id).slice(-8)
-            return (
-              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '3px 0', color: 'var(--kt-ink)' }}>
-                <span style={{ color: '#818cf8', fontWeight: 600 }}>{relLabel(e.rel_type)}</span>
-                <span style={{ color: 'rgba(var(--kt-ink-rgb), 0.35)' }}>{outgoing ? '→' : '←'}</span>
-                <Link to={`/n/${other?.id || (outgoing ? e.target_id : e.source_id)}`} style={{ flex: 1, color: 'inherit', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {label}
-                </Link>
-                <button aria-label={`unlink relation ${label}`} onClick={() => handleUnlinkRelation(e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--kt-ink-rgb), 0.4)', padding: 0, display: 'flex' }}>
-                  <X size={10} />
-                </button>
-              </div>
-            )
-          })}
-          {/* The same picker the node page uses (ADR-0150). It used to list only
-              *custom* edge types and always point the edge outward, so this panel
-              could not express a relation a built-in already covered from the other
-              side. */}
-          <div style={{ marginTop: 6 }}>
-            <RelationPicker
-              nodeId={task.id}
-              nodeType={task.type || 'task'}
-              onLinked={invalidateEdges}
-              compact
-            />
-          </div>
+        <NodeRelationsPanel
+          nodeId={task.id}
+          nodeType={task.type || 'task'}
+          heading={t('membership.otherRelations')}
+          hideRels={CORE_RELS}
+          showGraph={false}
+          compact
+          onChanged={invalidate}
+        />
       </div>
     </div>
   )

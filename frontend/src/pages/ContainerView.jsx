@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Boxes, Link2, Search } from 'lucide-react'
+import { Boxes, Search } from 'lucide-react'
 import { getNode, getNodeTypes, getContainedTasks, getContainerSubtree, updateTask, deleteTask } from '../api/client'
 import { qk } from '../api/queryKeys'
 import NodeShareFacet from '../components/NodeShareFacet'
+import NodeRelationsPanel from '../components/NodeRelationsPanel'
 import ChildContainersPanel from '../components/ChildContainersPanel'
 import { DARK } from '../constants/theme'
 import { hasNodeRole } from '../constants/nodeRoles'
@@ -108,11 +109,6 @@ export default function ContainerView() {
               {nestedTaskCount > 0 && ` ${t('containers.nestedNote', { n: nestedTaskCount })}`}
             </span>
           </div>
-          <p className="kt-page-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Link to={`/n/${id}`} style={{ color: DARK.textMid, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Link2 size={12} /> {t('containerView.relations')}
-            </Link>
-          </p>
         </div>
         <Boxes size={22} color={color} />
       </div>
@@ -120,6 +116,18 @@ export default function ContainerView() {
       {hasNodeRole(typeMeta, 'shareable') && (
         <NodeShareFacet node={node} subscribable={hasNodeRole(typeMeta, 'subscribable')} />
       )}
+
+      {/* What this container is attached to, editable here (ADR-0155). This page used
+          to carry a link to `/n/{id}` and nothing else, so saying "this belongs to that
+          identity" meant leaving the page you were standing on. Closed by default: the
+          subject here is the work, and the relations are what you come looking for. */}
+      <NodeRelationsPanel
+        nodeId={id}
+        nodeType={node.type}
+        heading={t('containerView.relations')}
+        collapsible
+        defaultOpen={false}
+      />
 
       <ChildContainersPanel nodeId={id} />
 

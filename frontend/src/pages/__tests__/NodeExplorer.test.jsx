@@ -222,8 +222,9 @@ describe('NodeExplorer', () => {
     fireEvent.click(row('Roadmap'))
     expect(screen.getByText('nodeExplorer.edges')).toBeTruthy()
     // The relation's own label, not its engine key (ADR-0058) — 'Contains' is also an
-    // <option> in the attach picker, so the row is the SPAN one.
-    expect(screen.getAllByText('Contains').some(el => el.tagName === 'SPAN')).toBe(true)
+    // <option> in the attach picker, so what is asserted is that something other than
+    // that option carries it: the group heading the shared panel draws (ADR-0155).
+    expect(screen.getAllByText('Contains').some(el => el.tagName !== 'OPTION')).toBe(true)
   })
 
   it('names the node at the other end of an edge instead of printing its id', () => {

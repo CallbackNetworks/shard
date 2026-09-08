@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Target, Plus, Trash2, Edit2, Calendar, Link2, CheckCircle2, XCircle, Clock } from 'lucide-react'
@@ -155,7 +156,7 @@ function GoalForm({ projects, initial, onSave, onClose }) {
             <label key={p.id} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
               borderRadius: 4, cursor: 'pointer',
-              background: form.project_ids.includes(p.id) ? 'rgba(250,204,21,0.1)' : 'transparent',
+              background: form.project_ids.includes(p.id) ? 'color-mix(in srgb, var(--kt-hit) 10%, transparent)' : 'transparent',
             }}>
               <input
                 type="checkbox"
@@ -206,9 +207,12 @@ function GoalCard({ goal, onEdit, onDelete }) {
         <Target size={14} style={{ color: statusStyle.color, marginTop: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span className="kt-card-title">
+            {/* A goal holds the `container` role, so it has a page of its own —
+                with the tasks it holds and the relations panel every node now carries
+                (ADR-0155). Nothing on this card linked to it (ADR-0147's rule). */}
+            <Link to={`/c/${goal.id}`} className="kt-card-title" style={{ color: 'inherit', textDecoration: 'none' }}>
               {goal.title}
-            </span>
+            </Link>
             <span className="kt-badge" style={{ background: statusStyle.bg, color: statusStyle.color, textTransform: 'capitalize' }}>
               {t(`goals.status.${goal.status}`)}
             </span>
@@ -343,14 +347,14 @@ function StatusTabs({ active, onChange, counts }) {
             className={`kt-btn${isActive ? ' kt-badge-accent' : ''}`}
             style={{
               borderColor: isActive ? BRAND : 'transparent',
-              background: isActive ? 'rgba(250,204,21,0.12)' : 'transparent',
+              background: isActive ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'transparent',
               color: isActive ? DARK.text : DARK.textMid,
             }}
           >
             {Icon && <Icon size={11} />}
             <span>{tab.label}</span>
             <span className="kt-badge" style={{
-              background: isActive ? 'rgba(250,204,21,0.16)' : 'rgba(var(--kt-ink-rgb), 0.04)',
+              background: isActive ? 'color-mix(in srgb, var(--kt-hit) 16%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.076)',
               color: isActive ? BRAND : '#4b5563',
             }}>
               {count}
