@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import MarkdownPreview from '../MarkdownPreview'
 import OverflowMenu from '../shared/OverflowMenu'
+import { nodeHref } from '../../utils/nodeHref'
+import { useNodeTypeMap } from '../../hooks/useNodeTypeMap'
 import { BRAND, DECISION_STATUS_COLORS as STATUS_COLORS } from '../../constants/theme'
 import s from './DecisionCard.module.css'
 
@@ -49,6 +51,7 @@ export default function DecisionCard({
   onLink, onUnlink,
 }) {
   const { t } = useTranslation()
+  const typeByKey = useNodeTypeMap()
   const [expanded, setExpanded] = useState(false)
   const status = decision.decision_status || 'proposed'
   const statusStyle = STATUS_COLORS[status] || STATUS_COLORS.proposed
@@ -131,7 +134,7 @@ export default function DecisionCard({
             // where connecting is the primary act, and there they are first-class.
             { key: 'requires', onClick: () => onLink?.(decision, 'requires'), icon: <Anchor size={12} />, label: t('decisions.requiresAction') },
             { key: 'conflicts', onClick: () => onLink?.(decision, 'conflicts_with'), icon: <TriangleAlert size={12} />, label: t('decisions.conflictsAction') },
-            { key: 'node', href: `/n/${decision.id}`, icon: <Link2 size={12} />, label: t('decisions.openNode') },
+            { key: 'node', href: nodeHref(decision, typeByKey), icon: <Link2 size={12} />, label: t('decisions.openNode') },
             { key: 'export', onClick: () => onExport(decision), icon: <Download size={12} />, label: t('decisions.export') },
             { key: 'edit', onClick: () => onEdit(decision), icon: <Edit2 size={12} />, label: t('edit') },
             { key: 'delete', onClick: () => onDelete(decision), icon: <Trash2 size={12} />, label: t('delete'), danger: true },
@@ -152,7 +155,7 @@ export default function DecisionCard({
             </button>
           ))}
           {supersededBy.map(n => (
-            <Link key={n.id} to={`/n/${n.id}`} className={`${s.relation} ${s.replacedBy}`}>
+            <Link key={n.id} to={nodeHref(n, typeByKey)} className={`${s.relation} ${s.replacedBy}`}>
               <ArrowDown size={10} /> {t('decisions.supersededByName', { name: n.title })}
             </Link>
           ))}
@@ -167,7 +170,7 @@ export default function DecisionCard({
             </button>
           ))}
           {requiredBy.map(n => (
-            <Link key={`reqby-${n.id}`} to={`/n/${n.id}`} className={`${s.relation} ${s.requiredBy}`}>
+            <Link key={`reqby-${n.id}`} to={nodeHref(n, typeByKey)} className={`${s.relation} ${s.requiredBy}`}>
               <Anchor size={10} /> {t('decisions.requiredByName', { name: n.title })}
             </Link>
           ))}
@@ -188,7 +191,7 @@ export default function DecisionCard({
           {governs.map(n => (
             <div key={n.id} className={s.governsItem}>
               <Link2 size={10} />
-              <Link to={`/n/${n.id}`} className={s.governsLink}>{n.title}</Link>
+              <Link to={nodeHref(n, typeByKey)} className={s.governsLink}>{n.title}</Link>
               <span className={s.governsType}>{n.type}</span>
               <button type="button" className={s.governsDrop}
                 aria-label={t('decisions.ungovern', { name: n.title })}

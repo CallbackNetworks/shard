@@ -18,8 +18,13 @@ import s from './OverflowMenu.module.css'
  * Items are `{ key, label, icon, onClick | href, danger }`. `href` renders a router
  * `Link` so navigation stays a real anchor — middle-click and copy-link keep working,
  * which a button-with-navigate quietly breaks.
+ *
+ * `icon`/`text` override the `⋯` trigger (ADR-0156). The portal-and-place mechanism
+ * below is the reason to reuse this rather than hand-roll a second dropdown: any
+ * in-place popover on a page whose route wrapper carries an entrance `transform` is
+ * clipped or displaced, and that is a bug found once per new dropdown otherwise.
  */
-export default function OverflowMenu({ items = [], label }) {
+export default function OverflowMenu({ items = [], label, icon = null, text = null }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [box, setBox] = useState(null)
@@ -70,14 +75,15 @@ export default function OverflowMenu({ items = [], label }) {
       <button
         ref={triggerRef}
         type="button"
-        className={s.trigger}
+        className={`${s.trigger} ${text ? s.triggerLabeled : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label || t('more')}
         title={label || t('more')}
         onClick={() => { if (!open) place(); setOpen(v => !v) }}
       >
-        <MoreHorizontal size={14} />
+        {icon || <MoreHorizontal size={14} />}
+        {text && <span className={s.triggerText}>{text}</span>}
       </button>
       {open && createPortal(
         <div ref={menuRef} role="menu" className={s.menu} style={box || undefined}>

@@ -2,9 +2,10 @@ import { Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Boxes, ChevronRight } from 'lucide-react'
-import { getContainerSubtree, getNodeTypes } from '../api/client'
+import { getContainerSubtree } from '../api/client'
 import { qk } from '../api/queryKeys'
-import { containerRoute } from '../utils/containerRoute'
+import { nodeHref } from '../utils/nodeHref'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 import ProgressBar from './ProgressBar'
 import s from './ChildContainersPanel.module.css'
 
@@ -12,6 +13,10 @@ import s from './ChildContainersPanel.module.css'
 // tasks (the board) and containers; every view used to read only the task half, so a
 // container nested under this one — and all the work inside it — was invisible here.
 // Rollup numbers come from the server, never recomputed from the tasks on screen.
+//
+// Where a child opens is `nodeHref` and nothing local (ADR-0156): this panel used to
+// call a second rule that sent a goal to the *list* of goals, so clicking one child
+// container opened a page about all of them.
 export default function ChildContainersPanel({ nodeId }) {
   const { t } = useTranslation()
   const { data: subtree } = useQuery({
@@ -19,7 +24,7 @@ export default function ChildContainersPanel({ nodeId }) {
     queryFn: () => getContainerSubtree(nodeId),
     enabled: !!nodeId,
   })
-  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
+  const typeByKey = useNodeTypeMap()
 
   const children = subtree?.children || []
   if (children.length === 0) return null
@@ -32,10 +37,10 @@ export default function ChildContainersPanel({ nodeId }) {
       </div>
       <div className={s.grid}>
         {children.map(child => {
-          const typeMeta = nodeTypes.find(nt => nt.key === child.type)
+          const typeMeta = typeByKey.get(child.type)
           const color = typeMeta?.color || '#818cf8'
           return (
-            <Link key={child.id} to={containerRoute(child.id, child.type)} className={s.card}>
+            <Link key={child.id} to={nodeHref(child, typeByKey)} className={s.card}>
               <div className={s.cardHead}>
                 <span className={s.badge} style={{ color, background: `${color}22`, borderColor: `${color}44` }}>
                   {typeMeta?.label || child.type}

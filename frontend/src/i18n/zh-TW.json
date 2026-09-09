@@ -770,7 +770,6 @@
   "nodeExplorer.selectHint": "選一個節點來檢視與編輯它的關係。",
   "nodeExplorer.edges": "關係邊",
   "nodeExplorer.attach": "掛上",
-  "nodePage.back": "返回",
   "nodePage.notFound": "找不到這個節點。",
   "nodePage.untitled": "(未命名)",
   "nodePage.relations": "關聯",
@@ -999,13 +998,8 @@
   "structure.risk": "風險",
   "structure.unowned": "無歸屬",
   "structure.openProject": "開啟專案",
-  "structure.open.project": "開啟專案",
   "structure.openNode": "開啟節點頁",
   "structure.customNodes": "自訂節點",
-  "structure.open.task": "在專案中開啟",
-  "structure.open.identity": "開啟角色頁",
-  "structure.open.goal": "開啟目標頁",
-  "structure.open.decision": "開啟決策頁",
   "structure.doubleClickOpen": "雙擊開啟",
   "structure.inspector": "檢視器",
   "structure.selectNode": "選取節點",
@@ -1404,5 +1398,10 @@
   "nodeExplorer.bulkResult": "完成 {{ok}} 筆，被拒 {{failed}} 筆。",
   "nodeExplorer.createFailed": "無法建立這個節點。",
   "nodeExplorer.builtinHint": "{{type}} 有自己的頁面，那裡的內容更完整；這裡它就是一列資料。",
-  "nodeExplorer.filterNarrow": "篩選"
+  "nodeExplorer.filterNarrow": "篩選",
+  "ancestry.up": "上一層",
+  "ancestry.upAmong": "上一層 — {{count}} 個父節點",
+  "ancestry.noParent": "未歸檔於任何位置",
+  "nodeExplorer.open": "開啟",
+  "structure.openSubject": "開啟這個{{type}}"
 }

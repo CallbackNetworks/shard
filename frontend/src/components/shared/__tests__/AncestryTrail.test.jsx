@@ -37,12 +37,16 @@ function mockAncestry(entry) {
   })
 }
 
-const renderTrail = () =>
+const renderTrail = (props) =>
   render(
     <MemoryRouter>
-      <AncestryTrail nodeId="n1" />
+      <AncestryTrail nodeId="n1" {...props} />
     </MemoryRouter>
   )
+
+// The page mode: the strip is this node's own breadcrumb rather than a locator on a
+// row, so it carries the subject and an up control (ADR-0156).
+const SELF = { id: 'n1', title: 'Shard', type: 'project' }
 
 // Braces matter: `mockReset()` returns the mock, and a value returned from
 // `beforeEach` is treated as a teardown hook — vitest would then call the mock
@@ -92,5 +96,54 @@ describe('AncestryTrail', () => {
     mockAncestry({ id: 'n1', trails: [], owners: [] })
     const { container } = renderTrail()
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('AncestryTrail as a page breadcrumb', () => {
+  it('ends the path at the node the page is about', () => {
+    mockAncestry({
+      id: 'n1',
+      trails: [[ref('o1', 'organization', 'CGCG'), ref('i1', 'identity', 'Pipeline dev')]],
+      owners: [],
+    })
+    renderTrail({ self: SELF })
+    // The ancestors stay links; the subject is where you already are, so it is not one.
+    expect(screen.getAllByRole('link').map(l => l.textContent)).toEqual([
+      'ancestry.up', 'CGCG', 'Pipeline dev',
+    ])
+    expect(screen.getByText('Shard')).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('goes up one level, which is the end of the trail and not its start', () => {
+    mockAncestry({
+      id: 'n1',
+      trails: [[ref('o1', 'organization', 'CGCG'), ref('i1', 'identity', 'Pipeline dev')]],
+      owners: [],
+    })
+    renderTrail({ self: SELF })
+    // `/n/i1`, not `/n/o1`: the outermost ancestor is the far end of the path.
+    expect(screen.getByText('ancestry.up').closest('a')).toHaveAttribute('href', '/n/i1')
+  })
+
+  it('names every parent instead of silently picking one', () => {
+    mockAncestry({
+      id: 'n1',
+      trails: [[ref('a1', 'project', 'Left')], [ref('b1', 'project', 'Right')]],
+      owners: [],
+    })
+    renderTrail({ self: SELF })
+    // A menu, not a link: with two ways up, following one without saying so would
+    // contradict the trail drawn right beside it.
+    expect(screen.queryByText('ancestry.up')?.closest('a')).toBeFalsy()
+    expect(screen.getByRole('button', { name: 'ancestry.upAmong:{"count":2}' })).toBeInTheDocument()
+  })
+
+  it('says a root is a root rather than vanishing', () => {
+    mockAncestry({ id: 'n1', trails: [], owners: [] })
+    renderTrail({ self: SELF })
+    // The locator mode renders nothing here, and on a page that would take the up
+    // control with it and leave "nowhere" and "not loaded yet" looking identical.
+    expect(screen.getByText('ancestry.noParent')).toBeInTheDocument()
+    expect(screen.getByText('Shard')).toBeInTheDocument()
   })
 })

@@ -10,6 +10,8 @@ import FormModal from '../components/shared/FormModal'
 import EmptyState from '../components/shared/EmptyState'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import FormField from '../components/shared/FormField'
+import { nodeHref } from '../utils/nodeHref'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 
 /* ── Directly-held tasks (ADR-0041: a goal contains tasks directly) ── */
 function GoalTasks({ goalId }) {
@@ -183,6 +185,7 @@ function GoalForm({ projects, initial, onSave, onClose }) {
 /* ── Goal Card ── */
 function GoalCard({ goal, onEdit, onDelete }) {
   const { t } = useTranslation()
+  const typeByKey = useNodeTypeMap()
   const [hovered, setHovered] = useState(false)
   const statusStyle = STATUS_COLORS[goal.status] || STATUS_COLORS.active
   const progress = goal.progress != null ? Math.round(goal.progress) : 0
@@ -210,7 +213,7 @@ function GoalCard({ goal, onEdit, onDelete }) {
             {/* A goal holds the `container` role, so it has a page of its own —
                 with the tasks it holds and the relations panel every node now carries
                 (ADR-0155). Nothing on this card linked to it (ADR-0147's rule). */}
-            <Link to={`/c/${goal.id}`} className="kt-card-title" style={{ color: 'inherit', textDecoration: 'none' }}>
+            <Link to={nodeHref({ id: goal.id, type: 'goal' }, typeByKey)} className="kt-card-title" style={{ color: 'inherit', textDecoration: 'none' }}>
               {goal.title}
             </Link>
             <span className="kt-badge" style={{ background: statusStyle.bg, color: statusStyle.color, textTransform: 'capitalize' }}>

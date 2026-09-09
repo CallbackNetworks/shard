@@ -764,7 +764,6 @@
   "nodeExplorer.selectHint": "Select a node to see and edit its relations.",
   "nodeExplorer.edges": "Edges",
   "nodeExplorer.attach": "Attach",
-  "nodePage.back": "Back",
   "nodePage.notFound": "Node not found.",
   "nodePage.untitled": "(untitled)",
   "nodePage.relations": "Relations",
@@ -993,13 +992,8 @@
   "structure.risk": "Risk",
   "structure.unowned": "Unowned",
   "structure.openProject": "Open Project",
-  "structure.open.project": "Open Project",
   "structure.openNode": "Open node page",
   "structure.customNodes": "Custom nodes",
-  "structure.open.task": "Open in Project",
-  "structure.open.identity": "Open Personas",
-  "structure.open.goal": "Open Goals",
-  "structure.open.decision": "Open Decisions",
   "structure.doubleClickOpen": "double-click to open",
   "structure.inspector": "Inspector",
   "structure.selectNode": "Select Node",
@@ -1403,5 +1397,10 @@
   "nodeExplorer.bulkResult": "{{ok}} done, {{failed}} refused.",
   "nodeExplorer.createFailed": "Could not create that node.",
   "nodeExplorer.builtinHint": "{{type}} has a page of its own with more on it; here it is one row of data like any other.",
-  "nodeExplorer.filterNarrow": "Filter"
+  "nodeExplorer.filterNarrow": "Filter",
+  "ancestry.up": "Up",
+  "ancestry.upAmong": "Up — {{count}} parents",
+  "ancestry.noParent": "Not filed anywhere",
+  "nodeExplorer.open": "Open",
+  "structure.openSubject": "Open {{type}}"
 }

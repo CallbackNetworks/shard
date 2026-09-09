@@ -3,10 +3,11 @@ import { Link, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Plus } from 'lucide-react'
-import { getNodes, getNodeTypes, createNode } from '../api/client'
+import { getNodes, createNode } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { DARK } from '../constants/theme'
-import { hasNodeRole } from '../constants/nodeRoles'
+import { nodeHref } from '../utils/nodeHref'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 import EmptyState from '../components/shared/EmptyState'
 import AncestryTrail from '../components/shared/AncestryTrail'
 import useAncestry from '../hooks/useAncestry'
@@ -19,7 +20,6 @@ export default function TypeNodesPage() {
   const qc = useQueryClient()
   const [newTitle, setNewTitle] = useState('')
 
-  const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
   const { data: nodes = [], isLoading } = useQuery({ queryKey: qk.nodes(typeKey), queryFn: () => getNodes(typeKey) })
 
   // One request for the whole page (ADR-0094): the listing said what each node is
@@ -27,9 +27,13 @@ export default function TypeNodesPage() {
   // what distinguishes two rows with similar names.
   const ancestry = useAncestry(nodes.map(n => n.id), `type:${typeKey}`)
 
-  const typeMeta = nodeTypes.find(nt => nt.key === typeKey)
+  const typeByKey = useNodeTypeMap()
+  const typeMeta = typeByKey.get(typeKey)
   const color = typeMeta?.color || '#818cf8'
-  const href = (n) => (hasNodeRole(typeMeta, 'container') ? `/c/${n.id}` : `/n/${n.id}`)
+  // The rule, not a re-derivation of it (ADR-0156). This line was the container half
+  // of `nodeHref` written out again, which meant a project listed here opened on the
+  // generic container page instead of its own.
+  const href = (n) => nodeHref({ id: n.id, type: typeKey }, typeByKey)
 
   const createMut = useMutation({
     mutationFn: () => createNode({ type: typeKey, title: newTitle.trim() }),

@@ -92,7 +92,7 @@ export default function ContainerView() {
         <div className="kt-page-heading">
           {/* Where this container sits (ADR-0094) — a container one level down used to
               open with no sign that anything was above it. */}
-          <AncestryTrail nodeId={id} className="kt-ancestry" />
+          <AncestryTrail nodeId={id} className="kt-ancestry" self={{ id, title: node.title, type: node.type }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 3,

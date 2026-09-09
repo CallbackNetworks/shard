@@ -23,7 +23,7 @@
   padding: 1px 7px;
   border-radius: 9999px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.12);
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
   color: rgba(var(--kt-ink-rgb), 0.55);
   text-decoration: none;
   max-width: 220px;
@@ -67,4 +67,43 @@
   padding: 0 2px;
   font-size: 11px;
   cursor: help;
+}
+
+/* The page's own subject at the tail of its path (ADR-0156). Plain text, not a chip:
+   it is where you already are, so it must not look like somewhere you can go. */
+.self {
+  color: rgba(var(--kt-ink-rgb), 0.78);
+  font-weight: 600;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Up one level. A link, so middle-click and copy-link keep working. */
+.up {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px 1px 6px;
+  margin-right: 2px;
+  border-radius: 9999px;
+  border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
+  color: var(--kt-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.up:hover {
+  border-color: rgba(var(--kt-ink-rgb), 0.3);
+  color: var(--kt-ink);
+}
+
+/* "Nothing contains this" is an answer, and the strip says it rather than vanishing. */
+.rootMark {
+  color: rgba(var(--kt-ink-rgb), 0.32);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 700;
 }

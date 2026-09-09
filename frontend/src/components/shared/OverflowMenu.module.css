@@ -28,7 +28,7 @@
   min-width: 168px;
   display: grid;
   padding: 4px;
-  background: var(--kt-surface);
+  background: var(--kt-elev-2);
   border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
@@ -54,4 +54,17 @@
 
 .danger {
   color: var(--kt-status-failed);
+}
+
+/* A trigger that carries a word (ADR-0156) — "up one level" has a name, and a bare
+   glyph for it is the mistake this component exists to stop. Scoped to the labelled
+   case: the bare `⋯` triggers already read correctly and must not change shape. */
+.triggerLabeled {
+  gap: 4px;
+  font-size: 11px;
+  border-radius: 9999px;
+}
+
+.triggerText {
+  white-space: nowrap;
 }

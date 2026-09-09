@@ -276,7 +276,10 @@ export default function ProjectDetail() {
           <div className={s.projectInfo}>
             {/* Whose project this is, and where it sits (ADR-0094). The identity used to
                 reach this page as a colour and nothing else. */}
-            <AncestryTrail nodeId={id} className="kt-ancestry" />
+            {/* The subject travels with the path (ADR-0156): without it the strip
+                names the ancestors and stops one short of you, which reads as a row of
+                chips rather than a place. It also carries the up control. */}
+            <AncestryTrail nodeId={id} className="kt-ancestry" self={{ id, title: project.name, type: 'project' }} />
             <div className={s.projectNameRow}>
               <h1 className={s.projectName}>{project.name}</h1>
               <span className={`${s.statusBadge} ${project.status === 'archived' ? s.statusArchived : s.statusActive}`}>

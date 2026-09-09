@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { BRAND, STATUS_MAP, DARK } from '../../constants/theme'
 import s from '../../pages/Dashboard.module.css'
+import { nodeHref } from '../../utils/nodeHref'
+import { useNodeTypeMap } from '../../hooks/useNodeTypeMap'
 
 /* ── Shimmer progress bar ─────────────────────────────────────────── */
 function GlowBar({ done, inProgress, failed, total }) {
@@ -34,6 +36,7 @@ function GlowBar({ done, inProgress, failed, total }) {
 export default function ProjectCard({ project, owners = [], onDelete, index }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const typeByKey = useNodeTypeMap()
   const [hovered, setHovered] = useState(false)
   const tasks = project.tasks || []
   const inProgress = tasks.filter(t => t.status === 'in_progress').length
@@ -50,7 +53,7 @@ export default function ProjectCard({ project, owners = [], onDelete, index }) {
       className={`card-hover ${s.projectCard}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => navigate(`/projects/${project.id}`)}
+      onClick={() => navigate(nodeHref({ id: project.id, type: 'project' }, typeByKey))}
       style={{ animationDelay: `${index * 0.055}s` }}
     >
       {/* Subtle gradient top accent */}

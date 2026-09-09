@@ -75,7 +75,9 @@ beforeEach(() => vi.clearAllMocks())
 describe('ContainerView', () => {
   it('renders the container header with type label and task count', () => {
     setup()
-    expect(screen.getByText('Research')).toBeInTheDocument()
+    // Named as the heading specifically: the breadcrumb above it ends at this same
+    // node (ADR-0156), so the title is on screen twice on purpose.
+    expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument()
     expect(screen.getByText('Topic')).toBeInTheDocument()
     expect(screen.getByText('containerView.count:2')).toBeInTheDocument()
   })

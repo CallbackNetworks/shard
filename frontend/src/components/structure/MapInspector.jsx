@@ -5,7 +5,11 @@ function hasInspectorMetrics(node) {
   return ['project', 'identity', 'task', 'goal', 'decision'].includes(node?.type)
 }
 
-export default function MapInspector({ selected, taskById, projectById, onSelect, onClear, onJump }) {
+// `containerHrefFor` resolves a container id to its page through the one shared rule
+// (ADR-0156). This panel used to build `/projects/{id}` by hand for the containers an
+// identity holds, which is the right page for exactly one container type out of the
+// several that can be there — a custom container landed on a project page about nothing.
+export default function MapInspector({ selected, taskById, projectById, containerHrefFor, jumpHrefFor, jumpTypeLabel, onSelect, onClear, onJump }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
@@ -18,6 +22,9 @@ export default function MapInspector({ selected, taskById, projectById, onSelect
       </aside>
     )
   }
+
+  const nodePageHref = selected.id ? `/n/${selected.id}` : null
+  const jumpHref = jumpHrefFor?.(selected) || null
 
   return (
     <aside className="kt-map-inspector">
@@ -99,7 +106,10 @@ export default function MapInspector({ selected, taskById, projectById, onSelect
             {selected.projectIds.map(projectId => {
               const project = projectById.get(projectId)
               return (
-                <button key={projectId} type="button" onClick={() => navigate(`/projects/${projectId}`)}>
+                <button key={projectId} type="button" onClick={() => {
+                  const href = containerHrefFor?.(projectId)
+                  if (href) navigate(href)
+                }}>
                   {project?.name || projectId.slice(-8)}
                 </button>
               )
@@ -114,7 +124,10 @@ export default function MapInspector({ selected, taskById, projectById, onSelect
             {selected.projectIds.map(projectId => {
               const project = projectById.get(projectId)
               return (
-                <button key={projectId} type="button" onClick={() => navigate(`/projects/${projectId}`)}>
+                <button key={projectId} type="button" onClick={() => {
+                  const href = containerHrefFor?.(projectId)
+                  if (href) navigate(href)
+                }}>
                   {project?.name || projectId.slice(-8)}
                 </button>
               )
@@ -122,9 +135,15 @@ export default function MapInspector({ selected, taskById, projectById, onSelect
           </div>
         </div>
       )}
-      {['project', 'task', 'identity', 'goal', 'decision'].includes(selected.type) && (
+      {/* The subject's own page, when that is somewhere other than the node page the
+          next button already offers (ADR-0156). These labels used to name the *list*
+          for each kind — "Open Decisions" on one decision out of a hundred — which was
+          not a wrong label so much as an accurate one for the wrong destination. And
+          the type is read from the registry, never spelled here: the map's `type` is a
+          drawing category, so every container card would have said "Project". */}
+      {jumpHref && jumpHref !== nodePageHref && (
         <button className="kt-map-open" onClick={() => onJump(selected)}>
-          {t(`structure.open.${selected.type}`)}
+          {t('structure.openSubject', { type: jumpTypeLabel || selected.typeLabel || selected.type })}
         </button>
       )}
       {/* Every entity is a node (ADR-0032/0033): deep-link to its graph page. */}

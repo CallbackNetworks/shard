@@ -170,7 +170,12 @@
   color: var(--kt-muted);
   padding: 4px;
   display: flex;
+  /* Also worn by the row's open *link* (ADR-0156), which needs the underline off. */
+  text-decoration: none;
+  flex-shrink: 0;
 }
+
+.iconBtn:hover { color: var(--kt-ink); }
 
 /* Prev/Next, not "load more": the count row now knows the real total, so the page can
    say where it is in the answer instead of growing the request until it stops. */

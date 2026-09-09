@@ -7,9 +7,9 @@ import { getProjects, search, getNodes, getNodeTypes } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { NAV_GROUPS } from '../constants/nav'
 import { BRAND, DARK } from '../constants/theme'
-import { hasNodeRole } from '../constants/nodeRoles'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { orderByRecent, useRecentProjectIds } from '../utils/recentProjects'
+import { nodeHref, taskHref } from '../utils/nodeHref'
 
 const BACKDROP = 'rgba(0,0,0,0.8)'
 const PANEL_BG = DARK.surface
@@ -141,9 +141,12 @@ export default function CommandPalette({ open, onClose, mode = 'all', intent = n
 
   // Custom graph nodes (ADR-0037): searched via the generic /nodes API; builtin
   // entities are already covered by the search endpoint above.
+  // Built here rather than through `useNodeTypeMap` because this query is
+  // `enabled: open` — the palette must not fetch the registry until it is asked for.
   const { data: nodeTypes = [] } = useQuery({
     queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000, enabled: open,
   })
+  const typeByKey = useMemo(() => new Map(nodeTypes.map(nt => [nt.key, nt])), [nodeTypes])
   const { data: nodeHits = [] } = useQuery({
     queryKey: qk.paletteNodes(debouncedQ),
     queryFn: () => getNodes(null, debouncedQ),
@@ -167,7 +170,7 @@ export default function CommandPalette({ open, onClose, mode = 'all', intent = n
       meta: p.status === 'archived'
         ? t('palette.archived')
         : (p.total_tasks > 0 ? t('palette.taskCount', { count: p.total_tasks }) : undefined),
-      path: `/projects/${p.id}`,
+      path: nodeHref({ id: p.id, type: 'project' }, typeByKey),
     })
 
     // Projects you were just in come first, whatever their status — that is
@@ -210,7 +213,10 @@ export default function CommandPalette({ open, onClose, mode = 'all', intent = n
           section: t('palette.sectionTasks'),
           icon: <Hash size={14}/>,
           meta: task.status,
-          path: `/projects/${task.project_id}`,
+          // With the row picked out (ADR-0147). Searching for a task and landing on
+          // its project with nothing highlighted is the palette answering a different
+          // question from the one that was typed.
+          path: taskHref(task),
         }))
       }
 
@@ -232,20 +238,22 @@ export default function CommandPalette({ open, onClose, mode = 'all', intent = n
       if (customTypeByKey.size > 0) {
         nodeHits.filter(n => customTypeByKey.has(n.type)).slice(0, 6).forEach(n => {
           const nt = customTypeByKey.get(n.type)
+          // The type still decides the destination, but the rule that reads it lives in
+          // one place (ADR-0156): this line was the container half of `nodeHref` again.
           list.push({
             id: `node-${n.id}`,
             label: n.title || n.id,
             section: t('palette.sectionNodes'),
             icon: <Boxes size={14}/>,
             meta: nt.label,
-            path: hasNodeRole(nt, 'container') ? `/c/${n.id}` : `/n/${n.id}`,
+            path: nodeHref(n, typeByKey),
           })
         })
       }
     }
 
     return list
-  }, [query, t, projects, recentIds, projectsOnly, currentProjectId, searchResults, nodeTypes, nodeHits])
+  }, [query, t, projects, recentIds, projectsOnly, currentProjectId, searchResults, nodeTypes, typeByKey, nodeHits])
 
   // Group items by section for rendering
   const grouped = []

@@ -8,6 +8,8 @@ import { qk } from '../api/queryKeys'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
 import { DECISION_STATUS_COLORS as STATUS_COLORS } from '../constants/theme'
 import FormModal from './shared/FormModal'
+import { nodeHref } from '../utils/nodeHref'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 import NodeCombobox from './shared/NodeCombobox'
 import s from './GoverningDecisions.module.css'
 
@@ -31,6 +33,7 @@ import s from './GoverningDecisions.module.css'
  */
 export default function GoverningDecisions({ nodeId, className = '', editable = false }) {
   const { t } = useTranslation()
+  const typeByKey = useNodeTypeMap()
   const [picking, setPicking] = useState(false)
   const { data: decisions = [] } = useQuery({
     queryKey: qk.governingDecisions(nodeId),
@@ -76,7 +79,7 @@ export default function GoverningDecisions({ nodeId, className = '', editable = 
           const style = STATUS_COLORS[d.decision_status || 'proposed'] || STATUS_COLORS.proposed
           return (
             <span key={d.id} className={s.chip} style={{ borderColor: style.color, color: style.color }}>
-              <Link to={`/n/${d.id}`} className={s.chipName}>{d.name}</Link>
+              <Link to={nodeHref(d, typeByKey)} className={s.chipName}>{d.name}</Link>
               <span className={s.chipStatus}>{t(`decisions.${d.decision_status || 'proposed'}`)}</span>
               {editable && (
                 <button type="button" className={s.drop} onClick={() => drop(d)}

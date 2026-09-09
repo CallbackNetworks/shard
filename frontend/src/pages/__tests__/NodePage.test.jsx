@@ -88,7 +88,9 @@ beforeEach(() => vi.clearAllMocks())
 describe('NodePage', () => {
   it('renders the node header with its type chip', () => {
     setup()
-    expect(screen.getByText('Research')).toBeInTheDocument()
+    // The breadcrumb ends at this node (ADR-0156), so the title appears twice — the
+    // heading is the one this assertion is about.
+    expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument()
     expect(screen.getAllByText('Topic').length).toBeGreaterThan(0)
     expect(screen.getByText('n1')).toBeInTheDocument()
   })

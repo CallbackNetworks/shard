@@ -3,7 +3,7 @@ import { qk } from '../api/queryKeys'
 import { useNavigate, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, History, Pencil, Trash2, X } from 'lucide-react'
+import { Check, History, Pencil, Trash2, X } from 'lucide-react'
 import {
   getNode, getNodeEvents, getNodeTypes,
   updateNode, deleteNode,
@@ -69,19 +69,14 @@ export default function NodePage() {
 
   return (
     <div className="kt-page">
-      <button
-        onClick={() => navigate(-1)}
-        className="kt-btn"
-        style={{ marginBottom: 14 }}
-      >
-        <ArrowLeft size={12} /> {t('nodePage.back')}
-      </button>
-
       {/* Header */}
       <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
         {/* Where it lives, before what it is (ADR-0094). The relations panel below lists
-            every edge; this says which of them is the node's place in the hierarchy. */}
-        <AncestryTrail nodeId={id} className="kt-ancestry" />
+            every edge; this says which of them is the node's place in the hierarchy.
+            It replaced a `navigate(-1)` button labelled "back" (ADR-0156): browser back
+            is not one level up — arrive here from a search and it returns you to the
+            search — and it was the only up-shaped control the app had. */}
+        <AncestryTrail nodeId={id} className="kt-ancestry" self={{ id, title: node.title, type: node.type }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <TypeChip typeMeta={typeMeta} typeKey={node.type} />
           {editingTitle ? (

@@ -3,7 +3,7 @@ import { qk } from '../api/queryKeys'
 import { Link, useSearchParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Boxes, Plus, Search, Trash2, Unlink } from 'lucide-react'
+import { ArrowUpRight, Boxes, Plus, Search, Trash2, Unlink } from 'lucide-react'
 import {
   getNodeTypes, getNodes, getNode, createNode, deleteNode,
   getNodeFacets, getEdgeCounts, attachNodeEdge,
@@ -438,6 +438,21 @@ export default function NodeExplorer() {
                     </span>
                     <span>{formatTimestamp(n.updated_at)}</span>
                   </span>
+                  {/* Opening is a *second* act here, not the click on the row: the row
+                      click fills the pane on the right, and collapsing the two would
+                      cost the pane its only way of being filled. So it gets a control
+                      of its own rather than a double-click nobody would guess at
+                      (ADR-0156). It stops propagation for the same reason the trail
+                      chips do — following a link must not also re-select the row. */}
+                  <Link
+                    to={nodeHref(n, typeByKey)}
+                    onClick={e => e.stopPropagation()}
+                    className={s.iconBtn}
+                    aria-label={t('nodeExplorer.open')}
+                    title={t('nodeExplorer.open')}
+                  >
+                    <ArrowUpRight size={14} />
+                  </Link>
                   <button
                     onClick={e => {
                       e.stopPropagation()

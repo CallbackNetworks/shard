@@ -9,10 +9,11 @@ import { STATUS_COLOR } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { dependencyNeighborhood } from '../utils/structureMap'
 import { deriveGraphStructure, focusGraph } from '../utils/graphStructure'
-import { containerRoute } from '../utils/containerRoute'
+import { nodeHref, taskHref } from '../utils/nodeHref'
 import { buildMindMapLayout, buildNetworkLayout, buildTreeLayout, taskWeight } from '../utils/structureMapLayout'
 import { buildTerritoryModel } from '../utils/territoryModel'
 import useMapViewport from '../hooks/useMapViewport'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 import MapCanvas from '../components/structure/MapCanvas'
 import MapInspector from '../components/structure/MapInspector'
 import TerritoryCanvas from '../components/structure/TerritoryCanvas'
@@ -55,6 +56,9 @@ export default function StructureMap() {
     queryFn: () => getGraphMap({ includeData: true }),
   })
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
+  // Same query, memoised into the shape `nodeHref` asks about (ADR-0056: the client
+  // holds no second copy of the role table).
+  const typeByKey = useNodeTypeMap()
   const { data: edgeTypes = [] } = useQuery({ queryKey: qk.edgeTypes(), queryFn: getEdgeTypes, staleTime: 300000 })
 
   const fullGraph = useMemo(
@@ -351,37 +355,31 @@ export default function StructureMap() {
     const container = projectById.get(containerId)
     // Where a container opens is one shared rule (ADR-0065) — the sub-container
     // panels link to the same pages and must not disagree with the map.
-    return container ? containerRoute(container.id, container.typeKey) : null
+    return container ? nodeHref({ id: container.id, type: container.typeKey }, typeByKey) : null
+  }
+
+  /**
+   * Where a map node opens (ADR-0156).
+   *
+   * This was a hand-written `switch` — the third copy of a rule `nodeHref` already
+   * held — and every branch that was not a container disagreed with it: an identity,
+   * a goal and a decision each navigated to the *list* page for their kind, so
+   * opening one decision out of a hundred landed you on all hundred, and a task
+   * opened its project without `?focus=`, i.e. without the row you double-clicked.
+   *
+   * The map's own `type` is a drawing category, not a registry key ('project' covers
+   * every container role, 'custom' covers the rest), so the registry key travels
+   * beside it as `typeKey` and that is what the shared rule is asked about.
+   */
+  const jumpHref = (node) => {
+    if (!node) return null
+    if (node.type === 'task') return taskHref({ id: node.id, project_id: node.projectId })
+    return nodeHref({ id: node.id, type: node.typeKey || node.type }, typeByKey)
   }
 
   const jumpTo = (node) => {
-    if (!node) return
-    switch (node.type) {
-      case 'project': {
-        const href = containerHref(node.id)
-        if (href) navigate(href)
-        break
-      }
-      case 'task': {
-        const href = node.projectId && containerHref(node.projectId)
-        if (href) navigate(href)
-        break
-      }
-      case 'identity':
-        navigate('/identities')
-        break
-      case 'goal':
-        navigate('/goals')
-        break
-      case 'decision':
-        navigate('/decisions')
-        break
-      case 'custom':
-        navigate(`/n/${node.id}`)
-        break
-      default:
-        break
-    }
+    const href = jumpHref(node)
+    if (href) navigate(href)
   }
 
   const clearFilters = () => {
@@ -527,6 +525,9 @@ export default function StructureMap() {
             selected={selected}
             taskById={taskById}
             projectById={projectById}
+            containerHrefFor={containerHref}
+            jumpHrefFor={jumpHref}
+            jumpTypeLabel={typeByKey.get(selected?.typeKey || selected?.type)?.label}
             onSelect={setSelected}
             onClear={() => setSelected(null)}
             onJump={jumpTo}

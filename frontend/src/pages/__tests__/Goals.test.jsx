@@ -33,6 +33,11 @@ vi.mock('../../api/client', () => ({
   updateGoal: vi.fn(),
   deleteGoal: vi.fn(),
   getProjects: vi.fn(),
+  getContainedTasks: vi.fn(),
+  createTask: vi.fn(),
+  // A goal card links through `nodeHref`, which asks the registry what roles the type
+  // carries (ADR-0156) — so this page now reads the node types like every other.
+  getNodeTypes: vi.fn(() => Promise.resolve([{ key: 'goal', label: 'Goal', roles: ['container'] }])),
 }))
 
 import Goals from '../Goals'

@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import ChildContainersPanel from '../ChildContainersPanel'
-import { containerRoute } from '../../utils/containerRoute'
 
 const mocks = vi.hoisted(() => ({
   useQuery: vi.fn(),
@@ -28,8 +27,9 @@ vi.mock('../../api/client', () => ({
 }))
 
 const NODE_TYPES = [
-  { key: 'project', label: 'Project', color: '#818cf8', is_builtin: true },
-  { key: 'area', label: 'Area', color: '#34d399', is_builtin: false },
+  { key: 'project', label: 'Project', color: '#818cf8', is_builtin: true, roles: ['container'] },
+  { key: 'area', label: 'Area', color: '#34d399', is_builtin: false, roles: ['container'] },
+  { key: 'goal', label: 'Goal', color: '#34d399', is_builtin: true, roles: ['container'] },
 ]
 
 function mockQueries(subtree) {
@@ -99,17 +99,9 @@ describe('ChildContainersPanel', () => {
 
     expect(screen.getByText('A project').closest('a')).toHaveAttribute('href', '/projects/p1')
     expect(screen.getByText('An area').closest('a')).toHaveAttribute('href', '/c/a1')
-    expect(screen.getByText('A goal').closest('a')).toHaveAttribute('href', '/goals')
-  })
-})
-
-describe('containerRoute', () => {
-  it('sends each container type to the page that can render it', () => {
-    expect(containerRoute('x', 'project')).toBe('/projects/x')
-    expect(containerRoute('x', 'goal')).toBe('/goals')
-    // Any user-defined container type: ContainerView is role-driven, so an
-    // unknown key is not a special case.
-    expect(containerRoute('x', 'area')).toBe('/c/x')
-    expect(containerRoute('x', 'workstream')).toBe('/c/x')
+    // A goal carries the container role, so it opens as itself (ADR-0156). It used to
+    // link to `/goals` — the list of every goal — which is a page about all of them and
+    // therefore not a page about the one that was clicked.
+    expect(screen.getByText('A goal').closest('a')).toHaveAttribute('href', '/c/g1')
   })
 })

@@ -6,6 +6,8 @@ import { X } from 'lucide-react'
 import { getNodeTypes } from '../../api/client'
 import { qk } from '../../api/queryKeys'
 import { hasNodeRole } from '../../constants/nodeRoles'
+import { nodeHref } from '../../utils/nodeHref'
+import { useNodeTypeMap } from '../../hooks/useNodeTypeMap'
 import FormModal from '../shared/FormModal'
 import NodeCombobox from '../shared/NodeCombobox'
 import s from './GovernPicker.module.css'
@@ -22,6 +24,7 @@ import s from './GovernPicker.module.css'
 export default function GovernPicker({ decision, onPick, onDrop, onClose }) {
   const { t } = useTranslation()
   const { data: nodeTypes = [] } = useQuery({ queryKey: qk.nodeTypes(), queryFn: getNodeTypes, staleTime: 300000 })
+  const typeByKey = useNodeTypeMap()
 
   const eligible = useMemo(() => {
     const keys = new Set(nodeTypes
@@ -45,7 +48,7 @@ export default function GovernPicker({ decision, onPick, onDrop, onClose }) {
         <div className={s.current}>
           {governs.map(n => (
             <span key={n.id} className={s.chip}>
-              <Link to={`/n/${n.id}`} className={s.chipName}>{n.title}</Link>
+              <Link to={nodeHref(n, typeByKey)} className={s.chipName}>{n.title}</Link>
               <em>{n.type}</em>
               <button type="button" aria-label={t('decisions.ungovern', { name: n.title })} onClick={() => onDrop(n)}>
                 <X size={10} />

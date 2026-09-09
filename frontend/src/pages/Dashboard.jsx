@@ -21,7 +21,8 @@ import { BRAND, DARK } from '../constants/theme'
 import { useIdentityFocus } from '../context/IdentityFocusContext'
 import { deriveCommandCenter } from '../utils/commandCenter'
 import { groupProjectsByOwner } from '../utils/projectGroups'
-import { taskHref } from '../utils/nodeHref'
+import { nodeHref, taskHref } from '../utils/nodeHref'
+import { useNodeTypeMap } from '../hooks/useNodeTypeMap'
 import { DEFAULT_WIDGET_ORDER, normalizeWidgetOrder, reorderWidgets } from '../utils/widgetLayout'
 import { useUiPrefs } from '../utils/uiPrefs'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const bp = useBreakpoint()
   const isMobile = bp === 'mobile'
   const qc = useQueryClient()
+  const typeByKey = useNodeTypeMap()
   useUiPrefs() // re-render on list-density / timestamp preference changes
   const { focusTarget, filterProjects, clearFocus } = useIdentityFocus()
   const { data: allProjects = [], isLoading } = useQuery({ queryKey: qk.projects(), queryFn: getProjects })
@@ -448,7 +450,7 @@ export default function Dashboard() {
             data={hubStats}
             selectedIdentityId={chartIdentityId}
             onSelectIdentity={setChartIdentityId}
-            onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
+            onNavigate={(projectId) => navigate(nodeHref({ id: projectId, type: 'project' }, typeByKey))}
           />
         ) : tab === 'mywork' ? (
           <div className={`${s.myWorkGrid} ${isMobile ? s.myWorkGridMobile : s.myWorkGridDesktop}`}>
