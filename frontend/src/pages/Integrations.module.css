@@ -140,7 +140,6 @@
 .setupCodeBlock {
   background: rgba(var(--kt-ink-rgb), 0.04);
   border: 1px solid var(--kt-line);
-  border-radius: 6px;
   padding: 10px 14px;
   font-size: 12px;
   color: #e0e0e0;

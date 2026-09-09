@@ -2799,7 +2799,6 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   margin-right: 4px;
   padding: 2px 6px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
-  border-radius: 9999px;
   background: none;
   color: var(--kt-faint);
   font-size: 8px;
@@ -2835,7 +2834,6 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   font-size: 10px;
   font-weight: 600;
   padding: 2px 7px 2px 6px;
-  border-radius: 9999px;
   background: rgba(var(--kt-ink-rgb), 0.05);
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   color: var(--kt-muted);
@@ -2878,7 +2876,6 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 9999px;
   background: none;
   border: 1px dashed rgba(var(--kt-ink-rgb), 0.18);
   color: var(--kt-faint);
@@ -2898,7 +2895,6 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   width: 260px;
   background: var(--kt-elev);
   border: 1px solid var(--kt-line);
-  border-radius: 8px;
   box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
   padding: 10px;
   z-index: 80;
@@ -2916,7 +2912,6 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   letter-spacing: 0.04em;
   padding: 4px 0;
   text-align: center;
-  border-radius: 5px;
   border: 1px solid transparent;
   background: rgba(var(--kt-ink-rgb), 0.04);
   color: var(--kt-faint);
@@ -4407,8 +4402,8 @@ select[style*="border-radius"],
 .tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0 0.2em; }
 .tiptap ul, .tiptap ol { padding-left: 1.4em; margin: 0.3em 0; }
 .tiptap li { margin: 0.1em 0; }
-.tiptap code { background: rgba(var(--kt-ink-rgb), 0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace; color: var(--kt-hit); }
-.tiptap pre { background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
+.tiptap code { background: rgba(var(--kt-ink-rgb), 0.08); padding: 1px 4px; font-size: 0.9em; font-family: monospace; color: var(--kt-hit); }
+.tiptap pre { background: #1e293b; color: #e2e8f0; padding: 10px 14px; overflow-x: auto; margin: 0.4em 0; }
 .tiptap pre code { background: none; padding: 0; color: inherit; }
 .tiptap blockquote { border-left: 3px solid rgba(var(--kt-ink-rgb), 0.15); padding-left: 12px; margin: 0.4em 0; color: rgba(var(--kt-ink-rgb), 0.4); }
 .tiptap a { color: var(--kt-hit); text-decoration: underline; }
@@ -4459,7 +4454,6 @@ select.kt-select option {
    ADR-0088) — arriving is not a state in the status machine. */
 .kt-focus-flash {
   animation: kt-focus-flash 1.8s ease-out;
-  border-radius: inherit;
 }
 @keyframes kt-focus-flash {
   0%, 55% {

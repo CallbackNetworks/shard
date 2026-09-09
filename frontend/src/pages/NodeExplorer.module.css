@@ -35,7 +35,6 @@
   width: 100%;
   padding: 6px 8px;
   border: none;
-  border-radius: 4px;
   background: none;
   color: var(--kt-ink);
   cursor: pointer;
@@ -49,7 +48,6 @@
 .typeDot {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
   background: var(--chip);
   flex-shrink: 0;
 }
@@ -154,7 +152,6 @@
   font-size: 9px;
   font-weight: 700;
   padding: 1px 5px;
-  border-radius: 3px;
   flex-shrink: 0;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -301,7 +298,6 @@
   margin-bottom: 10px;
   border: 1px solid color-mix(in srgb, var(--kt-hit) 30%, transparent);
   background: color-mix(in srgb, var(--kt-hit) 8%, transparent);
-  border-radius: 4px;
 }
 
 .bulkCount { font-size: 12px; font-weight: 700; color: var(--kt-ink); }

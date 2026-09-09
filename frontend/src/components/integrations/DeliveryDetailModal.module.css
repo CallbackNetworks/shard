@@ -18,7 +18,6 @@
 .errorPre {
   background: rgba(250, 204, 21, 0.1);
   border: 1px solid rgba(250, 204, 21, 0.2);
-  border-radius: 6px;
   padding: 8px 10px;
   color: #fca5a5;
   font-size: 11px;
@@ -29,7 +28,6 @@
 .responsePre {
   background: rgba(var(--kt-ink-rgb), 0.04);
   border: 1px solid var(--kt-line);
-  border-radius: 6px;
   padding: 8px 10px;
   color: var(--kt-muted);
   font-size: 11px;
@@ -42,7 +40,6 @@
 .payloadPre {
   background: rgba(var(--kt-ink-rgb), 0.04);
   border: 1px solid var(--kt-line);
-  border-radius: 6px;
   padding: 8px 10px;
   color: var(--kt-muted);
   font-size: 11px;

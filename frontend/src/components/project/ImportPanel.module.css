@@ -17,7 +17,6 @@
   background: var(--kt-elev);
   color: var(--kt-ink);
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  border-radius: 6px;
   padding: 10px;
   font-size: 12px;
   font-family: monospace;
