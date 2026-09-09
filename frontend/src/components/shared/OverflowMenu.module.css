@@ -58,11 +58,13 @@
 
 /* A trigger that carries a word (ADR-0156) — "up one level" has a name, and a bare
    glyph for it is the mistake this component exists to stop. Scoped to the labelled
-   case: the bare `⋯` triggers already read correctly and must not change shape. */
+   case: the bare `⋯` triggers already read correctly and must not change shape.
+   Square, like everything else: `global.css` resets `border-radius` on every form
+   control, so a radius here would be dead CSS that still says the wrong thing to the
+   next person who copies this block onto an element the reset does not reach. */
 .triggerLabeled {
   gap: 4px;
   font-size: 11px;
-  border-radius: 9999px;
 }
 
 .triggerText {
