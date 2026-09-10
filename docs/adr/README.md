@@ -159,3 +159,4 @@
 | [0155](0155-a-relation-is-editable-where-the-node-is-read.md) | 關係要在讀得到這個節點的地方就編得動：關係面板收成一個，掛到專案／容器／身分頁 | Accepted | 2026-09-08 |
 | [0156](0156-a-path-is-walked-in-both-directions.md) | 一條路徑要走得了兩個方向：跳轉規則三份收成一份、麵包屑帶自己、上一層是真的上一層 | Accepted | 2026-09-08 |
 | [0157](0157-a-relation-is-drawn-where-it-is-read-by-a-stranger.md) | 一條關係要畫在讀它的陌生人面前：分享頁補上結構圖、Ask 改成 dock；順手修掉結構圖上決策狀態永遠是 proposed | Accepted | 2026-09-09 |
+| [0158](0158-a-count-is-asked-for-as-a-count.md) | 一個數字要當成一個數字去要：跑馬燈改讀伺服器計數，`/api/projects` 從每一頁的載入路徑上消失；overview 兩份實作收成一份 | Accepted | 2026-09-10 |

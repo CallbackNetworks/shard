@@ -26,7 +26,7 @@ sub_router = APIRouter()
 @sub_router.get(
     "/analytics/overview",
     summary="Platform analytics overview",
-    description="""Platform-wide aggregated statistics: task counts by status, overdue count, most active project last 7 days.
+    description="""Platform-wide aggregated statistics: task counts by status, overdue/failed/high-priority-active counts, most active project last 7 days.
 
 If the API key is scoped to a single project, counts are restricted to that project. Requires `read` scope.""",
     responses=_auth_errors,
@@ -36,53 +36,7 @@ def api_analytics_overview(
     api_key: ApiKey = Depends(_get_api_key),
 ):
     _require_scope(api_key, "read")
-    now = datetime.now(UTC)
-    week_ago = now - timedelta(days=7)
-    scoped_project_ids = _project_ids_in_scope(db, api_key)  # None means platform-wide
-    scoped_task_ids = None
-    if scoped_project_ids is not None:
-        scoped_task_ids = set()
-        for spid in scoped_project_ids:
-            scoped_task_ids |= set(graph.contained_task_ids(db, spid))
-
-    def _task_count(*filters):
-        q = db.query(func.count(Node.id)).filter(graph.task_type_filter(db))
-        if scoped_task_ids is not None:
-            q = q.filter(Node.id.in_(scoped_task_ids))
-        return (q.filter(*filters).scalar() or 0) if filters else (q.scalar() or 0)
-
-    total_tasks = _task_count()
-    done_tasks = _task_count(Node.status == "done")
-    in_progress = _task_count(Node.status == "in_progress")
-    overdue = _task_count(*graph.overdue_clause(now))
-
-    proj_q = db.query(func.count(Node.id)).filter(Node.type == graph.NODE_PROJECT)
-    if scoped_project_ids is not None:
-        proj_q = proj_q.filter(Node.id.in_(scoped_project_ids))
-    total_projects = proj_q.scalar() or 0
-    active_projects = proj_q.filter(Node.status == "active").scalar() or 0
-
-    act_q = db.query(ActivityLog.project_id, func.count(ActivityLog.id).label("cnt")).filter(
-        ActivityLog.created_at >= week_ago, ActivityLog.project_id.isnot(None)
-    )
-    if scoped_project_ids is not None:
-        act_q = act_q.filter(ActivityLog.project_id.in_(scoped_project_ids))
-    top_activity = act_q.group_by(ActivityLog.project_id).order_by(func.count(ActivityLog.id).desc()).first()
-    most_active_project = None
-    if top_activity:
-        p = graph.get_project(db, top_activity.project_id)
-        if p:
-            most_active_project = {"id": p.id, "name": p.name, "activity_count": top_activity.cnt}
-
-    return {
-        "total_projects": total_projects,
-        "active_projects": active_projects,
-        "total_tasks": total_tasks,
-        "done_tasks": done_tasks,
-        "in_progress_tasks": in_progress,
-        "overdue_tasks": overdue,
-        "most_active_project": most_active_project,
-    }
+    return analytics_admin.overview(db, project_ids=_project_ids_in_scope(db, api_key))
 
 
 @sub_router.get(

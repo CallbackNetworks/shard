@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Node
+from app.models import ActivityLog, Node
 from app.services import graph
 from app.services.critical_path import compute_critical_path
 from app.services.datetimes import ensure_aware
@@ -259,4 +259,65 @@ def estimate_suggestion(db: Session, raw_estimate: int, project_id: str | None =
         "basis_scope": basis_scope,
         "bucket": bucket_label,
         "sample_size": sample,
+    }
+
+
+def overview(db: Session, *, project_ids: list[str] | None = None) -> dict:
+    """Platform task/project counts, for both doors (ADR-0086).
+
+    The internal router and the v1 router each carried a copy of this, identical
+    except for the key scoping the second one applies — so a count added to one was
+    absent from the other with nothing to say so. ``project_ids=None`` is unrestricted.
+
+    ``failed_tasks`` and ``high_priority_active_tasks`` are here because
+    ``GlobalActivityTicker`` needs them. It used to derive all three of its numbers in
+    the browser from ``GET /projects`` with every task embedded — a second definition
+    of "overdue" living exactly where ADR-0089 says there is one, and 327KB of payload
+    on every page to reach three integers.
+
+    "Active" is :func:`graph.open_status_clause`, not ``notin_(CLOSED_STATUSES)``:
+    ``Node.status`` is nullable and SQL drops NULL rows from a ``NOT IN`` (ADR-0142),
+    while the Python and JavaScript forms of the same rule keep them.
+    """
+    now = datetime.now(UTC)
+    week_ago = now - timedelta(days=7)
+
+    task_ids = None
+    if project_ids is not None:
+        task_ids = set()
+        for pid in project_ids:
+            task_ids |= set(graph.contained_task_ids(db, pid))
+
+    def _task_count(*filters):
+        q = db.query(func.count(Node.id)).filter(graph.task_type_filter(db))
+        if task_ids is not None:
+            q = q.filter(Node.id.in_(task_ids))
+        return (q.filter(*filters).scalar() if filters else q.scalar()) or 0
+
+    proj_q = db.query(func.count(Node.id)).filter(Node.type == graph.NODE_PROJECT)
+    if project_ids is not None:
+        proj_q = proj_q.filter(Node.id.in_(project_ids))
+
+    act_q = db.query(ActivityLog.project_id, func.count(ActivityLog.id).label("cnt")).filter(
+        ActivityLog.created_at >= week_ago, ActivityLog.project_id.isnot(None)
+    )
+    if project_ids is not None:
+        act_q = act_q.filter(ActivityLog.project_id.in_(project_ids))
+    top = act_q.group_by(ActivityLog.project_id).order_by(func.count(ActivityLog.id).desc()).first()
+    most_active_project = None
+    if top:
+        p = graph.get_project(db, top.project_id)
+        if p:
+            most_active_project = {"id": p.id, "name": p.name, "activity_count": top.cnt}
+
+    return {
+        "total_projects": proj_q.scalar() or 0,
+        "active_projects": proj_q.filter(Node.status == "active").scalar() or 0,
+        "total_tasks": _task_count(),
+        "done_tasks": _task_count(Node.status == "done"),
+        "in_progress_tasks": _task_count(Node.status == "in_progress"),
+        "overdue_tasks": _task_count(*graph.overdue_clause(now)),
+        "failed_tasks": _task_count(Node.status == "failed"),
+        "high_priority_active_tasks": _task_count(Node.priority == "high", graph.open_status_clause()),
+        "most_active_project": most_active_project,
     }

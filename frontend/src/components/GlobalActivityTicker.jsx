@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ChevronDown, ChevronUp, X } from 'lucide-react'
-import { getActivity, getProjects, getActivityWatches, createActivityWatch, deleteActivityWatch } from '../api/client'
+import { getActivity, getAnalyticsOverview, getActivityWatches, createActivityWatch, deleteActivityWatch } from '../api/client'
 import { qk } from '../api/queryKeys'
 import { useUiPrefs, setUiPref, refreshInterval } from '../utils/uiPrefs'
 import { loopDuration, loopRepeats, repeatItems } from '../utils/tickerLoop'
-import { countOverdue } from '../utils/overdue'
 import ActivityWatchPicker from './ActivityWatchPicker'
 
 const FALLBACK_ITEMS = [
@@ -77,10 +76,6 @@ function eventLabel(entry) {
   const action = String(entry.action || '').replaceAll('.', ' ')
   const detail = entry.detail || entry.message || action
   return `${action.toUpperCase()} / ${detail}`.slice(0, 120)
-}
-
-function getProjectTasks(project) {
-  return Array.isArray(project?.tasks) ? project.tasks : []
 }
 
 function eventKind(entry) {
@@ -204,10 +199,15 @@ export default function GlobalActivityTicker() {
     staleTime: 30000,
   })
 
-  const { data: projects = [] } = useQuery({
-    queryKey: qk.projects(),
-    queryFn: getProjects,
-    refetchInterval: 60000,
+  // Three integers, fetched as three integers (ADR-0158). This was `getProjects()`
+  // — every project with every task embedded — so the browser could recount overdue
+  // itself, which is a second copy of the rule ADR-0089 says has one. The server
+  // already counts all three, and the payload went from ~327KB to a few hundred
+  // bytes on every page this ticker is mounted on, which is all of them.
+  const { data: overview } = useQuery({
+    queryKey: qk.analyticsOverview(),
+    queryFn: getAnalyticsOverview,
+    refetchInterval: refreshInterval(60000, prefs),
     staleTime: 30000,
   })
 
@@ -230,20 +230,16 @@ export default function GlobalActivityTicker() {
   const handleAddType = (typeKey, typeLabel) => addWatch.mutate({ kind: 'node_type', target_type: typeKey, label: typeLabel })
 
   const alerts = useMemo(() => {
-    const tasks = projects.flatMap(getProjectTasks)
-    const now = new Date()
-    const overdue = countOverdue(tasks, now)
-    const failed = tasks.filter(task => task.status === 'failed').length
-    const highActive = tasks.filter(task =>
-      task.priority === 'high' && !['done', 'failed'].includes(task.status)
-    ).length
+    const overdue = overview?.overdue_tasks || 0
+    const failed = overview?.failed_tasks || 0
+    const highActive = overview?.high_priority_active_tasks || 0
 
     return [
       overdue > 0 ? t('ticker.overdueTasks', { count: overdue }) : null,
       failed > 0 ? t('ticker.failedTasks', { count: failed }) : null,
       highActive > 0 ? t('ticker.highPriorityActive', { count: highActive }) : null,
     ].filter(Boolean)
-  }, [projects, t])
+  }, [overview, t])
 
   const activityItems = activities.slice(0, TICKER_MAX_ITEMS).map(eventLabel).filter(Boolean)
   const tickerItems = activityItems.length > 0 ? activityItems : FALLBACK_ITEMS

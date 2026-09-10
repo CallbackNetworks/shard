@@ -14,46 +14,7 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 @router.get("/overview")
 def get_overview(db: Session = Depends(get_db)):
-    now = datetime.now(UTC)
-    week_ago = now - timedelta(days=7)
-
-    def _task_count():
-        return db.query(func.count(Node.id)).filter(graph.task_type_filter(db))
-
-    total_tasks = _task_count().scalar() or 0
-    done_tasks = _task_count().filter(Node.status == "done").scalar() or 0
-    in_progress = _task_count().filter(Node.status == "in_progress").scalar() or 0
-    overdue = _task_count().filter(*graph.overdue_clause(now)).scalar() or 0
-
-    # Most active project last 7 days
-    activity_counts = (
-        db.query(ActivityLog.project_id, func.count(ActivityLog.id).label("cnt"))
-        .filter(ActivityLog.created_at >= week_ago, ActivityLog.project_id != None)
-        .group_by(ActivityLog.project_id)
-        .order_by(func.count(ActivityLog.id).desc())
-        .first()
-    )
-    most_active_project = None
-    if activity_counts:
-        p = graph.get_project(db, activity_counts.project_id)
-        if p:
-            most_active_project = {"id": p.id, "name": p.name, "activity_count": activity_counts.cnt}
-
-    def _project_count():
-        return db.query(func.count(Node.id)).filter(Node.type == graph.NODE_PROJECT)
-
-    total_projects = _project_count().scalar() or 0
-    active_projects = _project_count().filter(Node.status == "active").scalar() or 0
-
-    return {
-        "total_projects": total_projects,
-        "active_projects": active_projects,
-        "total_tasks": total_tasks,
-        "done_tasks": done_tasks,
-        "in_progress_tasks": in_progress,
-        "overdue_tasks": overdue,
-        "most_active_project": most_active_project,
-    }
+    return analytics_admin.overview(db)
 
 
 @router.get("/heatmap")
