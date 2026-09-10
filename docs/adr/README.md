@@ -158,3 +158,4 @@
 | [0154](0154-a-filter-shows-its-count-before-you-apply-it.md) | 一個篩選要在被套用之前就說出自己有幾筆：孤立併進篩選清單並帶計數；順帶更正 ADR-0153 一句量反的話 | Accepted | 2026-09-05 |
 | [0155](0155-a-relation-is-editable-where-the-node-is-read.md) | 關係要在讀得到這個節點的地方就編得動：關係面板收成一個，掛到專案／容器／身分頁 | Accepted | 2026-09-08 |
 | [0156](0156-a-path-is-walked-in-both-directions.md) | 一條路徑要走得了兩個方向：跳轉規則三份收成一份、麵包屑帶自己、上一層是真的上一層 | Accepted | 2026-09-08 |
+| [0157](0157-a-relation-is-drawn-where-it-is-read-by-a-stranger.md) | 一條關係要畫在讀它的陌生人面前：分享頁補上結構圖、Ask 改成 dock；順手修掉結構圖上決策狀態永遠是 proposed | Accepted | 2026-09-09 |

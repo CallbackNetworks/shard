@@ -27,6 +27,19 @@ describe('ShareChatWidget', () => {
     global.IntersectionObserver = MockIntersectionObserver
   })
 
+  // The widget is a dock (ADR-0157): closed it is one launcher, and the conversation
+  // is not on the page at all. A test rendering it open is testing the panel, so the
+  // closed state needs its own — otherwise "the input exists" would keep passing for a
+  // widget that had lost its way onto the screen.
+  it('shows only a launcher until it is opened', () => {
+    const onOpenChange = vi.fn()
+    render(<ShareChatWidget token="tok123" open={false} onOpenChange={onOpenChange} />)
+
+    expect(screen.queryByLabelText('Ask a question')).toBeNull()
+    fireEvent.click(screen.getByLabelText('Ask a question about this page'))
+    expect(onOpenChange).toHaveBeenCalledWith(true)
+  })
+
   it('sends a question and renders the streamed reply', async () => {
     mockFetchStream([
       { type: 'text', text: 'The project is ' },
@@ -34,7 +47,7 @@ describe('ShareChatWidget', () => {
       { type: 'done' },
     ])
 
-    render(<ShareChatWidget token="tok123" />)
+    render(<ShareChatWidget token="tok123" open onOpenChange={() => {}} />)
     fireEvent.change(screen.getByLabelText('Ask a question'), { target: { value: 'How is it going?' } })
     fireEvent.click(screen.getByText('ASK'))
 
@@ -55,7 +68,7 @@ describe('ShareChatWidget', () => {
       json: async () => ({ detail: 'PIN verification required' }),
     })
 
-    render(<ShareChatWidget token="tok123" />)
+    render(<ShareChatWidget token="tok123" open onOpenChange={() => {}} />)
     fireEvent.change(screen.getByLabelText('Ask a question'), { target: { value: 'Anything?' } })
     fireEvent.click(screen.getByText('ASK'))
 
@@ -68,7 +81,7 @@ describe('ShareChatWidget', () => {
       { type: 'done' },
     ])
 
-    render(<ShareChatWidget token="tok123" />)
+    render(<ShareChatWidget token="tok123" open onOpenChange={() => {}} />)
     fireEvent.change(screen.getByLabelText('Ask a question'), { target: { value: 'Hello?' } })
     fireEvent.click(screen.getByText('ASK'))
 

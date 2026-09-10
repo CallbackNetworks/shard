@@ -9,6 +9,7 @@ import ShareStats from '../components/share/ShareStats'
 import ShareScrollNav, { SECTIONS } from '../components/share/ShareScrollNav'
 import ShareProjectCard from '../components/share/ShareProjectCard'
 import ShareDecisions from '../components/share/ShareDecisions'
+import ShareStructureMap from '../components/share/ShareStructureMap'
 import ShareActivityFeed from '../components/share/ShareActivityFeed'
 import SharePinGate from '../components/share/SharePinGate'
 import ShareChatWidget from '../components/share/ShareChatWidget'
@@ -24,6 +25,7 @@ export default function ShareView() {
   const [now, setNow] = useState(new Date())
   const [activeSection, setActiveSection] = useState('overview')
   const [pinData, setPinData] = useState(null) // data from PIN verification
+  const [askOpen, setAskOpen] = useState(false)
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60000)
@@ -75,7 +77,14 @@ export default function ShareView() {
   const meta = effectiveData?.meta || {}
   const color = identity?.color || 'var(--kt-hit, #f5f6f7)'
   // A nav entry whose section is not rendered is a button that does nothing when clicked.
-  const navSections = SECTIONS.filter(s => s.key !== 'decisions' || summary.total_decisions > 0)
+  // The structure section draws itself away when the payload holds no shape worth
+  // drawing, so the entry follows the same condition the component applies.
+  const hasGraph = projects.length > 0 && (projects.length > 1 || (projects[0]?.tasks?.length || 0) + (projects[0]?.decisions?.length || 0) > 0)
+  const navSections = SECTIONS.filter(s => {
+    if (s.key === 'decisions') return summary.total_decisions > 0
+    if (s.key === 'graph') return hasGraph
+    return true
+  })
 
   // Error state
   if (isError) {
@@ -130,7 +139,13 @@ export default function ShareView() {
         </div>
 
         {/* Scroll navigation */}
-        <ShareScrollNav activeSection={activeSection} color={color} sections={navSections} />
+        <ShareScrollNav
+          activeSection={activeSection}
+          activeAction={askOpen ? 'ask' : null}
+          color={color}
+          sections={navSections}
+          onAction={() => setAskOpen(true)}
+        />
 
         {/* Section: Projects */}
         <div id="share-section-projects" style={{ paddingTop: 8 }}>
@@ -149,17 +164,19 @@ export default function ShareView() {
           ))}
         </div>
 
+        {/* Section: Structure (ADR-0157) — the relations the page already carried, drawn */}
+        {hasGraph && (
+          <div id="share-section-graph" style={{ paddingTop: 24 }}>
+            <ShareStructureMap payload={effectiveData} color={color} />
+          </div>
+        )}
+
         {/* Section: Decisions (ADR-0120) — the page carried the work and never said why */}
         {summary.total_decisions > 0 && (
           <div id="share-section-decisions" style={{ paddingTop: 24 }}>
             <ShareDecisions projects={projects} />
           </div>
         )}
-
-        {/* Section: Ask (public read-only Q&A assistant, ADR-0098) */}
-        <div id="share-section-ask" style={{ paddingTop: 24 }}>
-          <ShareChatWidget token={token} />
-        </div>
 
         {/* Section: Activity */}
         <div id="share-section-activity" style={{ paddingTop: 24 }}>
@@ -169,6 +186,11 @@ export default function ShareView() {
         {/* Footer */}
         <ShareFooter generatedAt={meta.generated_at} />
       </div>
+
+      {/* Ask (ADR-0098) docks rather than sitting in the flow (ADR-0157). Outside the
+          shell on purpose: it is `position: fixed`, and the shell is the element the
+          page's reveal transitions run on. */}
+      <ShareChatWidget token={token} open={askOpen} onOpenChange={setAskOpen} />
     </div>
   )
 }

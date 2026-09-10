@@ -30,8 +30,17 @@ Decisions are on the public page for a reason. The one person most likely to ask
 "why is it like this?" is the person who was not in the room, and that is exactly
 who this page is for.
 
-There is also a read-only assistant on the page. It can answer questions about the
-project, and it can only see what the page already shows. It cannot create anything.
+There is also a **structure graph**: the same map the Structure page draws for you,
+built from what the link already carries. What holds what, which task is waiting on
+which, and which decision governs which task — the relations the rest of the page
+states in words, one end at a time. Select a node and everything it does not touch
+dims. Three layouts, and the zoom controls are there because a big project starts out
+fitted to the frame.
+
+There is also a read-only assistant on the page, docked in the bottom-right corner
+(the **Ask** button in the section nav raises it too). It can answer questions about
+the project, and it can only see what the page already shows. It cannot create
+anything.
 
 ## Practical notes
 

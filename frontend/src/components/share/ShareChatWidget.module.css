@@ -1,0 +1,106 @@
+/* Dock chrome for the public Q&A assistant (ADR-0157). The conversation itself keeps
+   the `kt-share-chat-*` globals it has always used, so moving the widget out of the
+   scroll flow did not restyle a single message.
+
+   Both layers are children of `.kt-share-page`, which carries no transform — a
+   transformed ancestor would make itself the containing block for `position: fixed`
+   and drop the dock into the middle of the page (ADR-0129). */
+
+.launcher {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--share-accent, #facc15) 45%, var(--kt-line));
+  background: rgba(var(--kt-bg-rgb), 0.94);
+  backdrop-filter: blur(10px);
+  color: var(--kt-ink);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.launcher:hover {
+  border-color: color-mix(in srgb, var(--share-accent, #facc15) 80%, transparent);
+  background: color-mix(in srgb, var(--share-accent, #facc15) 12%, rgba(var(--kt-bg-rgb), 0.94));
+}
+
+.launcher b {
+  min-width: 16px;
+  padding: 1px 4px;
+  background: color-mix(in srgb, var(--share-accent, #facc15) 22%, transparent);
+  color: var(--kt-ink);
+  font-size: 9px;
+}
+
+.dock {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--share-accent, #facc15) 34%, var(--kt-line));
+  background: rgba(var(--kt-bg-rgb), 0.97);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--kt-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.head span {
+  flex: 1;
+}
+
+.head button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--kt-muted);
+  cursor: pointer;
+}
+
+.head button:hover {
+  border-color: rgba(var(--kt-ink-rgb), 0.14);
+  color: var(--kt-ink);
+}
+
+.hint {
+  color: var(--kt-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .dock {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
+  }
+  .launcher {
+    right: 12px;
+    bottom: 12px;
+  }
+}

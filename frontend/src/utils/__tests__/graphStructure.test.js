@@ -34,7 +34,12 @@ function fixture() {
     { id: 't3', type: 'task', title: 'Subtask', status: 'todo', priority: 'medium', data: {} },
     { id: 'k1', type: 'ticket', title: 'Custom ticket', status: 'todo', priority: 'high', data: {} },
     { id: 'g1', type: 'goal', title: 'Ship it', status: 'active', data: {} },
-    { id: 'd1', type: 'decision', title: 'Use graph', data: { decision_status: 'proposed' } },
+    { id: 'd1', type: 'decision', title: 'Use graph', status: 'proposed', data: {} },
+    // Settled, and stated the way the server states it: on the column (ADR-0130). The
+    // fixture used to write `data.decision_status`, which is the field the derivation
+    // read and the one the API stopped sending — so the assertion below passed while
+    // every decision on the live map reported `proposed`.
+    { id: 'd2', type: 'decision', title: 'Use SQLite', status: 'accepted', data: {} },
     { id: 'l1', type: 'label', title: 'bug', data: { type: 'label' } },
     { id: 'n1', type: 'note', title: 'Design note', data: {} },
   ]
@@ -47,6 +52,7 @@ function fixture() {
     { id: 'e6', source_id: 't1', target_id: 't3', rel_type: 'contains' },
     { id: 'e7', source_id: 'c1', target_id: 'k1', rel_type: 'contains' },
     { id: 'e8', source_id: 'p1', target_id: 'd1', rel_type: 'contains' },
+    { id: 'e8b', source_id: 'p1', target_id: 'd2', rel_type: 'contains' },
     { id: 'e9', source_id: 'p1', target_id: 'l1', rel_type: 'contains' },
     { id: 'e10', source_id: 'p1', target_id: 'n1', rel_type: 'contains' },
     { id: 'e11', source_id: 'g1', target_id: 'p1', rel_type: 'contains' },
@@ -79,7 +85,7 @@ describe('deriveGraphStructure', () => {
     expect(p1.directTaskCount).toBe(2)
     expect(p1.risk).toBe('active')
     expect(p1.identityIds).toEqual(['i1'])
-    expect(p1.decisionCount).toBe(1)
+    expect(p1.decisionCount).toBe(2)
     expect(p1.pendingDecisionCount).toBe(1)
     expect(p1.dependencyCount).toBe(1)
     expect(p1.parentContainerId).toBe('c1') // nested containers survive
@@ -119,9 +125,9 @@ describe('deriveGraphStructure', () => {
     )
   })
 
-  it('derives decisions from decision-type nodes', () => {
-    expect(graph.decisionNodes.map(d => d.id)).toEqual(['d1'])
-    expect(graph.decisionNodes[0].status).toBe('proposed')
+  it('derives decisions from decision-type nodes, reading state from the column', () => {
+    expect(graph.decisionNodes.map(d => d.id)).toEqual(['d1', 'd2'])
+    expect(graph.decisionNodes.map(d => d.status)).toEqual(['proposed', 'accepted'])
     expect(graph.decisionNodes[0].projectId).toBe('p1')
   })
 

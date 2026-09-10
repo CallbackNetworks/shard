@@ -1,0 +1,57 @@
+/* The structure graph on the public page (ADR-0157). The canvas itself is drawn by
+   the shared `kt-map-*` globals — this file is only the section chrome around it,
+   so the map cannot look like a different map here. */
+
+.wrap {
+  display: grid;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.visible {
+  opacity: 1;
+  transform: none;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.title {
+  color: var(--kt-ink);
+  font-family: var(--kt-display);
+  font-size: 22px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.count {
+  color: var(--kt-faint);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+/* The controls sit at the far end of the heading rather than in a toolbar row of
+   their own: on a page that is read by scrolling, a second bar is a second thing
+   to skip past before reaching the picture. */
+.head .spacer {
+  flex: 1;
+}
+
+.blurb {
+  color: var(--kt-faint);
+  font-size: 11px;
+  max-width: 62ch;
+}
+
+.selected {
+  color: var(--kt-ink);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}

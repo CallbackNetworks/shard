@@ -36,8 +36,14 @@ export default function MapCanvas({
   onOpen,
   showEmpty,
   onClearFilters,
+  // The owner's map draws a ranked slice of *signal* tasks and says so. The share map
+  // draws every task the payload holds (ADR-0157), where that heading would be a lie.
+  taskColumnLabel,
 }) {
   const { t } = useTranslation()
+  // A column heading over an empty column is a heading that describes nothing — the
+  // three columns are fixed geometry, but what got placed in them is not.
+  const drawn = new Set(layout.nodes.map(node => node.type))
 
   return (
     <div
@@ -111,15 +117,21 @@ export default function MapCanvas({
       ))}
       {layout.columns && (
         <>
-          <div className="kt-map-col-label" style={{ left: layout.columns.identity.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.identity.w }}>
-            {t('structure.identities')}
-          </div>
-          <div className="kt-map-col-label" style={{ left: layout.columns.project.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.project.w }}>
-            {t('structure.projects')}
-          </div>
-          <div className="kt-map-col-label" style={{ left: layout.columns.task.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.task.w }}>
-            {t('structure.signalTasks')}
-          </div>
+          {drawn.has('identity') && (
+            <div className="kt-map-col-label" style={{ left: layout.columns.identity.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.identity.w }}>
+              {t('structure.identities')}
+            </div>
+          )}
+          {drawn.has('project') && (
+            <div className="kt-map-col-label" style={{ left: layout.columns.project.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.project.w }}>
+              {t('structure.projects')}
+            </div>
+          )}
+          {drawn.has('task') && (
+            <div className="kt-map-col-label" style={{ left: layout.columns.task.x, top: layout.labelY ?? layout.padY ?? 6, width: layout.columns.task.w }}>
+              {taskColumnLabel || t('structure.signalTasks')}
+            </div>
+          )}
         </>
       )}
 
@@ -129,9 +141,11 @@ export default function MapCanvas({
           color={node.color}
           active={selectedNodeKey === node.id}
           muted={isNodeMuted(node.data)}
-          label={`${node.name} · ${node.data.status || node.data.risk || node.type} — ${t('structure.doubleClickOpen')}`}
+          // A canvas with nowhere to jump (the public share map) must not promise one:
+          // the hint is part of the label only when there is an `onOpen` behind it.
+          label={`${node.name} · ${node.data.status || node.data.risk || node.type}${onOpen ? ` — ${t('structure.doubleClickOpen')}` : ''}`}
           onClick={() => onSelect(node.data)}
-          onDoubleClick={() => onOpen(node.data)}
+          onDoubleClick={onOpen ? () => onOpen(node.data) : undefined}
           className={`is-${node.type}`}
           style={{ left: node.x, top: node.y, width: node.w, minHeight: node.h }}
         >

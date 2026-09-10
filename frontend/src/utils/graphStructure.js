@@ -112,7 +112,12 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
       id: n.id,
       type: 'decision',
       name: n.title,
-      status: n.data?.decision_status || 'proposed',
+      // The column, not the data bag: ADR-0130 moved a decision's state onto
+      // `nodes.status` and the reads that still *say* `decision_status` are the API's
+      // own translation. This read never followed, so every decision on the map has
+      // been `proposed` since that migration — including the settled ones ADR-0128
+      // exists to keep on screen.
+      status: n.status || 'proposed',
       projectId: containerParentOf(n.id)?.id || null,
     }))
   const decisionsByContainer = new Map()

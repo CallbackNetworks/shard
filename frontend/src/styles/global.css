@@ -2180,6 +2180,10 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   border-color: #fb7185;
   border-top-style: dashed;
 }
+.kt-map-legend i.is-decision {
+  border-color: var(--kt-status-done, #4ade80);
+  border-top-style: dashed;
+}
 .kt-map-notice {
   display: flex;
   flex-wrap: wrap;
@@ -2264,6 +2268,13 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   overscroll-behavior: contain;
   touch-action: none;
   user-select: none;
+}
+/* The map frame sized for a page that is not the map page: `/structure` gives the
+   canvas the rest of the viewport, which on the public share page would be a hole in
+   the middle of a document meant to be scrolled through (ADR-0157). */
+.kt-map-graph.is-embedded {
+  height: min(72vh, 620px);
+  min-height: 380px;
 }
 .kt-map-graph.is-panning {
   cursor: grabbing;
@@ -2400,6 +2411,11 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   white-space: nowrap;
 }
 .kt-map-node em {
+  /* Pinned to the text column. The icon spans the first two rows, so auto-placement
+     sent a *third* line — the "N depends on · M blocks" row a task grows in
+     dependencies mode — into column 1, where it stretched the icon column and shoved
+     the title off the right edge of the card. */
+  grid-column: 2;
   min-width: 0;
   overflow: hidden;
   color: #737373;
