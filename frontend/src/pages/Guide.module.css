@@ -70,7 +70,7 @@
 .navItem:hover,
 .navItem:focus-visible {
   color: var(--kt-ink);
-  background: rgba(var(--kt-ink-rgb), 0.04);
+  background: rgba(var(--kt-ink-rgb), 0.076);
 }
 
 .navItemActive {
@@ -132,7 +132,7 @@
 .tourRow:hover,
 .tourRow:focus-visible {
   color: var(--kt-ink);
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
 }
 
 .tourDone {

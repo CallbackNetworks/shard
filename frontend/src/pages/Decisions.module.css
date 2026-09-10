@@ -95,7 +95,7 @@
   gap: 10px;
   width: 100%;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
   color: var(--kt-ink);
   padding: 8px 10px;
   cursor: pointer;
@@ -150,7 +150,7 @@
   align-items: center;
   gap: 6px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
   color: var(--kt-faint);
   padding: 0 8px;
   min-height: 32px;

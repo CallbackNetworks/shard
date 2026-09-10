@@ -28,7 +28,7 @@
   display: block;
   padding: 10px 12px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
   color: inherit;
   text-decoration: none;
   transition: border-color 0.15s ease, background 0.15s ease;

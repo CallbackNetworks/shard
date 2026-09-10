@@ -70,7 +70,7 @@ function IdentityCard({ identity, onNavigate }) {
 
   return (
     <div style={{
-      background: 'rgba(var(--kt-ink-rgb), 0.03)',
+      background: 'rgba(var(--kt-ink-rgb), 0.057)',
       border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
       borderTop: `2px solid ${identity.color}`,
       borderRadius: 10,
@@ -364,9 +364,9 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
         marginBottom: 4, flexWrap: 'wrap',
       }}>
         <button onClick={() => onSelectIdentity?.(null)} style={{
-          background: !selectedIdentityId ? 'rgba(250,204,21,0.1)' : 'transparent',
+          background: !selectedIdentityId ? 'color-mix(in srgb, var(--kt-hit) 10%, transparent)' : 'transparent',
           border: 'none',
-          borderBottom: `2px solid ${!selectedIdentityId ? '#facc15' : 'transparent'}`,
+          borderBottom: `2px solid ${!selectedIdentityId ? 'var(--kt-hit, #f5f6f7)' : 'transparent'}`,
           cursor: 'pointer', padding: '8px 16px',
           fontSize: 11, fontWeight: !selectedIdentityId ? 700 : 400,
           color: !selectedIdentityId ? 'var(--kt-ink)' : 'rgba(var(--kt-ink-rgb), 0.4)',
@@ -464,7 +464,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             <Section title={t('hub.activityHeatmap')}>
               <HeatmapChart
                 data={heatmapData}
-                color={selectedIdent?.color || '#facc15'}
+                color={selectedIdent?.color || 'var(--kt-hit, #f5f6f7)'}
               />
             </Section>
 
@@ -501,7 +501,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             {displayedIdentities.map(ident => {
               return (
                 <div key={ident.id} style={{
-                  background: 'rgba(var(--kt-ink-rgb), 0.03)',
+                  background: 'rgba(var(--kt-ink-rgb), 0.057)',
                   border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
                   borderRadius: 10, padding: 16,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -527,7 +527,7 @@ export default function IdentityChartsView({ data, selectedIdentityId, onSelectI
             }}>
               {displayedIdentities.map(ident => (
                 <div key={ident.id} style={{
-                  background: 'rgba(var(--kt-ink-rgb), 0.03)',
+                  background: 'rgba(var(--kt-ink-rgb), 0.057)',
                   border: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
                   borderRadius: 10, padding: 16,
                 }}>

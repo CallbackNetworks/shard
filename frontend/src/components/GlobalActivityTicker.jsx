@@ -313,13 +313,13 @@ export default function GlobalActivityTicker() {
         >
           <defs>
             <linearGradient id="ktActArea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#facc15" stopOpacity="0.32" />
-              <stop offset="100%" stopColor="#facc15" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--kt-hit, #f5f6f7)" stopOpacity="0.32" />
+              <stop offset="100%" stopColor="var(--kt-hit, #f5f6f7)" stopOpacity="0" />
             </linearGradient>
             <linearGradient id="ktActLine" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#facc15" stopOpacity="0.22" />
-              <stop offset="70%" stopColor="#facc15" stopOpacity="0.75" />
-              <stop offset="100%" stopColor="#fde047" stopOpacity="1" />
+              <stop offset="0%" stopColor="var(--kt-hit, #f5f6f7)" stopOpacity="0.22" />
+              <stop offset="70%" stopColor="var(--kt-hit, #f5f6f7)" stopOpacity="0.75" />
+              <stop offset="100%" stopColor="var(--accent, #ffffff)" stopOpacity="1" />
             </linearGradient>
           </defs>
           <path d={spark.area} fill="url(#ktActArea)" />
@@ -371,7 +371,7 @@ export default function GlobalActivityTicker() {
         {watchOpen && (
         <div className="kt-watch-legend">
           <span className="kt-watch-chip">
-            <i style={{ background: '#facc15' }} />
+            <i style={{ background: 'var(--kt-hit, #f5f6f7)' }} />
             <span>{t('ticker.watchAll')}</span>
           </span>
           {watchCurves.map(watch => (

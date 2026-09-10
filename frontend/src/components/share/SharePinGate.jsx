@@ -13,7 +13,7 @@ export default function SharePinGate({ identity, token, onVerified }) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const color = identity?.color || '#facc15'
+  const color = identity?.color || 'var(--kt-hit, #f5f6f7)'
 
   const handleSubmit = async (e) => {
     e.preventDefault()

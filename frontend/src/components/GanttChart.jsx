@@ -109,7 +109,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             style={{
               padding: '3px 10px', borderRadius: 9999, fontSize: 11, cursor: 'pointer',
               border: zoom === i ? 'none' : '1px solid rgba(var(--kt-ink-rgb), 0.15)',
-              background: zoom === i ? 'rgba(250,204,21,0.12)' : 'transparent',
+              background: zoom === i ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'transparent',
               color: zoom === i ? DARK.success : DARK.textMid,
               fontWeight: zoom === i ? 700 : 400,
             }}
@@ -137,7 +137,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             const nextLeft = i + 1 < weeks.length ? getLeft(weeks[i + 1]) : 100
             return (
               <div key={i}>
-                <div style={{ position: 'absolute', left: `${left}%`, top: 0, bottom: 0, width: 1, background: 'rgba(var(--kt-ink-rgb), 0.05)' }} />
+                <div style={{ position: 'absolute', left: `${left}%`, top: 0, bottom: 0, width: 1, background: 'rgba(var(--kt-ink-rgb), 0.095)' }} />
                 <div style={{
                   position: 'absolute', left: `${left}%`, width: `${nextLeft - left}%`,
                   padding: '8px 4px', fontSize: 11, color: 'rgba(var(--kt-ink-rgb), 0.25)',
@@ -149,7 +149,7 @@ export default function GanttChart({ tasks, onUpdateTask }) {
             )
           })}
           <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 4 }}>
-            <span style={{ fontSize: 10, color: '#facc15', fontWeight: 700, marginLeft: 3, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 10, color: 'var(--kt-hit, #f5f6f7)', fontWeight: 700, marginLeft: 3, whiteSpace: 'nowrap' }}>
               {t('gantt.today')}
             </span>
           </div>
@@ -239,9 +239,9 @@ export default function GanttChart({ tasks, onUpdateTask }) {
                   }}
                 >
                   {weeks.map((week, i) => (
-                    <div key={i} style={{ position: 'absolute', left: `${getLeft(week)}%`, top: 0, bottom: 0, width: 1, background: 'rgba(var(--kt-ink-rgb), 0.03)' }} />
+                    <div key={i} style={{ position: 'absolute', left: `${getLeft(week)}%`, top: 0, bottom: 0, width: 1, background: 'rgba(var(--kt-ink-rgb), 0.057)' }} />
                   ))}
-                  <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 0, bottom: 0, width: 1.5, background: 'rgba(250,204,21,0.5)', zIndex: 1 }} />
+                  <div style={{ position: 'absolute', left: `${todayLeft}%`, top: 0, bottom: 0, width: 1.5, background: 'color-mix(in srgb, var(--kt-hit) 50%, transparent)', zIndex: 1 }} />
                   {hasDates ? (
                     <div
                       title={`${fmtDate(task.start_date)} \u2192 ${fmtDate(task.due_date)}`}

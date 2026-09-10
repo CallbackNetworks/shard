@@ -157,7 +157,7 @@ export default function TaskFiltersPanel({
             <button
               onClick={onToggleBulk}
               style={{
-                background: bulkMode ? 'rgba(250,204,21,0.12)' : 'none',
+                background: bulkMode ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none',
                 border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer',
                 color: bulkMode ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center', gap: 3, fontSize: 11,
               }}
@@ -177,7 +177,7 @@ export default function TaskFiltersPanel({
           <button
             onClick={onToggleImport}
             title={t('project.importTasksTitle')}
-            style={{ background: showImport ? 'rgba(250,204,21,0.12)' : 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
+            style={{ background: showImport ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: '1px solid rgba(var(--kt-ink-rgb), 0.1)', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', color: showImport ? DARK.info : DARK.textMid, display: 'flex', alignItems: 'center' }}
           >
             <Upload size={11} />
           </button>

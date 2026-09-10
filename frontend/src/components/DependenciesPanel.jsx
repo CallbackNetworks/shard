@@ -32,7 +32,7 @@ export default function DependenciesPanel({ projectId, task, allTasks, depth }) 
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
       borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-      background: 'rgba(var(--kt-ink-rgb), 0.02)',
+      background: 'rgba(var(--kt-ink-rgb), 0.038)',
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {t('deps.blockedBy')}

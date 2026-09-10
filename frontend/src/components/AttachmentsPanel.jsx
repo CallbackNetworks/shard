@@ -53,7 +53,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
       borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-      background: 'rgba(var(--kt-ink-rgb), 0.02)',
+      background: 'rgba(var(--kt-ink-rgb), 0.038)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -98,7 +98,7 @@ export default function AttachmentsPanel({ projectId, taskId, depth }) {
               >
                 <Download size={11} />
               </a>
-              <button onClick={() => handleDelete(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(250,204,21,0.5)', padding: 0, display: 'flex' }}>
+              <button onClick={() => handleDelete(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'color-mix(in srgb, var(--kt-hit) 50%, transparent)', padding: 0, display: 'flex' }}>
                 <X size={10} />
               </button>
             </div>

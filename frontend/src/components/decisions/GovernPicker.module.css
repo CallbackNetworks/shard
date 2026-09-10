@@ -11,7 +11,7 @@
   gap: 6px;
   max-width: 100%;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.12);
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
   padding: 3px 8px;
   font-size: 11px;
 }

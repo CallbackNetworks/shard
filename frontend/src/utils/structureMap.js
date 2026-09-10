@@ -83,7 +83,7 @@ export function deriveStructureMap(projects = [], identities = [], goals = [], d
       type: 'identity',
       name: identity.name,
       avatar: identity.avatar,
-      color: identity.color || '#facc15',
+      color: identity.color || 'var(--kt-hit, #f5f6f7)',
       projectCount: linked.length,
       projectIds: linked.map(project => project.id),
       shareActive: Boolean(identity.share_pin_set || identity.share_token),

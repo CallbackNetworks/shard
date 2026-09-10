@@ -60,9 +60,9 @@ const chip = (active) => ({
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 700,
-  background: active ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.04)',
+  background: active ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.076)',
   color: active ? BRAND : DARK.textMid,
-  border: `1px solid ${active ? 'rgba(250,204,21,0.32)' : 'rgba(var(--kt-ink-rgb), 0.08)'}`,
+  border: `1px solid ${active ? 'color-mix(in srgb, var(--kt-hit) 32%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.08)'}`,
   transition: 'all 0.15s',
 })
 

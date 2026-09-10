@@ -1,4 +1,4 @@
-export default function GaugeChart({ value = 0, max = 100, size = 120, color = '#facc15', label }) {
+export default function GaugeChart({ value = 0, max = 100, size = 120, color = 'var(--kt-hit, #f5f6f7)', label }) {
   const pct = max > 0 ? Math.min(value / max, 1) : 0
   const radius = (size - 16) / 2
   const circumference = Math.PI * radius

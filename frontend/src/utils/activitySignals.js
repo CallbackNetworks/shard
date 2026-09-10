@@ -1,10 +1,10 @@
 const GROUP_STYLES = {
-  task: { marker: 'task', color: '#facc15' },
+  task: { marker: 'task', color: 'var(--kt-hit, #f5f6f7)' },
   project: { marker: 'project', color: '#f3f4f6' },
-  decision: { marker: 'decision', color: '#facc15' },
-  goal: { marker: 'goal', color: '#facc15' },
-  rule: { marker: 'webhook', color: '#facc15' },
-  webhook: { marker: 'webhook', color: '#facc15' },
+  decision: { marker: 'decision', color: 'var(--kt-hit, #f5f6f7)' },
+  goal: { marker: 'goal', color: 'var(--kt-hit, #f5f6f7)' },
+  rule: { marker: 'webhook', color: 'var(--kt-hit, #f5f6f7)' },
+  webhook: { marker: 'webhook', color: 'var(--kt-hit, #f5f6f7)' },
   share: { marker: 'share', color: 'rgba(255,255,255,0.34)' },
   comment: { marker: 'comment', color: '#38bdf8' },
 }

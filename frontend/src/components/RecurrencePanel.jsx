@@ -32,7 +32,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
       paddingLeft: padLeft, paddingRight: 16,
       paddingTop: 10, paddingBottom: 12,
       borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-      background: 'rgba(var(--kt-ink-rgb), 0.02)',
+      background: 'rgba(var(--kt-ink-rgb), 0.038)',
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--kt-ink-rgb), 0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {t('recurrence.title')}
@@ -71,7 +71,7 @@ export default function RecurrencePanel({ projectId, task, depth }) {
                 await removeRecurrence(projectId, task.id)
                 qc.invalidateQueries({ queryKey: qk.project(projectId) })
               }}
-              style={{ padding: '4px 14px', border: '1px solid rgba(250,204,21,0.4)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.danger, textTransform: 'uppercase', letterSpacing: '1px' }}
+              style={{ padding: '4px 14px', border: '1px solid color-mix(in srgb, var(--kt-hit) 40%, transparent)', borderRadius: 9999, background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer', color: DARK.danger, textTransform: 'uppercase', letterSpacing: '1px' }}
             >
               {t('remove')}
             </button>

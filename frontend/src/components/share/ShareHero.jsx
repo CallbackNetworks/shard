@@ -1,5 +1,5 @@
 export default function ShareHero({ identity, summary: _summary, now, bp }) {
-  const color = identity?.color || '#facc15'
+  const color = identity?.color || 'var(--kt-hit, #f5f6f7)'
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const dateStr = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
   const isMobile = bp === 'mobile'

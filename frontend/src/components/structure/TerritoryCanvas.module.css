@@ -5,7 +5,7 @@
   overflow: auto;
   border: 1px solid var(--kt-line);
   background:
-    radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.05), transparent 34%),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--kt-hit) 5%, transparent), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.08));
 }
 
@@ -265,9 +265,9 @@
 }
 
 .pendingBadge {
-  border: 1px solid rgba(250, 204, 21, 0.38);
-  background: rgba(250, 204, 21, 0.1);
-  color: #facc15;
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 38%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
+  color: var(--kt-hit, #f5f6f7);
 }
 
 .progress {
@@ -353,7 +353,7 @@
 }
 
 .pendingChip {
-  --chip-color: #facc15;
+  --chip-color: var(--kt-hit, #f5f6f7);
 }
 
 .moreChip {

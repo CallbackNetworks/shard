@@ -311,11 +311,11 @@ function IntegrationModal({ initial, onSave, onClose }) {
             {/* Quick presets */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, marginTop: 4 }}>
               <button type="button" onClick={() => set('events', [...allEvents])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: allSelected ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: allSelected ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: allSelected ? 'color-mix(in srgb, var(--kt-hit) 15%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: allSelected ? BRAND : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.allEvents')}
               </button>
               <button type="button" onClick={() => set('events', [...CRITICAL_EVENTS])}
-                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? '#facc15' : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(var(--kt-ink-rgb), 0.12)', background: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'color-mix(in srgb, var(--kt-hit) 15%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.04)', color: JSON.stringify([...form.events].sort()) === JSON.stringify([...CRITICAL_EVENTS].sort()) ? 'var(--kt-hit, #f5f6f7)' : DARK.textMid, cursor: 'pointer', fontWeight: 600 }}>
                 {t('integrations.criticalOnly')}
               </button>
               <button type="button" onClick={() => set('events', [])}

@@ -2,19 +2,32 @@
 :root {
   /* Accent resolution: uiPrefs publishes --accent-dark/--accent-light (and
      -2 variants); the active theme picks the readable shade. */
-  --accent: var(--accent-dark, #facc15);
-  --accent-2: var(--accent-2-dark, #eab308);
-  --kt-bg: #171717;
-  --kt-bg-rgb: 23, 23, 23;
-  --kt-surface: #1f1f1f;
-  --kt-elev: #262626;
-  --kt-ink: #ffffff;
-  --kt-ink-rgb: 255, 255, 255;
-  --kt-muted: #9ca3af;
-  --kt-faint: #6b7280;
-  --kt-line: #3a3a3a;
-  --kt-hover: rgba(var(--kt-ink-rgb), 0.05);
-  --kt-hit: var(--accent, #facc15);
+  --accent: var(--accent-dark, #f5f6f7);
+  --accent-2: var(--accent-2-dark, #c8ccd1);
+  /* Elevation is one white layer at a time. The ground is the only literal
+     colour here; every surface above it is the ground plus N coats of white,
+     so nesting a panel inside a panel inside a modal reads as progressively
+     lighter without any component having to know its own depth. --kt-layer is
+     that single coat, for anything that needs to stack translucently. */
+  --kt-bg: #1d1f21;
+  --kt-bg-rgb: 29, 31, 33;
+  --kt-layer: rgba(255, 255, 255, 0.06);
+  --kt-surface: color-mix(in srgb, #ffffff 9%, var(--kt-bg));
+  --kt-elev: color-mix(in srgb, #ffffff 16%, var(--kt-bg));
+  --kt-elev-2: color-mix(in srgb, #ffffff 24%, var(--kt-bg));
+  --kt-elev-3: color-mix(in srgb, #ffffff 33%, var(--kt-bg));
+  /* Depth is not colour alone. A raised surface catches light on its top edge
+     and casts onto what is under it; without both cues four tones of grey read
+     as four unrelated fills rather than as a stack. */
+  --kt-lift-1: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --kt-lift-2: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.45);
+  --kt-ink: #e8eaec;
+  --kt-ink-rgb: 232, 234, 236;
+  --kt-muted: #a5aab0;
+  --kt-faint: #7b8087;
+  --kt-line: #4a4d52;
+  --kt-hover: rgba(var(--kt-ink-rgb), 0.06);
+  --kt-hit: var(--accent, #f5f6f7);
   /* Display font is overridable at runtime via the `displayFont` UI pref, which
      rewrites --kt-display (see utils/uiPrefs.js). This is the default. */
   --kt-display: 'Anton', 'Bebas Neue', 'Impact', 'Arial Narrow', sans-serif;
@@ -58,24 +71,97 @@
      an alias for --kt-bg: it happens to hold the same value today because the
      page ground is the far end of the same ramp, and it must keep tracking the
      fills if the ground ever moves. */
-  --kt-on-fill: #171717;
+  --kt-on-fill: #1f2124;
+
+  /* Motion has a vocabulary too, and until now it did not: 56 transitions said
+     a bare `ease` and every duration was typed at the call site, so nothing in
+     the app agreed on how fast a thing moves. Three durations, keyed to what
+     the motion is for rather than to a number:
+       --kt-dur-1  a state answering the pointer — must land before the eye asks
+       --kt-dur-2  something changing size or place under a deliberate act
+       --kt-dur-3  something arriving or leaving
+     Two curves. `--kt-ease-out` decelerates into rest, which is what a settling
+     state does. `--kt-ease-snap` overshoots slightly and is for a press
+     releasing, where the small rebound is the whole message. Neither is
+     symmetric: an ease-in-out on a 90ms hover reads as lag, because half the
+     budget is spent getting started.
+     These live only here and not in the light theme — how fast a thing moves is
+     not a colour, and duplicating them is one more pair to drift. */
+  --kt-dur-1: 90ms;
+  --kt-dur-2: 160ms;
+  --kt-dur-3: 260ms;
+  --kt-ease-out: cubic-bezier(.2, .8, .2, 1);
+  --kt-ease-snap: cubic-bezier(.34, 1.56, .64, 1);
+
+  /* How far a pressed thing travels. One number, because a button sinking 1px
+     while a row sinks 3px reads as two different apps. */
+  --kt-press: 1px;
+
+  /* ── Type scale ──────────────────────────────────────────────────────────
+     A display face carries a page through the *gap* between levels, not
+     through the size of any one of them. This app had 23 distinct font-sizes
+     and 375 of its ~450 declarations — 83% — inside a 9-13px band, so a
+     section heading and the label under it differed by a single pixel. The
+     measured result on the dashboard was two volumes and nothing between
+     them: a 46px title, 32px stat numerals, then a cliff straight to 13/12/11
+     with the whole middle of the scale empty. Anton set at 12px is not a
+     display face, it is a narrow grey label.
+
+     Six steps on a ~1.45 ratio. The ratio is the whole point — adjacent steps
+     have to be far enough apart that no reader has to compare them to work out
+     which one is the heading.
+
+     Tracking belongs to the step, not to the call site. Optical spacing runs
+     the opposite way from size: a display face set large needs to be pulled
+     *tight* or the counters float apart, and the same face set small and
+     uppercase needs to be opened up or the caps collide. One number for both
+     is wrong at both ends, and this stylesheet had that number — `0`, forced
+     with `!important` on `h1, h2, h3`, `.font-display` and `.kt-label`, i.e.
+     on precisely the three selectors that make up the typographic system. It
+     arrived in a commit about floating-panel positioning, bundled in beside
+     the `border-radius: 0` reset: the square-corners reflex reaching one
+     property further than it meant to, never a decision about type. */
+  --kt-t-hero: clamp(56px, 7vw, 104px);
+  --kt-t-display: clamp(34px, 3.4vw, 52px);
+  --kt-t-head: 30px;
+  --kt-t-sub: 20px;
+  --kt-t-body: 13px;
+  --kt-t-label: 11px;
+  --kt-t-micro: 10px;
+
+  --kt-tr-hero: -0.035em;
+  --kt-tr-display: -0.025em;
+  --kt-tr-head: -0.015em;
+  --kt-tr-sub: -0.005em;
+  --kt-tr-body: 0;
+  --kt-tr-label: 0.12em;
+  --kt-tr-micro: 0.16em;
 }
 /* Light mode palette: must come after :root so equal-specificity override wins.
-   --kt-hit falls back to a dark amber because #facc15 is illegible on white. */
+   --kt-hit falls back to a dark amber because var(--kt-hit, #f5f6f7) is illegible on white. */
 [data-theme="light"] {
-  --accent: var(--accent-light, #a16207);
-  --accent-2: var(--accent-2-light, #854d0e);
+  --accent: var(--accent-light, #3a3e43);
+  --accent-2: var(--accent-2-light, #22262a);
+  /* The same ramp, run the other way: the ground is already white, so a layer
+     is a coat of ink instead of a coat of white. */
   --kt-bg: #ffffff;
   --kt-bg-rgb: 255, 255, 255;
-  --kt-surface: #fafafa;
-  --kt-elev: #f3f4f6;
-  --kt-ink: #111111;
-  --kt-ink-rgb: 17, 17, 17;
-  --kt-muted: #4b5563;
-  --kt-faint: #6b7280;
-  --kt-line: #e5e7eb;
+  --kt-layer: rgba(27, 29, 32, 0.05);
+  --kt-surface: color-mix(in srgb, #1b1d20 5%, var(--kt-bg));
+  --kt-elev: color-mix(in srgb, #1b1d20 10%, var(--kt-bg));
+  --kt-elev-2: color-mix(in srgb, #1b1d20 15%, var(--kt-bg));
+  --kt-elev-3: color-mix(in srgb, #1b1d20 21%, var(--kt-bg));
+  /* Light comes from the same place in both themes; on white the highlight is
+     the paper itself, so only the cast shadow does the work. */
+  --kt-lift-1: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(27, 29, 32, 0.10);
+  --kt-lift-2: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 6px 18px rgba(27, 29, 32, 0.14);
+  --kt-ink: #1b1d20;
+  --kt-ink-rgb: 27, 29, 32;
+  --kt-muted: #4b5158;
+  --kt-faint: #71777e;
+  --kt-line: #d9dcdf;
   --kt-hover: rgba(0, 0, 0, 0.05);
-  --kt-hit: var(--accent, #a16207);
+  --kt-hit: var(--accent, #3a3e43);
   /* The dark-tuned status hues score 1.5–2.7:1 on white — below even the 3:1
      non-text floor. These are the same semantics at AA on #ffffff. */
   --kt-status-todo: #4b5563;
@@ -125,23 +211,23 @@ body::before {
   opacity: 0.06;
   mix-blend-mode: multiply;
 }
-::selection { background: rgba(250,204,21,0.32); color: #ffffff; }
+::selection { background: rgba(var(--kt-ink-rgb), 0.22); color: var(--kt-ink); }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #374151; border-radius: 0; }
+::-webkit-scrollbar-thumb { background: #55595e; border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
 /* Light mode scrollbar */
-[data-theme="light"] ::-webkit-scrollbar-thumb { background: #d1d5db; }
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-[data-theme="light"] ::selection { background: rgba(250,204,21,0.38); color: #000000; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #cdd1d5; }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #9aa0a7; }
+[data-theme="light"] ::selection { background: rgba(var(--kt-ink-rgb), 0.14); color: var(--kt-ink); }
 input, select, button, textarea { font-family: inherit; }
 /* The amber-bordered strip that opens under a project header: agent
    instructions and the CI/CD block are two of them, so the shell is shared
    rather than declared once per panel. */
 .kt-inline-panel {
-  background: rgba(250,204,21,0.06);
-  border: 1px solid rgba(250,204,21,0.2);
+  background: color-mix(in srgb, var(--kt-hit) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 20%, transparent);
   border-radius: 0;
   padding: 16px;
   margin-bottom: 16px;
@@ -172,30 +258,73 @@ button, input, select, textarea, kbd, code, pre, .badge, .panel, .card-hover, [r
   border-color: var(--kt-line) !important;
 }
 [style*="rgba(250,204,21"] {
-  background-color: rgba(250,204,21,0.12) !important;
-  border-color: rgba(250,204,21,0.28) !important;
+  background-color: color-mix(in srgb, var(--kt-hit) 12%, transparent) !important;
+  border-color: color-mix(in srgb, var(--kt-hit) 28%, transparent) !important;
 }
 [style*="#ef4444"], [style*="#dc2626"], [style*="#f87171"], [style*="#ff5533"],
-[style*="rgb(239, 68, 68)"], [style*="rgb(248, 113, 113)"], [style*="#eab308"] {
+[style*="rgb(239, 68, 68)"], [style*="rgb(248, 113, 113)"], [style*="var(--accent-2, #c8ccd1)"] {
   color: var(--kt-hit) !important;
-  border-color: rgba(250,204,21,0.36) !important;
+  border-color: color-mix(in srgb, var(--kt-hit) 36%, transparent) !important;
 }
 [style*="rgba(243,114,127"], [style*="rgba(248,113,113"] {
-  background-color: rgba(250,204,21,0.12) !important;
-  border-color: rgba(250,204,21,0.32) !important;
+  background-color: color-mix(in srgb, var(--kt-hit) 12%, transparent) !important;
+  border-color: color-mix(in srgb, var(--kt-hit) 32%, transparent) !important;
   color: var(--kt-hit) !important;
 }
-button[style*="#facc15"], button[style*="rgb(250, 204, 21)"],
-[role="button"][style*="#facc15"], [role="button"][style*="rgb(250, 204, 21)"] {
+button[style*="var(--kt-hit, #f5f6f7)"], button[style*="rgb(250, 204, 21)"],
+[role="button"][style*="var(--kt-hit, #f5f6f7)"], [role="button"][style*="rgb(250, 204, 21)"] {
   color: var(--kt-bg) !important;
 }
 button {
   position: relative;
   overflow: hidden;
-  transition: transform 0.14s ease, background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  transition: transform var(--kt-dur-1) var(--kt-ease-out),
+              background var(--kt-dur-1) var(--kt-ease-out),
+              color var(--kt-dur-1) var(--kt-ease-out),
+              border-color var(--kt-dur-1) var(--kt-ease-out);
 }
+/* Hover raises, press sinks. The pair is the point: a lift with no matching
+   press is a button that acknowledges being *approached* and not being *used*,
+   which is what every control in this app did — one `:active` rule existed in
+   the whole codebase and it set a cursor. The travel is vertical because a
+   control that slides sideways moves out from under the pointer aiming at it;
+   the old `translateX(2px) skewX(-1deg)` did exactly that. */
 button:hover {
-  transform: translateX(2px) scale(1.018) skewX(-1deg);
+  transform: translateY(calc(var(--kt-press) * -1));
+}
+button:active {
+  transform: translateY(var(--kt-press));
+  transition-duration: 0s;
+}
+button:disabled:hover,
+button:disabled:active,
+button[aria-disabled="true"]:hover,
+button[aria-disabled="true"]:active {
+  transform: none;
+}
+
+/* The other three families that get clicked. `button:active` above reaches only
+   real <button>s: the rail's rows are anchors, the card surfaces are divs, and
+   an icon control is often `[role="button"]` — so pressing any of them did
+   nothing visible. Same token, same direction, so the whole app sinks by the
+   same amount under a finger.
+   `transition-duration: 0s` on the press is deliberate: the sink must be on
+   screen within the frame the pointer went down, or it reads as the app
+   lagging rather than as the app answering. The *release* keeps the eased
+   duration, which is where --kt-ease-snap's small rebound lands. */
+[role="button"]:not([aria-disabled="true"]):active,
+a.kt-mini-nav-button:active,
+.kt-card:active,
+.card-hover:active {
+  transform: translateY(var(--kt-press));
+  transition-duration: 0s;
+}
+[role="button"],
+a.kt-mini-nav-button {
+  transition: transform var(--kt-dur-2) var(--kt-ease-snap),
+              background var(--kt-dur-1) var(--kt-ease-out),
+              color var(--kt-dur-1) var(--kt-ease-out),
+              border-color var(--kt-dur-1) var(--kt-ease-out);
 }
 button::after {
   content: '';
@@ -215,9 +344,12 @@ h1, h2, h3, .font-display {
   font-family: var(--kt-display);
   font-weight: 400;
   font-synthesis-weight: none;
-  letter-spacing: 0 !important;
   text-transform: uppercase;
+  letter-spacing: var(--kt-tr-display);
 }
+h1 { font-size: var(--kt-t-display); letter-spacing: var(--kt-tr-display); }
+h2 { font-size: var(--kt-t-head); letter-spacing: var(--kt-tr-head); }
+h3 { font-size: var(--kt-t-sub); letter-spacing: var(--kt-tr-sub); }
 h1 {
   position: relative;
   isolation: isolate;
@@ -240,65 +372,13 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(500%); }
 }
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-@keyframes kineticFloatWord {
-  0%, 100% { transform: translateY(0) skewX(0); }
-  50% { transform: translateY(-10px) skewX(-1deg); }
-}
 @keyframes kineticTickerPulse {
   0%, 100% { transform: scaleX(1); opacity: 1; }
   50% { transform: scaleX(1.04); opacity: 0.78; }
 }
-@keyframes kineticSlidePunch {
-  0% { transform: translateX(-14px); opacity: 0.72; }
-  45% { transform: translateX(3px) skewX(-6deg); opacity: 1; }
-  100% { transform: translateX(0) skewX(0); opacity: 1; }
-}
-@keyframes kineticRotateTap {
-  0%, 100% { transform: translateX(0) scale(1); }
-  42% { transform: translateX(3px) scale(1.018); }
-  68% { transform: translateX(1px) scale(1.01); }
-}
-@keyframes kineticExpandPulse {
-  0%, 100% { transform: scaleX(1); }
-  45% { transform: scaleX(1.035); }
-}
-@keyframes kineticFadeBeat {
-  0%, 100% { opacity: 1; }
-  45% { opacity: 0.62; }
-}
-@keyframes kineticMarqueeHit {
-  0%, 100% { color: var(--kt-hit); background-position: 0 0; }
-  50% { color: #ffffff; background-position: 100% 0; }
-}
-@keyframes alertStripPunch {
-  0%, 100% { background-position: 0 0; }
-  50% { background-position: 100% 0; }
-}
-@keyframes slideMarquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-@keyframes letterPop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.12); }
-  100% { transform: scale(1); }
-}
 @keyframes skewReveal {
   from { opacity: 0; transform: skewX(-8deg) translateX(-20px); }
   to { opacity: 1; transform: skewX(0) translateX(0); }
-}
-@keyframes expandTracking {
-  from { transform: translateX(-10px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-@keyframes pulseRing {
-  0%   { box-shadow: 0 0 0 0 rgba(250,204,21,0.4); }
-  70%  { box-shadow: 0 0 0 8px rgba(250,204,21,0); }
-  100% { box-shadow: 0 0 0 0 rgba(250,204,21,0); }
 }
 @keyframes kineticCutIn {
   0% { opacity: 0; transform: translateX(-18px) skewX(-7deg); clip-path: inset(0 100% 0 0); }
@@ -323,11 +403,11 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 @keyframes kineticFlicker {
   0%, 100% { opacity: 1; text-shadow: none; }
-  8% { opacity: 0.72; text-shadow: 2px 0 0 rgba(250,204,21,0.28); }
+  8% { opacity: 0.72; text-shadow: 2px 0 0 color-mix(in srgb, var(--kt-hit) 28%, transparent); }
   9% { opacity: 1; text-shadow: none; }
   38% { opacity: 0.86; }
   39% { opacity: 1; }
-  74% { opacity: 0.78; text-shadow: -2px 0 0 rgba(250,204,21,0.2); }
+  74% { opacity: 0.78; text-shadow: -2px 0 0 color-mix(in srgb, var(--kt-hit) 20%, transparent); }
   76% { opacity: 1; text-shadow: none; }
 }
 @keyframes kineticScan {
@@ -379,15 +459,10 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   from { opacity: 0; transform: translateX(-14px); clip-path: inset(0 100% 0 0); }
   to { opacity: 1; transform: translateX(0); clip-path: inset(0 0 0 0); }
 }
-@keyframes toastImpact {
-  0% { opacity: 0; transform: translateX(18px) scaleY(0.75); clip-path: inset(0 0 100% 0); }
-  72% { opacity: 1; transform: translateX(-2px) scaleY(1.05); clip-path: inset(0 0 0 0); }
-  100% { opacity: 1; transform: translateX(0) scaleY(1); clip-path: inset(0 0 0 0); }
-}
 @keyframes commandGlitch {
   0%, 100% { transform: translateX(0); filter: none; }
-  18% { transform: translateX(-2px); filter: drop-shadow(2px 0 0 rgba(250,204,21,0.32)); }
-  32% { transform: translateX(2px); filter: drop-shadow(-2px 0 0 rgba(250,204,21,0.24)); }
+  18% { transform: translateX(-2px); filter: drop-shadow(2px 0 0 color-mix(in srgb, var(--kt-hit) 32%, transparent)); }
+  32% { transform: translateX(2px); filter: drop-shadow(-2px 0 0 color-mix(in srgb, var(--kt-hit) 24%, transparent)); }
   46% { transform: translateX(0); filter: none; }
 }
 @keyframes progressScan {
@@ -400,31 +475,15 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 
 /* Share page animations */
-@keyframes shareReveal {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes statPulse {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.08); }
-}
-@keyframes barShimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
 @keyframes slideInLeft {
   from { opacity: 0; transform: translateX(-16px); }
   to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes refreshPulse {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50%      { opacity: 1; transform: scale(1.4); }
 }
 
 .kt-share-page {
   min-height: 100vh;
   background:
-    linear-gradient(90deg, rgba(250,204,21,0.045) 0 1px, transparent 1px 100%),
+    linear-gradient(90deg, color-mix(in srgb, var(--kt-hit) 4%, transparent) 0 1px, transparent 1px 100%),
     linear-gradient(180deg, rgba(var(--kt-ink-rgb), 0.028) 0 1px, transparent 1px 100%),
     var(--kt-bg);
   background-size: 72px 72px, 72px 72px, auto;
@@ -443,9 +502,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   align-items: center;
   overflow: hidden;
   padding-left: 18px;
-  border-bottom: 1px solid rgba(250,204,21,0.18);
+  border-bottom: 1px solid color-mix(in srgb, var(--kt-hit) 18%, transparent);
   background: rgba(var(--kt-bg-rgb), 0.96);
-  color: rgba(250,204,21,0.55);
+  color: color-mix(in srgb, var(--kt-hit) 55%, transparent);
   font-family: var(--kt-display);
   font-size: 18px;
   line-height: 1;
@@ -474,7 +533,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   border: 1px solid var(--kt-line);
   border-left: 4px solid var(--share-accent, var(--kt-hit));
   background:
-    linear-gradient(90deg, rgba(250,204,21,0.075), transparent 34%),
+    linear-gradient(90deg, color-mix(in srgb, var(--kt-hit) 8%, transparent), transparent 34%),
     rgba(31,31,31,0.94);
   box-shadow: 8px 8px 0 rgba(0,0,0,0.22);
 }
@@ -509,7 +568,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(250,204,21,0.1), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kt-hit) 10%, transparent), transparent);
   transform: translateX(-110%);
   pointer-events: none;
 }
@@ -531,7 +590,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   height: 64px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(250,204,21,0.4);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 40%, transparent);
   background: var(--share-accent, var(--kt-hit));
   color: var(--kt-bg);
   font-family: var(--kt-display);
@@ -579,8 +638,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-share-badge {
   padding: 4px 9px;
-  border: 1px solid rgba(250,204,21,0.35);
-  background: rgba(250,204,21,0.1);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 35%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
   color: var(--kt-hit);
   font-size: 10px;
   font-weight: 900;
@@ -659,12 +718,12 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-share-nav.is-stuck {
   background: rgba(var(--kt-bg-rgb), 0.96);
-  border-color: rgba(250,204,21,0.28);
+  border-color: color-mix(in srgb, var(--kt-hit) 28%, transparent);
 }
 .kt-share-nav button {
   min-height: 32px;
   border: 1px solid transparent;
-  background: rgba(var(--kt-ink-rgb), 0.025);
+  background: rgba(var(--kt-ink-rgb), 0.048);
   color: var(--kt-muted);
   cursor: pointer;
   font-size: 10px;
@@ -672,8 +731,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   text-transform: uppercase;
 }
 .kt-share-nav button.is-active {
-  border-color: rgba(250,204,21,0.42);
-  background: rgba(250,204,21,0.14);
+  border-color: color-mix(in srgb, var(--kt-hit) 42%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 14%, transparent);
   color: #ffffff;
 }
 .kt-share-project {
@@ -795,16 +854,16 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   padding: 7px 16px;
   border-left: 2px solid color-mix(in srgb, var(--task-color, var(--kt-hit)) 35%, transparent);
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.035);
-  background: rgba(var(--kt-ink-rgb), 0.012);
+  background: rgba(var(--kt-ink-rgb), 0.023);
 }
 .kt-share-task-row.is-alt {
-  background: rgba(var(--kt-ink-rgb), 0.022);
+  background: rgba(var(--kt-ink-rgb), 0.042);
 }
 .kt-share-task-row.is-expandable {
   cursor: pointer;
 }
 .kt-share-task-row:hover {
-  background: rgba(250,204,21,0.055);
+  background: color-mix(in srgb, var(--kt-hit) 6%, transparent);
 }
 .kt-share-task-main {
   display: flex;
@@ -860,7 +919,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   padding: 10px 18px 12px 38px;
   border-left: 2px solid color-mix(in srgb, var(--task-color, var(--kt-hit)) 45%, transparent);
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.04);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
 }
 .kt-share-task-description {
   margin-bottom: 8px;
@@ -932,13 +991,13 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   padding: 10px 18px 14px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.06);
   border-top: none;
-  background: rgba(var(--kt-ink-rgb), 0.018);
+  background: rgba(var(--kt-ink-rgb), 0.034);
 }
 .kt-share-note {
   margin-bottom: 4px;
   padding: 6px 8px;
   border-left: 2px solid rgba(var(--kt-ink-rgb), 0.12);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
 }
 .kt-share-note.is-guest {
   border-left-color: color-mix(in srgb, var(--share-accent, #818cf8) 55%, transparent);
@@ -979,7 +1038,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-width: 0;
   padding: 5px 8px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
   color: rgba(var(--kt-ink-rgb), 0.75);
   font-size: 12px;
 }
@@ -993,7 +1052,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-share-note-form button {
   padding: 5px 12px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
   color: rgba(var(--kt-ink-rgb), 0.6);
   cursor: pointer;
   font-size: 10px;
@@ -1021,7 +1080,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   max-width: 80%;
   padding: 8px 10px;
   border-left: 2px solid rgba(var(--kt-ink-rgb), 0.12);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
   color: rgba(var(--kt-ink-rgb), 0.65);
   font-size: 12px;
   line-height: 1.5;
@@ -1032,7 +1091,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   align-self: flex-end;
   border-left: none;
   border-right: 2px solid color-mix(in srgb, var(--share-accent, #818cf8) 55%, transparent);
-  background: rgba(var(--kt-ink-rgb), 0.04);
+  background: rgba(var(--kt-ink-rgb), 0.076);
   color: rgba(var(--kt-ink-rgb), 0.8);
 }
 .kt-share-chat-msg.is-pending {
@@ -1048,14 +1107,14 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-width: 0;
   padding: 5px 8px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
   color: rgba(var(--kt-ink-rgb), 0.75);
   font-size: 12px;
 }
 .kt-share-chat-form button {
   padding: 5px 12px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
   color: rgba(var(--kt-ink-rgb), 0.6);
   cursor: pointer;
   font-size: 10px;
@@ -1070,7 +1129,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-height: 32px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.06);
   border-top: none;
-  background: rgba(var(--kt-ink-rgb), 0.018);
+  background: rgba(var(--kt-ink-rgb), 0.034);
   color: var(--kt-muted);
   cursor: pointer;
   font-size: 10px;
@@ -1196,7 +1255,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   width: 100%;
   padding: 12px 16px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.14);
-  background: rgba(var(--kt-ink-rgb), 0.045);
+  background: rgba(var(--kt-ink-rgb), 0.085);
   color: #ffffff;
   outline: none;
   font-size: 18px;
@@ -1205,7 +1264,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   letter-spacing: 0.26em !important;
 }
 .kt-share-pin-input:focus {
-  border-color: rgba(250,204,21,0.5);
+  border-color: color-mix(in srgb, var(--kt-hit) 50%, transparent);
 }
 .kt-share-pin-input.is-error {
   border-color: var(--kt-hit);
@@ -1308,7 +1367,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   transition: background 0.12s, color 0.12s;
 }
 .sb-link:hover {
-  background: rgba(var(--kt-ink-rgb), 0.05) !important;
+  background: rgba(var(--kt-ink-rgb), 0.095) !important;
   color: #ffffff !important;
 }
 .kt-sidebar {
@@ -1332,7 +1391,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   padding: 10px 8px;
   border-right: 1px solid var(--kt-line);
   background:
-    linear-gradient(180deg, rgba(250,204,21,0.06), transparent 16%, rgba(var(--kt-ink-rgb), 0.02)),
+    linear-gradient(180deg, color-mix(in srgb, var(--kt-hit) 6%, transparent), transparent 16%, rgba(var(--kt-ink-rgb), 0.02)),
     var(--kt-bg);
   overflow: hidden;
   user-select: none;
@@ -1432,7 +1491,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-mini-nav-button.is-active {
   color: var(--kt-ink);
-  background: rgba(250,204,21,0.1);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
 }
 .kt-mini-nav-button.is-active .kt-rail-ico {
   color: var(--kt-hit);
@@ -1507,7 +1566,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   font-weight: 400;
   line-height: 1;
   color: var(--kt-muted);
-  background: rgba(var(--kt-ink-rgb), 0.045);
+  background: rgba(var(--kt-ink-rgb), 0.085);
   border: 1px solid var(--kt-line);
   transition: color 0.14s ease, background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
@@ -1569,7 +1628,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 10px;
   padding: 14px;
-  border-right: 1px solid rgba(250,204,21,0.32);
+  border-right: 1px solid color-mix(in srgb, var(--kt-hit) 32%, transparent);
   background: rgba(var(--kt-bg-rgb), 0.98);
   box-shadow: 10px 0 0 rgba(0,0,0,0.24);
   transform: translateX(-104%);
@@ -1630,7 +1689,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   padding: 0 9px;
   border-left: 2px solid transparent;
   color: var(--kt-muted);
-  background: rgba(var(--kt-ink-rgb), 0.025);
+  background: rgba(var(--kt-ink-rgb), 0.048);
   text-decoration: none;
   font-size: 11px;
   font-weight: 800;
@@ -1643,7 +1702,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-mini-drawer-project.is-active {
   color: #ffffff;
   border-left-color: var(--kt-hit);
-  background: rgba(250,204,21,0.1);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
 }
 .kt-mini-drawer-project i {
   width: 7px;
@@ -1734,7 +1793,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(250,204,21,0.12), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kt-hit) 12%, transparent), transparent);
   transform: translateX(-115%);
   pointer-events: none;
 }
@@ -1748,7 +1807,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-sidebar-link.is-active {
   color: #ffffff !important;
   background:
-    linear-gradient(90deg, rgba(250,204,21,0.18), rgba(var(--kt-ink-rgb), 0.035)) !important;
+    linear-gradient(90deg, color-mix(in srgb, var(--kt-hit) 18%, transparent), rgba(var(--kt-ink-rgb), 0.035)) !important;
 }
 .kt-sidebar-link.is-active .kt-sidebar-link-index {
   color: var(--kt-bg);
@@ -1785,7 +1844,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   gap: 7px;
   padding: 7px 8px;
   border: 1px solid var(--kt-line);
-  background: rgba(250,204,21,0.06);
+  background: color-mix(in srgb, var(--kt-hit) 6%, transparent);
 }
 .kt-sidebar-ops span {
   width: 7px;
@@ -1823,9 +1882,16 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   transition: opacity 0.15s;
 }
 .btn-primary:hover { opacity: 0.9; }
+/* Was `animation: kineticExpandPulse … both`. An animation on :hover plays once
+   and then *sits on its fill*, so the button's settled hover appearance was a
+   frame from a keyframe list, and under reduced motion (duration 0.001ms) it
+   jumped straight to that frame with no motion at all. The fill also left a
+   transform on the element, which makes it the containing block for any
+   `position: fixed` child — ADR-0129/ADR-0122 chased that exact mechanism twice
+   through popovers without anyone checking the buttons. */
 .btn-primary:hover,
 .kt-btn-primary:hover {
-  animation: kineticExpandPulse 0.28s ease both;
+  filter: brightness(1.06);
 }
 
 .btn-ghost {
@@ -1841,13 +1907,17 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   transition: background 0.15s, color 0.15s;
 }
 .btn-ghost:hover { background: #ffffff; color: #000000; }
+/* Was `animation: kineticSlidePunch …`, whose 0% frame is `translateX(-14px)`:
+   every secondary button in the app jumped 14px left and slid back when the
+   pointer arrived. That is not feedback, it is the button leaving the cursor. */
 .btn-ghost:hover,
 .kt-btn:hover {
-  animation: kineticSlidePunch 0.24s cubic-bezier(.2,.8,.2,1) both;
+  border-color: var(--kt-hit);
+  color: var(--kt-hit);
 }
 
 .btn-sm {
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
   color: #ffffff;
   border: 1px solid var(--kt-line);
   border-radius: 0;
@@ -1903,7 +1973,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   font-family: var(--kt-display);
   font-weight: 400;
   font-synthesis-weight: none;
-  letter-spacing: 0 !important;
+  letter-spacing: var(--kt-tr-display);
 }
 .layout-main {
   position: relative;
@@ -1940,7 +2010,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   display: block;
   height: 1px;
   z-index: 60;
-  background: linear-gradient(90deg, transparent, rgba(250,204,21,0.85), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kt-hit) 85%, transparent), transparent);
   animation: kineticBlink 4.8s steps(1, end) infinite;
   pointer-events: none;
 }
@@ -1981,7 +2051,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--kt-line);
-  background: rgba(var(--kt-ink-rgb), 0.035);
+  background: rgba(var(--kt-ink-rgb), 0.067);
   color: var(--kt-hit);
 }
 .kt-map-search input {
@@ -2003,7 +2073,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-map-inspector button {
   min-height: 34px;
   border: 1px solid var(--kt-line);
-  background: rgba(var(--kt-ink-rgb), 0.035);
+  background: rgba(var(--kt-ink-rgb), 0.067);
   color: #a3a3a3;
   font-size: 11px;
   font-weight: 900;
@@ -2017,7 +2087,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   display: inline-flex;
   gap: 0;
   border: 1px solid var(--kt-line);
-  background: rgba(var(--kt-ink-rgb), 0.025);
+  background: rgba(var(--kt-ink-rgb), 0.048);
 }
 /* The segment carries its own padding and active state. It used to inherit both from
    `.kt-map-toolbar button`, so the first time it was mounted anywhere else (the decisions
@@ -2045,13 +2115,13 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   color: var(--kt-ink);
 }
 .kt-map-segment button.is-active {
-  background: rgba(250,204,21,0.1);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
   color: var(--kt-hit);
 }
 .kt-map-toolbar button.is-active,
 .kt-map-inspector button:hover {
-  border-color: rgba(250,204,21,0.45);
-  background: rgba(250,204,21,0.1);
+  border-color: color-mix(in srgb, var(--kt-hit) 45%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
   color: var(--kt-hit);
 }
 .kt-map-stats {
@@ -2062,7 +2132,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 }
 .kt-map-stat {
   border: 1px solid color-mix(in srgb, var(--map-color) 32%, var(--kt-line));
-  background: rgba(var(--kt-ink-rgb), 0.028);
+  background: rgba(var(--kt-ink-rgb), 0.053);
   padding: 9px 10px;
 }
 .kt-map-stat span {
@@ -2092,7 +2162,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-height: 26px;
   padding: 0 8px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
-  background: rgba(var(--kt-ink-rgb), 0.024);
+  background: rgba(var(--kt-ink-rgb), 0.046);
   color: #8b8b8b;
   font-size: 10px;
   font-weight: 900;
@@ -2117,8 +2187,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   align-items: center;
   margin-bottom: 12px;
   padding: 9px 10px;
-  border: 1px solid rgba(250,204,21,0.28);
-  background: rgba(250,204,21,0.07);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 28%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 7%, transparent);
 }
 .kt-map-notice strong {
   color: var(--kt-hit);
@@ -2147,7 +2217,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   overflow: auto;
   padding: 9px;
   border: 1px solid var(--kt-line);
-  background: linear-gradient(90deg, rgba(250,204,21,0.08), rgba(var(--kt-ink-rgb), 0.02));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--kt-hit) 8%, transparent), rgba(var(--kt-ink-rgb), 0.038));
 }
 .kt-map-lane-node {
   flex: 0 0 210px;
@@ -2184,7 +2254,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-height: 520px;
   border: 1px solid var(--kt-line);
   background:
-    radial-gradient(circle at 50% 50%, rgba(250,204,21,0.08), transparent 28%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--kt-hit) 8%, transparent), transparent 28%),
     linear-gradient(rgba(var(--kt-ink-rgb), 0.028) 1px, transparent 1px),
     linear-gradient(90deg, rgba(var(--kt-ink-rgb), 0.028) 1px, transparent 1px),
     linear-gradient(180deg, rgba(var(--kt-ink-rgb), 0.03), rgba(0,0,0,0.08));
@@ -2199,7 +2269,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   cursor: grabbing;
 }
 .kt-map-graph:focus-visible {
-  outline: 2px solid rgba(250,204,21,0.62);
+  outline: 2px solid color-mix(in srgb, var(--kt-hit) 62%, transparent);
   outline-offset: 3px;
 }
 .kt-map-controls {
@@ -2219,8 +2289,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   backdrop-filter: blur(10px);
 }
 .kt-map-controls button:hover {
-  border-color: rgba(250,204,21,0.5);
-  background: rgba(250,204,21,0.12);
+  border-color: color-mix(in srgb, var(--kt-hit) 50%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
 }
 .kt-map-canvas {
   position: absolute;
@@ -2248,7 +2318,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-map-links path {
   opacity: 0.72;
   stroke-dasharray: var(--kt-map-dash, none);
-  filter: drop-shadow(0 0 7px rgba(250,204,21,0.06));
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--kt-hit) 6%, transparent));
   animation: kineticMapLinkIn 0.56s ease both;
   transition: opacity 0.16s ease, stroke-width 0.16s ease;
 }
@@ -2409,7 +2479,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   z-index: 2;
   width: min(360px, calc(100vw - 64px));
   padding: 18px;
-  border: 1px solid rgba(250,204,21,0.34);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 34%, transparent);
   background: rgba(var(--kt-bg-rgb), 0.92);
   color: #f5f5f5;
   text-align: center;
@@ -2436,8 +2506,8 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .kt-map-empty button {
   min-height: 32px;
   margin-top: 12px;
-  border: 1px solid rgba(250,204,21,0.4);
-  background: rgba(250,204,21,0.1);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 40%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
   color: var(--kt-hit);
   cursor: pointer;
   font-size: 11px;
@@ -2486,7 +2556,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   min-width: 0;
   padding: 8px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
-  background: rgba(var(--kt-ink-rgb), 0.035);
+  background: rgba(var(--kt-ink-rgb), 0.067);
 }
 .kt-map-inspector-metrics b {
   display: block;
@@ -2513,7 +2583,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   gap: 6px;
   padding: 9px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
-  background: rgba(var(--kt-ink-rgb), 0.026);
+  background: rgba(var(--kt-ink-rgb), 0.049);
 }
 .kt-map-dependencies strong {
   color: var(--kt-hit);
@@ -2544,13 +2614,13 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   margin-top: 8px;
 }
 .kt-map-inspector button.kt-map-open {
-  border-color: rgba(129,140,248,0.5);
-  background: rgba(129,140,248,0.12);
+  border-color: color-mix(in srgb, var(--kt-hit) 50%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
   color: #c7d2fe;
 }
 .kt-map-inspector button.kt-map-open:hover {
-  border-color: rgba(129,140,248,0.85);
-  background: rgba(129,140,248,0.2);
+  border-color: color-mix(in srgb, var(--kt-hit) 85%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 20%, transparent);
   color: #e0e7ff;
 }
 .kt-alert-strip {
@@ -2784,7 +2854,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   flex: 1 1 auto;
   min-width: 24px;
   height: 8px;
-  background: linear-gradient(90deg, hsl(42, 50%, 20%), hsl(42, 75%, 46%), hsl(42, 100%, 72%));
+  background: linear-gradient(90deg, hsl(220, 5%, 24%), hsl(220, 4%, 52%), hsl(220, 3%, 94%));
 }
 .kt-heatscale span {
   white-space: nowrap;
@@ -2834,7 +2904,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   font-size: 10px;
   font-weight: 600;
   padding: 2px 7px 2px 6px;
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
   color: var(--kt-muted);
   white-space: nowrap;
@@ -2893,7 +2963,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   left: 0;
   margin-bottom: 6px;
   width: 260px;
-  background: var(--kt-elev);
+  background: var(--kt-elev-2);
   border: 1px solid var(--kt-line);
   box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
   padding: 10px;
@@ -2913,7 +2983,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   padding: 4px 0;
   text-align: center;
   border: 1px solid transparent;
-  background: rgba(var(--kt-ink-rgb), 0.04);
+  background: rgba(var(--kt-ink-rgb), 0.076);
   color: var(--kt-faint);
   cursor: pointer;
 }
@@ -3008,7 +3078,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(250,204,21,0.14), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kt-hit) 14%, transparent), transparent);
   transform: translateX(-110%);
   pointer-events: none;
 }
@@ -3022,12 +3092,15 @@ h1 {
   animation-timing-function: cubic-bezier(.2,.8,.2,1), steps(1, end);
   animation-iteration-count: 1, infinite;
 }
+/* The bottom of the scale is where tracking earns the most: 10px uppercase at
+   weight 800 with no spacing is a solid bar of caps, which is why every label
+   on the page read as texture rather than as a word. */
 .kt-label {
   color: var(--kt-faint);
-  font-size: 10px;
+  font-size: var(--kt-t-label);
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0 !important;
+  letter-spacing: var(--kt-tr-label);
 }
 .kt-page {
   max-width: 1120px;
@@ -3117,7 +3190,7 @@ h1 {
 .kt-panel {
   background: var(--kt-surface);
   border: 1px solid var(--kt-line);
-  box-shadow: none;
+  box-shadow: var(--kt-lift-1);
   position: relative;
 }
 /* Hover is a state change, not a stunt. A card used to pick its hover behaviour from
@@ -3134,14 +3207,19 @@ h1 {
 .kt-card {
   background: var(--kt-surface);
   border: 1px solid var(--kt-line);
+  box-shadow: var(--kt-lift-1);
   padding: 16px;
   position: relative;
   overflow: hidden;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--kt-dur-2) var(--kt-ease-out),
+              background var(--kt-dur-2) var(--kt-ease-out),
+              box-shadow var(--kt-dur-2) var(--kt-ease-out),
+              transform var(--kt-dur-2) var(--kt-ease-snap);
 }
 .kt-card:hover {
   border-color: var(--kt-hit);
   background: var(--kt-elev);
+  box-shadow: var(--kt-lift-2);
 }
 .kt-card:hover .kt-card-title,
 .kt-card:hover [class*="cardName"],
@@ -3159,8 +3237,11 @@ h1 {
   background: rgba(10,10,10,0.72);
 }
 .kt-modal {
-  background: var(--kt-surface);
+  /* A modal floats two coats above the ground, and the fields inside it one
+     more, so depth reads as lightness as well as as a shadow. */
+  background: var(--kt-elev-2);
   border: 1px solid var(--kt-line);
+  box-shadow: var(--kt-lift-2);
   padding: 24px;
   width: 520px;
   max-width: 95vw;
@@ -3196,6 +3277,15 @@ h1 {
   width: 100%;
   box-sizing: border-box;
   background: var(--kt-elev);
+  border: 1px solid var(--kt-line);
+  color: var(--kt-ink);
+  outline: none;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.kt-modal .kt-input,
+.kt-modal .kt-select {
+  background: var(--kt-elev-3);
   border: 1px solid var(--kt-line);
   color: var(--kt-ink);
   outline: none;
@@ -3242,8 +3332,8 @@ h1 {
   color: var(--kt-status-failed);
 }
 .kt-btn-accept {
-  background: rgba(250,204,21,0.12);
-  border-color: rgba(250,204,21,0.32);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
+  border-color: color-mix(in srgb, var(--kt-hit) 32%, transparent);
   color: var(--kt-hit);
 }
 .kt-icon-btn {
@@ -3268,7 +3358,7 @@ h1 {
   font-weight: 700;
 }
 .kt-badge-accent {
-  background: rgba(250,204,21,0.14);
+  background: color-mix(in srgb, var(--kt-hit) 14%, transparent);
   color: var(--kt-hit);
 }
 .kt-empty {
@@ -3317,7 +3407,7 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(250,204,21,0.12);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
   color: var(--kt-hit);
   font-size: 10px;
   padding: 1px 6px;
@@ -3397,12 +3487,12 @@ h1 {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(250,204,21,0.12), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kt-hit) 12%, transparent), transparent);
   transform: translateX(-115%);
   pointer-events: none;
 }
 .kt-assistant-conversation:hover {
-  background: rgba(var(--kt-ink-rgb), 0.04) !important;
+  background: rgba(var(--kt-ink-rgb), 0.076) !important;
 }
 .kt-assistant-conversation:hover::after,
 .kt-assistant-conversation.is-active::after {
@@ -3410,7 +3500,7 @@ h1 {
 }
 .kt-assistant-stage {
   background:
-    radial-gradient(circle at 80% 12%, rgba(250,204,21,0.06), transparent 24%),
+    radial-gradient(circle at 80% 12%, color-mix(in srgb, var(--kt-hit) 6%, transparent), transparent 24%),
     transparent;
 }
 .kt-assistant-bubble {
@@ -3505,12 +3595,12 @@ h1 {
   gap: 4px;
   padding: 8px;
   border-bottom: 1px solid var(--kt-line);
-  background: rgba(var(--kt-ink-rgb), 0.018);
+  background: rgba(var(--kt-ink-rgb), 0.034);
 }
 .kt-activity-view-toggle button {
   min-height: 30px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.07);
-  background: rgba(var(--kt-ink-rgb), 0.025);
+  background: rgba(var(--kt-ink-rgb), 0.048);
   color: var(--kt-faint);
   cursor: pointer;
   font-size: 10px;
@@ -3518,8 +3608,8 @@ h1 {
   text-transform: uppercase;
 }
 .kt-activity-view-toggle button.is-active {
-  border-color: rgba(250,204,21,0.42);
-  background: rgba(250,204,21,0.12);
+  border-color: color-mix(in srgb, var(--kt-hit) 42%, transparent);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
   color: #ffffff;
 }
 .kt-activity-list {
@@ -3540,12 +3630,12 @@ h1 {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(250,204,21,0.11), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kt-hit) 11%, transparent), transparent);
   transform: translateX(-115%);
   pointer-events: none;
 }
 .kt-activity-event:hover {
-  background: rgba(var(--kt-ink-rgb), 0.025);
+  background: rgba(var(--kt-ink-rgb), 0.048);
 }
 .kt-activity-event:hover::after {
   animation: kineticScan 0.72s ease both;
@@ -3660,7 +3750,7 @@ h1 {
   background: transparent;
 }
 .kt-activity-signal-marker.is-goal {
-  background: rgba(250,204,21,0.12);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
   border-width: 2px;
 }
 .kt-activity-signal-marker.is-webhook {
@@ -3686,7 +3776,7 @@ h1 {
   align-items: end;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.06);
   background:
-    linear-gradient(180deg, rgba(250,204,21,0.08), transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--kt-hit) 8%, transparent), transparent),
     rgba(var(--kt-ink-rgb), 0.018);
   padding: 8px;
 }
@@ -3702,9 +3792,9 @@ h1 {
 .kt-activity-rail {
   position: relative;
   height: 34px;
-  border-top: 1px solid rgba(250,204,21,0.36);
+  border-top: 1px solid color-mix(in srgb, var(--kt-hit) 36%, transparent);
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.06);
-  background: rgba(var(--kt-ink-rgb), 0.018);
+  background: rgba(var(--kt-ink-rgb), 0.034);
 }
 .kt-activity-rail-marker {
   position: absolute;
@@ -3725,7 +3815,7 @@ h1 {
   background: transparent;
 }
 .kt-activity-rail-marker.is-goal {
-  background: rgba(250,204,21,0.1);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
   border-width: 2px;
 }
 .kt-activity-rail-marker.is-webhook {
@@ -3743,7 +3833,7 @@ h1 {
   align-items: center;
   min-height: 36px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.055);
-  background: rgba(var(--kt-ink-rgb), 0.018);
+  background: rgba(var(--kt-ink-rgb), 0.034);
   padding: 7px 9px;
 }
 .kt-activity-timeline-feed strong,
@@ -3776,7 +3866,7 @@ h1 {
   min-width: 0;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.07);
   background:
-    linear-gradient(90deg, rgba(250,204,21,0.075), transparent 45%),
+    linear-gradient(90deg, color-mix(in srgb, var(--kt-hit) 8%, transparent), transparent 45%),
     rgba(var(--kt-ink-rgb), 0.018);
   padding: 10px;
   overflow: hidden;
@@ -3931,7 +4021,7 @@ h1 {
   justify-content: space-between;
   gap: 10px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.06);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
   padding: 8px 9px;
 }
 .kt-decision-scoreboard span {
@@ -3982,7 +4072,7 @@ h1 {
 }
 .kt-decision-card.is-proposed {
   background:
-    linear-gradient(90deg, rgba(250,204,21,0.11), transparent 38%),
+    linear-gradient(90deg, color-mix(in srgb, var(--kt-hit) 11%, transparent), transparent 38%),
     var(--kt-surface);
 }
 .kt-decision-card.is-accepted {
@@ -4001,7 +4091,7 @@ h1 {
 .kt-decision-editor-tools button {
   min-height: 26px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.08);
-  background: rgba(var(--kt-ink-rgb), 0.025);
+  background: rgba(var(--kt-ink-rgb), 0.048);
   color: var(--kt-muted);
   cursor: pointer;
   font-size: 10px;
@@ -4009,7 +4099,7 @@ h1 {
   text-transform: uppercase;
 }
 .kt-decision-editor-tools button:hover {
-  border-color: rgba(250,204,21,0.42);
+  border-color: color-mix(in srgb, var(--kt-hit) 42%, transparent);
   color: var(--kt-hit);
 }
 .kt-decision-preview {
@@ -4059,10 +4149,10 @@ h1 {
   display: inline-block;
   transform-origin: left center;
 }
-.kt-empty:hover .kt-empty-title,
-.kt-modal:hover .kt-modal-title {
-  animation: kineticRotateTap 0.42s ease both;
-}
+/* Removed: `kineticRotateTap` on the *container's* hover. You hover a modal by
+   moving the pointer inside it to reach any control in it, so the title wiggled
+   on the way to every button — a reaction to something nobody aimed at, and one
+   more `both` fill parking a transform on a live element. */
 [class*="sectionTitle"],
 [class*="headerTitle"],
 [class*="cardName"],
@@ -4076,6 +4166,62 @@ h1 {
 [class*="templateName"]:hover,
 [class*="emptyTitle"]:hover {
   color: var(--kt-hit) !important;
+}
+
+/* ── The scale, reaching the modules ─────────────────────────────────────────
+   These live in CSS modules that hardcode `letter-spacing: 0` and their own
+   sizes. The `body ` prefix is only there for specificity — (0,1,1) beats the
+   module's (0,1,0) whichever order the two sheets land in — and it is why none
+   of this needs `!important`. Same `[class*=]` idiom the hover rules above
+   already use, and it keeps the scale in one file instead of scattering it
+   back across the modules it is meant to unify. */
+/* Every module class that sets `font-family: var(--kt-display)` and then leaves
+   tracking at `normal` — enumerated from the modules rather than guessed, and
+   deliberately not including the two avatar classes, where a single letter is
+   centred in a box and tracking would push it off centre. */
+body [class*="headerTitle"],
+body [class*="sectionTitle"],
+body [class*="opsPanelTitle"],
+body [class*="commandHeadline"],
+body [class*="gettingStartedTitle"],
+body [class*="priorityLaneHeader"],
+body [class*="cardTitle"],
+body [class*="stepTitle"] {
+  letter-spacing: var(--kt-tr-display);
+}
+body [class*="commandMetric"],
+body [class*="stepNumber"] {
+  letter-spacing: var(--kt-tr-display);
+  font-variant-numeric: tabular-nums;
+}
+body [class*="statCardValue"] {
+  font-size: var(--kt-t-display);
+  letter-spacing: var(--kt-tr-display);
+  font-variant-numeric: tabular-nums;
+}
+body [class*="statCardLabel"] {
+  font-size: var(--kt-t-label);
+  letter-spacing: var(--kt-tr-label);
+}
+
+/* A count is the answer to the question its label asks, and every one of them
+   rendered at 10-11px Inter regular — the same treatment as the timestamp
+   beside it. Measured on the dashboard: `102`, `14`, `24`, `8` under headings
+   set in a display face, all four of them typeset as footnotes. They get the
+   display face, one step up, and tabular figures so a column of them lines up
+   on the digit rather than drifting. */
+body [class*="filterCount"],
+body [class*="groupCount"],
+body [class*="dueSoonCount"],
+body [class*="laneCount"],
+body [class*="tabCount"] {
+  font-family: var(--kt-display);
+  font-synthesis-weight: none;
+  font-weight: 400;
+  font-size: var(--kt-t-sub);
+  line-height: 1;
+  letter-spacing: var(--kt-tr-sub);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Legacy inline color safety net while older modules are being migrated. */
@@ -4092,7 +4238,7 @@ h1 {
 [style*="rgb(34, 197, 94)"],
 [style*="rgb(248, 113, 113)"] {
   color: var(--kt-hit) !important;
-  border-color: rgba(250,204,21,0.36) !important;
+  border-color: color-mix(in srgb, var(--kt-hit) 36%, transparent) !important;
 }
 
 [style*="rgba(16,185,129"],
@@ -4101,8 +4247,8 @@ h1 {
 [style*="rgba(52,211,153"],
 [style*="rgba(248,113,113"],
 [style*="rgba(243,114,127"] {
-  background: rgba(250,204,21,0.12) !important;
-  border-color: rgba(250,204,21,0.32) !important;
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent) !important;
+  border-color: color-mix(in srgb, var(--kt-hit) 32%, transparent) !important;
   color: var(--kt-hit) !important;
 }
 
@@ -4157,7 +4303,7 @@ select[style*="border-radius"],
   color: #000000 !important;
 }
 [data-theme="light"] .btn-primary {
-  background: var(--accent-2, #eab308);
+  background: var(--accent-2, var(--accent-2, #c8ccd1));
   color: #000000;
 }
 [data-theme="light"] .btn-primary:hover { opacity: 0.9; }
@@ -4409,7 +4555,7 @@ select[style*="border-radius"],
 .tiptap a { color: var(--kt-hit); text-decoration: underline; }
 /* Editor-only: the tiptap placeholder. The rest of the block above is shared
    with the read-only preview — it used to be duplicated in MarkdownEditor with
-   a hardcoded #facc15 link colour, so links in the editor and links in the
+   a hardcoded var(--kt-hit, #f5f6f7) link colour, so links in the editor and links in the
    preview were different colours, and the editor's failed on white. */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

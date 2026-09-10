@@ -1,7 +1,7 @@
 /* ── GlowBar ─────────────────────────────────────────────────────── */
 .glowBarEmpty {
   height: 3px;
-  background: rgba(var(--kt-ink-rgb), 0.04);
+  background: rgba(var(--kt-ink-rgb), 0.076);
   border-radius: 0;
 }
 
@@ -9,7 +9,7 @@
   height: 3px;
   border-radius: 0;
   overflow: hidden;
-  background: rgba(var(--kt-ink-rgb), 0.04);
+  background: rgba(var(--kt-ink-rgb), 0.076);
   position: relative;
 }
 
@@ -136,13 +136,13 @@
 }
 
 .statusBadgeActive {
-  background: rgba(250, 204, 21, 0.12);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
   color: var(--kt-hit);
-  border: 1px solid rgba(250, 204, 21, 0.32);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 32%, transparent);
 }
 
 .statusBadgeArchived {
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
   color: var(--kt-muted);
   border: 1px solid var(--kt-line);
 }
@@ -178,7 +178,7 @@
 
 .deleteBtn {
   background: none;
-  border: 1px solid rgba(250, 204, 21, 0.35);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 35%, transparent);
   cursor: pointer;
   color: var(--kt-hit);
   font-size: 11px;
@@ -219,7 +219,7 @@
 }
 .activityItemLink:hover,
 .activityItemLink:focus-visible {
-  background: rgba(var(--kt-ink-rgb), 0.045);
+  background: rgba(var(--kt-ink-rgb), 0.085);
 }
 
 .activityDot {
@@ -271,12 +271,12 @@
 }
 
 .taskRowOverdue {
-  background: rgba(250, 204, 21, 0.06);
+  background: color-mix(in srgb, var(--kt-hit) 6%, transparent);
   border-left: 2px solid var(--kt-hit);
 }
 
 .taskRowHover {
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
 }
 
 .taskStatusDot {
@@ -731,7 +731,7 @@
 /* ── Create form ─────────────────────────────────────────────────── */
 .createForm {
   padding: 12px 24px;
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
   border-bottom: 1px solid var(--kt-line);
   animation: fadeUpIn 0.2s ease forwards;
 }
@@ -809,7 +809,7 @@
   font-weight: 400;
   color: var(--kt-ink);
   border-bottom: 2px solid var(--kt-hit);
-  background: rgba(250,204,21,0.12);
+  background: color-mix(in srgb, var(--kt-hit) 12%, transparent);
 }
 
 .tabBtnInactive {
@@ -927,8 +927,8 @@
 }
 
 .widgetColumnDropOver {
-  background: rgba(250, 204, 21, 0.05);
-  outline: 2px dashed rgba(250, 204, 21, 0.35);
+  background: color-mix(in srgb, var(--kt-hit) 5%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--kt-hit) 35%, transparent);
   outline-offset: 6px;
 }
 
@@ -952,7 +952,7 @@
   padding: 4px 8px;
   margin-bottom: 4px;
   border: 1px dashed rgba(var(--kt-ink-rgb), 0.15);
-  background: rgba(250, 204, 21, 0.06);
+  background: color-mix(in srgb, var(--kt-hit) 6%, transparent);
   color: rgba(var(--kt-ink-rgb), 0.4);
   font-size: 10px;
   font-weight: 700;
@@ -974,7 +974,7 @@
   margin-bottom: 16px;
   border: 1px solid var(--kt-line);
   background:
-    linear-gradient(90deg, rgba(250,204,21,0.13), transparent 36%),
+    linear-gradient(90deg, color-mix(in srgb, var(--kt-hit) 13%, transparent), transparent 36%),
     var(--kt-surface);
   position: relative;
   overflow: hidden;
@@ -1117,7 +1117,7 @@
 }
 
 .priorityLaneRisk {
-  border-color: rgba(250,204,21,0.44);
+  border-color: color-mix(in srgb, var(--kt-hit) 44%, transparent);
 }
 
 .priorityLaneWaiting {
@@ -1167,7 +1167,7 @@
   width: 100%;
   text-align: left;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.06);
-  background: rgba(var(--kt-ink-rgb), 0.025);
+  background: rgba(var(--kt-ink-rgb), 0.048);
   padding: 8px 9px;
   cursor: pointer;
   animation: slideInLeft 0.26s ease both;
@@ -1175,13 +1175,20 @@
 
 .priorityTask:hover {
   border-color: var(--kt-hit);
-  background: rgba(250,204,21,0.11);
+  background: color-mix(in srgb, var(--kt-hit) 11%, transparent);
 }
 
+/* Twenty of these stack under each lane heading, and both lines used to be grey
+   at 12px and 10px with no tracking — a 1.2 ratio between the task and the
+   project it belongs to, which is not enough for either to be read first. The
+   title is the content, so it takes the ink; the project is a caption, so it
+   goes down a step and opens up. Contrast does as much of the separating here
+   as size does: everything on this page was speaking in --kt-muted. */
 .priorityTaskTitle {
   display: block;
-  color: var(--kt-muted);
-  font-size: 12px;
+  color: var(--kt-ink);
+  font-size: var(--kt-t-body);
+  letter-spacing: var(--kt-tr-body);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1189,10 +1196,17 @@
 
 .priorityTaskMeta {
   display: block;
-  color: #4b5563;
-  font-size: 10px;
-  margin-top: 2px;
+  color: var(--kt-faint);
+  font-size: var(--kt-t-micro);
+  letter-spacing: var(--kt-tr-micro);
+  margin-top: 3px;
   text-transform: uppercase;
+  /* Tracking widens the caption enough that a long project name wraps, and a
+     wrapped second line makes one row taller than the four beside it. Clipped,
+     like the title above it, so the lane stays an even column. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .opsSidebar {
@@ -1291,7 +1305,7 @@
   min-height: 28px;
   padding: 6px 8px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.055);
-  background: rgba(var(--kt-ink-rgb), 0.018);
+  background: rgba(var(--kt-ink-rgb), 0.034);
 }
 
 /* Same button reset as the activity row and the stat card (ADR-0147). `width: 100%`
@@ -1336,6 +1350,19 @@
   color: var(--accent);
   border-bottom-color: color-mix(in srgb, var(--accent) 50%, transparent);
 }
+/* `font: inherit` in the group above is the right reset for a <button> that
+   *wraps* styled content — `.statCardLink` above says so, and it is true there
+   because the number inside carries its own family. It is wrong here: this
+   class lands on the same element as `.commandHeadline`, which is what sets the
+   display face, and the shorthand resets `font-family` along with the rest. It
+   is declared later, so it won. The largest piece of type in the app — the
+   headline count — has been rendering in Inter, verified with
+   `CSS.getPlatformFontsForNode`, since the headline became clickable. */
+.commandHeadlineLink {
+  font-family: var(--kt-display);
+  font-synthesis-weight: none;
+}
+
 .commandHeadlineLink:hover span,
 .commandHeadlineLink:focus-visible span {
   color: var(--accent);

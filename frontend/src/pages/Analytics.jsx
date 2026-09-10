@@ -115,7 +115,7 @@ function VelocityChart({ data }) {
               fill={isHovered ? 'rgba(var(--kt-ink-rgb), 0.1)' : 'rgba(var(--kt-ink-rgb), 0.06)'}
             />
             <rect x={padding.l} y={y} width={doneW} height={barH} rx={4}
-              fill={isHovered ? 'rgba(250,204,21,0.7)' : 'rgba(250,204,21,0.5)'}
+              fill={isHovered ? 'color-mix(in srgb, var(--kt-hit) 70%, transparent)' : 'color-mix(in srgb, var(--kt-hit) 50%, transparent)'}
             />
             <text x={padding.l + totalW + 6} y={y + barH / 2 + 4} fontSize={10} fill="rgba(var(--kt-ink-rgb), 0.3)">
               {d.completed_tasks}/{d.total_tasks}

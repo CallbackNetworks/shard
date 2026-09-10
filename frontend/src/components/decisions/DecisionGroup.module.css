@@ -30,7 +30,7 @@
 }
 
 .head:hover {
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
 }
 
 /* The header is the control: a chevron alone is a 12px target in a column that may hold

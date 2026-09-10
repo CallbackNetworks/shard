@@ -134,7 +134,7 @@ export default function NotificationCenter() {
         <div className="kt-notification-panel" style={{
           position: 'absolute', top: 42, right: 0,
           width: 340, maxWidth: 'calc(100vw - 24px)', maxHeight: 480,
-          background: '#1f1f1f', border: '1px solid rgba(250,204,21,0.18)', borderRadius: 0,
+          background: '#1f1f1f', border: '1px solid color-mix(in srgb, var(--kt-hit) 18%, transparent)', borderRadius: 0,
           boxShadow: '10px 10px 0 rgba(0,0,0,0.42)',
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
@@ -171,11 +171,11 @@ export default function NotificationCenter() {
                     display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
                     borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.04)',
                     cursor: n.link ? 'pointer' : 'default',
-                    background: n.read ? 'transparent' : 'rgba(250,204,21,0.05)',
+                    background: n.read ? 'transparent' : 'color-mix(in srgb, var(--kt-hit) 5%, transparent)',
                     transition: 'background 0.1s',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--kt-ink-rgb), 0.04)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(250,204,21,0.05)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--kt-ink-rgb), 0.076)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = n.read ? 'transparent' : 'color-mix(in srgb, var(--kt-hit) 5%, transparent)' }}
                 >
                   <div style={{ marginTop: 2, flexShrink: 0 }}>
                     {TYPE_ICON[n.type] || <Bell size={13} style={{ color: '#6b7280' }} />}

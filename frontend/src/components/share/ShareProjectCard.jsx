@@ -8,7 +8,7 @@ import { isOverdue as isTaskOverdue, countOverdue } from '../../utils/overdue'
 
 const STATUS_COLOR_MAP = STATUS_COLOR
 const STATUS_LABEL = { done: 'DONE', in_progress: 'ACTIVE', failed: 'FAILED', todo: 'TODO' }
-const PRI_COLOR = { high: '#facc15', medium: '#f0b429', low: 'rgba(var(--kt-ink-rgb), 0.35)' }
+const PRI_COLOR = { high: 'var(--kt-hit, #f5f6f7)', medium: '#f0b429', low: 'rgba(var(--kt-ink-rgb), 0.35)' }
 
 function hasDetails(task) {
   return task.description || task.progress_pct != null || task.start_date ||

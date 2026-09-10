@@ -14,7 +14,10 @@ describe('activitySignals', () => {
   })
 
   it('maps known and unknown groups to marker styles', () => {
-    expect(signalStyle('task')).toMatchObject({ marker: 'task', color: '#facc15' })
+    // The colour is asserted as *the accent*, not as a hex: pinning a literal
+    // here is what made a palette change a test failure rather than a redraw.
+    expect(signalStyle('task')).toMatchObject({ marker: 'task' })
+    expect(signalStyle('task').color).toContain('--kt-hit')
     expect(signalStyle('decision')).toMatchObject({ marker: 'decision' })
     expect(signalStyle('unknown')).toMatchObject({ marker: 'other' })
   })

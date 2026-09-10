@@ -38,7 +38,7 @@ export default function HorizontalBarChart({ items = [], maxValue, showMedals = 
               fill="rgba(var(--kt-ink-rgb), 0.03)" />
 
             <rect x={PAD.l} y={y} width={Math.max(w, 2)} height={barH} rx={4}
-              fill={item.color || '#facc15'}
+              fill={item.color || 'var(--kt-hit, #f5f6f7)'}
               opacity={isHov ? 1 : 0.75}
             />
 

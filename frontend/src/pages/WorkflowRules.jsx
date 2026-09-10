@@ -401,7 +401,7 @@ export default function WorkflowRules() {
                     <span style={{ fontWeight: 600, fontSize: 14, color: DARK.text }}>{rule.name}</span>
                     <span style={{
                       fontSize: 10, padding: '1px 8px', fontWeight: 600,
-                      background: rule.active ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.07)',
+                      background: rule.active ? 'color-mix(in srgb, var(--kt-hit) 15%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.07)',
                       color: rule.active ? DARK.success : '#6b7280',
                     }}>{rule.active ? 'active' : 'paused'}</span>
                     {/* "ran 47×" answers a question nobody asked. A rule that fires

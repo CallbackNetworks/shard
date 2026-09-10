@@ -7,7 +7,7 @@
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
   flex-wrap: wrap;
   align-items: center;
-  background: rgba(var(--kt-ink-rgb), 0.01);
+  background: rgba(var(--kt-ink-rgb), 0.019);
 }
 
 .filterBtn {
@@ -57,7 +57,7 @@
 
 .advancedFilterActive {
   border: 1px solid rgba(var(--kt-ink-rgb), 0.15);
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
   color: var(--kt-hit);
 }
 
@@ -104,7 +104,7 @@
   flex-wrap: wrap;
   align-items: center;
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
 }
 
 .advancedFilterLabel {
@@ -125,11 +125,11 @@
 }
 
 .filterSelectDefault {
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
 }
 
 .filterSelectActive {
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
 }
 
 .filterSelectAgent {
@@ -138,14 +138,14 @@
 }
 
 .filterSelectAgentDefault {
-  background: rgba(var(--kt-ink-rgb), 0.03);
+  background: rgba(var(--kt-ink-rgb), 0.057);
   color: var(--kt-ink);
 }
 
 .clearAllFiltersBtn {
   padding: 3px 10px;
   border-radius: 0;
-  border: 1px solid rgba(250,204,21,0.3);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 30%, transparent);
   background: transparent;
   font-size: 11px;
   cursor: pointer;

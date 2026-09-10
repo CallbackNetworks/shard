@@ -6,9 +6,9 @@ import { useUiPrefs } from '../utils/uiPrefs'
 import { weekStartIndex } from '../utils/datetime'
 
 const PRIORITY_COLORS = {
-  high: '#facc15',
+  high: 'var(--kt-hit, #f5f6f7)',
   medium: '#ffa42b',
-  low: '#facc15',
+  low: 'var(--kt-hit, #f5f6f7)',
 }
 
 const GRID_BORDER = 'rgba(var(--kt-ink-rgb), 0.06)'
@@ -272,7 +272,7 @@ export default function CalendarView({ tasks, onUpdateTask, projectId: _projectI
                 borderRight: (idx + 1) % 7 !== 0 ? `1px solid ${GRID_BORDER}` : 'none',
                 borderBottom:
                   idx < calendarCells.length - 7 ? `1px solid ${GRID_BORDER}` : 'none',
-                background: isToday ? 'rgba(250,204,21,0.04)' : 'transparent',
+                background: isToday ? 'color-mix(in srgb, var(--kt-hit) 4%, transparent)' : 'transparent',
                 border: isToday ? `2px solid ${BRAND}` : undefined,
                 boxSizing: 'border-box',
               }}

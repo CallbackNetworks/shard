@@ -89,7 +89,7 @@
   align-items: center;
   gap: 4px;
   border: 1px solid rgba(var(--kt-ink-rgb), 0.1);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
   color: var(--kt-muted);
   padding: 2px 7px;
   font-size: 10px;

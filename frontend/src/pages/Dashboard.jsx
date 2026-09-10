@@ -321,7 +321,7 @@ export default function Dashboard() {
             onClick={() => setShowForm(v => !v)}
             data-tour="new-project"
             className={s.newProjectBtn}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = '#eab308' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.background = 'var(--accent-2, #c8ccd1)' }}
             onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = BRAND }}
           >
             <Plus size={14} /> {t('dashboard.newProject')}
@@ -342,8 +342,8 @@ export default function Dashboard() {
                 key={id}
                 onClick={() => toggleWidget(id)}
                 style={{
-                  background: w(id) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.04)',
-                  border: `1px solid ${w(id) ? 'rgba(250,204,21,0.3)' : 'rgba(var(--kt-ink-rgb), 0.1)'}`,
+                  background: w(id) ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.076)',
+                  border: `1px solid ${w(id) ? 'color-mix(in srgb, var(--kt-hit) 30%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.1)'}`,
                   borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
                   fontSize: 11, color: w(id) ? BRAND : DARK.textDim,
                   display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',

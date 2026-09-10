@@ -21,9 +21,9 @@ function staleDays(ak) {
 
 const METHOD_STYLE = {
   GET:    { bg: 'rgba(96,165,250,0.15)',  color: '#60a5fa' },
-  POST:   { bg: 'rgba(250,204,21,0.15)',   color: '#facc15' },
+  POST:   { bg: 'color-mix(in srgb, var(--kt-hit) 15%, transparent)',   color: 'var(--kt-hit, #f5f6f7)' },
   PATCH:  { bg: 'rgba(251,191,36,0.15)',  color: '#fbbf24' },
-  DELETE: { bg: 'rgba(250,204,21,0.15)',   color: '#facc15' },
+  DELETE: { bg: 'color-mix(in srgb, var(--kt-hit) 15%, transparent)',   color: 'var(--kt-hit, #f5f6f7)' },
 }
 
 export default function ApiKeys() {
@@ -198,10 +198,10 @@ export default function ApiKeys() {
                   {SCOPES.map(scope => (
                     <label key={scope} style={{
                       display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-                      background: editForm.scopes.includes(scope) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.05)',
+                      background: editForm.scopes.includes(scope) ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.095)',
                       color: editForm.scopes.includes(scope) ? BRAND : 'rgba(var(--kt-ink-rgb), 0.4)',
                       padding: '4px 12px', fontSize: 13,
-                      border: editForm.scopes.includes(scope) ? `1px solid rgba(250,204,21,0.3)` : '1px solid rgba(var(--kt-ink-rgb), 0.08)',
+                      border: editForm.scopes.includes(scope) ? `1px solid color-mix(in srgb, var(--kt-hit) 30%, transparent)` : '1px solid rgba(var(--kt-ink-rgb), 0.08)',
                     }}>
                       <input type="checkbox" checked={editForm.scopes.includes(scope)} onChange={() => toggleEditScope(scope)} style={{ cursor: 'pointer' }} />
                       {scope}
@@ -259,10 +259,10 @@ export default function ApiKeys() {
                 {SCOPES.map(scope => (
                   <label key={scope} style={{
                     display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-                    background: form.scopes.includes(scope) ? 'rgba(250,204,21,0.12)' : 'rgba(var(--kt-ink-rgb), 0.05)',
+                    background: form.scopes.includes(scope) ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.095)',
                     color: form.scopes.includes(scope) ? BRAND : 'rgba(var(--kt-ink-rgb), 0.4)',
                     padding: '4px 12px', fontSize: 13,
-                    border: form.scopes.includes(scope) ? `1px solid rgba(250,204,21,0.3)` : '1px solid rgba(var(--kt-ink-rgb), 0.08)',
+                    border: form.scopes.includes(scope) ? `1px solid color-mix(in srgb, var(--kt-hit) 30%, transparent)` : '1px solid rgba(var(--kt-ink-rgb), 0.08)',
                   }}>
                     <input type="checkbox" checked={form.scopes.includes(scope)} onChange={() => toggleScope(scope)} style={{ cursor: 'pointer' }} />
                     {scope}
@@ -305,8 +305,8 @@ export default function ApiKeys() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, color: 'var(--kt-ink)' }}>{ak.name}</span>
                     <span style={{
-                      background: ak.active ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)',
-                      color: ak.active ? '#facc15' : 'rgba(var(--kt-ink-rgb), 0.35)',
+                      background: ak.active ? 'color-mix(in srgb, var(--kt-hit) 15%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+                      color: ak.active ? 'var(--kt-hit, #f5f6f7)' : 'rgba(var(--kt-ink-rgb), 0.35)',
                       padding: '2px 8px', fontSize: 12, fontWeight: 600,
                     }}>{ak.active ? 'active' : 'inactive'}</span>
                     {ak.active && staleDays(ak) !== null && (

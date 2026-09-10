@@ -19,7 +19,7 @@
 }
 
 .input {
-  background: rgba(var(--kt-ink-rgb), 0.05);
+  background: rgba(var(--kt-ink-rgb), 0.095);
   border: 1px solid rgba(var(--kt-ink-rgb), 0.15);
   padding: 3px 8px;
   font-size: 11px;

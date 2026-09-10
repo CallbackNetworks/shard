@@ -50,7 +50,7 @@ export function urgencyColor(u) {
   if (u > 0.55) return STATUS_COLOR.failed
   if (u > 0.28) return '#f0b429'
   if (u > 0.08) return STATUS_COLOR.in_progress
-  return '#facc15'
+  return 'var(--kt-hit, #f5f6f7)'
 }
 
 export function useCountUp(target, ms = 700) {
@@ -96,7 +96,7 @@ export function StackedBar({ done, active, failed, total, height = 14 }) {
   const f = useCountUp(Math.round(pFailed))
   const offset = height * 1.2
   return (
-    <div style={{ width: '100%', height, display: 'flex', background: 'rgba(var(--kt-ink-rgb), 0.04)', clipPath: PARA_R(offset) }}>
+    <div style={{ width: '100%', height, display: 'flex', background: 'rgba(var(--kt-ink-rgb), 0.076)', clipPath: PARA_R(offset) }}>
       <div style={{ width: `${d}%`, height: '100%', background: STATUS_COLOR.done, transition: 'width 0.04s' }} />
       <div style={{ width: `${a}%`, height: '100%', background: STATUS_COLOR.in_progress, transition: 'width 0.04s' }} />
       <div style={{ width: `${f}%`, height: '100%', background: STATUS_COLOR.failed, transition: 'width 0.04s' }} />
@@ -125,7 +125,7 @@ export function Label({ children, color }) {
 export function TabBtn({ label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? 'rgba(250,204,21,0.1)' : 'transparent',
+      background: active ? 'color-mix(in srgb, var(--kt-hit) 10%, transparent)' : 'transparent',
       border: 'none',
       borderTop: `2px solid ${active ? DARK.success : 'transparent'}`,
       cursor: 'pointer',
@@ -147,7 +147,7 @@ function GlassRow({ children, accentColor, style = {} }) {
   return (
     <div style={{
       position: 'relative',
-      background: 'rgba(var(--kt-ink-rgb), 0.018)',
+      background: 'rgba(var(--kt-ink-rgb), 0.034)',
       borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
       borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.03)',
       margin: '6px 0',
@@ -337,7 +337,7 @@ export function ViewTasks({ projects, only = 'all', onOpenTask }) {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '12px 20px 12px 24px',
-                background: 'rgba(var(--kt-ink-rgb), 0.025)',
+                background: 'rgba(var(--kt-ink-rgb), 0.048)',
                 borderTop: '1px solid rgba(var(--kt-ink-rgb), 0.08)',
                 clipPath: PARA_R(14),
                 cursor: 'pointer', userSelect: 'none',
@@ -377,7 +377,7 @@ export function ViewTasks({ projects, only = 'all', onOpenTask }) {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '8px 20px 8px 32px',
-                      background: i % 2 === 0 ? 'rgba(var(--kt-ink-rgb), 0.008)' : 'transparent',
+                      background: i % 2 === 0 ? 'rgba(var(--kt-ink-rgb), 0.015)' : 'transparent',
                       borderLeft: `2px solid ${sc}22`,
                       cursor: hasDetail ? 'pointer' : 'default',
                       transition: 'background 0.15s',
@@ -435,7 +435,7 @@ export function ViewTasks({ projects, only = 'all', onOpenTask }) {
                   {isExpanded && (
                     <div style={{
                       padding: '10px 20px 12px 52px',
-                      background: 'rgba(var(--kt-ink-rgb), 0.015)',
+                      background: 'rgba(var(--kt-ink-rgb), 0.028)',
                       borderLeft: `2px solid ${sc}33`,
                       borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.04)',
                     }}>
@@ -553,7 +553,7 @@ export function ViewCompare({ projects }) {
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr repeat(6, 52px)',
         padding: '8px 20px 8px 24px',
-        background: 'rgba(var(--kt-ink-rgb), 0.03)',
+        background: 'rgba(var(--kt-ink-rgb), 0.057)',
         clipPath: PARA_R(14),
         marginBottom: 4,
       }}>

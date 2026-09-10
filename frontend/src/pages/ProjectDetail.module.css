@@ -13,7 +13,7 @@
 /* ── Header ── */
 .header {
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
-  background: rgba(var(--kt-ink-rgb), 0.015);
+  background: rgba(var(--kt-ink-rgb), 0.028);
 }
 
 .headerDesktop {
@@ -89,9 +89,9 @@
 }
 
 .statusActive {
-  background: rgba(250,204,21,0.1);
+  background: color-mix(in srgb, var(--kt-hit) 10%, transparent);
   color: var(--kt-hit);
-  border: 1px solid rgba(250,204,21,0.3);
+  border: 1px solid color-mix(in srgb, var(--kt-hit) 30%, transparent);
 }
 
 .statusArchived {
@@ -196,12 +196,12 @@
 
 /* Active state for a share-link header button: PIN protected and/or time-boxed.
    A class, not an inline colour — global.css (ADR-0031) treats any button whose
-   *inline* style mentions #facc15 as a filled-yellow button and forces its text to
+   *inline* style mentions var(--kt-hit, #f5f6f7) as a filled-yellow button and forces its text to
    the background colour with !important, which rendered this button's label
    invisible whenever the state it announces was actually on. */
 .archiveBtnActive {
-  color: #facc15;
-  border-color: rgba(250, 204, 21, 0.4);
+  color: var(--kt-hit, #f5f6f7);
+  border-color: color-mix(in srgb, var(--kt-hit) 40%, transparent);
 }
 
 .newIssueBtn {
@@ -295,7 +295,7 @@
   height: 28px;
   gap: 8px;
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
-  background: rgba(var(--kt-ink-rgb), 0.02);
+  background: rgba(var(--kt-ink-rgb), 0.038);
 }
 
 .colSpacer12 {
@@ -349,7 +349,7 @@
   border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.07);
   font-size: 12px;
   color: rgba(var(--kt-ink-rgb), 0.3);
-  background: rgba(var(--kt-ink-rgb), 0.01);
+  background: rgba(var(--kt-ink-rgb), 0.019);
 }
 
 .timelineHintStrong {

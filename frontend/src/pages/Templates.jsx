@@ -14,8 +14,8 @@ const PRIORITIES = ['low', 'medium', 'high']
 
 const PRIORITY_COLOR = {
   low: '#9ca3af',
-  medium: '#facc15',
-  high: '#facc15',
+  medium: 'var(--kt-hit, #f5f6f7)',
+  high: 'var(--kt-hit, #f5f6f7)',
 }
 
 const EMPTY_FORM = { name: '', description: '', priority: 'medium', subtasks: [], label_names: [] }
@@ -93,7 +93,7 @@ function TemplateForm({ initial, onSave, onClose }) {
         {form.subtasks.map((s, i) => (
           <div key={i} style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px',
-            background: 'rgba(var(--kt-ink-rgb), 0.03)', marginBottom: 4,
+            background: 'rgba(var(--kt-ink-rgb), 0.057)', marginBottom: 4,
           }}>
             <span style={{ flex: 1, fontSize: 12 }}>{s.title}</span>
             <button onClick={() => removeSubtask(i)} className="kt-icon-btn" style={{ color: DARK.danger, padding: 0 }}>
@@ -119,7 +119,7 @@ function TemplateForm({ initial, onSave, onClose }) {
           {form.label_names.map(l => (
             <span key={l} style={{
               display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-              background: 'rgba(250,204,21,0.15)', fontSize: 11, color: BRAND,
+              background: 'color-mix(in srgb, var(--kt-hit) 15%, transparent)', fontSize: 11, color: BRAND,
             }}>
               {l}
               <button onClick={() => removeLabel(l)} className="kt-icon-btn" style={{ color: BRAND, padding: 0, lineHeight: 1 }}>

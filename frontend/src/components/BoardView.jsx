@@ -194,7 +194,7 @@ function DroppableColumn({ colKey, colLabel, colColor, tasks, parents, projectCo
             minHeight: 48,
             borderRadius: 8,
             padding: isOver ? 4 : 0,
-            background: isOver ? 'rgba(var(--kt-ink-rgb), 0.04)' : 'transparent',
+            background: isOver ? 'rgba(var(--kt-ink-rgb), 0.076)' : 'transparent',
             border: isOver ? '2px dashed rgba(var(--kt-ink-rgb), 0.15)' : '2px dashed transparent',
             transition: 'background 0.15s, border-color 0.15s, padding 0.15s',
           }}

@@ -54,9 +54,9 @@ function AgentCard({ agent, index }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 30, height: 30, borderRadius: '50%',
-          background: agent.active ? 'rgba(250,204,21,0.15)' : 'rgba(var(--kt-ink-rgb), 0.06)',
+          background: agent.active ? 'color-mix(in srgb, var(--kt-hit) 15%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.06)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          border: `1px solid ${agent.active ? 'rgba(250,204,21,0.3)' : 'rgba(var(--kt-ink-rgb), 0.1)'}`,
+          border: `1px solid ${agent.active ? 'color-mix(in srgb, var(--kt-hit) 30%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.1)'}`,
         }}>
           <Bot size={14} color={agent.active ? DARK.info : '#6b7280'} />
         </div>
@@ -66,7 +66,7 @@ function AgentCard({ agent, index }) {
             <span style={{ fontWeight: 600, fontSize: 13, color: DARK.text }}>{agent.agent_name}</span>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 9999,
-              background: agent.active ? 'rgba(250,204,21,0.1)' : 'rgba(var(--kt-ink-rgb), 0.05)',
+              background: agent.active ? 'color-mix(in srgb, var(--kt-hit) 10%, transparent)' : 'rgba(var(--kt-ink-rgb), 0.095)',
               color: agent.active ? DARK.success : '#6b7280',
             }}>
               {agent.active ? t('agent.active') : t('agent.inactive')}
@@ -164,7 +164,7 @@ export default function AgentTasksPanel() {
       {isLoading || isError || relevant.length === 0 ? (
         <div style={{
           border: '1px solid rgba(var(--kt-ink-rgb), 0.08)',
-          background: 'rgba(var(--kt-ink-rgb), 0.018)',
+          background: 'rgba(var(--kt-ink-rgb), 0.034)',
           color: '#6b7280',
           fontSize: 12,
           padding: '18px 14px',

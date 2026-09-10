@@ -307,8 +307,8 @@ export default memo(function IssueRow({
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '1px 7px', borderRadius: 9999, fontSize: 10, fontWeight: 600,
-            background: 'rgba(250,204,21,0.12)', color: DARK.info,
-            border: '1px solid rgba(250,204,21,0.25)', flexShrink: 0, whiteSpace: 'nowrap',
+            background: 'color-mix(in srgb, var(--kt-hit) 12%, transparent)', color: DARK.info,
+            border: '1px solid color-mix(in srgb, var(--kt-hit) 25%, transparent)', flexShrink: 0, whiteSpace: 'nowrap',
           }}>
             <Bot size={9} />
             {task.assigned_agent_name}
@@ -356,16 +356,16 @@ export default memo(function IssueRow({
         {hovered ? (
           <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
             {task.description && (
-              <button onClick={(e) => { e.stopPropagation(); setShowDescription(v => !v) }} title={t('issue.toggleDescription')} style={{ background: showDescription ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDescription ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              <button onClick={(e) => { e.stopPropagation(); setShowDescription(v => !v) }} title={t('issue.toggleDescription')} style={{ background: showDescription ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: 'none', cursor: 'pointer', color: showDescription ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
                 <FileText size={12} />
               </button>
             )}
             <button onClick={(e) => { e.stopPropagation(); setShowComments(v => !v) }} title={t('issue.comments')}
-              style={{ background: showComments ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showComments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showComments ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: 'none', cursor: 'pointer', color: showComments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <MessageSquare size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowDeps(v => !v) }} title={t('issue.dependencies')}
-              style={{ background: showDeps ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showDeps ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showDeps ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: 'none', cursor: 'pointer', color: showDeps ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <GitBranch size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowMembership(v => !v) }} title={t('membership.title')}
@@ -373,19 +373,19 @@ export default memo(function IssueRow({
               <Boxes size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowRecurrence(v => !v) }} title={t('issue.recurrence')}
-              style={{ background: showRecurrence ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showRecurrence ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showRecurrence ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: 'none', cursor: 'pointer', color: showRecurrence ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Repeat2 size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowAttachments(v => !v) }} title={t('issue.attachments')}
-              style={{ background: showAttachments ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showAttachments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showAttachments ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: 'none', cursor: 'pointer', color: showAttachments ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Paperclip size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowBuildHistory(v => !v) }} title={t('issue.buildHistory')}
-              style={{ background: showBuildHistory ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showBuildHistory ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showBuildHistory ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: 'none', cursor: 'pointer', color: showBuildHistory ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Activity size={12} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowWebhook(v => !v) }} title={t('issue.webhookSetup')}
-              style={{ background: showWebhook ? 'rgba(250,204,21,0.12)' : 'none', border: 'none', cursor: 'pointer', color: showWebhook ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
+              style={{ background: showWebhook ? 'color-mix(in srgb, var(--kt-hit) 12%, transparent)' : 'none', border: 'none', cursor: 'pointer', color: showWebhook ? DARK.success : DARK.textMid, padding: '2px 5px', borderRadius: 4 }}>
               <Link2 size={12} />
             </button>
             {task.external_url ? (
@@ -435,7 +435,7 @@ export default memo(function IssueRow({
                 <Plus size={12} />
               </button>
             )}
-            <button onClick={() => { if (confirm(t('issue.deleteConfirm', { title: task.title }))) onDelete(task.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(250,204,21,0.7)', padding: '2px 5px', borderRadius: 4 }}>
+            <button onClick={() => { if (confirm(t('issue.deleteConfirm', { title: task.title }))) onDelete(task.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'color-mix(in srgb, var(--kt-hit) 70%, transparent)', padding: '2px 5px', borderRadius: 4 }}>
               <Trash2 size={12} />
             </button>
           </div>
@@ -464,7 +464,7 @@ export default memo(function IssueRow({
           paddingTop: 8,
           paddingBottom: 10,
           borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-          background: 'rgba(var(--kt-ink-rgb), 0.02)',
+          background: 'rgba(var(--kt-ink-rgb), 0.038)',
           fontSize: 13,
           lineHeight: 1.6,
           color: DARK.textMid,
@@ -505,7 +505,7 @@ export default memo(function IssueRow({
           paddingLeft: 16 + depth * 20 + 36, paddingRight: 16,
           paddingTop: 8, paddingBottom: 10,
           borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-          background: 'rgba(var(--kt-ink-rgb), 0.02)',
+          background: 'rgba(var(--kt-ink-rgb), 0.038)',
         }}>
           <WebhookPanel taskId={task.id} />
         </div>
@@ -517,7 +517,7 @@ export default memo(function IssueRow({
           paddingLeft: 16 + depth * 20 + 36, paddingRight: 16,
           paddingTop: 8, paddingBottom: 10,
           borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-          background: 'rgba(var(--kt-ink-rgb), 0.02)',
+          background: 'rgba(var(--kt-ink-rgb), 0.038)',
         }}>
           <BuildHistoryPanel taskId={task.id} />
         </div>

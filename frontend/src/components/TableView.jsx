@@ -35,7 +35,7 @@ function SortableRow({ task, parent, cycleByTask, onUpdate, tdStyle }) {
   }
 
   const style = {
-    background: isDragging ? 'rgba(250,204,21,0.08)' : 'transparent',
+    background: isDragging ? 'color-mix(in srgb, var(--kt-hit) 8%, transparent)' : 'transparent',
     opacity: isDragging ? 0.6 : 1,
     transform: CSS.Transform.toString(transform),
     transition,
@@ -150,7 +150,7 @@ function SortableRow({ task, parent, cycleByTask, onUpdate, tdStyle }) {
       <td style={tdStyle}>
         {cycle ? (
           <span style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(250,204,21,0.12)', color: BRAND,
+            fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'color-mix(in srgb, var(--kt-hit) 12%, transparent)', color: BRAND,
             fontWeight: 500, whiteSpace: 'nowrap',
           }}>
             {cycle.name}

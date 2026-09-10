@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 
 const toolbarBtnStyle = (active) => ({
-  background: active ? 'rgba(250,204,21,0.2)' : 'none',
+  background: active ? 'color-mix(in srgb, var(--kt-hit) 20%, transparent)' : 'none',
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',
@@ -147,7 +147,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
       border: '1px solid rgba(var(--kt-ink-rgb), 0.1)',
       borderRadius: 6,
       overflow: 'hidden',
-      background: 'rgba(var(--kt-ink-rgb), 0.03)',
+      background: 'rgba(var(--kt-ink-rgb), 0.057)',
       fontSize: 13,
       color: 'var(--kt-ink)',
     }}>
@@ -158,7 +158,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
         justifyContent: 'space-between',
         padding: '4px 8px',
         borderBottom: '1px solid rgba(var(--kt-ink-rgb), 0.07)',
-        background: 'rgba(var(--kt-ink-rgb), 0.02)',
+        background: 'rgba(var(--kt-ink-rgb), 0.038)',
         gap: 8,
         flexWrap: 'wrap',
       }}>
@@ -196,7 +196,7 @@ export default function MarkdownEditor({ value, onChange, placeholder, minHeight
             fontFamily: 'monospace',
             fontSize: 12,
             lineHeight: 1.6,
-            background: 'rgba(var(--kt-ink-rgb), 0.02)',
+            background: 'rgba(var(--kt-ink-rgb), 0.038)',
             color: 'var(--kt-ink)',
             boxSizing: 'border-box',
           }}

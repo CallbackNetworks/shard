@@ -26,7 +26,7 @@ function DeliveryRow({ delivery, integrationMap, isMobile }) {
     <>
       <tr
         onClick={() => setExpanded(v => !v)}
-        style={{ cursor: 'pointer', background: expanded ? 'rgba(var(--kt-ink-rgb), 0.02)' : 'transparent' }}
+        style={{ cursor: 'pointer', background: expanded ? 'rgba(var(--kt-ink-rgb), 0.038)' : 'transparent' }}
       >
         <td style={tdStyle}>
           <span style={{
@@ -60,7 +60,7 @@ function DeliveryRow({ delivery, integrationMap, isMobile }) {
         </td>
       </tr>
       {expanded && (
-        <tr style={{ background: 'rgba(var(--kt-ink-rgb), 0.02)' }}>
+        <tr style={{ background: 'rgba(var(--kt-ink-rgb), 0.038)' }}>
           <td colSpan={7} style={{ padding: '8px 16px 16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
               <div>

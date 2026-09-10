@@ -32,6 +32,13 @@ function walk(dir, out = []) {
   return out
 }
 
+// Comments are not declarations. This file's own prose explains the rule by
+// quoting it, and so does global.css's type-scale note — a stylesheet that
+// documents `border-radius: 0` was reported as breaking it. Newlines are kept
+// so the reported line number still points at the real line.
+const stripComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g,
+  (block) => block.replace(/[^\n]/g, ' '))
+
 const allowed = (value) => {
   const v = value.replace('!important', '').trim().toLowerCase()
   return v === '0' || v === '0px' || v.includes('50%')
@@ -41,7 +48,7 @@ describe('no rounded corners', () => {
   it('every stylesheet declares square corners or a circle, nothing between', () => {
     const offenders = []
     for (const full of walk(SRC)) {
-      const src = readFileSync(full, 'utf8')
+      const src = stripComments(readFileSync(full, 'utf8'))
       src.split('\n').forEach((line, i) => {
         // A selector matching elements that carry an inline radius is not a declaration.
         if (line.includes('[style*=')) return

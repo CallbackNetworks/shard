@@ -189,7 +189,7 @@ export function deriveGraphStructure(slice, nodeTypes = [], edgeTypes = [], now 
         type: 'identity',
         name: n.title,
         avatar: n.data?.avatar || null,
-        color: n.data?.color || '#facc15',
+        color: n.data?.color || 'var(--kt-hit, #f5f6f7)',
         projectCount: linked.length,
         projectIds: linked.map(p => p.id),
         shareActive: Boolean(n.data?.share_token || n.data?.share_pin_set),

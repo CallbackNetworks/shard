@@ -73,7 +73,7 @@ export default function ShareView() {
   }
   const recentActivity = effectiveData?.recent_activity || []
   const meta = effectiveData?.meta || {}
-  const color = identity?.color || '#facc15'
+  const color = identity?.color || 'var(--kt-hit, #f5f6f7)'
   // A nav entry whose section is not rendered is a button that does nothing when clicked.
   const navSections = SECTIONS.filter(s => s.key !== 'decisions' || summary.total_decisions > 0)
 

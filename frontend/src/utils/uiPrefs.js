@@ -16,6 +16,7 @@ export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent']
 // applyUiPrefs publishes all four as CSS vars; global.css resolves --accent
 // and --accent-2 per theme.
 export const ACCENT_PRESETS = [
+  { key: 'graphite', main: '#f5f6f7', deep: '#c8ccd1', mainLight: '#3a3e43', deepLight: '#22262a' },
   { key: 'amber', main: '#facc15', deep: '#eab308', mainLight: '#a16207', deepLight: '#854d0e' },
   { key: 'indigo', main: '#818cf8', deep: '#6366f1', mainLight: '#4f46e5', deepLight: '#4338ca' },
   { key: 'emerald', main: '#34d399', deep: '#10b981', mainLight: '#059669', deepLight: '#047857' },
@@ -60,7 +61,7 @@ export const DEFAULT_UI_PREFS = {
   defaultView: 'issues',
   defaultPriority: 'medium',
   reduceMotion: false,
-  accent: 'amber',
+  accent: 'graphite',
   displayFont: 'anton',
   uiScale: 1.0,
   railExpanded: true, // rail shows labels and reserves its own gutter
