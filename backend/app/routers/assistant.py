@@ -12,7 +12,7 @@ from app.schemas import (
     AssistantConversationSummary,
     AssistantSendMessage,
 )
-from app.services.assistant_tools import TOOLS, dispatch_tool
+from app.services.assistant_tools import agent_tools, dispatch_tool
 from app.services.llm import get_provider
 
 logger = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ async def send_message(conv_id: str, body: AssistantSendMessage, db: Session = D
             for _round_num in range(MAX_TOOL_ROUNDS):
                 round_had_tool_call = False
 
-                async for event in provider.chat(round_messages, TOOLS, SYSTEM_PROMPT):
+                async for event in provider.chat(round_messages, agent_tools(), SYSTEM_PROMPT):
                     if event["type"] == "error":
                         # A provider-level failure is not a turn in the conversation:
                         # it is forwarded to the client and never written to history

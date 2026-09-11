@@ -64,12 +64,20 @@ STRUCTURAL_PARAMS = {"project_id"}
 # capability gaps, frozen so they cannot grow — not endorsed. Closing one means
 # deleting its line.
 PARAM_DIFFS = {
-    "list_tasks": {"priority"},  # the assistant cannot filter by priority
-    "get_analytics": {"days"},  # no window argument
+    "get_analytics": {"days"},  # three of MCP's reports live in v1 routes, not analytics_admin
     "get_graph_map": {"include"},  # cannot ask for the data payload
-    "get_container_subtree": {"view"},  # no view selector
     "add_comment": {"author"},  # the assistant always writes as "assistant"
     "manage_attachments": {"content_base64", "content_type", "filename"},  # cannot upload
+}
+
+# A shared tool takes its description from the MCP registry (ADR-0161). These are the
+# ones that keep their own, and the reason is always the same: the shared prose names a
+# capability this door does not have, so handing it over would describe a parameter the
+# model was not given. Closing the gap means deleting the line — which is what happened
+# to `list_tasks` (gained `priority`) and `get_container_subtree` (gained `view`).
+LOCAL_PROSE = {
+    "get_analytics": "MCP's names velocity/heatmap/status_trend, which are not reachable here",
+    "manage_attachments": "MCP's describes uploading via content_base64; this door lists and deletes",
 }
 
 
@@ -149,3 +157,49 @@ def test_the_exemption_lists_do_not_rot():
         f"stale MCP_ONLY: {stale_mcp}; stale ASSISTANT_ONLY: {stale_assistant}; "
         f"PARAM_DIFFS entries whose gap is closed (delete the line): {stale_params}"
     )
+
+
+def _assistant_local_prose() -> set[str]:
+    tree = ast.parse((APP / "services/assistant_tools.py").read_text())
+    literal = next(
+        ast.literal_eval(node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "TOOLS" for t in node.targets)
+    )
+    return {t["name"] for t in literal if t.get("description")}
+
+
+def test_a_shared_tool_does_not_describe_itself_twice():
+    """The half this file did not check, and the one the model actually reads (ADR-0161).
+
+    Names and parameters were pinned from the start; prose was not, and 27 of the 34
+    shared tools described themselves differently — no failure symptom, just a model
+    getting a better hint about when to reach for a tool depending on which door it came
+    through. That is ADR-0089 one layer up, which this file's own docstring cites.
+    """
+    shared = set(_assistant_tools()) & set(_mcp_tools())
+    unexpected = sorted((_assistant_local_prose() & shared) - set(LOCAL_PROSE))
+    assert not unexpected, (
+        f"These tools exist on both doors and still carry their own description: "
+        f"{unexpected}. Delete it so the tool takes MCP's, or add it to LOCAL_PROSE with "
+        "the capability that genuinely differs."
+    )
+
+
+def test_an_assistant_only_tool_carries_its_own_description():
+    """The other direction: MCP has no prose for these, so nothing would fill it in."""
+    missing = sorted(set(ASSISTANT_ONLY) - _assistant_local_prose())
+    assert not missing, f"assistant-only tools with no description of their own: {missing}"
+
+
+def test_every_tool_the_assistant_offers_is_described():
+    """End to end, through the function the router actually calls."""
+    from app.services.assistant_tools import agent_tools
+
+    blank = sorted(t["name"] for t in agent_tools() if not (t.get("description") or "").strip())
+    assert not blank, f"tools offered to the model with no description: {blank}"
+
+
+def test_the_local_prose_list_does_not_rot():
+    stale = sorted(set(LOCAL_PROSE) - _assistant_local_prose())
+    assert not stale, f"LOCAL_PROSE names tools that no longer carry their own description: {stale}"

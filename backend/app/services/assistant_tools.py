@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.models import ActivityLog, Comment, Edge, Node, Notification, TaskTemplate, WorkflowRule
 from app.schemas import RecurrenceRuleCreate, RecurrenceRuleOut, RecurrenceRuleUpdate, TaskImportItem
 from app.services import (
+    agent_tool_prose,
     analytics_admin,
     ancestry,
     attachment_admin,
@@ -51,7 +52,6 @@ from app.services.task_mutations import apply_task_update, finalize_task_create
 TOOLS = [
     {
         "name": "get_summary",
-        "description": "Get a high-level summary of all projects and tasks. Good starting point.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -60,7 +60,6 @@ TOOLS = [
     },
     {
         "name": "list_tasks",
-        "description": "List tasks for a project, optionally filtered by status.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -70,13 +69,17 @@ TOOLS = [
                     "enum": ["todo", "in_progress", "done", "failed"],
                     "description": "Filter by status",
                 },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                    "description": "Filter by priority",
+                },
             },
             "required": ["project_id"],
         },
     },
     {
         "name": "create_task",
-        "description": "Create a new task in a project.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -92,7 +95,6 @@ TOOLS = [
     },
     {
         "name": "update_task",
-        "description": "Update task fields: status, priority, due_date, assignee, title, description, time_estimate, time_spent.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -111,7 +113,6 @@ TOOLS = [
     },
     {
         "name": "create_subtask",
-        "description": "Create a subtask under an existing task.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -124,7 +125,6 @@ TOOLS = [
     },
     {
         "name": "manage_labels",
-        "description": "Add or remove a label from a task, or list labels for a project.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -138,7 +138,6 @@ TOOLS = [
     },
     {
         "name": "analyze_workload",
-        "description": "Analyze workload distribution: tasks by status, priority, overdue count, and per-assignee breakdown.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -149,7 +148,6 @@ TOOLS = [
     },
     {
         "name": "search",
-        "description": "Search for tasks or projects by keyword.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -160,7 +158,6 @@ TOOLS = [
     },
     {
         "name": "get_activity",
-        "description": "Get recent activity log.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -259,7 +256,6 @@ TOOLS = [
     },
     {
         "name": "add_comment",
-        "description": "Add a comment to a task. Supports markdown.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -271,7 +267,6 @@ TOOLS = [
     },
     {
         "name": "list_comments",
-        "description": "List all comments on a task in chronological order.",
         "input_schema": {
             "type": "object",
             "properties": {"task_id": {"type": "string", "description": "Task ID"}},
@@ -280,7 +275,6 @@ TOOLS = [
     },
     {
         "name": "manage_dependencies",
-        "description": "View, add, or remove task dependencies (blocker relationships).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -293,7 +287,6 @@ TOOLS = [
     },
     {
         "name": "get_notifications",
-        "description": "Get in-app notifications. Useful for checking what events occurred recently.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -305,10 +298,6 @@ TOOLS = [
     },
     {
         "name": "manage_notifications",
-        "description": (
-            "Act on notifications: 'unread_count', 'read' one, 'read_all', or 'delete' one. "
-            "Reading the list itself is get_notifications — this is the half that clears them."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -320,7 +309,6 @@ TOOLS = [
     },
     {
         "name": "report_progress",
-        "description": "Report intermediate progress on a task: progress percentage, agent notes, optionally a comment.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -334,7 +322,6 @@ TOOLS = [
     },
     {
         "name": "list_projects",
-        "description": "List all projects, optionally filtered by status.",
         "input_schema": {
             "type": "object",
             "properties": {"status": {"type": "string", "enum": ["active", "archived"]}},
@@ -343,7 +330,6 @@ TOOLS = [
     },
     {
         "name": "create_project",
-        "description": "Create a new project.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -355,11 +341,6 @@ TOOLS = [
     },
     {
         "name": "get_project_detail",
-        "description": (
-            "Get a single project with its own tasks, progress and labels in one call. "
-            "Shows only the project's own tasks, not nested containers — for that, use "
-            "get_container_subtree."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {"project_id": {"type": "string", "description": "Project ID"}},
@@ -368,7 +349,6 @@ TOOLS = [
     },
     {
         "name": "delete_task",
-        "description": "Permanently delete a task. Irreversible.",
         "input_schema": {
             "type": "object",
             "properties": {"task_id": {"type": "string", "description": "Task ID"}},
@@ -377,21 +357,24 @@ TOOLS = [
     },
     {
         "name": "get_container_subtree",
-        "description": (
-            "A container's task rollup over everything it contains, plus the containers "
-            "directly inside it (each with its own rollup). Use this to find work that "
-            "lives one or more levels below a project: list_tasks and get_project_detail "
-            "only show a container's own tasks, not nested containers."
-        ),
         "input_schema": {
             "type": "object",
-            "properties": {"node_id": {"type": "string", "description": "A project or any custom container"}},
+            "properties": {
+                "node_id": {"type": "string", "description": "A project or any custom container"},
+                "view": {
+                    "type": "string",
+                    "enum": ["containers", "tasks"],
+                    "description": (
+                        "'containers' (default) rolls the whole subtree up; 'tasks' returns "
+                        "the board of tasks living directly in this container"
+                    ),
+                },
+            },
             "required": ["node_id"],
         },
     },
     {
         "name": "bulk_update_tasks",
-        "description": "Batch-update multiple existing tasks in one call. Each item needs an 'id' plus the fields to change.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -414,10 +397,6 @@ TOOLS = [
     },
     {
         "name": "manage_unfiled",
-        "description": (
-            "List or file the unfiled bucket: tasks that belong to no project at all. "
-            "'file' gives a task its first project — idempotent."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -430,12 +409,6 @@ TOOLS = [
     },
     {
         "name": "get_graph_map",
-        "description": (
-            "The whole graph in one call — nodes and the edges between them. Narrow with "
-            "types (comma-separated node type keys). This is the orientation call: it "
-            "shows which containers exist and how they nest, which listing projects "
-            "cannot. Never includes a node's raw data payload (credentials may live there)."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -447,13 +420,6 @@ TOOLS = [
     },
     {
         "name": "get_ancestry",
-        "description": (
-            "Where these nodes live and whose they are. For each id: 'trails' are the "
-            "containment paths above it, root-first — several when a node has several "
-            "parents — and 'owners' are the identities that own it. Ask this before "
-            "reporting on a project: the project list says nothing about the identity or "
-            "organization it sits under."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -464,7 +430,6 @@ TOOLS = [
     },
     {
         "name": "list_decisions",
-        "description": "List decision records with their status (proposed/accepted/deprecated/superseded), what each supersedes and is superseded by, and the work each governs.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -476,13 +441,6 @@ TOOLS = [
     },
     {
         "name": "manage_decision_links",
-        "description": (
-            "The relations a decision record carries. 'supersede' records that decision_id replaces "
-            "superseded_id and marks the older one superseded (one act — a record saying it was replaced "
-            "with nothing naming the replacement is a dead end). 'unsupersede' withdraws that. 'governs' "
-            "attaches a decision to a task or container; 'ungoverns' detaches it. 'governing' lists the "
-            "decisions attached to a piece of work."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -499,7 +457,6 @@ TOOLS = [
     },
     {
         "name": "export_decision",
-        "description": "Export one decision record as a Markdown document ready to save as an ADR.",
         "input_schema": {
             "type": "object",
             "properties": {"decision_id": {"type": "string", "description": "Decision ID"}},
@@ -508,12 +465,6 @@ TOOLS = [
     },
     {
         "name": "manage_cycles",
-        "description": (
-            "Read and roll over cycles (sprints). 'list'/'get' return a cycle with its "
-            "tasks; 'compare' puts two cycles side by side; 'duplicate' rolls a cycle over "
-            "into a fresh draft cycle carrying its tasks (as new todos, not the old ones' "
-            "status/time-spent)."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -527,12 +478,15 @@ TOOLS = [
     },
     {
         "name": "get_analytics",
+        # Local prose (ADR-0161): MCP's names velocity/heatmap/status_trend, which live in
+        # v1 routes rather than `analytics_admin` and are not reachable from here.
         "description": (
             "One planning report at a time. 'burndown'/'cycle_burndown' need cycle_id; "
-            "'critical_path' needs project_id and returns the longest dependency chain; "
-            "'estimation_calibration' compares past estimates against actuals for a "
-            "project (or globally if omitted); 'estimate_suggestion' takes raw_estimate "
-            "and corrects it by that history."
+            "'critical_path' needs project_id and returns the dependency chain that decides "
+            "the finish date; 'estimation_calibration' compares past estimates against "
+            "actuals; 'estimate_suggestion' takes raw_estimate and corrects it by that "
+            "history. analyze_workload answers 'what is the state of things' — this answers "
+            "'how is it trending, and what will it take'."
         ),
         "input_schema": {
             "type": "object",
@@ -556,13 +510,6 @@ TOOLS = [
     },
     {
         "name": "manage_recurrence",
-        "description": (
-            "Read or set a task's recurrence. config for create/update: {frequency: "
-            "daily|weekly|monthly|interval, next_run_at: ISO timestamp, interval_value?: "
-            "int, day_of_week?: 0-6, day_of_month?: 1-31, end_date?: ISO, active?: bool}. "
-            "A task has at most one rule; 'create' on a task that already has one fails — "
-            "use 'update' instead."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -576,11 +523,6 @@ TOOLS = [
     },
     {
         "name": "manage_templates",
-        "description": (
-            "List, create, update or delete task templates. config for create: {name, "
-            "description?, priority?: low|medium|high, subtasks?: [{title, priority?}], "
-            "label_names?: [str], project_id?}. A template with no project_id is global."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -594,9 +536,11 @@ TOOLS = [
     },
     {
         "name": "manage_attachments",
+        # Local prose (ADR-0161): MCP's describes uploading bytes in content_base64, which
+        # this door does not take — it lists and deletes only.
         "description": (
-            "List or delete a task's file attachments. Uploading is not available from "
-            "the assistant — use the app to attach a file."
+            "List or delete a task's file attachments. Uploading is not available here: "
+            "the file has to arrive through the app or the external API."
         ),
         "input_schema": {
             "type": "object",
@@ -610,11 +554,6 @@ TOOLS = [
     },
     {
         "name": "import_tasks",
-        "description": (
-            "Import a batch of issues or cards as tasks. Labels are matched by name in "
-            "the project and created if missing; a closed issue or card becomes a done "
-            "task. Partial success: the result is {imported, skipped, errors}."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -635,11 +574,6 @@ TOOLS = [
     },
     {
         "name": "transfer_tasks",
-        "description": (
-            "Export a project's tasks as JSON, or import a batch back. Unlike "
-            "import_tasks (which speaks Trello/Linear/GitHub), this is the platform's own "
-            "shape and round-trips: what export gives you is what import takes."
-        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -658,6 +592,16 @@ TOOLS = [
         },
     },
 ]
+
+
+def agent_tools() -> list[dict]:
+    """``TOOLS`` with the prose the MCP registry already generates (ADR-0161).
+
+    ``TOOLS`` itself stays a plain literal: it is what ``test_assistant_tool_parity.py``
+    reads with ``ast.literal_eval`` to pin the tool names and their parameters, and a
+    guard that has to import the module it guards can be defeated by the module.
+    """
+    return [{**tool, "description": agent_tool_prose.describe(tool["name"], tool.get("description"))} for tool in TOOLS]
 
 
 async def dispatch_tool(tool_name: str, tool_input: dict, db: Session) -> str:
@@ -772,10 +716,12 @@ async def _tool_get_summary(db: Session) -> str:
     return json.dumps(result, default=str)
 
 
-def _tool_list_tasks(db: Session, project_id: str, status: str | None = None) -> str:
+def _tool_list_tasks(db: Session, project_id: str, status: str | None = None, priority: str | None = None) -> str:
     q = db.query(Node).filter(graph.task_type_filter(db), Node.id.in_(graph.contained_task_ids(db, project_id)))
     if status:
         q = q.filter(Node.status == status)
+    if priority:
+        q = q.filter(Node.priority == priority)
     tasks = [graph.task_view(n, db) for n in q.order_by(Node.created_at.desc()).limit(50).all()]
     return json.dumps(
         [
@@ -1407,10 +1353,16 @@ async def _tool_delete_task(db: Session, task_id: str) -> str:
     return json.dumps({"status": "deleted", "id": task_id, "title": title})
 
 
-def _tool_get_container_subtree(db: Session, node_id: str) -> str:
+def _tool_get_container_subtree(db: Session, node_id: str, view: str = "containers") -> str:
     node = db.get(Node, node_id)
     if not node:
         return f"Node {node_id} not found"
+    # The two halves of a container's children have one endpoint each (ADR-0065): the
+    # child containers with their own rollups, or the board of tasks living directly in
+    # it. The shared description names both, so both have to be reachable here.
+    if view == "tasks":
+        ids = graph.contained_task_ids(db, node_id)
+        return json.dumps([graph.task_view(t, db).model_dump() for t in graph.task_views_by_ids(db, ids)], default=str)
     return json.dumps(enrich_container_subtree(node, db, visible=None).model_dump(), default=str)
 
 
