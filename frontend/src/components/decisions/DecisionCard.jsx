@@ -14,7 +14,9 @@ import s from './DecisionCard.module.css'
 
 // `superseded` is not in this table on purpose: that status is a consequence of the
 // supersession edge (ADR-0118), so it is changed by withdrawing the edge, never by a
-// button that would leave the edge saying the opposite.
+// button that would leave the edge saying the opposite. The reason is the edge, not the
+// word — so a record wearing the word with *no* edge behind it is the one case where a
+// button contradicts nothing, and it gets `UNBACKED_ACTIONS` instead (ADR-0159).
 const STATUS_ACTIONS = {
   proposed: [
     { key: 'accept', to: 'accepted', icon: <Check size={11} />, cls: 'kt-btn-accept' },
@@ -28,6 +30,12 @@ const STATUS_ACTIONS = {
   ],
   superseded: [],
 }
+
+// The repair for a dead end: nothing names a replacement, so the record is live and the
+// only honest thing to do with it is put it back in a state it can leave.
+const UNBACKED_ACTIONS = [
+  { key: 'reopen', to: 'proposed', icon: <RotateCcw size={11} />, cls: '' },
+]
 
 const RETIRED = new Set(['deprecated', 'superseded'])
 
@@ -58,6 +66,13 @@ export default function DecisionCard({
   const inChain = (id) => !!chainIds?.has(id)
   const supersedes = (decision.supersedes || []).filter(n => !inChain(n.id))
   const supersededBy = (decision.superseded_by || []).filter(n => !inChain(n.id))
+  // Measured against the *unfiltered* list: `supersededBy` drops what the lineage rail
+  // already states, and a chain member is still an edge. Production held 17 records
+  // saying "replaced" with nothing naming by what — nine of them written after ADR-0118
+  // through the generic node surface, which took the word until ADR-0159 closed it. The
+  // door is shut now; these are what is behind it, and they are only repairable if the
+  // card says so.
+  const unbacked = status === 'superseded' && (decision.superseded_by || []).length === 0
   const governs = decision.governs || []
   // ADR-0127. `requires` is directed and drawn from both ends; `conflicts_with` is
   // symmetric and arrives already merged from the server, so the card never has to know
@@ -81,6 +96,11 @@ export default function DecisionCard({
             <span className="kt-badge" style={{ background: statusStyle.bg, color: statusStyle.color }}>
               {t(`decisions.${status}`)}
             </span>
+            {unbacked && (
+              <span className={s.unbacked} title={t('decisions.unbackedHint')}>
+                <TriangleAlert size={10} /> {t('decisions.unbacked')}
+              </span>
+            )}
             {decision.source && (
               // `source` is free-form: `ai` and `manual` have a translation, and
               // production also holds `assistant` and `frontend`, which rendered as the
@@ -104,7 +124,7 @@ export default function DecisionCard({
       </div>
 
       <div className={s.actions}>
-        {(STATUS_ACTIONS[status] || []).map(action => (
+        {(unbacked ? UNBACKED_ACTIONS : STATUS_ACTIONS[status] || []).map(action => (
           <button
             key={action.key}
             onClick={() => onStatus(decision, action.to)}

@@ -258,6 +258,90 @@ class TestASupersededDecisionNamesItsSuccessor:
         assert "supersedes" in r.json()["detail"]
 
 
+class TestTheSupersededStatusCannotBeTypedOnItsOwn:
+    """ADR-0159: the claim ADR-0118 made twice in prose and enforced nowhere.
+
+    ``supersede()`` writes the edge and the status as one act precisely so the half that
+    fails alone cannot leave a record saying "replaced" with nothing naming by what — and
+    then the generic node surface, which is the door an agent uses, accepted
+    ``status="superseded"`` as a plain word. ADR-0118 migrated the nine dead ends that
+    existed; by the time this was measured production held **17 more**, every one of them
+    written through that door. The nine were the symptom, not the defect.
+
+    The rule runs both ways. While the edge exists the status belongs to it, or the
+    invariant holds in one direction only and the mirror dead end — an edge saying
+    replaced beside a status saying accepted — is still reachable.
+    """
+
+    def test_a_decision_cannot_be_created_already_superseded(self, client, sample_project):
+        r = client.post(
+            "/api/nodes",
+            json={
+                "type": "decision",
+                "title": "Use MySQL",
+                "container_id": sample_project.id,
+                "status": "superseded",
+            },
+        )
+        assert r.status_code == 422, r.text
+        assert "supersedes" in r.json()["detail"]
+        assert client.get("/api/decisions").json() == []
+
+    def test_the_status_cannot_be_typed_onto_an_existing_record(self, client, db, sample_project):
+        d = _make_decision(db, sample_project.id, "Use MySQL", decision_status="accepted")
+        r = client.patch(f"/api/nodes/{d.id}", json={"status": "superseded"})
+        assert r.status_code == 422, r.text
+        # The refusal names the act that works, with this record's own id already in it
+        # (ADR-0078: an agent always reads the error and not always the docs).
+        assert f"/supersedes/{d.id}" in r.json()["detail"]
+        assert client.get(f"/api/decisions/{d.id}").json()["decision_status"] == "accepted"
+
+    def test_both_doors_refuse_it_the_same_way(self, client, db, sample_project):
+        d = _make_decision(db, sample_project.id, "Use MySQL", decision_status="accepted")
+        raw = _read_key(db, "tdp_test_decision_write", scopes=("read", "write"))
+        internal = client.patch(f"/api/nodes/{d.id}", json={"status": "superseded"})
+        external = client.patch(
+            f"/api/v1/nodes/{d.id}", json={"status": "superseded"}, headers={"X-API-Key": raw}
+        )
+        assert internal.status_code == external.status_code == 422
+        assert internal.json()["detail"] == external.json()["detail"]
+
+    def test_any_other_status_is_still_free(self, client, db, sample_project):
+        """The negative control: the guard is about one word, not about decisions."""
+        d = _make_decision(db, sample_project.id, "Use MySQL", decision_status="accepted")
+        assert client.patch(f"/api/nodes/{d.id}", json={"status": "deprecated"}).status_code == 200
+        assert client.get(f"/api/decisions/{d.id}").json()["decision_status"] == "deprecated"
+
+    def test_a_record_the_edge_backs_may_be_written_back_unchanged(self, client, db, sample_project):
+        """A client that GETs a record and PATCHes it must not be refused its own state."""
+        old = _make_decision(db, sample_project.id, "Use MySQL", decision_status="accepted")
+        new = _make_decision(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+        client.post(f"/api/decisions/{new.id}/supersedes/{old.id}")
+
+        r = client.patch(f"/api/nodes/{old.id}", json={"status": "superseded", "title": "Use MySQL 8"})
+        assert r.status_code == 200, r.text
+        assert client.get(f"/api/decisions/{old.id}").json()["name"] == "Use MySQL 8"
+
+    def test_the_status_is_not_free_while_the_edge_exists(self, client, db, sample_project):
+        old = _make_decision(db, sample_project.id, "Use MySQL", decision_status="accepted")
+        new = _make_decision(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+        client.post(f"/api/decisions/{new.id}/supersedes/{old.id}")
+
+        r = client.patch(f"/api/nodes/{old.id}", json={"status": "accepted"})
+        assert r.status_code == 422, r.text
+        assert "Withdraw the supersession" in r.json()["detail"]
+        assert client.get(f"/api/decisions/{old.id}").json()["decision_status"] == "superseded"
+
+    def test_withdrawing_the_edge_hands_the_status_back(self, client, db, sample_project):
+        old = _make_decision(db, sample_project.id, "Use MySQL", decision_status="accepted")
+        new = _make_decision(db, sample_project.id, "Use PostgreSQL", decision_status="accepted")
+        client.post(f"/api/decisions/{new.id}/supersedes/{old.id}")
+        client.delete(f"/api/decisions/{new.id}/supersedes/{old.id}")
+
+        assert client.patch(f"/api/nodes/{old.id}", json={"status": "proposed"}).status_code == 200
+        assert client.get(f"/api/decisions/{old.id}").json()["decision_status"] == "proposed"
+
+
 class TestADecisionNamesTheWorkItGoverns:
     def test_governing_reads_from_the_works_side(self, client, db, sample_project):
         from tests.factories import make_task

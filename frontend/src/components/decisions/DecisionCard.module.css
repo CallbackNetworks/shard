@@ -29,6 +29,19 @@
   opacity: 0.6;
 }
 
+/* A status not backed by the edge it is supposed to be a consequence of (ADR-0159).
+   Drawn in the failed family rather than a fourth hue: it is a broken state, which is
+   what that family already means (ADR-0088). */
+.unbacked {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 1px 5px;
+  color: var(--kt-status-failed, #fb7185);
+  background: var(--kt-status-failed-bg, rgba(251, 113, 133, 0.14));
+}
+
 .source {
   display: flex;
   align-items: center;

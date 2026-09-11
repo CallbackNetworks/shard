@@ -563,6 +563,8 @@
   "decisions.accepted": "已採納",
   "decisions.deprecated": "已棄用",
   "decisions.superseded": "已取代",
+  "decisions.unbacked": "沒有後繼者",
+  "decisions.unbackedHint": "這筆記錄說自己被取代了，但沒有任何決策說自己是後繼者。把它重新開啟，或從取代它的那筆決策記錄取代關係。",
   "decisions.accept": "採納",
   "decisions.reject": "拒絕",
   "decisions.export": "匯出",
@@ -1403,5 +1405,8 @@
   "ancestry.upAmong": "上一層 — {{count}} 個父節點",
   "ancestry.noParent": "未歸檔於任何位置",
   "nodeExplorer.open": "開啟",
-  "structure.openSubject": "開啟這個{{type}}"
+  "structure.openSubject": "開啟這個{{type}}",
+  "common.close": "關閉",
+  "pwa.install": "安裝",
+  "pwa.installPrompt": "安裝 Shard，隨手就能打開"
 }

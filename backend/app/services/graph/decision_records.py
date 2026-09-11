@@ -21,7 +21,10 @@ Two relations make the record answerable about itself (both declared in
 ``supersedes``  newer decision -> the one it replaces. The ``superseded`` status is a
                 consequence of this edge, never typed on its own — a status saying "this
                 was replaced" while nothing says by what is a dead end, which is what
-                production held for all nine of them.
+                production held for all nine of them. Stated here from the start and
+                *enforced* only by ADR-0159, which is why production then collected 17
+                more through the generic node surface: a sentence in a docstring is not
+                a rule, it is a description of one somebody still has to write.
 ``governs``     decision -> the task or container it decides. The reverse read
                 (:func:`governing`) is the question that had no query at all: labels
                 could be listed for a task, and the work could never be listed for a
@@ -280,7 +283,17 @@ def governing(db: Session, node_id: str) -> list[DecisionView]:
     return [_view(n, pmap.get(n.id), lmap.get(n.id)) for n in rows]
 
 
-def assert_decision_write_shape(db: Session, node_type: str, fields: dict | None) -> None:
+def superseded_by_edge(db: Session, node_id: str | None) -> bool:
+    """Whether anything actually names itself the replacement for ``node_id``."""
+    if node_id is None:
+        return False
+    row = db.execute(select(Edge.id).where(Edge.target_id == node_id, Edge.rel_type == REL_SUPERSEDES)).first()
+    return row is not None
+
+
+def assert_decision_write_shape(
+    db: Session, node_type: str, fields: dict | None, *, node_id: str | None = None
+) -> None:
     """Refuse the two ways a decision write silently lands somewhere it will not be found.
 
     Both are the same defect wearing two dates. ADR-0118 moved a decision out of
@@ -314,4 +327,32 @@ def assert_decision_write_shape(db: Session, node_type: str, fields: dict | None
             f"a decision's state is the 'status' field, not data.{LEGACY_STATUS_KEY} "
             f"(ADR-0130). Send status='{fields[LEGACY_STATUS_KEY]}'; the response still "
             f"reports it as {LEGACY_STATUS_KEY}."
+        )
+    if node_type != NODE_DECISION or "status" not in fields:
+        return
+    # The third way a decision write lands somewhere it will not be found, and the one
+    # ADR-0118 asserted and never enforced (ADR-0159): ``superseded`` is what a ``supersedes`` edge
+    # sets on the far end, never a state somebody types on its own. The card offers no
+    # button for it precisely because a button would contradict an edge (ADR-0122) — but
+    # the generic node surface, which is the door an agent uses, took the word happily.
+    # Production collected 17 records saying "replaced" with nothing naming by what —
+    # eight of them older than ADR-0118 (its migration could only convert the ones that
+    # named a successor) and **nine written after it**, straight through this door. The
+    # rule runs both ways, because a consequence that only holds in one
+    # direction is half an invariant: while the edge exists the status is its own.
+    backed = superseded_by_edge(db, node_id)
+    if fields["status"] == STATUS_SUPERSEDED and not backed:
+        raise Unprocessable(
+            f"'{STATUS_SUPERSEDED}' is a consequence of a supersedes edge, not a status to "
+            f"type (ADR-0118). Record the replacement instead: "
+            f"POST /decisions/{{replacement_id}}/supersedes/{node_id or '{decision_id}'} "
+            f"— that writes the edge and sets this status in one act. Written on its own "
+            f"it says this was replaced while nothing says by what."
+        )
+    if fields["status"] != STATUS_SUPERSEDED and backed:
+        raise Unprocessable(
+            f"this decision is superseded by another one, so its status is not free to set "
+            f"(ADR-0118). Withdraw the supersession first: "
+            f"DELETE /decisions/{{replacement_id}}/supersedes/{node_id} — that removes the "
+            f"edge and returns this record to 'accepted'."
         )

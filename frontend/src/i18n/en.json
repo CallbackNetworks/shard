@@ -557,6 +557,8 @@
   "decisions.accepted": "Accepted",
   "decisions.deprecated": "Deprecated",
   "decisions.superseded": "Superseded",
+  "decisions.unbacked": "no successor",
+  "decisions.unbackedHint": "This record says it was replaced, but no decision names itself the replacement. Reopen it, or record the supersession from the decision that replaced it.",
   "decisions.accept": "Accept",
   "decisions.reject": "Reject",
   "decisions.export": "Export",
@@ -1402,5 +1404,8 @@
   "ancestry.upAmong": "Up — {{count}} parents",
   "ancestry.noParent": "Not filed anywhere",
   "nodeExplorer.open": "Open",
-  "structure.openSubject": "Open {{type}}"
+  "structure.openSubject": "Open {{type}}",
+  "common.close": "Close",
+  "pwa.install": "Install",
+  "pwa.installPrompt": "Install Shard for quick access"
 }

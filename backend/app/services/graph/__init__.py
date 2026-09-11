@@ -109,6 +109,7 @@ from app.services.graph.decision_records import (
     get_decision,
     governing,
     supersede,
+    superseded_by_edge,
     unsupersede,
 )
 from app.services.graph.decision_records import (
