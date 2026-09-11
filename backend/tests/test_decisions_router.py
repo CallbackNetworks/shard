@@ -300,9 +300,7 @@ class TestTheSupersededStatusCannotBeTypedOnItsOwn:
         d = _make_decision(db, sample_project.id, "Use MySQL", decision_status="accepted")
         raw = _read_key(db, "tdp_test_decision_write", scopes=("read", "write"))
         internal = client.patch(f"/api/nodes/{d.id}", json={"status": "superseded"})
-        external = client.patch(
-            f"/api/v1/nodes/{d.id}", json={"status": "superseded"}, headers={"X-API-Key": raw}
-        )
+        external = client.patch(f"/api/v1/nodes/{d.id}", json={"status": "superseded"}, headers={"X-API-Key": raw})
         assert internal.status_code == external.status_code == 422
         assert internal.json()["detail"] == external.json()["detail"]
 
