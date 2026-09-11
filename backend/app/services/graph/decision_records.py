@@ -54,6 +54,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Edge, Node
+from app.services import write_invariants
 from app.services.errors import Unprocessable
 from app.services.graph.core import (
     NODE_DECISION,
@@ -291,55 +292,80 @@ def superseded_by_edge(db: Session, node_id: str | None) -> bool:
     return row is not None
 
 
-def assert_decision_write_shape(
-    db: Session, node_type: str, fields: dict | None, *, node_id: str | None = None
+# --- Write invariants (ADR-0159, registered per ADR-0161) --------------------
+#
+# Three rules, all of them the same defect wearing three dates: a decision write that
+# returns 2xx and lands somewhere nothing will find it. They live here, beside the type
+# they constrain, and register themselves against the write paths rather than being
+# called by name from two services that know nothing about decisions.
+
+
+@write_invariants.register(write_invariants.ANY)
+def _refuse_a_decision_written_as_something_else(
+    db: Session, node_type: str, fields: dict, node_id: str | None
 ) -> None:
-    """Refuse the two ways a decision write silently lands somewhere it will not be found.
+    """The ADR-0004 shape: a ``label`` carrying ``data.type="decision"``.
 
-    Both are the same defect wearing two dates. ADR-0118 moved a decision out of
-    ``label`` + ``data.type="decision"`` and said the old shape would stop working
-    "visibly"; it did not. ``POST /nodes`` with the old shape returns **201**, and what
-    it creates is a label — invisible to ``decisions()`` (which filters on ``Node.type``)
-    and, since ADR-0118 removed ``label_names``'s subtraction, a real entry in the label
-    vocabulary. Production ran that way for two days and collected 17 records: the newest
-    17 decisions in the database, none of them on the decisions page and all of them in
-    the label picker. ADR-0130 moved the *status* to the ``nodes.status`` column, which
-    opens the identical trap one field down — ``data.decision_status`` would be accepted
-    as an inert key while the column, which is now what every decision surface reads,
-    stayed NULL.
+    ADR-0118 moved a decision out of ``label`` + ``data.type="decision"`` and said the
+    old shape would stop working "visibly"; it did not. ``POST /nodes`` with the old
+    shape returns **201**, and what it creates is a label — invisible to ``decisions()``
+    (which filters on ``Node.type``) and, since the same ADR removed ``label_names``'s
+    subtraction, a real entry in the label vocabulary. Production ran that way for two
+    days and collected 17 records: the newest 17 decisions in the database, none of them
+    on the decisions page and all of them in the label picker.
 
-    So both are refused at the door, and the refusal names the shape that works. That is
-    ADR-0078's rule: an agent always reads the error and does not always read the docs.
+    Registered under ``ANY`` rather than under ``decision``: the whole point is that the
+    write *says* label and *means* decision, so the type it would key on is the one type
+    it can never see.
     """
-    if not fields:
+    if node_type == NODE_DECISION:
         return
-    if node_type != NODE_DECISION and (
-        fields.get("type") == NODE_DECISION or (node_type == NODE_LABEL and LEGACY_STATUS_KEY in fields)
-    ):
+    if fields.get("type") == NODE_DECISION or (node_type == NODE_LABEL and LEGACY_STATUS_KEY in fields):
         raise Unprocessable(
             f"a decision record is its own node type since ADR-0118: create it with "
             f"type='{NODE_DECISION}' instead of type='{node_type}' carrying "
             f"data.type='{NODE_DECISION}'. Written this way it is a label — it will not "
             f"appear on the decisions page and it will appear in the label vocabulary."
         )
-    if node_type == NODE_DECISION and LEGACY_STATUS_KEY in fields:
-        raise Unprocessable(
-            f"a decision's state is the 'status' field, not data.{LEGACY_STATUS_KEY} "
-            f"(ADR-0130). Send status='{fields[LEGACY_STATUS_KEY]}'; the response still "
-            f"reports it as {LEGACY_STATUS_KEY}."
-        )
-    if node_type != NODE_DECISION or "status" not in fields:
+
+
+@write_invariants.register(NODE_DECISION)
+def _refuse_the_state_in_the_old_data_key(db: Session, node_type: str, fields: dict, node_id: str | None) -> None:
+    """ADR-0130 moved the state to the ``nodes.status`` column, which opens the identical
+    trap one field down: ``data.decision_status`` would be accepted as an inert key while
+    the column, which is now what every decision surface reads, stayed NULL.
+
+    The refusal names the field that works, because an agent always reads the error and
+    does not always read the docs (ADR-0078).
+    """
+    if LEGACY_STATUS_KEY not in fields:
         return
-    # The third way a decision write lands somewhere it will not be found, and the one
-    # ADR-0118 asserted and never enforced (ADR-0159): ``superseded`` is what a ``supersedes`` edge
-    # sets on the far end, never a state somebody types on its own. The card offers no
-    # button for it precisely because a button would contradict an edge (ADR-0122) — but
-    # the generic node surface, which is the door an agent uses, took the word happily.
-    # Production collected 17 records saying "replaced" with nothing naming by what —
-    # eight of them older than ADR-0118 (its migration could only convert the ones that
-    # named a successor) and **nine written after it**, straight through this door. The
-    # rule runs both ways, because a consequence that only holds in one
-    # direction is half an invariant: while the edge exists the status is its own.
+    raise Unprocessable(
+        f"a decision's state is the 'status' field, not data.{LEGACY_STATUS_KEY} "
+        f"(ADR-0130). Send status='{fields[LEGACY_STATUS_KEY]}'; the response still "
+        f"reports it as {LEGACY_STATUS_KEY}."
+    )
+
+
+@write_invariants.register(NODE_DECISION)
+def _keep_the_superseded_status_tied_to_its_edge(
+    db: Session, node_type: str, fields: dict, node_id: str | None
+) -> None:
+    """The third way, and the one ADR-0118 asserted and never enforced (ADR-0159).
+
+    ``superseded`` is what a ``supersedes`` edge sets on the far end, never a state
+    somebody types on its own. The card offers no button for it precisely because a
+    button would contradict an edge (ADR-0122) — but the generic node surface, which is
+    the door an agent uses, took the word happily. Production collected 17 records saying
+    "replaced" with nothing naming by what: eight older than ADR-0118 (its migration
+    could only convert the ones that named a successor) and **nine written after it**,
+    straight through this door.
+
+    The rule runs both ways, because a consequence that only holds in one direction is
+    half an invariant: while the edge exists the status is its own.
+    """
+    if "status" not in fields:
+        return
     backed = superseded_by_edge(db, node_id)
     if fields["status"] == STATUS_SUPERSEDED and not backed:
         raise Unprocessable(

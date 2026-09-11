@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Node, NodeType
 from app.schemas import NodeCreate, NodeOut
-from app.services import graph
+from app.services import graph, write_invariants
 from app.services.enrichment import enrich_task
 from app.services.errors import NotFound, Unprocessable
 from app.services.graph_dispatch import dispatch_node_created
@@ -76,10 +76,11 @@ async def create(
     fields = body.model_dump(exclude={"type", "title", "data", "container_id", "parent_id"}, exclude_none=True)
     if body.data:
         fields.update(body.data)
-    # A write whose shape means "decision" must actually make one (ADR-0130). Checked
-    # after the merge because the old shape can arrive in ``data`` or, since NodeCreate
-    # allows extras, flat beside it — both fold into the same bag.
-    graph.assert_decision_write_shape(db, body.type, fields)
+    # Whatever this type's write rules are, they run here (ADR-0161). Checked after the
+    # merge because a rule's subject can arrive in ``data`` or, since NodeCreate allows
+    # extras, flat beside it — both fold into the same bag. No ``node_id``: a rule about
+    # what a row already is cannot hold for a row that does not exist yet.
+    write_invariants.check_write(db, body.type, fields)
     node = graph.create_node(db, body.type, title=body.title, **fields)
 
     # Containment before dispatch, so the task pipeline can resolve the node's project

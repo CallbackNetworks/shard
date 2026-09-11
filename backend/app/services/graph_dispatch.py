@@ -29,7 +29,7 @@ endpoints' roles rather than by the route that happened to be called.
 from sqlalchemy.orm import Session
 
 from app.models import Node
-from app.services import graph
+from app.services import graph, write_invariants
 from app.services.activity import log_activity
 from app.services.notifier import fire_notifications, fire_project_notifications
 from app.services.rules_engine import run_rules
@@ -104,7 +104,7 @@ async def dispatch_node_updated(
     ``graph.update_node`` and emit a generic activity entry + broadcast. Commits
     and returns the refreshed ``Node``.
     """
-    graph.assert_decision_write_shape(db, node.type, changes, node_id=node.id)
+    write_invariants.check_write(db, node.type, changes, node_id=node.id)
     if _has_task_role(db, node.type):
         await apply_task_update(db, node.id, changes, actor=actor, source=source)
         return db.get(Node, node.id)
