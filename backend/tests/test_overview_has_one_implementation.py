@@ -12,14 +12,13 @@ overdue/failed/high-priority in the browser from ``GET /projects`` with every ta
 reach three integers. So the counts it needs are asserted here, at the door it now reads.
 """
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.models import ApiKey
 from tests.factories import make_task
-
-import hashlib
 
 # Every key the ticker and the analytics page read. A count added to the service and not
 # to this list is not tested; a count in this list missing from either door fails.
