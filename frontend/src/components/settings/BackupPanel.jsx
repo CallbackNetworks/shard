@@ -67,7 +67,7 @@ export default function BackupPanel({ settings, onUpdateSystem }) {
   }
 
   return (
-    <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+    <div className="kt-card kt-card-section">
       <SectionTitle
         icon={<DatabaseBackup size={16} color={DARK.info} />}
         title={t('settings.backup')}

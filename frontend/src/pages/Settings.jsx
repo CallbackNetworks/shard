@@ -96,7 +96,7 @@ export default function Settings() {
 
       <div className="kt-settings-grid">
       {/* Preferences (client-side, always available) */}
-      <div className="kt-card" data-tour="settings-preferences" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card kt-card-section" data-tour="settings-preferences">
         <SectionTitle
           icon={<SlidersHorizontal size={16} color="#818cf8" />}
           title={t('settings.preferences')}
@@ -207,7 +207,7 @@ export default function Settings() {
       </div>
 
       {/* Date & time display */}
-      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card kt-card-section">
         <SectionTitle
           icon={<Clock size={16} color="#818cf8" />}
           title={t('settings.dateTime')}
@@ -236,7 +236,7 @@ export default function Settings() {
       </div>
 
       {/* Lists & live updates */}
-      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card kt-card-section">
         <SectionTitle
           icon={<SlidersHorizontal size={16} color="#818cf8" />}
           title={t('settings.listsRefresh')}
@@ -258,7 +258,7 @@ export default function Settings() {
       </div>
 
       {/* Sidebar modules: show/hide + reorder */}
-      <div className="kt-card" data-tour="settings-modules" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card kt-card-section" data-tour="settings-modules">
         <SectionTitle
           icon={<PanelLeft size={16} color="#818cf8" />}
           title={t('settings.sidebarModules')}
@@ -321,7 +321,7 @@ export default function Settings() {
       </div>
 
       {/* Calendar feed (personal global iCal subscription) */}
-      <div className="kt-card" data-tour="settings-calendar" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card kt-card-section" data-tour="settings-calendar">
         <SectionTitle
           icon={<CalendarClock size={16} color="#818cf8" />}
           title={t('settings.calendarFeed')}
@@ -367,7 +367,7 @@ export default function Settings() {
       {settings && (
         <>
           {/* System Status */}
-          <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+          <div className="kt-card kt-card-section">
             <SectionTitle
               icon={<Shield size={16} color={DARK.info} />}
               title={t('settings.systemStatus')}
@@ -390,7 +390,7 @@ export default function Settings() {
           </div>
 
           {/* Notifications & Reminders (backend-persisted) */}
-          <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+          <div className="kt-card kt-card-section">
             <SectionTitle
               icon={<Bell size={16} color={DARK.warning} />}
               title={t('settings.notifications')}

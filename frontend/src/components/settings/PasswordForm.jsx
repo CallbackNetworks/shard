@@ -29,7 +29,7 @@ export default function PasswordForm() {
   })
 
   return (
-    <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+    <div className="kt-card kt-card-section">
       <SectionTitle
         icon={<Lock size={16} color={DARK.warning} />}
         title={t('settings.changePassword')}

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, X, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/client'
 import { qk } from '../api/queryKeys'
-import { BRAND, DARK } from '../constants/theme'
+import { BRAND } from '../constants/theme'
 import FormModal from '../components/shared/FormModal'
 import EmptyState from '../components/shared/EmptyState'
 import { useInvalidatingMutation } from '../hooks/useCrudMutations'
@@ -96,7 +96,7 @@ function TemplateForm({ initial, onSave, onClose }) {
             background: 'rgba(var(--kt-ink-rgb), 0.057)', marginBottom: 4,
           }}>
             <span style={{ flex: 1, fontSize: 12 }}>{s.title}</span>
-            <button onClick={() => removeSubtask(i)} className="kt-icon-btn" style={{ color: DARK.danger, padding: 0 }}>
+            <button onClick={() => removeSubtask(i)} className="kt-icon-btn kt-icon-btn-danger" style={{ padding: 0 }}>
               <X size={11} />
             </button>
           </div>
@@ -180,7 +180,7 @@ function TemplateCard({ tpl, onEdit, onDelete }) {
           <button onClick={() => onEdit(tpl)} className="kt-icon-btn">
             <Edit2 size={13} />
           </button>
-          <button onClick={() => onDelete(tpl.id)} className="kt-icon-btn" style={{ color: DARK.danger }}>
+          <button onClick={() => onDelete(tpl.id)} className="kt-icon-btn kt-icon-btn-danger">
             <Trash2 size={13} />
           </button>
         </div>

@@ -315,8 +315,7 @@ function GoalCard({ goal, onEdit, onDelete }) {
           </button>
           <button
             onClick={() => onDelete(goal)}
-            className="kt-icon-btn"
-            style={{ color: DARK.danger }}
+            className="kt-icon-btn kt-icon-btn-danger"
             title={t('delete')}
           >
             <Trash2 size={13} />

@@ -3352,6 +3352,14 @@ h1 {
   border-color: color-mix(in srgb, var(--kt-hit) 32%, transparent);
   color: var(--kt-hit);
 }
+/* A section on a settings-shaped page: `.kt-card` with more room inside and a gap below
+   the next one. Thirteen places wrote `className="kt-card"` and then overrode its padding
+   inline with the identical pair, across six files — a named concept hand-rolled once per
+   site, which is the shape ADR-0070 keeps finding (ADR-0161). */
+.kt-card-section {
+  padding: 20px;
+  margin-bottom: 16px;
+}
 .kt-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -3364,6 +3372,15 @@ h1 {
 }
 .kt-icon-btn:hover {
   color: var(--kt-hit);
+}
+/* The icon-button form of the rule stated above `.kt-btn-danger`: colour arrives on
+   hover and focus, where it confirms what the button does, rather than advertising it at
+   rest. Six delete buttons (goals, templates, workflow rules) set `color: DARK.danger`
+   inline and were therefore red the whole time — the loudest thing in a row whose other
+   controls are grey, and a contradiction of a rule written twenty lines up (ADR-0161). */
+.kt-icon-btn-danger:hover,
+.kt-icon-btn-danger:focus-visible {
+  color: var(--kt-status-failed);
 }
 .kt-badge {
   display: inline-flex;

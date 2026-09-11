@@ -162,3 +162,4 @@
 | [0158](0158-a-count-is-asked-for-as-a-count.md) | 一個數字要當成一個數字去要：跑馬燈改讀伺服器計數，`/api/projects` 從每一頁的載入路徑上消失；overview 兩份實作收成一份 | Accepted | 2026-09-10 |
 | [0159](0159-a-status-that-is-a-consequence-is-not-a-word-you-type.md) | 一個「後果」性質的狀態不是一個可以自己打上去的字：`superseded` 沒有邊撐著就拒絕，正式站 17 筆死結在畫面上修得掉 | Accepted | 2026-09-11 |
 | [0160](0160-a-key-a-component-asks-for-is-a-key-the-locales-have.md) | 元件要得到的 key 必須是語言檔真的有的 key：補上第三個方向的守衛，位置參數的英文預設值不再算數 | Accepted | 2026-09-11 |
+| [0161](0161-a-rule-lives-where-a-writer-would-look-for-it.md) | 規則要住在會去找它的人會看的地方：寫入不變量改成向型別登記、助理工具說明收成一份、六顆刪除鈕照既有規則走 | Accepted | 2026-09-11 |

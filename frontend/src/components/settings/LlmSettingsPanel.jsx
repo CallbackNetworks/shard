@@ -64,7 +64,7 @@ export default function LlmSettingsPanel({ settings }) {
   }
 
   return (
-    <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+    <div className="kt-card kt-card-section">
       <SectionTitle icon={<Bot size={16} color={DARK.success} />} title={t('settings.aiAssistant')} />
 
       <ControlRow label={t('settings.provider')} hint={t('settings.llmProviderHint')}>

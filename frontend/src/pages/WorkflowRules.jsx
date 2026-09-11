@@ -84,7 +84,7 @@ function ConditionRow({ cond, fields, ops, specs, onChange, onRemove, t }) {
         {withCurrent(ops, cond.op).map(o => <option key={o} value={o}>{opLabel(o, t)}</option>)}
       </select>
       <ValueInput spec={specs[cond.field]} value={cond.value} slot={cond.field} onChange={v => onChange({ ...cond, value: v })} t={t} />
-      <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
+      <button onClick={onRemove} className="kt-icon-btn kt-icon-btn-danger">
         <X size={12} />
       </button>
     </div>
@@ -110,7 +110,7 @@ function ActionRow({ action, types, specs, onChange, onRemove, t }) {
           {withCurrent(types, action.type).map(a => <option key={a} value={a}>{actionLabel(a, t)}</option>)}
         </select>
         <ValueInput spec={spec} value={action.value} slot={action.type} onChange={v => onChange({ ...action, value: v })} t={t} />
-        <button onClick={onRemove} className="kt-icon-btn" style={{ color: DARK.danger }}>
+        <button onClick={onRemove} className="kt-icon-btn kt-icon-btn-danger">
           <X size={12} />
         </button>
       </div>
@@ -150,7 +150,7 @@ function SubjectPicker({ selected, onPick, t }) {
     return (
       <span className="kt-chip" style={{ fontSize: 11 }}>
         {selected.type}: {selected.title}
-        <button onClick={() => onPick(null)} className="kt-icon-btn" style={{ color: DARK.danger, marginLeft: 4 }}>
+        <button onClick={() => onPick(null)} className="kt-icon-btn kt-icon-btn-danger" style={{ marginLeft: 4 }}>
           <X size={10} />
         </button>
       </span>

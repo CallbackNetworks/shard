@@ -70,7 +70,7 @@ export default function NodePage() {
   return (
     <div className="kt-page">
       {/* Header */}
-      <div className="kt-card" style={{ padding: 20, marginBottom: 16 }}>
+      <div className="kt-card kt-card-section">
         {/* Where it lives, before what it is (ADR-0094). The relations panel below lists
             every edge; this says which of them is the node's place in the hierarchy.
             It replaced a `navigate(-1)` button labelled "back" (ADR-0156): browser back
@@ -125,7 +125,8 @@ export default function NodePage() {
               onClick={() => { if (window.confirm(t('nodePage.deleteConfirm'))) deleteMut.mutate() }}
               aria-label={t('delete')} title={t('delete')}
               disabled={deleteMut.isPending}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: DARK.danger, padding: 4, marginLeft: 'auto' }}
+              className="kt-icon-btn kt-icon-btn-danger"
+              style={{ marginLeft: 'auto' }}
             >
               <Trash2 size={14} />
             </button>
