@@ -70,6 +70,50 @@ describe('every page and component that shows prose is translatable', () => {
   })
 })
 
+describe('a key a component asks for is a key the locales have', () => {
+  /**
+   * The third direction, and the one the other two cannot see (ADR-0160).
+   *
+   * The guard above asks whether a component *calls* the translator, and the one
+   * below asks whether the two locale files describe the same app. Both pass for a
+   * `t('pwa.install')` whose key exists in neither file: the call is there, and the
+   * two files agree — they agree that the key is absent. What renders is the key
+   * itself, which is how a button came to read literally `SETTINGS.SAVE` in a real
+   * browser while every automated layer stayed green (the component test mocks `t`
+   * as the identity function, so it cannot tell a right key from a wrong one).
+   *
+   * `defaultValue:` in an options object is the declared escape hatch — ADR-0058's
+   * derived rule names resolve English that way on purpose. A *positional* string
+   * default is not: `t('pwa.install', 'Install')` renders "Install" in every
+   * language, which is a hardcoded English string wearing a translator call, i.e.
+   * exactly the defect ADR-0088 set out to end.
+   */
+  const base = (key) => key.replace(/_(one|other|zero|few|many)$/, '')
+  const known = new Set([...Object.keys(en), ...Object.keys(zh)].map(base))
+
+  const files = walk(SRC)
+    .map(f => relative(SRC, f).replaceAll('\\', '/'))
+    .filter(rel => rel.startsWith('pages/') || rel.startsWith('components/'))
+
+  const missing = []
+  for (const rel of files) {
+    const source = readFileSync(join(SRC, rel), 'utf8')
+    // Literal keys only. A template literal is a computed name (ADR-0058) and is
+    // checked by the locale-parity guard instead.
+    const call = /\bt\(\s*'([A-Za-z0-9_.]+)'\s*(,\s*\{[^)]*?\})?/g
+    let m
+    while ((m = call.exec(source)) !== null) {
+      if (known.has(base(m[1]))) continue
+      if (m[2] && /defaultValue\s*:/.test(m[2])) continue
+      missing.push(`${rel}: t('${m[1]}')`)
+    }
+  }
+
+  it('has no call site asking for a string neither locale carries', () => {
+    expect(missing).toEqual([])
+  })
+})
+
 describe('the two locales describe the same app', () => {
   // i18next resolves `key` from `key_one` / `key_other` for languages that have
   // plurals; zh-TW has none, so a single form there is complete.

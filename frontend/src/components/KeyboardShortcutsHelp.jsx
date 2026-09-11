@@ -186,7 +186,7 @@ export default function KeyboardShortcutsHelp({ open, onClose }) {
               cursor: 'pointer',
             }}
           >
-            {t('common.close', 'Close')}
+            {t('common.close')}
           </button>
         </div>
       </div>

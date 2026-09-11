@@ -55,7 +55,7 @@ export default function PWAInstallPrompt() {
     }}>
       <Download size={16} style={{ color: DARK.info, flexShrink: 0 }} />
       <span style={{ fontSize: 13, color: '#e2e8f0', whiteSpace: 'nowrap' }}>
-        {t('pwa.installPrompt', 'Install Shard for quick access')}
+        {t('pwa.installPrompt')}
       </span>
       <button
         onClick={handleInstall}
@@ -72,7 +72,7 @@ export default function PWAInstallPrompt() {
           flexShrink: 0,
         }}
       >
-        {t('pwa.install', 'Install')}
+        {t('pwa.install')}
       </button>
       <button
         onClick={handleDismiss}
