@@ -3,7 +3,7 @@ import { isOverdue } from '../../utils/overdue'
 
 const LEVELS = 28            // contour lines between sea level and the highest summit
 const INDEX_EVERY = 5        // every fifth line is an index contour, drawn heavier
-const CELL = 8               // field resolution: coarse enough that contours turn corners
+const CELL = 5               // field resolution: fine enough that small hills draw round, not as diamonds
 const MARGIN = 160           // ground computed past each edge of the frame
 const HOT = 1, COLD = 0.4 // line opacity at the hottest and the quietest mountain
 const FOOTHILL = 0.55        // line opacity on ground that belongs to no project, below any COLD line once dimmed
@@ -124,6 +124,18 @@ function wilds(x, y) {
     + 0.18 * ridged(wx / 29 - 6, wy / 29 + 3)
     + 0.1 * smooth(wx / 13 + 9, wy / 13 - 9)
   return v ** 1.35
+}
+
+// In-place 3×3 box blur of a cols×rows grid.
+function blur(f, cols, rows) {
+  const src = Float32Array.from(f)
+  for (let j = 1; j < rows - 1; j++) {
+    for (let i = 1; i < cols - 1; i++) {
+      let acc = 0
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) acc += src[(j + dj) * cols + i + di]
+      f[j * cols + i] = acc / 9
+    }
+  }
 }
 
 // Ridged noise: 1 on a crest, falling away sharply either side of it.
@@ -286,7 +298,7 @@ const TEAR_BAND = 7
 function tear(x, y) {
   const band = Math.floor(y / TEAR_BAND)
   const h = hash(band * 1.31, 9.7)
-  return h < 0.08 ? x + (hash(band, 3.3) - 0.5) * 24 : x
+  return h < 0.035 ? x + (hash(band, 3.3) - 0.5) * 10 : x
 }
 
 const segPath = (segs, f, dx = 0) => segs.map(([ax, ay, bx, by]) => {
@@ -408,7 +420,9 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
   return (
     <>
       <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} part="ground" />
-      {levels.map(level => {
+      {/* While the camera moves only the index contours are drawn: a fifth of the
+          work, and still the shape of the ground. The rest return on release. */}
+      {(moving ? levels.filter(lv => lv.index) : levels).map(level => {
         const f = (x, y) => px(x * CELL - MARGIN, y * CELL - MARGIN, level.z)
         const fill = level.rings.map(r => r.map((p, i) => {
           const [x, y] = f(p[0], p[1])
@@ -598,6 +612,11 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         owned[j * cols + i] = t * t * (3 - 2 * t)
       }
     }
+    // Two passes of a 3×3 box blur before contouring: the ridged layers fold the
+    // surface along their crests, and contours traced across a fold turn hard
+    // corners that no real terrain draws.
+    blur(field, cols, rows)
+    blur(field, cols, rows)
     const top = Math.max(...field)
 
     // Contours are traced on a copy whose rim is sea level, so every ring closes.
