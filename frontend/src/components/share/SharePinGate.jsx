@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ShareMarquee from './ShareMarquee'
 import useBreakpoint from './useBreakpoint'
 
 // One verify door for every shareable node, whichever page the visitor is on
@@ -44,6 +45,7 @@ export default function SharePinGate({ identity, token, onVerified }) {
 
   return (
     <div className="kt-share-page kt-share-center" style={{ '--share-accent': color }}>
+      <ShareMarquee />
       <form onSubmit={handleSubmit} className={isMobile ? 'kt-share-pin is-mobile' : 'kt-share-pin'}>
 
         {/* Identity avatar */}

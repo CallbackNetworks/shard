@@ -14,6 +14,8 @@ import ShareActivityFeed from '../components/share/ShareActivityFeed'
 import SharePinGate from '../components/share/SharePinGate'
 import ShareChatWidget from '../components/share/ShareChatWidget'
 import ShareFooter from '../components/share/ShareFooter'
+import ShareMarquee from '../components/share/ShareMarquee'
+import ShareNow from '../components/share/ShareNow'
 import useBreakpoint from '../components/share/useBreakpoint'
 import EmptyState from '../components/shared/EmptyState'
 
@@ -90,6 +92,7 @@ export default function ShareView() {
   if (isError) {
     return (
       <div className="kt-share-page kt-share-center">
+        <ShareMarquee />
         <div className="kt-share-empty-block">
           <div className="kt-share-kicker">
               Share link not found
@@ -115,6 +118,7 @@ export default function ShareView() {
   if (isLoading && !effectiveData) {
     return (
       <div className="kt-share-page kt-share-center">
+        <ShareMarquee />
         <div className="kt-share-loading">Loading...</div>
       </div>
     )
@@ -122,6 +126,7 @@ export default function ShareView() {
 
   return (
     <div className="kt-share-page" style={{ '--share-accent': color }}>
+      <ShareMarquee activity={recentActivity} />
       <div className="kt-share-shell">
 
         {/* Section: Overview */}
@@ -136,6 +141,10 @@ export default function ShareView() {
 
           {/* Summary stats */}
           <ShareStats summary={summary} color={color} bp={bp} />
+
+          {/* What is moving right now, drawn: per-project status, the work in
+              progress, and how busy the last two weeks were. */}
+          <ShareNow projects={projects} daily={effectiveData?.activity_daily || []} />
         </div>
 
         {/* Scroll navigation */}

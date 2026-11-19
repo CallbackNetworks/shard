@@ -40,6 +40,22 @@ def test_get_project_share_only_returns_that_project(client, db, sample_identity
     assert [p["id"] for p in data["projects"]] == [sample_project.id]
 
 
+def test_activity_daily_is_a_calendar_of_counts(client, db, sample_project):
+    now = datetime.now(UTC)
+    for days_ago, action in [(0, "task.created"), (0, "task.done"), (3, "task.created"), (20, "task.created")]:
+        db.add(ActivityLog(action=action, project_id=sample_project.id, created_at=now - timedelta(days=days_ago)))
+    # A visit is not work: it stays out of the chart as it stays out of the feed.
+    db.add(ActivityLog(action="share.viewed", project_id=sample_project.id, created_at=now))
+    db.commit()
+
+    daily = client.get(f"/share/node/{sample_project.share_token}").json()["activity_daily"]
+
+    assert len(daily) == 14
+    assert daily[-1] == {"date": now.date().isoformat(), "count": 2}
+    assert daily[-4]["count"] == 1
+    assert sum(d["count"] for d in daily) == 3
+
+
 def test_get_share_invalid_token(client):
     resp = client.get("/share/node/nonexistent-token")
     assert resp.status_code == 404

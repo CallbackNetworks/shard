@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -110,6 +110,35 @@ def _serialize_comment(c: Comment):
         "body": c.body,
         "created_at": c.created_at.isoformat() if c.created_at else None,
     }
+
+
+ACTIVITY_DAYS = 14
+
+
+def _activity_daily(db: Session, project_ids: list[str]) -> list[dict]:
+    """Activity rows per UTC day over the last ``ACTIVITY_DAYS`` days, oldest first,
+    with quiet days present as zero so the chart's x axis is the calendar."""
+    today = datetime.now(UTC).date()
+    first = today - timedelta(days=ACTIVITY_DAYS - 1)
+    counts = {first + timedelta(days=i): 0 for i in range(ACTIVITY_DAYS)}
+    if project_ids:
+        since = datetime.combine(first, datetime.min.time(), tzinfo=UTC)
+        rows = (
+            db.query(ActivityLog.created_at)
+            .filter(
+                ActivityLog.project_id.in_(project_ids),
+                ActivityLog.action != "share.viewed",
+                ActivityLog.created_at >= since,
+            )
+            .all()
+        )
+        for (created_at,) in rows:
+            if created_at is None:
+                continue
+            day = _as_utc(created_at).date()
+            if day in counts:
+                counts[day] += 1
+    return [{"date": d.isoformat(), "count": n} for d, n in counts.items()]
 
 
 def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
@@ -279,6 +308,10 @@ def _build_payload(
                 }
             )
 
+    # Per-day counts for the page's activity chart. The feed above is the newest 15 rows,
+    # which on a busy day is one afternoon, so the chart cannot be drawn from it.
+    activity_daily = _activity_daily(db, project_ids)
+
     all_tasks_flat = []
     for p_data in projects:
         all_tasks_flat.extend(p_data["tasks"])
@@ -299,6 +332,7 @@ def _build_payload(
         },
         "projects": projects,
         "recent_activity": recent_activity,
+        "activity_daily": activity_daily,
         "summary": {
             "total_projects": len(projects),
             "total_tasks": total_tasks,
