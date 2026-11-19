@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { isOverdue } from '../../utils/overdue'
 
 const LEVELS = 28            // contour lines between sea level and the highest summit
@@ -261,7 +261,7 @@ function Frame({ W, H, peaks, levels, view }) {
         fill="none" stroke="rgba(var(--kt-ink-rgb), 0.45)" strokeWidth={1}
       />
       <text x={W - 6} y={H - 6} textAnchor="end" fontSize={8} fill="rgba(var(--kt-ink-rgb), 0.4)">
-        {`${view === 'plan' ? 'PLAN' : 'RELIEF'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
+        {`${view === 'plan' ? 'PLAN' : 'RELIEF · DRAG TO ORBIT'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
       </text>
     </g>
   )
@@ -290,7 +290,7 @@ const FRINGE = [
   { dx: 1.6, color: 'var(--kt-ink, #f5f6f7)', share: 0.22, cls: 'kt-fringe-c' },
 ]
 
-function Strokes({ level, f, lineOpacity, peaks }) {
+function Strokes({ level, f, lineOpacity, peaks, fringe = true }) {
   return level.strokes.map((st, k) => {
     // Heat is carried twice, by brightness and by weight, and the noise only
     // shades the line by a fifth — less than the gap between a busy mountain and
@@ -300,7 +300,7 @@ function Strokes({ level, f, lineOpacity, peaks }) {
     const opacity = Math.min(1, lineOpacity(warmth) * (0.8 + 0.2 * st.alpha) * (level.index ? 0.8 : 0.55))
     return (
       <g key={k}>
-        {FRINGE.map(fr => (
+        {fringe && FRINGE.map(fr => (
           <path key={fr.cls} className={fr.cls} d={segPath(st.segs, f, fr.dx)} fill="none" stroke={fr.color}
             strokeOpacity={opacity * fr.share} strokeWidth={width} strokeLinecap="butt" />
         ))}
@@ -337,18 +337,43 @@ function spreadLabels(labels) {
   return placed
 }
 
-const TILT = 0.62       // how flat the ground plane is drawn: 1 is top-down, 0 edge-on
 const RISE = 0.22       // the tallest summit stands this fraction of the frame high
+// The camera: `az` turns the ground about its centre, `tilt` is how steeply it is
+// looked down on (1 top-down, 0 edge-on). Dragging moves both, within limits that
+// keep the ground readable; a double-click returns here.
+export const HOME_CAMERA = { az: 0, tilt: 0.62 }
+export const TILT_RANGE = [0.3, 0.72]
+
+// Perspective projection of ground point (x, y) at height z. Distance shrinks
+// what is far, so the terrain reads as a solid rather than a stack of drawings.
+export function camera(W, H, { az, tilt }, lift) {
+  const ax = axes(W, H)
+  const cx = (ax.x0 + ax.x1) / 2, cy = (ax.y0 + ax.y1) / 2
+  const cos = Math.cos(az), sin = Math.sin(az)
+  const D = W * 1.4
+  const project = (x, y, z) => {
+    const dx = x - cx, dy = y - cy
+    const rx = dx * cos - dy * sin
+    const ry = dx * sin + dy * cos
+    // One zoom for every heading: small enough that the ground's diagonal, which
+    // is what spans the frame once it is turned, still fits inside it.
+    const k = (D / (D - ry)) * 0.84
+    return [W / 2 + rx * k, H * 0.58 + (ry * tilt - z * lift) * k]
+  }
+  // Nearness, for drawing order: larger is nearer the viewer.
+  const depth = (x, y) => (x - cx) * sin + (y - cy) * cos
+  return { project, depth }
+}
 
 // In relief: every contour ring lifted to its own height, stacked from sea level
 // up like terraces. Each ring is filled with the background, so a higher terrace
 // hides the part of a lower one that is behind the hill; a task stands on the
 // terrace beneath it.
-function ReliefView({ map, focus, pick, lineOpacity, W, H }) {
+function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
   const { field, cols, rows, top, peaks, dots, levels } = map
   const lift = (H * RISE) / top
-  const ground = H * (1 - TILT) * 0.8
-  const px = (x, y, z) => [x, ground + y * TILT - z * lift]
+  const cam = camera(W, H, view3d, lift)
+  const px = cam.project
   const height = (x, y) => {
     const i = Math.max(0, Math.min(cols - 1, Math.round(x / CELL)))
     const j = Math.max(0, Math.min(rows - 1, Math.round(y / CELL)))
@@ -358,7 +383,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H }) {
   // Pins stand on the surface but are drawn above every terrace, nearest last: a
   // pin's head rises into the terrace above it, and hiding it there would hide a
   // task in front of the hill, not behind it.
-  const pins = dots.map(d => ({ d, z: height(d.x, d.y) })).sort((a, b) => a.d.y - b.d.y)
+  const pins = dots.map(d => ({ d, z: height(d.x, d.y) })).sort((a, b) => cam.depth(a.d.x, a.d.y) - cam.depth(b.d.x, b.d.y))
   const pin = ({ d, z }) => {
     const [x, y] = px(d.x, d.y, z)
     const on = focus?.kind === 'task' && focus.task.id === d.task.id
@@ -381,7 +406,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H }) {
         return (
           <g key={level.l}>
             <path d={fill} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.9} fillRule="nonzero" />
-            <Strokes level={level} f={f} lineOpacity={lineOpacity} peaks={peaks} />
+            <Strokes level={level} f={f} lineOpacity={lineOpacity} peaks={peaks} fringe={!moving} />
           </g>
         )
       })}
@@ -431,7 +456,32 @@ export function foldFoothills(projects) {
  */
 export default function ContourMap({ projects, width = 720, height = 420, emptyLabel = 'Nothing to map yet', initialView = 'relief', extraViews = [] }) {
   const [focus, setFocus] = useState(null) // { kind: 'task' | 'peak', ... }
-  const [view, setView] = useState(initialView) // 'relief' (2.5D) | 'plan' (top-down) | an extra view's key
+  const [view, setView] = useState(initialView) // 'relief' (3D) | 'plan' (top-down) | an extra view's key
+  const [view3d, setView3d] = useState(HOME_CAMERA)
+  const [drag, setDrag] = useState(null) // { x, y, from } while the pointer is orbiting
+  const frame = useRef(0)
+
+  // Drag to orbit: sideways turns the ground, up and down changes how steeply it
+  // is seen. A finger only turns it, so a vertical swipe still scrolls the page.
+  const orbit = {
+    onPointerDown: e => {
+      if (e.button !== 0) return
+      setDrag({ x: e.clientX, y: e.clientY, from: view3d, touch: e.pointerType === 'touch' })
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+    },
+    onPointerMove: e => {
+      if (!drag) return
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y
+      cancelAnimationFrame(frame.current)
+      frame.current = requestAnimationFrame(() => setView3d({
+        az: drag.from.az + dx * 0.008,
+        tilt: drag.touch ? drag.from.tilt : Math.max(TILT_RANGE[0], Math.min(TILT_RANGE[1], drag.from.tilt - dy * 0.004)),
+      }))
+    },
+    onPointerUp: () => setDrag(null),
+    onPointerCancel: () => setDrag(null),
+    onDoubleClick: () => setView3d(HOME_CAMERA),
+  }
   const W = width, H = height
 
   const map = useMemo(() => {
@@ -574,7 +624,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: -6, marginBottom: 4 }}>
-        {[['relief', '2.5D'], ['plan', 'Map'], ...extraViews.map(v => [v.key, v.label])].map(([key, label]) => (
+        {[['relief', '3D'], ['plan', 'Map'], ...extraViews.map(v => [v.key, v.label])].map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -600,11 +650,12 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           aria-label={map.peaks.map(p => `${p.name}: ${p.open} open of ${p.tasks.length} tasks, ${p.heat} recent updates`).join('; ')}
           onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
           className="kt-glitch-map"
-          style={{ display: 'block' }}
+          style={{ display: 'block', cursor: view === 'relief' ? (drag ? 'grabbing' : 'grab') : undefined, touchAction: 'pan-y', userSelect: 'none', WebkitUserSelect: 'none' }}
+          {...(view === 'relief' ? orbit : {})}
         >
           {view === 'plan'
             ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
-            : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />}
+            : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} view3d={view3d} moving={!!drag} />}
           <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
         </svg>
 

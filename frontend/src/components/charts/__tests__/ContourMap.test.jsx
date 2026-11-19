@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import ContourMap, { axes, foldFoothills, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
+import ContourMap, { axes, camera, foldFoothills, HOME_CAMERA, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
 
 const task = (id, status) => ({ id, title: id, status })
 const W = 720, H = 420
@@ -19,6 +19,36 @@ describe('axes', () => {
   it('puts nothing done at the back and everything done at the front', () => {
     expect(ax.y(0)).toBe(ax.y0)
     expect(ax.y(1)).toBe(ax.y1)
+  })
+})
+
+describe('camera', () => {
+  const ax = axes(W, H)
+  const mid = [(ax.x0 + ax.x1) / 2, (ax.y0 + ax.y1) / 2]
+
+  it('draws something nearer the viewer larger than the same thing farther away', () => {
+    const cam = camera(W, H, HOME_CAMERA, 1)
+    const span = y => cam.project(mid[0] + 50, y, 0)[0] - cam.project(mid[0] - 50, y, 0)[0]
+    expect(span(ax.y1)).toBeGreaterThan(span(ax.y0))
+  })
+
+  it('turns the ground about its centre: the centre stays put at any heading', () => {
+    const a = camera(W, H, HOME_CAMERA, 1).project(...mid, 0)
+    const b = camera(W, H, { ...HOME_CAMERA, az: 1.3 }, 1).project(...mid, 0)
+    expect(b[0]).toBeCloseTo(a[0]); expect(b[1]).toBeCloseTo(a[1])
+  })
+
+  it('lifts height straight up the screen', () => {
+    const cam = camera(W, H, HOME_CAMERA, 10)
+    const [x0, y0] = cam.project(...mid, 0), [x1, y1] = cam.project(...mid, 2)
+    expect(x1).toBeCloseTo(x0)
+    expect(y1).toBeLessThan(y0)
+  })
+
+  it('orders depth so a turned map still paints its near side last', () => {
+    const turned = camera(W, H, { ...HOME_CAMERA, az: Math.PI }, 1)
+    // Half a turn: the back edge is now the near one.
+    expect(turned.depth(mid[0], ax.y0)).toBeGreaterThan(turned.depth(mid[0], ax.y1))
   })
 })
 
@@ -102,6 +132,7 @@ describe('ContourMap', () => {
     expect(terraces()).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: 'Map' }))
     expect(terraces()).toBe(0)
+    expect(screen.getByRole('button', { name: '3D' }).getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByRole('button', { name: 'Map' }).getAttribute('aria-pressed')).toBe('true')
     // Every task is still on the map in either view.
     expect(container.querySelectorAll('title').length).toBe(2)
