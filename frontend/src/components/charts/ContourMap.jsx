@@ -107,8 +107,9 @@ function grain(x, y, level) {
   const drift = smooth(x / 5 + level * 3.1, y / 5 - level * 1.7)
   const speck = hash(x * 3.3 + level, y * 2.9 - level)
   const bucket = Math.min(GRAIN_BUCKETS - 1, Math.floor((0.15 + 0.85 * drift * (0.7 + 0.3 * speck)) * GRAIN_BUCKETS))
-  const drop = speck < 0.2
-  const slip = hash(x + level * 7, y) < 0.1 ? (hash(y, x) - 0.5) * 3.6 : 0
+  // Gaps are rare: the wear is in the opacity, and a line should still read as one.
+  const drop = speck < 0.015
+  const slip = hash(x + level * 7, y) < 0.03 ? (hash(y, x) - 0.5) * 2.4 : 0
   return { bucket, drop, slip }
 }
 
@@ -252,7 +253,7 @@ const TEAR_BAND = 7
 function tear(x, y) {
   const band = Math.floor(y / TEAR_BAND)
   const h = hash(band * 1.31, 9.7)
-  return h < 0.16 ? x + (hash(band, 3.3) - 0.5) * 30 : x
+  return h < 0.08 ? x + (hash(band, 3.3) - 0.5) * 24 : x
 }
 
 const segPath = (segs, f, dx = 0) => segs.map(([ax, ay, bx, by]) => {
@@ -268,17 +269,17 @@ const FRINGE = [
 ]
 
 function Strokes({ level, f, lineOpacity, peaks }) {
-  const width = level.index ? 0.8 : 0.45
+  const width = level.index ? 0.55 : 0.3
   return level.strokes.map((st, k) => {
     // Thinner lines read darker at the same opacity, so they carry more of it.
-    const opacity = Math.min(1, lineOpacity(peaks[st.owner]?.warmth ?? 0) * (0.35 + 0.65 * st.alpha) * (level.index ? 1.25 : 0.95))
+    const opacity = Math.min(1, lineOpacity(peaks[st.owner]?.warmth ?? 0) * (0.35 + 0.65 * st.alpha) * (level.index ? 0.8 : 0.55))
     return (
       <g key={k}>
         {FRINGE.map(fr => (
           <path key={fr.cls} className={fr.cls} d={segPath(st.segs, f, fr.dx)} fill="none" stroke={fr.color}
             strokeOpacity={opacity * fr.share} strokeWidth={width} strokeLinecap="butt" />
         ))}
-        <path d={segPath(st.segs, f)} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={opacity} strokeWidth={width} strokeLinecap="butt" />
+        <path d={segPath(st.segs, f)} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={opacity} strokeWidth={width} strokeLinecap="round" />
       </g>
     )
   })
