@@ -147,12 +147,11 @@ describe('ContourMap', () => {
       projects={[{ id: 'p1', name: 'Alpha', heat: 5, lastActive: 0, tasks: [task('t1', 'done'), task('t2', 'in_progress')] }]}
       extraViews={[{ key: 'other', label: 'Other', render: () => <p>another view</p> }]}
     />)
-    // 3D draws shards with solid faces that hide what stands behind them; the plan
-    // draws contour lines and fills nothing.
-    const faces = () => container.querySelectorAll('path[fill-opacity="0.94"]').length
-    expect(faces()).toBeGreaterThan(0)
+    // 3D frosts each shard with flakes on a canvas; the plan draws contour lines.
+    const flakes = () => container.querySelectorAll('canvas').length
+    expect(flakes()).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: 'Map' }))
-    expect(faces()).toBe(0)
+    expect(flakes()).toBe(0)
     expect(screen.getByRole('button', { name: '3D' }).getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByRole('button', { name: 'Map' }).getAttribute('aria-pressed')).toBe('true')
     // Every task is still on the map in either view.

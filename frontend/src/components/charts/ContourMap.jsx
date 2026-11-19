@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { isOverdue } from '../../utils/overdue'
 
 const LEVELS = 28            // contour lines between sea level and the highest summit
@@ -387,12 +387,14 @@ export function camera(W, H, { az, tilt }, lift) {
   return { project, depth }
 }
 
-// The 3D view: every project is a shard — an abstract fragment whose surface is
-// a scatter of triangles, the convex hull of points thrown into a tapering,
-// leaning volume. Its height is the work still open, its girth all the work it
-// holds, and its edges and facets are as bright as the last 30 days were busy.
-// A few loose chips float beside it: broken-off pieces, carrying no data, dim.
-// The irregularity is fixed per shard, so the same share draws the same way.
+// The 3D view: every project is a shard — not a solid but a crust of loose
+// triangular flakes, like sugar frosting with nothing inside it. The flakes are
+// scattered over the outside of an irregular, leaning volume (the convex hull of
+// points thrown into it) and a few drift loose around it. Each flake turns its
+// own way and catches the light on its own, so most are dim and a few glint.
+// The volume's height is the work still open, its girth all the work it holds;
+// the busier the last 30 days, the brighter it glints. Everything is seeded per
+// shard, so the same share draws the same way.
 const LIGHT = (() => { const v = [-0.5, 0.3, 0.8], n = Math.hypot(...v); return v.map(c => c / n) })()
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
@@ -453,20 +455,78 @@ function shardSolid(p, k, maxTasks, H, centre) {
   })
   // The highest point carries the label; it is just one of the crown's points.
   const tip = pts.reduce((t, q) => (q[2] > t[2] ? q : t), pts[0])
-  const main = { pts, faces: convexHull(pts), key: `s${k}`, centre: [p.x, p.y], chip: false }
-  // Loose chips: three small tetrahedra hanging off the main body.
-  const chips = [0, 1, 2].map(c => {
-    const a = rnd(c + 20, 3) * Math.PI * 2
-    const dist = r * (1.3 + 0.6 * rnd(c, 30))
-    const cx = p.x + Math.cos(a) * dist + shearX * h * 0.5, cy = p.y + Math.sin(a) * dist * 0.8 + shearY * h * 0.5
-    const cz = h * (0.25 + 0.55 * rnd(c, 40))
-    const s = r * (0.22 + 0.2 * rnd(c, 50))
-    const cp = [0, 1, 2, 3].map(i => [
-      cx + (rnd(c * 4 + i, 60) - 0.5) * s * 2, cy + (rnd(c * 4 + i, 70) - 0.5) * s * 2, cz + (rnd(c * 4 + i, 80) - 0.5) * s * 2.4,
-    ])
-    return { pts: cp, faces: convexHull(cp), key: `s${k}c${c}`, centre: [cx, cy], chip: true }
+  const main = { pts, faces: convexHull(pts) }
+  return { r, h, tip, pts, main }
+}
+
+// Flakes for one shard, in world space: scattered over the hull's faces by area,
+// nudged off the surface, plus a loose halo. Each is a small triangle of three
+// random spokes from its centre, so no two face the same way.
+function frost(sol, k) {
+  const { pts, faces } = sol.main
+  const rnd = (i, j) => hash(k * 5.37 + i * 0.731, j * 2.17 - k)
+  const tris = faces.map(f => f.map(j => pts[j]))
+  const areas = tris.map(([a, b, c]) => Math.hypot(...cross3(sub(b, a), sub(c, a))) / 2)
+  const total = areas.reduce((n, x) => n + x, 0) || 1
+  const count = Math.round(130 + 3 * Math.sqrt(total))
+  const flakes = []
+  const flake = (centre, size, i) => {
+    const spoke = j => {
+      const t = rnd(i, 10 + j) * Math.PI * 2, u = rnd(i, 20 + j) * 2 - 1, w = Math.sqrt(1 - u * u)
+      const len = size * (0.55 + 0.45 * rnd(i, 30 + j))
+      return [centre[0] + Math.cos(t) * w * len, centre[1] + Math.sin(t) * w * len, centre[2] + u * len]
+    }
+    const v = [spoke(0), spoke(1), spoke(2)]
+    flakes.push({ v, centre, n: unit(cross3(sub(v[1], v[0]), sub(v[2], v[0]))), i })
+  }
+  for (let i = 0; i < count; i++) {
+    // A face chosen in proportion to its area, then a point on it.
+    let pick = rnd(i, 1) * total, f = 0
+    while (f < areas.length - 1 && pick > areas[f]) pick -= areas[f++]
+    const [a, b, c] = tris[f]
+    let u = rnd(i, 2), w = rnd(i, 3)
+    if (u + w > 1) { u = 1 - u; w = 1 - w }
+    const n = unit(cross3(sub(b, a), sub(c, a)))
+    const lift = (rnd(i, 4) - 0.35) * 3
+    const at = [0, 1, 2].map(d => a[d] + (b[d] - a[d]) * u + (c[d] - a[d]) * w + n[d] * lift)
+    flake(at, 2.2 + 3.2 * rnd(i, 5), i)
+  }
+  // Loose sugar around it.
+  for (let i = 0; i < 14; i++) {
+    const t = rnd(i + 500, 6) * Math.PI * 2
+    const dist = sol.r * (1.15 + 0.7 * rnd(i + 500, 7))
+    const z = sol.h * (0.1 + 0.9 * rnd(i + 500, 8))
+    flake([sol.p.x + Math.cos(t) * dist, sol.p.y + Math.sin(t) * dist * 0.8, z], 1.4 + 1.8 * rnd(i + 500, 9), i + 500)
+  }
+  return flakes
+}
+
+function FlakeCanvas({ flakes, project, W, H }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const canvas = ref.current
+    const ctx = canvas?.getContext?.('2d')
+    if (!ctx) return
+    const scale = 2
+    if (canvas.width !== W * scale) { canvas.width = W * scale; canvas.height = H * scale }
+    ctx.setTransform(scale, 0, 0, scale, 0, 0)
+    ctx.clearRect(0, 0, W, H)
+    const ink = getComputedStyle(canvas).getPropertyValue('--kt-ink').trim() || '#f5f6f7'
+    ctx.fillStyle = ink
+    for (const { f, opacity } of flakes) {
+      ctx.globalAlpha = opacity
+      ctx.beginPath()
+      f.v.forEach((q, i) => {
+        const [x, y] = project(...q)
+        if (i) ctx.lineTo(tear(x, y), y)
+        else ctx.moveTo(tear(x, y), y)
+      })
+      ctx.closePath()
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
   })
-  return { r, h, tip, pts, main, chips }
+  return <canvas ref={ref} style={{ width: W, height: H, display: 'block' }} />
 }
 
 function ShardView({ map, focus, pick, W, H, view3d }) {
@@ -475,54 +535,45 @@ function ShardView({ map, focus, pick, W, H, view3d }) {
   const px = cam.project
   const maxTasks = Math.max(...peaks.map(p => p.tasks.length))
   const centre = [peaks.reduce((n, p) => n + p.x, 0) / peaks.length, peaks.reduce((n, p) => n + p.y, 0) / peaks.length]
-  const solids = peaks.map((p, k) => ({ p, k, ...shardSolid(p, k, maxTasks, H, centre) }))
+  const solids = useMemo(
+    () => peaks.map((p, k) => {
+      const sol = { p, k, ...shardSolid(p, k, maxTasks, H, centre) }
+      return { ...sol, flakes: frost(sol, k) }
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [peaks, maxTasks, H],
+  )
   // The camera looks from the front and above: `toward` on the ground, `tilt`
   // the sine of the elevation.
   const flat = Math.sqrt(1 - view3d.tilt ** 2)
   const eye = [Math.sin(view3d.az) * flat, Math.cos(view3d.az) * flat, view3d.tilt]
-  const tri = f => f.map(([x, y, z], i) => { const [sx, sy] = px(x, y, z); return `${i ? 'L' : 'M'}${tear(sx, sy).toFixed(1)},${sy.toFixed(1)}` }).join('') + 'Z'
+  // Halfway between the light and the eye: a flake turned to it throws a glint.
+  const half = unit(LIGHT.map((c, i) => c + eye[i]))
 
-  // Every visible facet of a body, lit, with its own sheen.
-  const facets = (body, glow, edge) => body.faces.map((f, i) => {
-    const [a, b, c] = f.map(j => body.pts[j])
-    const n = unit(cross3(sub(b, a), sub(c, a)))
-    if (dot3(n, eye) <= 0) return null
-    const lit = Math.max(0, dot3(n, LIGHT))
-    const sheen = (0.015 + 0.42 * lit ** 2) * (0.35 + 0.65 * glow) * (body.chip ? 0.6 : 1)
-    const d = tri([a, b, c])
-    return (
-      <g key={`${body.key}-${i}`}>
-        <path d={d} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.94} />
-        <path d={d} fill="var(--kt-ink, #f5f6f7)" fillOpacity={sheen} />
-        {FRINGE.map(fr => (
-          <path key={fr.cls} className={fr.cls} d={d} transform={`translate(${fr.dx} 0)`} fill="none" stroke={fr.color}
-            strokeOpacity={edge * 0.5 * fr.share} strokeWidth={0.4} />
-        ))}
-        <path d={d} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={edge * (0.3 + 0.3 * hash(i, body.pts.length))} strokeWidth={0.35 + 0.35 * glow} strokeLinejoin="round" />
-      </g>
-    )
-  })
+  // Every flake of every shard, farthest first, lit on its own.
+  const flakes = solids.flatMap(sol => sol.flakes.map(f => ({ sol, f })))
+    .map(({ sol, f }) => {
+      const lit = Math.abs(dot3(f.n, LIGHT))
+      const glint = Math.abs(dot3(f.n, half)) ** 24
+      const glow = sol.p.warmth
+      const opacity = Math.min(0.95, (0.1 + 0.34 * lit ** 2 + 0.85 * glint) * (0.55 + 0.45 * glow))
+      return { sol, f, opacity, depth: cam.depth(f.centre[0], f.centre[1]) }
+    })
+    .sort((a, b) => a.depth - b.depth)
 
-  // Task marks on the main body's own facets: in progress on the highest ones,
-  // done on the lowest, each on a facet of its own while there are enough.
+  // Task marks on the shard's own faces: in progress on the highest, done on the
+  // lowest, shown only on the side facing the viewer.
   const marksOf = sol => {
-    const visible = sol.main.faces.map(f => {
+    const faces = sol.main.faces.map(f => {
       const [a, b, c] = f.map(j => sol.main.pts[j])
       const n = unit(cross3(sub(b, a), sub(c, a)))
       return { at: [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3], seen: dot3(n, eye) > 0.05 }
     }).sort((x, y) => y.at[2] - x.at[2])
     const rank = { in_progress: 0, todo: 1, failed: 2, done: 3 }
     const mine = dots.filter(d => d.project === sol.p.name).sort((x, y) => (rank[x.status] ?? 1) - (rank[y.status] ?? 1))
-    return mine.map((d, i) => {
-      // Spread evenly from the top facet to the bottom one, in status order.
-      const slot = visible[Math.min(visible.length - 1, Math.floor((i / Math.max(1, mine.length)) * visible.length))]
-      return { d, ...slot }
-    }).filter(m => m.seen)
+    return mine.map((d, i) => ({ d, ...faces[Math.min(faces.length - 1, Math.floor((i / Math.max(1, mine.length)) * faces.length))] }))
+      .filter(m => m.seen)
   }
-
-  // Bodies paint far to near: a nearer fragment covers a farther one.
-  const bodies = solids.flatMap(sol => [sol.main, ...sol.chips].map(body => ({ sol, body })))
-    .sort((x, y) => cam.depth(...x.body.centre) - cam.depth(...y.body.centre))
 
   return (
     <>
@@ -532,23 +583,21 @@ function ShardView({ map, focus, pick, W, H, view3d }) {
         const [x, y] = px(sol.p.x, sol.p.y, 0)
         return <path key={`f${sol.k}`} d={`M${x - 5},${y}L${x + 5},${y}M${x},${y - 3}L${x},${y + 3}`} stroke="var(--kt-ink)" strokeOpacity={0.3} strokeWidth={0.6} />
       })}
-      {bodies.map(({ sol, body }) => {
-        const glow = sol.p.warmth
-        const edge = (COLD + (HOT - COLD) * glow) * (body.chip ? 0.6 : 1)
-        return (
-          <g key={body.key}>
-            {facets(body, glow, edge)}
-            {!body.chip && marksOf(sol).map(({ d, at }) => {
-              const [x, y] = px(...at)
-              const on = focus?.kind === 'task' && focus.task.id === d.task.id
-              return <TaskDot key={d.task.id} d={d} x={x} y={y} on={on} pickProps={pick('task', d)} />
-            })}
-          </g>
-        )
-      })}
+      {/* A thousand flakes are a thousand elements to diff and paint on every frame
+          of a drag as SVG; on a canvas they are one draw call each. The canvas sits
+          inside the SVG, so it scales with it and keeps its place in the stack:
+          over the ground, under the task marks and labels. */}
+      <foreignObject x={0} y={0} width={W} height={H} pointerEvents="none">
+        <FlakeCanvas flakes={flakes} project={px} W={W} H={H} />
+      </foreignObject>
+      {solids.flatMap(sol => marksOf(sol).map(({ d, at }) => {
+        const [x, y] = px(...at)
+        const on = focus?.kind === 'task' && focus.task.id === d.task.id
+        return <TaskDot key={d.task.id} d={d} x={x} y={y} on={on} pickProps={pick('task', d)} />
+      }))}
       {spreadLabels(solids.map(sol => {
         const [x, y] = px(...sol.tip)
-        return { p: sol.p, x, y: y - 2 }
+        return { p: sol.p, x, y: y - 4 }
       })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={w => COLD + (HOT - COLD) * w} pickProps={pick('peak', p)} />)}
     </>
   )

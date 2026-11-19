@@ -47,7 +47,8 @@ reading, not decoration — left to right is how long since the project last cha
 is done. So a mountain at the front right is recent and nearly finished, and one at
 the back left is untouched. Tasks are small squares on the slopes; point at one, or at
 a summit, to see what it is. **Map** draws it as contour lines from above; **3D** stands every project up as an
-abstract shard — a fragment faceted in triangles — on the same ground — its height the open work, its girth all of it, its
+abstract shard on the same ground — not a solid but a crust of loose triangular flakes,
+like frosting, that glint as the view turns — its height the open work, its girth all of it, its
 edges as bright as it has been busy. Drag the 3D view to turn it or change how steeply
 you look down on it, double-click to put it back;
 **Timeline** shows when each project was busy. Past eight projects the smallest fold
