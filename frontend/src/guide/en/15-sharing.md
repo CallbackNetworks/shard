@@ -38,8 +38,10 @@ dims. Three layouts, and the zoom controls are there because a big project start
 fitted to the frame.
 
 At the top, under the summary, the **Analytics** section opens on a **terrain map**:
-every project is a mountain. Its width is all of its tasks, its height the tasks still
-open, and its lines are brighter the busier the last 30 days were. Where it stands is a
+the whole share is one mountain range, and every project is a summit in it, joined to
+its neighbours by ridges. A summit's width is all of its tasks, its height the tasks
+still open, and its lines are brighter the busier the last 30 days were; the dim
+foothills between them belong to no project. Where it stands is a
 reading, not decoration — left to right is how long since the project last changed
 (90 days or more at the far left, today at the right), back to front is how much of it
 is done. So a mountain at the front right is recent and nearly finished, and one at

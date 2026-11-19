@@ -110,13 +110,6 @@ function smooth(x, y) {
   const a = hash(x0, y0), b = hash(x0 + 1, y0), c = hash(x0, y0 + 1), d = hash(x0 + 1, y0 + 1)
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
 }
-// A stable number in [0, 1) from a string, so a project's silhouette is its own.
-function idSeed(id) {
-  let h = 2166136261
-  for (const ch of String(id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
-  return (h >>> 0) / 4294967296
-}
-
 // Ridged noise: 1 on a crest, falling away sharply either side of it.
 function ridged(x, y) {
   return 1 - Math.abs(smooth(x, y) * 2 - 1)
@@ -223,7 +216,7 @@ function PeakLabel({ p, x, y, W, lineOpacity, pickProps }) {
 // axes numbered along the front and left edges — days since last activity and
 // percent done — drawn through `f` so the relief can lay them on its tilted
 // ground plane and its terraces can cover them.
-function Graticule({ f, W, H }) {
+function Graticule({ f, W, H, part = 'all' }) {
   const ax = axes(W, H)
   const days = [90, 75, 60, 45, 30, 15, 0]
   const pcts = [0, 0.25, 0.5, 0.75, 1]
@@ -237,13 +230,15 @@ function Graticule({ f, W, H }) {
   const [lx, ly] = f(ax.x1, ax.y1), [px0, py0] = f(ax.x0, ax.y0)
   return (
     <g fontFamily={MONO} fontSize={7.5} fill="rgba(var(--kt-ink-rgb), 0.35)" pointerEvents="none">
-      <path d={xs.flatMap(x => ys.map(y => cross(x, y))).join('')} stroke="rgba(var(--kt-ink-rgb), 0.16)" strokeWidth={0.6} />
+      {part !== 'axes' && <path d={xs.flatMap(x => ys.map(y => cross(x, y))).join('')} stroke="rgba(var(--kt-ink-rgb), 0.16)" strokeWidth={0.6} />}
+      {part !== 'ground' && <>
       <path d={`M${bx0},${by0}L${fx0},${fy0}L${fx1},${fy1}`} fill="none" stroke="rgba(var(--kt-ink-rgb), 0.18)" strokeWidth={0.6} />
       <path d={xs.map(x => tick([x, ax.y1], [x, ax.y1 - 8])).join('') + ys.map(y => tick([ax.x0, y], [ax.x0 + 8, y])).join('')} stroke="rgba(var(--kt-ink-rgb), 0.3)" strokeWidth={0.6} />
       {xs.map((x, i) => { const [tx, ty] = f(x, ax.y1); return <text key={`x${i}`} x={tx} y={ty + 11} textAnchor="middle">{days[i] === 0 ? 'NOW' : `${days[i]}D`}</text> })}
       {ys.map((y, i) => { const [tx, ty] = f(ax.x0, y); return <text key={`y${i}`} x={tx - 5} y={ty + 2.5} textAnchor="end">{`${Math.round(pcts[i] * 100)}%`}</text> })}
       <text x={lx} y={ly + 22} textAnchor="end" fill="rgba(var(--kt-ink-rgb), 0.5)">LAST ACTIVITY →</text>
       <text x={px0 - 5} y={py0 - 9} textAnchor="end" fill="rgba(var(--kt-ink-rgb), 0.5)">DONE ↓</text>
+      </>}
     </g>
   )
 }
@@ -296,9 +291,15 @@ function Strokes({ level, f, lineOpacity, peaks, fringe = true }) {
     // Heat is carried twice, by brightness and by weight, and the noise only
     // shades the line by a fifth — less than the gap between a busy mountain and
     // a quiet one — so the wear never reads as a change in heat.
-    const warmth = peaks[st.owner]?.warmth ?? 0
-    const width = (level.index ? 0.55 : 0.3) * (0.7 + 0.7 * warmth)
-    const opacity = Math.min(1, lineOpacity(warmth) * (0.8 + 0.2 * st.alpha) * (level.index ? 0.8 : 0.55))
+    // Ground that belongs to no project (owner -1) is the range's foothills: drawn,
+    // so the map reads as one landscape, but at a fixed low weight that no
+    // project's heat goes down to.
+    const own = peaks[st.owner]
+    const warmth = own?.warmth ?? 0
+    const width = (level.index ? 0.55 : 0.3) * (own ? 0.7 + 0.7 * warmth : 1)
+    const opacity = own
+      ? Math.min(1, lineOpacity(warmth) * (0.8 + 0.2 * st.alpha) * (level.index ? 0.8 : 0.55))
+      : 0.3 * (0.8 + 0.2 * st.alpha) * (level.index ? 1.4 : 1)
     return (
       <g key={k}>
         {fringe && FRINGE.map(fr => (
@@ -397,7 +398,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
 
   return (
     <>
-      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} />
+      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} part="ground" />
       {levels.map(level => {
         const f = (x, y) => px(x * CELL - MARGIN, y * CELL - MARGIN, level.z)
         const fill = level.rings.map(r => r.map((p, i) => {
@@ -411,6 +412,8 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
           </g>
         )
       })}
+      {/* The terrain now covers the ground, so the axes are read on top of it. */}
+      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} part="axes" />
       {pins.map(pin)}
       {spreadLabels(peaks.map(p => {
         // On the highest ring actually drawn near this summit, not on the spike above
@@ -517,29 +520,19 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
       })
     const peaks = placeMountains(items, W, H)
 
-    // A mountain is a range, not a spire: a main summit stretched along a heading
-    // and three lower shoulders off it, all seeded from the project's id so the
-    // same project keeps the same silhouette. The main summit carries the measure
-    // (its height the open tasks, its spread every task); the shoulders follow it.
-    const parts = peaks.flatMap((p, k) => {
-      const seed = idSeed(p.id)
-      const heading = seed * Math.PI * 2
-      const main = { k, x: p.x, y: p.y, h: p.peak, sa: p.sigma * 1.35, sb: p.sigma * 0.8, heading }
-      const shoulders = [0, 1, 2].map(i => {
-        const a = heading + (i - 1) * 2.1 + (hash(seed * 50, i) - 0.5) * 0.8
-        const d = p.sigma * (0.7 + 0.35 * hash(i, seed * 90))
-        return {
-          k,
-          x: p.x + Math.cos(a) * d,
-          y: p.y + Math.sin(a) * d,
-          h: p.peak * (0.45 + 0.3 * hash(seed * 13, i * 7)),
-          sa: p.sigma * 0.75,
-          sb: p.sigma * 0.5,
-          heading: a,
-        }
-      })
-      return [main, ...shoulders]
+    // One range, not separate mountains. The summits are strung along a spine in
+    // the order of the horizontal axis — so the range runs from long-idle work to
+    // recent work — and each pair of neighbours is joined by a ridge that dips to a
+    // saddle between them. Each summit is stretched along the spine where it
+    // stands, so its shape comes from the range rather than from chance.
+    const chain = peaks.map((p, k) => ({ ...p, k })).sort((a, b) => a.x - b.x || a.y - b.y)
+    const heading = chain.map((p, n) => {
+      const prev = chain[n - 1] || p, next = chain[n + 1] || p
+      return prev === next ? 0 : Math.atan2(next.y - prev.y, next.x - prev.x)
     })
+    const summits = chain.map((p, n) => ({ k: p.k, x: p.x, y: p.y, h: p.peak, sa: p.sigma * 1.3, sb: p.sigma * 0.85, heading: heading[n] }))
+    const ridges = chain.slice(1).map((B, n) => ({ A: chain[n], B }))
+    const highest = Math.max(...peaks.map(p => p.peak))
 
     // The ground runs a margin past the frame on every side, so a mountain near the
     // edge slopes away out of view instead of being cut off at the border.
@@ -552,7 +545,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         const x = i * CELL - MARGIN, y = j * CELL - MARGIN
         share.fill(0)
         let sum = 0
-        for (const c of parts) {
+        for (const c of summits) {
           const dx = x - c.x, dy = y - c.y
           const cos = Math.cos(c.heading), sin = Math.sin(c.heading)
           const u = (dx * cos + dy * sin) / c.sa, v = (-dx * sin + dy * cos) / c.sb
@@ -561,12 +554,32 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           sum += h
           share[c.k] += h
         }
+        for (const { A, B } of ridges) {
+          const ex = B.x - A.x, ey = B.y - A.y
+          const len2 = ex * ex + ey * ey || 1
+          const t = Math.max(0, Math.min(1, ((x - A.x) * ex + (y - A.y) * ey) / len2))
+          const d = Math.hypot(x - (A.x + ex * t), y - (A.y + ey * t))
+          const w = (A.sigma + (B.sigma - A.sigma) * t) * 0.55
+          // Highest at the summits it joins, lowest midway: a saddle.
+          const crest = (A.peak + (B.peak - A.peak) * t) * 0.5 * (1 - 0.45 * Math.sin(Math.PI * t))
+          const h = crest * Math.exp(-((d / w) ** 2))
+          sum += h
+          share[A.k] += h * (1 - t)
+          share[B.k] += h * t
+        }
+        // The rest of the ground is foothills and valleys, never a flat plain, so
+        // the whole map is terrain. It belongs to no project and is drawn dark.
+        // Fading to nothing toward the rim of the computed ground, so the lowest
+        // contours close as a coastline rather than along the rim's straight edge.
+        const rim = Math.min(x + MARGIN, W + MARGIN - x, y + MARGIN, H + MARGIN - y) / (MARGIN * 0.9)
+        const shore = rim >= 1 ? 1 : rim <= 0 ? 0 : rim * rim * (3 - 2 * rim)
+        const hills = shore * highest * 0.32 * (0.5 * smooth(x / 110, y / 110) + 0.3 * smooth(x / 55 + 3, y / 55 - 2) + 0.2 * smooth(x / 27 - 5, y / 27 + 4))
         let best = -1, bestV = 0
         for (let k = 0; k < share.length; k++) if (share[k] > bestV) { bestV = share[k]; best = k }
-        // Rock: ridged noise cut into the slopes, strongest mid-mountain and absent
-        // on the plain, so the ground stays flat and the mountains go craggy.
+        if (bestV < (sum + hills) * 0.35) best = -1
+        // Rock: ridged noise cut into the slopes.
         const rock = ridged(x / 46, y / 46) * 0.6 + ridged(x / 19 + 7, y / 19 - 3) * 0.3 + ridged(x / 8 - 2, y / 8 + 5) * 0.1
-        field[j * cols + i] = sum * (0.84 + 0.3 * rock) + (sum > 0.04 ? 0.03 * rock : 0)
+        field[j * cols + i] = (sum + hills) * (0.84 + 0.3 * rock)
         owner[j * cols + i] = best
       }
     }
