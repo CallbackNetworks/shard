@@ -4,7 +4,7 @@ import { isOverdue } from '../../utils/overdue'
 const LEVELS = 12            // contour lines between sea level and the highest summit
 const INDEX_EVERY = 4        // every fourth line is an index contour, drawn heavier
 const CELL = 6               // field resolution in viewBox units
-const HOT = 0.95, COLD = 0.14 // line opacity at the hottest and the quietest mountain
+const HOT = 0.95, COLD = 0.3 // line opacity at the hottest and the quietest mountain
 
 const DOT = {
   in_progress: { r: 0.32, fill: 'var(--kt-ink)', stroke: 'none' },
@@ -72,6 +72,189 @@ function contours(field, cols, rows, level) {
   return segs
 }
 
+const GRAIN_BUCKETS = 5
+
+// Deterministic noise: the same map draws the same way on every refresh.
+function hash(x, y) {
+  const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453
+  return v - Math.floor(v)
+}
+function smooth(x, y) {
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0
+  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy)
+  const a = hash(x0, y0), b = hash(x0 + 1, y0), c = hash(x0, y0 + 1), d = hash(x0 + 1, y0 + 1)
+  return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
+}
+// Per piece of line: an opacity that drifts slowly along it, the odd gap, and the
+// rarer piece knocked sideways — wear and misregistration, not static.
+function grain(x, y, level) {
+  const drift = smooth(x / 5 + level * 3.1, y / 5 - level * 1.7)
+  const speck = hash(x * 3.3 + level, y * 2.9 - level)
+  const bucket = Math.min(GRAIN_BUCKETS - 1, Math.floor((0.15 + 0.85 * drift * (0.7 + 0.3 * speck)) * GRAIN_BUCKETS))
+  const drop = speck < 0.07
+  const slip = hash(x + level * 7, y) < 0.025 ? (hash(y, x) - 0.5) * 1.6 : 0
+  return { bucket, drop, slip }
+}
+
+// Join marching-squares segments into rings. Neighbouring cells compute a shared
+// edge point from the same two samples, so endpoints match exactly.
+function stitch(segs) {
+  const key = p => `${p[0].toFixed(4)},${p[1].toFixed(4)}`
+  const at = new Map()
+  segs.forEach((s, i) => {
+    for (const end of [0, 1]) {
+      const k = key(s[end])
+      if (!at.has(k)) at.set(k, [])
+      at.get(k).push(i)
+    }
+  })
+  const used = new Uint8Array(segs.length)
+  const rings = []
+  for (let start = 0; start < segs.length; start++) {
+    if (used[start]) continue
+    used[start] = 1
+    const ring = [segs[start][0], segs[start][1]]
+    let tip = segs[start][1]
+    for (;;) {
+      const next = (at.get(key(tip)) || []).find(i => !used[i])
+      if (next == null) break
+      used[next] = 1
+      const s = segs[next]
+      tip = key(s[0]) === key(tip) ? s[1] : s[0]
+      ring.push(tip)
+    }
+    if (ring.length > 3) rings.push(ring)
+  }
+  return rings
+}
+
+function TaskDot({ d, x, y, on, pickProps }) {
+  const style = DOT[d.status]
+  return (
+    <g style={{ cursor: 'pointer' }} {...pickProps}>
+      {/* A ring around the dot, not a recoloured dot: a late todo must not read as failed. */}
+      {isOverdue(d.task) && <circle cx={x} cy={y} r={on ? 7 : 5} fill="none" stroke="var(--kt-status-failed, #fb7185)" strokeWidth={1} />}
+      <circle cx={x} cy={y} r={on ? 4.5 : 2.6} fill={style.fill === 'none' ? 'var(--kt-bg, #0b0c0e)' : style.fill} stroke={style.stroke} strokeWidth={1}>
+        <title>{d.task.title}</title>
+      </circle>
+    </g>
+  )
+}
+
+function PeakLabel({ p, x, y, lineOpacity, pickProps }) {
+  return (
+    <g style={{ cursor: 'pointer' }} {...pickProps}>
+      <path d={`M${x - 4},${y + 3} L${x},${y - 4} L${x + 4},${y + 3} Z`} fill="var(--kt-ink)" fillOpacity={lineOpacity(p.warmth)} />
+      <text x={x} y={y - 9} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--kt-ink)" fillOpacity={0.35 + 0.65 * p.warmth}
+        style={{ paintOrder: 'stroke', stroke: 'var(--kt-bg, #0b0c0e)', strokeWidth: 3 }}>
+        {p.name.length > 22 ? `${p.name.slice(0, 21)}…` : p.name}
+      </text>
+    </g>
+  )
+}
+
+const segPath = (segs, f) => segs.map(([ax, ay, bx, by]) => {
+  const [x1, y1] = f(ax, ay), [x2, y2] = f(bx, by)
+  return `M${x1.toFixed(1)},${y1.toFixed(1)}L${x2.toFixed(1)},${y2.toFixed(1)}`
+}).join('')
+
+function Strokes({ level, f, lineOpacity, peaks }) {
+  return level.strokes.map((st, k) => (
+    <path
+      key={k}
+      d={segPath(st.segs, f)}
+      fill="none"
+      stroke="var(--kt-ink, #f5f6f7)"
+      strokeOpacity={lineOpacity(peaks[st.owner]?.warmth ?? 0) * st.alpha * (level.index ? 1 : 0.7)}
+      strokeWidth={level.index ? 1.3 : 0.75}
+      strokeLinecap="round"
+    />
+  ))
+}
+
+// Top-down: the contour lines themselves.
+function PlanView({ map, focus, pick, lineOpacity }) {
+  const f = (x, y) => [x * CELL, y * CELL]
+  return (
+    <>
+      {map.levels.map(level => <g key={level.l}><Strokes level={level} f={f} lineOpacity={lineOpacity} peaks={map.peaks} /></g>)}
+      {map.dots.map(d => (
+        <TaskDot key={d.task.id} d={d} x={d.x} y={d.y} on={focus?.kind === 'task' && focus.task.id === d.task.id} pickProps={pick('task', d)} />
+      ))}
+      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x} y={p.y} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+    </>
+  )
+}
+
+// Summits seen from the side line up along the horizon, so their names can land on
+// top of each other. Nearer labels keep their place; a farther one steps up clear.
+function spreadLabels(labels) {
+  const placed = []
+  for (const l of [...labels].sort((a, b) => b.y - a.y)) {
+    let y = l.y
+    for (const q of placed) if (Math.abs(q.x - l.x) < 150 && Math.abs(q.y - y) < 16) y = q.y - 16
+    placed.push({ ...l, y })
+  }
+  return placed
+}
+
+const TILT = 0.55       // how flat the ground plane is drawn: 1 is top-down, 0 edge-on
+const RISE = 0.3        // the tallest summit stands this fraction of the frame high
+
+// In relief: every contour ring lifted to its own height, stacked from sea level
+// up like terraces. Each ring is filled with the background, so a higher terrace
+// hides the part of a lower one that is behind the hill; a task stands on the
+// terrace beneath it.
+function ReliefView({ map, focus, pick, lineOpacity, H }) {
+  const { field, cols, rows, top, peaks, dots, levels } = map
+  const lift = (H * RISE) / top
+  const ground = H * (1 - TILT) * 0.8
+  const px = (x, y, z) => [x, ground + y * TILT - z * lift]
+  const height = (x, y) => {
+    const i = Math.max(0, Math.min(cols - 1, Math.round(x / CELL)))
+    const j = Math.max(0, Math.min(rows - 1, Math.round(y / CELL)))
+    return field[j * cols + i]
+  }
+
+  // Pins stand on the surface but are drawn above every terrace, nearest last: a
+  // pin's head rises into the terrace above it, and hiding it there would hide a
+  // task in front of the hill, not behind it.
+  const pins = dots.map(d => ({ d, z: height(d.x, d.y) })).sort((a, b) => a.d.y - b.d.y)
+  const pin = ({ d, z }) => {
+    const [x, y] = px(d.x, d.y, z)
+    const on = focus?.kind === 'task' && focus.task.id === d.task.id
+    return (
+      <g key={d.task.id}>
+        <line x1={x} y1={y} x2={x} y2={y - 9} stroke="rgba(var(--kt-ink-rgb), 0.5)" strokeWidth={0.8} />
+        <TaskDot d={d} x={x} y={y - 9} on={on} pickProps={pick('task', d)} />
+      </g>
+    )
+  }
+
+  return (
+    <>
+      {levels.map(level => {
+        const f = (x, y) => px(x * CELL, y * CELL, level.z)
+        const fill = level.rings.map(r => r.map((p, i) => {
+          const [x, y] = f(p[0], p[1])
+          return `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`
+        }).join('') + 'Z').join('')
+        return (
+          <g key={level.l}>
+            <path d={fill} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.9} fillRule="nonzero" />
+            <Strokes level={level} f={f} lineOpacity={lineOpacity} peaks={peaks} />
+          </g>
+        )
+      })}
+      {pins.map(pin)}
+      {spreadLabels(peaks.map(p => {
+        const [x, y] = px(p.x, p.y, height(p.x, p.y))
+        return { p, x, y: y - 14 }
+      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+    </>
+  )
+}
+
 /**
  * The share as one landscape: every project is a mountain whose size is its task
  * count, and whose contour lines are as bright as the project is busy. Tasks sit on
@@ -80,8 +263,9 @@ function contours(field, cols, rows, level) {
  * `projects`: `[{ id, name, tasks: [{ id, title, status, due_date, progress_pct }], heat }]`
  * where `heat` is a recent activity count.
  */
-export default function ContourMap({ projects, width = 720, height = 420, emptyLabel = 'Nothing to map yet' }) {
+export default function ContourMap({ projects, width = 720, height = 420, emptyLabel = 'Nothing to map yet', initialView = 'relief' }) {
   const [focus, setFocus] = useState(null) // { kind: 'task' | 'peak', ... }
+  const [view, setView] = useState(initialView) // 'relief' (2.5D) | 'plan' (top-down)
   const W = width, H = height
 
   const map = useMemo(() => {
@@ -116,20 +300,31 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
     }
     const top = Math.max(...field)
 
-    // One path per (level, owning mountain), so a line changes brightness where it
-    // crosses from one project's ground to another's.
-    const lines = []
+    // Contours are traced on a copy whose rim is sea level, so every ring closes.
+    const sea = Float32Array.from(field)
+    for (let i = 0; i < cols; i++) { sea[i] = 0; sea[(rows - 1) * cols + i] = 0 }
+    for (let j = 0; j < rows; j++) { sea[j * cols] = 0; sea[j * cols + cols - 1] = 0 }
+
+    // Per level: the rings (closed, for the relief's fills) and the strokes, cut into
+    // pieces by owning mountain and by noise bucket. A piece keeps its owner's
+    // warmth and gets its own opacity, so a line fades, breaks and slips like a
+    // worn print instead of running solid.
+    const levels = []
     for (let l = 1; l <= LEVELS; l++) {
-      const level = (l / (LEVELS + 1)) * top
-      const byOwner = new Map()
-      for (const [a, b] of contours(field, cols, rows, level)) {
-        const ci = Math.min(cols - 1, Math.round((a[0] + b[0]) / 2))
-        const cj = Math.min(rows - 1, Math.round((a[1] + b[1]) / 2))
+      const z = (l / (LEVELS + 1)) * top
+      const segs = contours(sea, cols, rows, z)
+      const strokes = new Map()
+      for (const [a, b] of segs) {
+        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
+        const n = grain(mx, my, l)
+        if (n.drop) continue
+        const ci = Math.min(cols - 1, Math.round(mx)), cj = Math.min(rows - 1, Math.round(my))
         const k = owner[cj * cols + ci]
-        const d = `M${(a[0] * CELL).toFixed(1)},${(a[1] * CELL).toFixed(1)}L${(b[0] * CELL).toFixed(1)},${(b[1] * CELL).toFixed(1)}`
-        byOwner.set(k, (byOwner.get(k) || '') + d)
+        const key = `${k}:${n.bucket}`
+        if (!strokes.has(key)) strokes.set(key, { owner: k, alpha: (n.bucket + 0.5) / GRAIN_BUCKETS, segs: [] })
+        strokes.get(key).segs.push([a[0] + n.slip, a[1], b[0] + n.slip, b[1]])
       }
-      for (const [k, d] of byOwner) lines.push({ key: `${l}-${k}`, d, index: l % INDEX_EVERY === 0, warmth: peaks[k]?.warmth ?? 0 })
+      levels.push({ l, z, index: l % INDEX_EVERY === 0, rings: stitch(segs), strokes: [...strokes.values()] })
     }
 
     // Tasks on the slopes: a ring per status, spread evenly around the summit.
@@ -143,17 +338,38 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           return { task: t, project: p.name, status, x: p.x + Math.cos(angle) * r, y: p.y + Math.sin(angle) * r * 0.8 }
         }))
     })
-    return { peaks, lines, dots }
+    return { peaks, levels, dots, field, cols, rows, top }
   }, [projects, W, H])
 
   if (!map) {
     return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.28)', fontSize: 12, padding: '18px 0' }}>{emptyLabel}</div>
   }
 
-  const overdue = t => isOverdue(t)
+  const overdue = isOverdue
+
+  const pick = (kind, d) => ({ onMouseEnter: () => setFocus({ kind, ...d }), onClick: () => setFocus({ kind, ...d }) })
+  const lineOpacity = warmth => COLD + (HOT - COLD) * warmth
 
   return (
     <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: -6, marginBottom: 4 }}>
+        {[['relief', '2.5D'], ['plan', 'Map']].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            aria-pressed={view === key}
+            style={{
+              padding: '3px 9px', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer',
+              border: '1px solid var(--kt-line)',
+              background: view === key ? 'rgba(var(--kt-ink-rgb), 0.14)' : 'transparent',
+              color: view === key ? 'var(--kt-ink)' : 'var(--kt-muted)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
@@ -162,57 +378,9 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
         style={{ display: 'block' }}
       >
-        {map.lines.map(l => (
-          <path
-            key={l.key}
-            d={l.d}
-            fill="none"
-            stroke="var(--kt-ink, #f5f6f7)"
-            strokeOpacity={(COLD + (HOT - COLD) * l.warmth) * (l.index ? 1 : 0.6)}
-            strokeWidth={l.index ? 1.3 : 0.7}
-            strokeLinecap="round"
-          />
-        ))}
-
-        {map.dots.map(d => {
-          const style = DOT[d.status]
-          const late = overdue(d.task)
-          const on = focus?.kind === 'task' && focus.task.id === d.task.id
-          return (
-            <g key={d.task.id}>
-            {/* A ring around the dot, not a recoloured dot: a late todo must not read as failed. */}
-            {late && <circle cx={d.x} cy={d.y} r={on ? 7 : 5} fill="none" stroke="var(--kt-status-failed, #fb7185)" strokeWidth={1} />}
-            <circle
-              cx={d.x}
-              cy={d.y}
-              r={on ? 4.5 : 2.6}
-              fill={style.fill}
-              stroke={style.stroke}
-              strokeWidth={1}
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={() => setFocus({ kind: 'task', ...d })}
-              onClick={() => setFocus({ kind: 'task', ...d })}
-            >
-              <title>{d.task.title}</title>
-            </circle>
-            </g>
-          )
-        })}
-
-        {map.peaks.map(p => (
-          <g
-            key={p.id}
-            style={{ cursor: 'pointer' }}
-            onMouseEnter={() => setFocus({ kind: 'peak', ...p })}
-            onClick={() => setFocus({ kind: 'peak', ...p })}
-          >
-            <path d={`M${p.x - 4},${p.y + 3} L${p.x},${p.y - 4} L${p.x + 4},${p.y + 3} Z`} fill="var(--kt-ink)" fillOpacity={COLD + (HOT - COLD) * p.warmth} />
-            <text x={p.x} y={p.y - 9} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--kt-ink)" fillOpacity={0.35 + 0.65 * p.warmth}
-              style={{ paintOrder: 'stroke', stroke: 'var(--kt-bg, #0b0c0e)', strokeWidth: 3 }}>
-              {p.name.length > 22 ? `${p.name.slice(0, 21)}…` : p.name}
-            </text>
-          </g>
-        ))}
+        {view === 'plan'
+          ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} />
+          : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} H={H} />}
       </svg>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 6, color: 'var(--kt-muted)', fontSize: 10, textTransform: 'uppercase' }}>

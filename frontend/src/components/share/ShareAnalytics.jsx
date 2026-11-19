@@ -41,7 +41,7 @@ export default function ShareAnalytics({ analytics, projects = [], bp }) {
   return (
     <section className={s.grid} aria-label="Analytics">
       <Panel title="Terrain · size = tasks, brightness = last 30 days" wide>
-        <ContourMap projects={mountains} width={mobile ? 380 : 720} height={mobile ? 420 : 420} />
+        <ContourMap projects={mountains} width={mobile ? 380 : 720} height={mobile ? 340 : 420} />
       </Panel>
 
       {byProject.length > 0 && (

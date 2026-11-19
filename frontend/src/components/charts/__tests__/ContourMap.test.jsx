@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import ContourMap, { placeMountains } from '../ContourMap'
@@ -44,5 +44,19 @@ describe('ContourMap', () => {
   it('leaves a project with no tasks off the map', () => {
     render(<ContourMap projects={[{ id: 'p1', name: 'Empty', heat: 3, tasks: [] }]} emptyLabel="flat" />)
     expect(screen.getByText('flat')).toBeTruthy()
+  })
+
+  it('draws the same landscape from above or in relief, and the toggle switches between them', () => {
+    const { container } = render(<ContourMap projects={[
+      { id: 'p1', name: 'Alpha', heat: 5, tasks: [task('t1', 'done'), task('t2', 'in_progress')] },
+    ]} />)
+    // Relief fills each lifted ring so a higher terrace hides what is behind it; the plan has no fills.
+    const terraces = () => container.querySelectorAll('path[fill-opacity="0.9"]').length
+    expect(terraces()).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Map' }))
+    expect(terraces()).toBe(0)
+    expect(screen.getByRole('button', { name: 'Map' }).getAttribute('aria-pressed')).toBe('true')
+    // Every task is still on the map in either view.
+    expect(container.querySelectorAll('title').length).toBe(2)
   })
 })
