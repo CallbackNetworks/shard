@@ -285,7 +285,7 @@ function Frame({ W, H, peaks, levels, view }) {
         fill="none" stroke="rgba(var(--kt-ink-rgb), 0.45)" strokeWidth={1}
       />
       <text x={W - 6} y={H - 6} textAnchor="end" fontSize={8} fill="rgba(var(--kt-ink-rgb), 0.4)">
-        {`${view === 'plan' ? 'PLAN' : 'RELIEF · DRAG TO ORBIT'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
+        {`${view === 'plan' ? 'PLAN' : 'SHARDS · DRAG TO ORBIT'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
       </text>
     </g>
   )
@@ -360,7 +360,6 @@ function spreadLabels(labels) {
   return placed
 }
 
-const RISE = 0.32       // the tallest summit stands this fraction of the frame high
 // The camera: `az` turns the ground about its centre, `tilt` is how steeply it is
 // looked down on (1 top-down, 0 edge-on). Dragging moves both, within limits that
 // keep the ground readable; a double-click returns here.
@@ -388,65 +387,115 @@ export function camera(W, H, { az, tilt }, lift) {
   return { project, depth }
 }
 
-// In relief: every contour ring lifted to its own height, stacked from sea level
-// up like terraces. Each ring is filled with the background, so a higher terrace
-// hides the part of a lower one that is behind the hill; a task stands on the
-// terrace beneath it.
-function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
-  const { field, cols, rows, top, peaks, dots, levels } = map
-  const lift = (H * RISE) / top
-  const cam = camera(W, H, view3d, lift)
-  const px = cam.project
-  const height = (x, y) => {
-    const i = Math.max(0, Math.min(cols - 1, Math.round((x + MARGIN) / CELL)))
-    const j = Math.max(0, Math.min(rows - 1, Math.round((y + MARGIN) / CELL)))
-    return field[j * cols + i]
-  }
+// The 3D view: the share as a tower of shards. Every project is a crystal standing
+// where its reading puts it on the ground — a faceted prism that narrows to a
+// point. Its height is the work still open, its girth all the work it holds, and
+// its edges and faces are as bright as the last 30 days were busy. The shards
+// lean a little toward the cluster's middle, so together they stand as one
+// formation rather than a scatter of posts.
+const FACETS = 6
+const LIGHT = (() => { const v = [-0.45, 0.35, 0.82], n = Math.hypot(...v); return v.map(c => c / n) })()
 
-  // Pins stand on the surface but are drawn above every terrace, nearest last: a
-  // pin's head rises into the terrace above it, and hiding it there would hide a
-  // task in front of the hill, not behind it.
-  const pins = dots.map(d => ({ d, z: height(d.x, d.y) })).sort((a, b) => cam.depth(a.d.x, a.d.y) - cam.depth(b.d.x, b.d.y))
-  const pin = ({ d, z }) => {
-    const [x, y] = px(d.x, d.y, z)
-    const on = focus?.kind === 'task' && focus.task.id === d.task.id
-    return (
-      <g key={d.task.id}>
-        <TaskDot d={d} x={x} y={y - 1.5} on={on} pickProps={pick('task', d)} />
-      </g>
-    )
+function shardSolid(p, k, maxTasks, H, centre) {
+  const r = 9 + 24 * Math.sqrt(p.tasks.length / maxTasks)
+  const h = H * 0.42 * p.peak
+  // A small, fixed irregularity per shard, so a cluster reads as broken crystal
+  // rather than machined columns; it carries no data and is the same every time.
+  const ring = (z, scale, twist) => Array.from({ length: FACETS }, (_, i) => {
+    const a = (i / FACETS) * Math.PI * 2 + twist + (hash(k * 3.1, i) - 0.5) * 0.35
+    const rr = r * scale * (0.86 + 0.28 * hash(i * 1.7, k + 0.5))
+    return [p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr, z]
+  })
+  const lean = Math.min(1, Math.hypot(centre[0] - p.x, centre[1] - p.y) / 200) * 0.22
+  const toward = Math.atan2(centre[1] - p.y, centre[0] - p.x)
+  const tip = [p.x + Math.cos(toward) * h * lean, p.y + Math.sin(toward) * h * lean, h]
+  const shoulder = ring(h * 0.72, 0.78, 0.3).map(([x, y, z]) => [x + (tip[0] - p.x) * 0.72, y + (tip[1] - p.y) * 0.72, z])
+  const base = ring(0, 1, 0)
+  const faces = []
+  for (let i = 0; i < FACETS; i++) {
+    const j = (i + 1) % FACETS
+    faces.push([base[i], base[j], shoulder[j], shoulder[i]])
+    faces.push([shoulder[i], shoulder[j], tip])
   }
+  return { r, h, base, shoulder, tip, faces }
+}
+
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const unit = v => { const n = Math.hypot(...v) || 1; return v.map(c => c / n) }
+
+function ShardView({ map, focus, pick, W, H, view3d }) {
+  const { peaks, dots } = map
+  const cam = camera(W, H, view3d, 1)
+  const px = cam.project
+  const maxTasks = Math.max(...peaks.map(p => p.tasks.length))
+  const centre = [peaks.reduce((n, p) => n + p.x, 0) / peaks.length, peaks.reduce((n, p) => n + p.y, 0) / peaks.length]
+  const solids = peaks.map((p, k) => ({ p, k, ...shardSolid(p, k, maxTasks, H, centre) }))
+  // Farthest first: a shard in front paints over the ones behind it.
+  const order = [...solids].sort((a, b) => cam.depth(a.p.x, a.p.y) - cam.depth(b.p.x, b.p.y))
+  const toward = [Math.sin(view3d.az), Math.cos(view3d.az)]
+  const poly = pts => pts.map(([x, y, z], i) => { const [sx, sy] = px(x, y, z); return `${i ? 'L' : 'M'}${tear(sx, sy).toFixed(1)},${sy.toFixed(1)}` }).join('') + 'Z'
+
+  const tasksOf = (sol) => dots.filter(d => d.project === sol.p.name).map((d, i, list) => {
+    // On the surface: in progress high, done at the foot; spread around.
+    const rise = { in_progress: 0.62, todo: 0.4, failed: 0.25, done: 0.08 }[d.status] ?? 0.4
+    const a = (i / list.length) * Math.PI * 2 + rise * 3
+    const z = sol.h * rise
+    const narrow = 1 - 0.25 * rise
+    const lx = (sol.tip[0] - sol.p.x) * rise, ly = (sol.tip[1] - sol.p.y) * rise
+    const facing = Math.cos(a) * toward[0] + Math.sin(a) * toward[1]
+    return { d, facing, at: [sol.p.x + lx + Math.cos(a) * sol.r * narrow, sol.p.y + ly + Math.sin(a) * sol.r * narrow, z] }
+  })
 
   return (
     <>
-      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} part="ground" />
-      {/* While the camera moves only the index contours are drawn: a fifth of the
-          work, and still the shape of the ground. The rest return on release. */}
-      {(moving ? levels.filter(lv => lv.index) : levels).map(level => {
-        const f = (x, y) => px(x * CELL - MARGIN, y * CELL - MARGIN, level.z)
-        const fill = level.rings.map(r => r.map((p, i) => {
-          const [x, y] = f(p[0], p[1])
-          return `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`
-        }).join('') + 'Z').join('')
+      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} />
+      {/* Footprints on the ground: where each shard stands, readable against the axes. */}
+      {solids.map(sol => (
+        <path key={`f${sol.k}`} d={poly(sol.base)} fill="none" stroke="var(--kt-ink)" strokeOpacity={0.12} strokeWidth={0.6} strokeDasharray="2 3" />
+      ))}
+      {order.map(sol => {
+        const glow = sol.p.warmth
+        const edge = COLD + (HOT - COLD) * glow
         return (
-          <g key={level.l}>
-            <path d={fill} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.9} fillRule="nonzero" />
-            <Strokes level={level} f={f} fringe={!moving} />
+          <g key={sol.k}>
+            {sol.faces.map((f, i) => {
+              let n = unit(cross3(sub(f[1], f[0]), sub(f[2], f[0])))
+              const mid = f.reduce((m, v) => [m[0] + v[0] / f.length, m[1] + v[1] / f.length, m[2] + v[2] / f.length], [0, 0, 0])
+              // Outward: away from the shard's axis.
+              const axis = [sol.p.x + (sol.tip[0] - sol.p.x) * (mid[2] / sol.h), sol.p.y + (sol.tip[1] - sol.p.y) * (mid[2] / sol.h), mid[2]]
+              const out = sub(mid, axis)
+              if (n[0] * out[0] + n[1] * out[1] + n[2] * Math.max(0, out[2]) < 0) n = n.map(c => -c)
+              // Seen from the front only: the camera looks along -toward on the ground and down.
+              const view = n[0] * toward[0] + n[1] * toward[1] + n[2] * view3d.tilt
+              if (view <= 0) return null
+              const lit = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2])
+              const sheen = (0.03 + 0.16 * lit) * (0.45 + 0.55 * glow) * (0.8 + 0.2 * hash(sol.k, i))
+              const d = poly(f)
+              return (
+                <g key={i}>
+                  <path d={d} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.94} />
+                  <path d={d} fill="var(--kt-ink, #f5f6f7)" fillOpacity={sheen} />
+                  {FRINGE.map(fr => (
+                    <path key={fr.cls} className={fr.cls} d={d} transform={`translate(${fr.dx} 0)`} fill="none" stroke={fr.color}
+                      strokeOpacity={edge * 0.6 * fr.share} strokeWidth={0.5} />
+                  ))}
+                  <path d={d} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={edge * (0.45 + 0.25 * hash(i, sol.k))} strokeWidth={0.45 + 0.5 * glow} strokeLinejoin="round" />
+                </g>
+              )
+            })}
+            {tasksOf(sol).filter(t => t.facing > -0.15).map(({ d, at }) => {
+              const [x, y] = px(...at)
+              const on = focus?.kind === 'task' && focus.task.id === d.task.id
+              return <TaskDot key={d.task.id} d={d} x={x} y={y} on={on} pickProps={pick('task', d)} />
+            })}
           </g>
         )
       })}
-      {/* The terrain now covers the ground, so the axes are read on top of it. */}
-      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} part="axes" />
-      {pins.map(pin)}
-      {spreadLabels(peaks.map(p => {
-        // On the highest ring actually drawn near this summit, not on the spike above
-        // it that nothing outlines.
-        const near = (p.sigma * 0.6) / CELL
-        const z = levels.findLast(lv => lv.strokes.some(st => st.segs.some(([ax, ay]) =>
-          Math.hypot(ax - (p.x + MARGIN) / CELL, ay - (p.y + MARGIN) / CELL) < near)))?.z ?? 0
-        const [x, y] = px(p.x, p.y, z)
-        return { p, x, y }
-      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+      {spreadLabels(solids.map(sol => {
+        const [x, y] = px(...sol.tip)
+        return { p: sol.p, x, y: y - 2 }
+      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={w => COLD + (HOT - COLD) * w} pickProps={pick('peak', p)} />)}
     </>
   )
 }
@@ -718,7 +767,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         >
           {view === 'plan'
             ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
-            : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} view3d={view3d} moving={!!drag} />}
+            : <ShardView map={map} focus={focus} pick={pick} W={W} H={H} view3d={view3d} />}
           <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
         </svg>
 

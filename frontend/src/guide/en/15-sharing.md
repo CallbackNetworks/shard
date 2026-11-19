@@ -46,8 +46,10 @@ reading, not decoration — left to right is how long since the project last cha
 (90 days or more at the far left, today at the right), back to front is how much of it
 is done. So a mountain at the front right is recent and nearly finished, and one at
 the back left is untouched. Tasks are small squares on the slopes; point at one, or at
-a summit, to see what it is. **3D** and **Map** are the same ground seen two ways — drag the 3D view to turn it
-or change how steeply you look down on it, double-click to put it back;
+a summit, to see what it is. **Map** draws it as contour lines from above; **3D** stands every project up as a
+crystal shard on the same ground — its height the open work, its girth all of it, its
+edges as bright as it has been busy. Drag the 3D view to turn it or change how steeply
+you look down on it, double-click to put it back;
 **Timeline** shows when each project was busy. Past eight projects the smallest fold
 into one low range labelled with how many it holds.
 

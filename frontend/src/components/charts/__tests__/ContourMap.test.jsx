@@ -122,16 +122,17 @@ describe('ContourMap', () => {
     expect(screen.getByText('flat')).toBeTruthy()
   })
 
-  it('draws the same landscape from above or in relief, and offers extra views beside them', () => {
+  it('draws the same projects as shards or as a contour map, and offers extra views beside them', () => {
     const { container } = render(<ContourMap
       projects={[{ id: 'p1', name: 'Alpha', heat: 5, lastActive: 0, tasks: [task('t1', 'done'), task('t2', 'in_progress')] }]}
       extraViews={[{ key: 'other', label: 'Other', render: () => <p>another view</p> }]}
     />)
-    // Relief fills each lifted ring so a higher terrace hides what is behind it; the plan has no fills.
-    const terraces = () => container.querySelectorAll('path[fill-opacity="0.9"]').length
-    expect(terraces()).toBeGreaterThan(0)
+    // 3D draws shards with solid faces that hide what stands behind them; the plan
+    // draws contour lines and fills nothing.
+    const faces = () => container.querySelectorAll('path[fill-opacity="0.94"]').length
+    expect(faces()).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: 'Map' }))
-    expect(terraces()).toBe(0)
+    expect(faces()).toBe(0)
     expect(screen.getByRole('button', { name: '3D' }).getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByRole('button', { name: 'Map' }).getAttribute('aria-pressed')).toBe('true')
     // Every task is still on the map in either view.
