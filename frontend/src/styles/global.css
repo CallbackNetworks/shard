@@ -491,25 +491,39 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   font-family: var(--kt-body);
 }
 .kt-share-page::before {
-  content: 'SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS';
+  content: '';
   position: fixed;
   left: 0;
   right: 0;
   top: 0;
   height: 28px;
   z-index: 0;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  padding-left: 18px;
   border-bottom: 1px solid color-mix(in srgb, var(--kt-hit) 18%, transparent);
   background: rgba(var(--kt-bg-rgb), 0.96);
+  pointer-events: none;
+}
+/* The marquee is the text half of the bar above. Its content is one phrase
+   repeated an even number of times, so the two halves are identical and
+   translating by -50% of its own width lands exactly on the seam; no padding,
+   or -50% would split it across the loop. Each half is wider than any screen
+   the page is read on, so the right edge never shows the track running out. */
+.kt-share-page::after {
+  content: 'SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS SHARED STATUS ';
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 28px;
+  z-index: 0;
+  width: max-content;
+  white-space: pre;
   color: color-mix(in srgb, var(--kt-hit) 55%, transparent);
   font-family: var(--kt-display);
   font-size: 18px;
-  line-height: 1;
+  line-height: 28px;
   word-spacing: 18px;
   pointer-events: none;
+  animation: kineticTicker 90s linear infinite;
+  --kt-ticker-shift: -50%;
 }
 .kt-share-center {
   display: grid;
@@ -1298,7 +1312,11 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .kt-share-page::before {
     height: 24px;
+  }
+  .kt-share-page::after {
+    height: 24px;
     font-size: 16px;
+    line-height: 24px;
   }
   .kt-share-shell {
     padding: 42px 14px 48px;
@@ -4302,7 +4320,8 @@ select[style*="border-radius"],
     transition-duration: 0.001ms !important;
   }
   :root:not([data-motion="full"]) .kt-ticker-track,
-  :root:not([data-motion="full"]) .kt-alert-strip-track {
+  :root:not([data-motion="full"]) .kt-alert-strip-track,
+  :root:not([data-motion="full"]) .kt-share-page::after {
     animation: none !important;
   }
   :root:not([data-motion="full"]) .kt-route-shell {
@@ -4321,6 +4340,7 @@ select[style*="border-radius"],
 }
 :root[data-motion="reduced"] .kt-ticker-track,
 :root[data-motion="reduced"] .kt-alert-strip-track,
+:root[data-motion="reduced"] .kt-share-page::after,
 :root[data-motion="reduced"] .kt-route-shell {
   animation: none !important;
 }
