@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import ContourMap, { axes, camera, foldFoothills, HOME_CAMERA, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
+import ContourMap, { axes, camera, convexHull, foldFoothills, HOME_CAMERA, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
 
 const task = (id, status) => ({ id, title: id, status })
 const W = 720, H = 420
@@ -19,6 +19,26 @@ describe('axes', () => {
   it('puts nothing done at the back and everything done at the front', () => {
     expect(ax.y(0)).toBe(ax.y0)
     expect(ax.y(1)).toBe(ax.y1)
+  })
+})
+
+describe('convexHull', () => {
+  const cube = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1], [0.5, 0.5, 0.5]]
+  const faces = convexHull(cube)
+
+  it('wraps the outside in triangles and leaves an inside point out', () => {
+    expect(faces).toHaveLength(12)
+    expect(faces.flat()).not.toContain(8)
+  })
+
+  it('turns every triangle outward, so back faces can be culled', () => {
+    for (const [a, b, c] of faces) {
+      const [p, q, r] = [cube[a], cube[b], cube[c]]
+      const u = q.map((v, i) => v - p[i]), w = r.map((v, i) => v - p[i])
+      const n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]
+      const out = p.map(v => v - 0.5)
+      expect(n[0] * out[0] + n[1] * out[1] + n[2] * out[2]).toBeGreaterThan(0)
+    }
   })
 })
 

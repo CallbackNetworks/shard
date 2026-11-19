@@ -387,42 +387,87 @@ export function camera(W, H, { az, tilt }, lift) {
   return { project, depth }
 }
 
-// The 3D view: the share as a tower of shards. Every project is a crystal standing
-// where its reading puts it on the ground — a faceted prism that narrows to a
-// point. Its height is the work still open, its girth all the work it holds, and
-// its edges and faces are as bright as the last 30 days were busy. The shards
-// lean a little toward the cluster's middle, so together they stand as one
-// formation rather than a scatter of posts.
-const FACETS = 6
-const LIGHT = (() => { const v = [-0.45, 0.35, 0.82], n = Math.hypot(...v); return v.map(c => c / n) })()
-
-function shardSolid(p, k, maxTasks, H, centre) {
-  const r = 9 + 24 * Math.sqrt(p.tasks.length / maxTasks)
-  const h = H * 0.42 * p.peak
-  // A small, fixed irregularity per shard, so a cluster reads as broken crystal
-  // rather than machined columns; it carries no data and is the same every time.
-  const ring = (z, scale, twist) => Array.from({ length: FACETS }, (_, i) => {
-    const a = (i / FACETS) * Math.PI * 2 + twist + (hash(k * 3.1, i) - 0.5) * 0.35
-    const rr = r * scale * (0.86 + 0.28 * hash(i * 1.7, k + 0.5))
-    return [p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr, z]
-  })
-  const lean = Math.min(1, Math.hypot(centre[0] - p.x, centre[1] - p.y) / 200) * 0.22
-  const toward = Math.atan2(centre[1] - p.y, centre[0] - p.x)
-  const tip = [p.x + Math.cos(toward) * h * lean, p.y + Math.sin(toward) * h * lean, h]
-  const shoulder = ring(h * 0.72, 0.78, 0.3).map(([x, y, z]) => [x + (tip[0] - p.x) * 0.72, y + (tip[1] - p.y) * 0.72, z])
-  const base = ring(0, 1, 0)
-  const faces = []
-  for (let i = 0; i < FACETS; i++) {
-    const j = (i + 1) % FACETS
-    faces.push([base[i], base[j], shoulder[j], shoulder[i]])
-    faces.push([shoulder[i], shoulder[j], tip])
-  }
-  return { r, h, base, shoulder, tip, faces }
-}
-
+// The 3D view: every project is a shard — an abstract fragment whose surface is
+// a scatter of triangles, the convex hull of points thrown into a tapering,
+// leaning volume. Its height is the work still open, its girth all the work it
+// holds, and its edges and facets are as bright as the last 30 days were busy.
+// A few loose chips float beside it: broken-off pieces, carrying no data, dim.
+// The irregularity is fixed per shard, so the same share draws the same way.
+const LIGHT = (() => { const v = [-0.5, 0.3, 0.8], n = Math.hypot(...v); return v.map(c => c / n) })()
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 const unit = v => { const n = Math.hypot(...v) || 1; return v.map(c => c / n) }
+
+// Incremental 3D convex hull for a handful of points. Returns outward-facing
+// triangles as index triples. Small n, so the quadratic walk is fine.
+export function convexHull(pts) {
+  const n = pts.length
+  if (n < 4) return []
+  const normal = (a, b, c) => cross3(sub(pts[b], pts[a]), sub(pts[c], pts[a]))
+  // A first tetrahedron that is not flat.
+  let d = -1
+  for (let i = 3; i < n && d < 0; i++) if (Math.abs(dot3(normal(0, 1, 2), sub(pts[i], pts[0]))) > 1e-6) d = i
+  if (d < 0) return []
+  const inside = [0, 1, 2, d].reduce((m, i) => m.map((c, k) => c + pts[i][k] / 4), [0, 0, 0])
+  const orient = f => (dot3(normal(...f), sub(inside, pts[f[0]])) > 0 ? [f[0], f[2], f[1]] : f)
+  let faces = [[0, 1, 2], [0, 1, d], [0, 2, d], [1, 2, d]].map(orient)
+  for (let p = 3; p < n; p++) {
+    if (p === d) continue
+    const sees = faces.map(f => dot3(normal(...f), sub(pts[p], pts[f[0]])) > 1e-6)
+    if (!sees.some(Boolean)) continue
+    const edges = new Map()
+    faces.forEach((f, i) => {
+      if (!sees[i]) return
+      for (const [u, v] of [[f[0], f[1]], [f[1], f[2]], [f[2], f[0]]]) {
+        const back = `${v},${u}`
+        if (edges.has(back)) edges.delete(back)
+        else edges.set(`${u},${v}`, [u, v])
+      }
+    })
+    faces = faces.filter((_, i) => !sees[i])
+    for (const [u, v] of edges.values()) faces.push(orient([u, v, p]))
+  }
+  return faces
+}
+
+function shardSolid(p, k, maxTasks, H, centre) {
+  const r = 16 + 36 * Math.sqrt(p.tasks.length / maxTasks)
+  const h = H * 0.34 * p.peak + 10
+  const lean = Math.min(1, Math.hypot(centre[0] - p.x, centre[1] - p.y) / 220) * 0.28
+  const toward = Math.atan2(centre[1] - p.y, centre[0] - p.x)
+  const shearX = Math.cos(toward) * lean, shearY = Math.sin(toward) * lean
+  const rnd = (i, j) => hash(k * 7.13 + i * 1.91, j * 3.7 + k)
+  // Bands up the volume: how high, how wide, how many points.
+  // No single tip: the top is a few points at slightly different heights, so the
+  // crown is a broken slant rather than a spire.
+  const bands = [[0, 0.85, 4], [0.3, 1.05, 3], [0.7, 0.8, 3], [0.95, 0.45, 3]]
+  const pts = []
+  bands.forEach(([z, width, count], b) => {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + rnd(b, i) * 1.6
+      const rr = r * width * (0.65 + 0.5 * rnd(i + 9, b))
+      const zz = h * Math.max(0, z + (rnd(b + 4, i + 2) - 0.5) * 0.12)
+      pts.push([p.x + Math.cos(a) * rr + shearX * zz, p.y + Math.sin(a) * rr * 0.8 + shearY * zz, zz])
+    }
+  })
+  // The highest point carries the label; it is just one of the crown's points.
+  const tip = pts.reduce((t, q) => (q[2] > t[2] ? q : t), pts[0])
+  const main = { pts, faces: convexHull(pts), key: `s${k}`, centre: [p.x, p.y], chip: false }
+  // Loose chips: three small tetrahedra hanging off the main body.
+  const chips = [0, 1, 2].map(c => {
+    const a = rnd(c + 20, 3) * Math.PI * 2
+    const dist = r * (1.3 + 0.6 * rnd(c, 30))
+    const cx = p.x + Math.cos(a) * dist + shearX * h * 0.5, cy = p.y + Math.sin(a) * dist * 0.8 + shearY * h * 0.5
+    const cz = h * (0.25 + 0.55 * rnd(c, 40))
+    const s = r * (0.22 + 0.2 * rnd(c, 50))
+    const cp = [0, 1, 2, 3].map(i => [
+      cx + (rnd(c * 4 + i, 60) - 0.5) * s * 2, cy + (rnd(c * 4 + i, 70) - 0.5) * s * 2, cz + (rnd(c * 4 + i, 80) - 0.5) * s * 2.4,
+    ])
+    return { pts: cp, faces: convexHull(cp), key: `s${k}c${c}`, centre: [cx, cy], chip: true }
+  })
+  return { r, h, tip, pts, main, chips }
+}
 
 function ShardView({ map, focus, pick, W, H, view3d }) {
   const { peaks, dots } = map
@@ -431,60 +476,69 @@ function ShardView({ map, focus, pick, W, H, view3d }) {
   const maxTasks = Math.max(...peaks.map(p => p.tasks.length))
   const centre = [peaks.reduce((n, p) => n + p.x, 0) / peaks.length, peaks.reduce((n, p) => n + p.y, 0) / peaks.length]
   const solids = peaks.map((p, k) => ({ p, k, ...shardSolid(p, k, maxTasks, H, centre) }))
-  // Farthest first: a shard in front paints over the ones behind it.
-  const order = [...solids].sort((a, b) => cam.depth(a.p.x, a.p.y) - cam.depth(b.p.x, b.p.y))
-  const toward = [Math.sin(view3d.az), Math.cos(view3d.az)]
-  const poly = pts => pts.map(([x, y, z], i) => { const [sx, sy] = px(x, y, z); return `${i ? 'L' : 'M'}${tear(sx, sy).toFixed(1)},${sy.toFixed(1)}` }).join('') + 'Z'
+  // The camera looks from the front and above: `toward` on the ground, `tilt`
+  // the sine of the elevation.
+  const flat = Math.sqrt(1 - view3d.tilt ** 2)
+  const eye = [Math.sin(view3d.az) * flat, Math.cos(view3d.az) * flat, view3d.tilt]
+  const tri = f => f.map(([x, y, z], i) => { const [sx, sy] = px(x, y, z); return `${i ? 'L' : 'M'}${tear(sx, sy).toFixed(1)},${sy.toFixed(1)}` }).join('') + 'Z'
 
-  const tasksOf = (sol) => dots.filter(d => d.project === sol.p.name).map((d, i, list) => {
-    // On the surface: in progress high, done at the foot; spread around.
-    const rise = { in_progress: 0.62, todo: 0.4, failed: 0.25, done: 0.08 }[d.status] ?? 0.4
-    const a = (i / list.length) * Math.PI * 2 + rise * 3
-    const z = sol.h * rise
-    const narrow = 1 - 0.25 * rise
-    const lx = (sol.tip[0] - sol.p.x) * rise, ly = (sol.tip[1] - sol.p.y) * rise
-    const facing = Math.cos(a) * toward[0] + Math.sin(a) * toward[1]
-    return { d, facing, at: [sol.p.x + lx + Math.cos(a) * sol.r * narrow, sol.p.y + ly + Math.sin(a) * sol.r * narrow, z] }
+  // Every visible facet of a body, lit, with its own sheen.
+  const facets = (body, glow, edge) => body.faces.map((f, i) => {
+    const [a, b, c] = f.map(j => body.pts[j])
+    const n = unit(cross3(sub(b, a), sub(c, a)))
+    if (dot3(n, eye) <= 0) return null
+    const lit = Math.max(0, dot3(n, LIGHT))
+    const sheen = (0.015 + 0.42 * lit ** 2) * (0.35 + 0.65 * glow) * (body.chip ? 0.6 : 1)
+    const d = tri([a, b, c])
+    return (
+      <g key={`${body.key}-${i}`}>
+        <path d={d} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.94} />
+        <path d={d} fill="var(--kt-ink, #f5f6f7)" fillOpacity={sheen} />
+        {FRINGE.map(fr => (
+          <path key={fr.cls} className={fr.cls} d={d} transform={`translate(${fr.dx} 0)`} fill="none" stroke={fr.color}
+            strokeOpacity={edge * 0.5 * fr.share} strokeWidth={0.4} />
+        ))}
+        <path d={d} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={edge * (0.3 + 0.3 * hash(i, body.pts.length))} strokeWidth={0.35 + 0.35 * glow} strokeLinejoin="round" />
+      </g>
+    )
   })
+
+  // Task marks on the main body's own facets: in progress on the highest ones,
+  // done on the lowest, each on a facet of its own while there are enough.
+  const marksOf = sol => {
+    const visible = sol.main.faces.map(f => {
+      const [a, b, c] = f.map(j => sol.main.pts[j])
+      const n = unit(cross3(sub(b, a), sub(c, a)))
+      return { at: [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3], seen: dot3(n, eye) > 0.05 }
+    }).sort((x, y) => y.at[2] - x.at[2])
+    const rank = { in_progress: 0, todo: 1, failed: 2, done: 3 }
+    const mine = dots.filter(d => d.project === sol.p.name).sort((x, y) => (rank[x.status] ?? 1) - (rank[y.status] ?? 1))
+    return mine.map((d, i) => {
+      // Spread evenly from the top facet to the bottom one, in status order.
+      const slot = visible[Math.min(visible.length - 1, Math.floor((i / Math.max(1, mine.length)) * visible.length))]
+      return { d, ...slot }
+    }).filter(m => m.seen)
+  }
+
+  // Bodies paint far to near: a nearer fragment covers a farther one.
+  const bodies = solids.flatMap(sol => [sol.main, ...sol.chips].map(body => ({ sol, body })))
+    .sort((x, y) => cam.depth(...x.body.centre) - cam.depth(...y.body.centre))
 
   return (
     <>
       <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} />
-      {/* Footprints on the ground: where each shard stands, readable against the axes. */}
-      {solids.map(sol => (
-        <path key={`f${sol.k}`} d={poly(sol.base)} fill="none" stroke="var(--kt-ink)" strokeOpacity={0.12} strokeWidth={0.6} strokeDasharray="2 3" />
-      ))}
-      {order.map(sol => {
+      {/* Where each shard stands, marked on the ground against the axes. */}
+      {solids.map(sol => {
+        const [x, y] = px(sol.p.x, sol.p.y, 0)
+        return <path key={`f${sol.k}`} d={`M${x - 5},${y}L${x + 5},${y}M${x},${y - 3}L${x},${y + 3}`} stroke="var(--kt-ink)" strokeOpacity={0.3} strokeWidth={0.6} />
+      })}
+      {bodies.map(({ sol, body }) => {
         const glow = sol.p.warmth
-        const edge = COLD + (HOT - COLD) * glow
+        const edge = (COLD + (HOT - COLD) * glow) * (body.chip ? 0.6 : 1)
         return (
-          <g key={sol.k}>
-            {sol.faces.map((f, i) => {
-              let n = unit(cross3(sub(f[1], f[0]), sub(f[2], f[0])))
-              const mid = f.reduce((m, v) => [m[0] + v[0] / f.length, m[1] + v[1] / f.length, m[2] + v[2] / f.length], [0, 0, 0])
-              // Outward: away from the shard's axis.
-              const axis = [sol.p.x + (sol.tip[0] - sol.p.x) * (mid[2] / sol.h), sol.p.y + (sol.tip[1] - sol.p.y) * (mid[2] / sol.h), mid[2]]
-              const out = sub(mid, axis)
-              if (n[0] * out[0] + n[1] * out[1] + n[2] * Math.max(0, out[2]) < 0) n = n.map(c => -c)
-              // Seen from the front only: the camera looks along -toward on the ground and down.
-              const view = n[0] * toward[0] + n[1] * toward[1] + n[2] * view3d.tilt
-              if (view <= 0) return null
-              const lit = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2])
-              const sheen = (0.03 + 0.16 * lit) * (0.45 + 0.55 * glow) * (0.8 + 0.2 * hash(sol.k, i))
-              const d = poly(f)
-              return (
-                <g key={i}>
-                  <path d={d} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.94} />
-                  <path d={d} fill="var(--kt-ink, #f5f6f7)" fillOpacity={sheen} />
-                  {FRINGE.map(fr => (
-                    <path key={fr.cls} className={fr.cls} d={d} transform={`translate(${fr.dx} 0)`} fill="none" stroke={fr.color}
-                      strokeOpacity={edge * 0.6 * fr.share} strokeWidth={0.5} />
-                  ))}
-                  <path d={d} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={edge * (0.45 + 0.25 * hash(i, sol.k))} strokeWidth={0.45 + 0.5 * glow} strokeLinejoin="round" />
-                </g>
-              )
-            })}
-            {tasksOf(sol).filter(t => t.facing > -0.15).map(({ d, at }) => {
+          <g key={body.key}>
+            {facets(body, glow, edge)}
+            {!body.chip && marksOf(sol).map(({ d, at }) => {
               const [x, y] = px(...at)
               const on = focus?.kind === 'task' && focus.task.id === d.task.id
               return <TaskDot key={d.task.id} d={d} x={x} y={y} on={on} pickProps={pick('task', d)} />
