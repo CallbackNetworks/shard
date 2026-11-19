@@ -6,12 +6,15 @@ const INDEX_EVERY = 4        // every fourth line is an index contour, drawn hea
 const CELL = 8               // field resolution: coarse enough that contours turn corners
 const HOT = 1, COLD = 0.4 // line opacity at the hottest and the quietest mountain
 
+// `r` is where on the slope a status sits (a fraction of the mountain's spread);
+// the rest is the mark: a small square, filled or open, and done shrinks to a point.
 const DOT = {
-  in_progress: { r: 0.32, fill: 'var(--kt-ink)', stroke: 'none' },
-  todo: { r: 0.72, fill: 'rgba(var(--kt-ink-rgb), 0.45)', stroke: 'none' },
-  failed: { r: 0.95, fill: 'var(--kt-status-failed, #fb7185)', stroke: 'none' },
-  done: { r: 1.25, fill: 'none', stroke: 'rgba(var(--kt-ink-rgb), 0.45)' },
+  in_progress: { r: 0.32, size: 3, fill: 'var(--kt-ink)', stroke: 'none' },
+  todo: { r: 0.72, size: 3, fill: 'none', stroke: 'rgba(var(--kt-ink-rgb), 0.6)' },
+  failed: { r: 0.95, size: 3, fill: 'var(--kt-status-failed, #fb7185)', stroke: 'none' },
+  done: { r: 1.25, size: 1.4, fill: 'rgba(var(--kt-ink-rgb), 0.4)', stroke: 'none' },
 }
+const LATE = 'var(--kt-status-failed, #fb7185)'
 
 // Where each mountain stands. Biggest first, on a golden-angle spiral, then pushed
 // apart until no two footprints overlap: deterministic, so the map does not move
@@ -136,9 +139,14 @@ function TaskDot({ d, x, y, on, pickProps }) {
   const style = DOT[d.status]
   return (
     <g style={{ cursor: 'pointer' }} {...pickProps}>
-      {/* A ring around the dot, not a recoloured dot: a late todo must not read as failed. */}
-      {isOverdue(d.task) && <circle cx={x} cy={y} r={on ? 5 : 3.2} fill="none" stroke="var(--kt-status-failed, #fb7185)" strokeWidth={0.8} />}
-      <circle cx={x} cy={y} r={on ? 3 : 1.5} fill={style.fill === 'none' ? 'var(--kt-bg, #0b0c0e)' : style.fill} stroke={style.stroke} strokeWidth={0.8} />
+      {/* Late is the outline turning red, not a recoloured fill: a late todo must not read as failed. */}
+      <rect
+        x={x - (on ? 3 : style.size / 2)} y={y - (on ? 3 : style.size / 2)}
+        width={on ? 6 : style.size} height={on ? 6 : style.size}
+        fill={style.fill}
+        stroke={isOverdue(d.task) ? LATE : style.stroke}
+        strokeWidth={0.7}
+      />
       {/* The mark is small; the target under the pointer is not. */}
       <circle cx={x} cy={y} r={7} fill="transparent">
         <title>{d.task.title}</title>
@@ -147,13 +155,82 @@ function TaskDot({ d, x, y, on, pickProps }) {
   )
 }
 
-function PeakLabel({ p, x, y, lineOpacity, pickProps }) {
+const MONO = "'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace"
+
+// Ground position as map reference: easting left to right, northing back to front,
+// 0–100 across the frame, so a label can be read against the edge ticks.
+const gridRef = (x, y, W, H) => `E${(x / W * 100).toFixed(1).padStart(4, '0')} N${((1 - y / H) * 100).toFixed(1).padStart(4, '0')}`
+
+// A summit: a crosshair on the peak, a leader line, and a two-line monospaced
+// readout — name, then grid reference · tasks · recent activity.
+function PeakLabel({ p, x, y, W, H, lineOpacity, pickProps }) {
+  const bright = 0.4 + 0.6 * p.warmth
+  const name = (p.name.length > 24 ? `${p.name.slice(0, 23)}…` : p.name).toUpperCase()
+  const data = `${gridRef(p.x, p.y, W, H)} · ${String(p.tasks.length).padStart(2, '0')} TSK · ${String(p.heat).padStart(3, '0')} ACT`
+  // A monospaced glyph is ~0.6em wide, so the readout's width is known before it
+  // is drawn; one that would run off the right edge hangs to the left instead.
+  const wide = Math.max(name.length * 6, data.length * 5.1) + 18
+  const left = x + wide > W - 4
+  const dir = left ? -1 : 1
+  const lx = x + 14 * dir, ly = y - 16
+  const anchor = left ? 'end' : 'start'
+  const halo = { paintOrder: 'stroke', stroke: 'var(--kt-bg, #0b0c0e)', strokeWidth: 3 }
   return (
-    <g style={{ cursor: 'pointer' }} {...pickProps}>
-      <path d={`M${x - 4},${y + 3} L${x},${y - 4} L${x + 4},${y + 3} Z`} fill="var(--kt-ink)" fillOpacity={lineOpacity(p.warmth)} />
-      <text x={x} y={y - 9} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--kt-ink)" fillOpacity={0.35 + 0.65 * p.warmth}
-        style={{ paintOrder: 'stroke', stroke: 'var(--kt-bg, #0b0c0e)', strokeWidth: 3 }}>
-        {p.name.length > 22 ? `${p.name.slice(0, 21)}…` : p.name}
+    <g style={{ cursor: 'pointer' }} {...pickProps} fontFamily={MONO}>
+      <g stroke="var(--kt-ink)" strokeOpacity={lineOpacity(p.warmth)} strokeWidth={0.8}>
+        <line x1={x - 6} y1={y} x2={x - 2} y2={y} /><line x1={x + 2} y1={y} x2={x + 6} y2={y} />
+        <line x1={x} y1={y - 6} x2={x} y2={y - 2} /><line x1={x} y1={y + 2} x2={x} y2={y + 6} />
+        <polyline points={`${x + 3 * dir},${y - 3} ${lx - 4 * dir},${ly + 4} ${lx + 2 * dir},${ly + 4}`} fill="none" strokeOpacity={0.45 * bright} />
+      </g>
+      <text x={lx + 4 * dir} y={ly} textAnchor={anchor} fontSize={10} fontWeight={700} letterSpacing={0.4} fill="var(--kt-ink)" fillOpacity={bright} style={halo}>
+        {name}
+      </text>
+      <text x={lx + 4 * dir} y={ly + 11} textAnchor={anchor} fontSize={8.5} fill="var(--kt-ink)" fillOpacity={0.35 + 0.4 * p.warmth} style={halo}>
+        {data}
+      </text>
+    </g>
+  )
+}
+
+// The ground graticule: faint crosses at every grid intersection and numbered
+// ticks along the front and left edges, drawn through `f` so the relief can lay
+// them on its tilted ground plane and its terraces can cover them.
+function Graticule({ f, W, H }) {
+  // Tenths of the frame, so the tick numbers are the grid reference's own units.
+  const xs = [], ys = []
+  for (let k = 1; k < 10; k++) { xs.push((W * k) / 10); ys.push((H * k) / 10) }
+  const cross = (x, y) => {
+    const [cx, cy] = f(x, y)
+    return `M${cx - 2.5},${cy}L${cx + 2.5},${cy}M${cx},${cy - 2.5}L${cx},${cy + 2.5}`
+  }
+  const tick = (a, b) => { const [x1, y1] = f(...a), [x2, y2] = f(...b); return `M${x1},${y1}L${x2},${y2}` }
+  const [fx0, fy0] = f(0, H), [fx1, fy1] = f(W, H), [bx0, by0] = f(0, 0)
+  return (
+    <g fontFamily={MONO} fontSize={7.5} fill="rgba(var(--kt-ink-rgb), 0.35)" pointerEvents="none">
+      <path d={xs.flatMap(x => ys.map(y => cross(x, y))).join('')} stroke="rgba(var(--kt-ink-rgb), 0.16)" strokeWidth={0.6} />
+      <path d={`M${bx0},${by0}L${fx0},${fy0}L${fx1},${fy1}`} fill="none" stroke="rgba(var(--kt-ink-rgb), 0.18)" strokeWidth={0.6} />
+      <path d={xs.map(x => tick([x, H], [x, H - 8])).join('') + ys.map(y => tick([0, y], [8, y])).join('')} stroke="rgba(var(--kt-ink-rgb), 0.3)" strokeWidth={0.6} />
+      {xs.map(x => { const [tx, ty] = f(x, H); return <text key={`x${x}`} x={tx} y={ty + 10 < H - 2 ? ty + 10 : ty - 11} textAnchor="middle">{String(Math.round(x / W * 100)).padStart(2, '0')}</text> })}
+      {ys.map(y => { const [tx, ty] = f(0, y); return <text key={`y${y}`} x={tx + 11} y={ty + 2.5}>{String(Math.round((1 - y / H) * 100)).padStart(2, '0')}</text> })}
+    </g>
+  )
+}
+
+// Corner brackets and a readout, in screen space: the frame of the instrument,
+// not part of the ground.
+function Frame({ W, H, peaks, levels, view }) {
+  const c = 12
+  const corners = [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]]
+  const tasks = peaks.reduce((n, p) => n + p.tasks.length, 0)
+  const act = peaks.reduce((n, p) => n + p.heat, 0)
+  return (
+    <g pointerEvents="none" fontFamily={MONO}>
+      <path
+        d={corners.map(([x, y, dx, dy]) => `M${x + dx * 0.5},${y + dy * c}L${x + dx * 0.5},${y + dy * 0.5}L${x + dx * c},${y + dy * 0.5}`).join('')}
+        fill="none" stroke="rgba(var(--kt-ink-rgb), 0.45)" strokeWidth={1}
+      />
+      <text x={W - 6} y={H - 6} textAnchor="end" fontSize={8} fill="rgba(var(--kt-ink-rgb), 0.4)">
+        {`${view === 'plan' ? 'PLAN' : 'RELIEF'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
       </text>
     </g>
   )
@@ -199,15 +276,16 @@ function Strokes({ level, f, lineOpacity, peaks }) {
 }
 
 // Top-down: the contour lines themselves.
-function PlanView({ map, focus, pick, lineOpacity }) {
+function PlanView({ map, focus, pick, lineOpacity, W, H }) {
   const f = (x, y) => [x * CELL, y * CELL]
   return (
     <>
+      <Graticule f={(x, y) => [x, y]} W={W} H={H} />
       {map.levels.map(level => <g key={level.l}><Strokes level={level} f={f} lineOpacity={lineOpacity} peaks={map.peaks} /></g>)}
       {map.dots.map(d => (
         <TaskDot key={d.task.id} d={d} x={d.x} y={d.y} on={focus?.kind === 'task' && focus.task.id === d.task.id} pickProps={pick('task', d)} />
       ))}
-      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x} y={p.y} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x} y={p.y} W={W} H={H} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
 }
@@ -218,7 +296,7 @@ function spreadLabels(labels) {
   const placed = []
   for (const l of [...labels].sort((a, b) => b.y - a.y)) {
     let y = l.y
-    for (const q of placed) if (Math.abs(q.x - l.x) < 150 && Math.abs(q.y - y) < 16) y = q.y - 16
+    for (const q of placed) if (Math.abs(q.x - l.x) < 200 && Math.abs(q.y - y) < 26) y = q.y - 26
     placed.push({ ...l, y })
   }
   return placed
@@ -231,7 +309,7 @@ const RISE = 0.3        // the tallest summit stands this fraction of the frame 
 // up like terraces. Each ring is filled with the background, so a higher terrace
 // hides the part of a lower one that is behind the hill; a task stands on the
 // terrace beneath it.
-function ReliefView({ map, focus, pick, lineOpacity, H }) {
+function ReliefView({ map, focus, pick, lineOpacity, W, H }) {
   const { field, cols, rows, top, peaks, dots, levels } = map
   const lift = (H * RISE) / top
   const ground = H * (1 - TILT) * 0.8
@@ -251,14 +329,14 @@ function ReliefView({ map, focus, pick, lineOpacity, H }) {
     const on = focus?.kind === 'task' && focus.task.id === d.task.id
     return (
       <g key={d.task.id}>
-        <line x1={x} y1={y} x2={x} y2={y - 5} stroke="rgba(var(--kt-ink-rgb), 0.4)" strokeWidth={0.6} />
-        <TaskDot d={d} x={x} y={y - 5} on={on} pickProps={pick('task', d)} />
+        <TaskDot d={d} x={x} y={y - 1.5} on={on} pickProps={pick('task', d)} />
       </g>
     )
   }
 
   return (
     <>
+      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} />
       {levels.map(level => {
         const f = (x, y) => px(x * CELL, y * CELL, level.z)
         const fill = level.rings.map(r => r.map((p, i) => {
@@ -280,8 +358,8 @@ function ReliefView({ map, focus, pick, lineOpacity, H }) {
         const z = levels.findLast(lv => lv.strokes.some(st => st.segs.some(([ax, ay]) =>
           Math.hypot(ax - p.x / CELL, ay - p.y / CELL) < near)))?.z ?? 0
         const [x, y] = px(p.x, p.y, z)
-        return { p, x, y: y - 6 }
-      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+        return { p, x, y }
+      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} H={H} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
 }
@@ -420,20 +498,21 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           </pattern>
         </defs>
         {view === 'plan'
-          ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} />
-          : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} H={H} />}
+          ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
+          : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />}
+        <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
         <rect width={W} height={H} fill="url(#kt-scanlines)" pointerEvents="none" />
       </svg>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 6, color: 'var(--kt-muted)', fontSize: 10, textTransform: 'uppercase' }}>
         {[['in_progress', 'in progress · summit'], ['todo', 'todo'], ['failed', 'failed'], ['done', 'done · foot']].map(([k, label]) => (
           <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="3" fill={DOT[k].fill} stroke={DOT[k].stroke} /></svg>
+            <svg width="8" height="8" aria-hidden="true"><rect x={4 - DOT[k].size / 2} y={4 - DOT[k].size / 2} width={DOT[k].size} height={DOT[k].size} fill={DOT[k].fill} stroke={DOT[k].stroke} strokeWidth={0.7} /></svg>
             {label}
           </span>
         ))}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="2" fill="rgba(var(--kt-ink-rgb), 0.45)" /><circle cx="6" cy="6" r="5" fill="none" stroke="var(--kt-status-failed, #fb7185)" /></svg>
+          <svg width="8" height="8" aria-hidden="true"><rect x="2.5" y="2.5" width="3" height="3" fill="none" stroke={LATE} strokeWidth={0.7} /></svg>
           overdue
         </span>
       </div>
