@@ -38,13 +38,19 @@ describe('ShareNow', () => {
 })
 
 describe('ShareMarquee', () => {
-  it('scrolls the newest activity, never a page visit', () => {
+  it('scrolls what people did, not what the system did', () => {
     render(<ShareMarquee activity={[
       { action: 'share.viewed', detail: 'someone looked', created_at: day(0) },
+      { action: 'task.sla_escalated', detail: 'Task stuck for 98 days', created_at: day(0) },
+      { action: 'rule.executed', detail: 'Rule fired', created_at: day(0) },
       { action: 'task.done', detail: 'Shipped the icon', created_at: day(0) },
+      { action: 'decision.accepted', detail: 'Use PostgreSQL', created_at: day(0) },
     ]} />)
     expect(screen.getAllByText('Shipped the icon').length).toBeGreaterThan(0)
-    expect(screen.queryByText('someone looked')).toBeNull()
+    expect(screen.getAllByText('Use PostgreSQL').length).toBeGreaterThan(0)
+    for (const noise of ['someone looked', 'Task stuck for 98 days', 'Rule fired']) {
+      expect(screen.queryByText(noise)).toBeNull()
+    }
   })
 
   it('falls back to the fixed label when there is nothing to say', () => {

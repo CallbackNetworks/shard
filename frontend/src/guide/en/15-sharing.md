@@ -37,6 +37,24 @@ states in words, one end at a time. Select a node and everything it does not tou
 dims. Three layouts, and the zoom controls are there because a big project starts out
 fitted to the frame.
 
+At the top, under the summary, the **Analytics** section opens on a **terrain map**:
+every project is a mountain. Its width is all of its tasks, its height the tasks still
+open, and its lines are brighter the busier the last 30 days were. Where it stands is a
+reading, not decoration — left to right is how long since the project last changed
+(90 days or more at the far left, today at the right), back to front is how much of it
+is done. So a mountain at the front right is recent and nearly finished, and one at
+the back left is untouched. Tasks are small squares on the slopes; point at one, or at
+a summit, to see what it is. **2.5D** and **Map** are the same ground seen two ways;
+**Timeline** shows when each project was busy. Past eight projects the smallest fold
+into one low range labelled with how many it holds.
+
+Below it are the analytics page's own charts — the year's activity, the status trend,
+a sprint's burndown, velocity — each shown only when it has something to show: a
+burndown that never moved is left out rather than drawn as a flat line.
+
+The bar across the top scrolls the latest things people did on the work; what the
+system did on its own (rules firing, reminders, page views) stays out of it.
+
 There is also a read-only assistant on the page, docked in the bottom-right corner
 (the **Ask** button in the section nav raises it too). It can answer questions about
 the project, and it can only see what the page already shows. It cannot create

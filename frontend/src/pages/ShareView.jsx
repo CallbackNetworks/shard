@@ -87,7 +87,7 @@ export default function ShareView() {
   const navSections = SECTIONS.filter(s => {
     if (s.key === 'decisions') return summary.total_decisions > 0
     if (s.key === 'graph') return hasGraph
-    if (s.key === 'analytics') return hasAnalytics(analytics)
+    if (s.key === 'analytics') return hasAnalytics(analytics, projects)
     return true
   })
 
@@ -160,7 +160,7 @@ export default function ShareView() {
         />
 
         {/* Section: Analytics — the analytics page's charts, scoped to this share */}
-        {hasAnalytics(analytics) && (
+        {hasAnalytics(analytics, projects) && (
           <div id="share-section-analytics" style={{ paddingTop: 8 }}>
             <ShareAnalytics analytics={analytics} projects={projects} bp={bp} />
           </div>

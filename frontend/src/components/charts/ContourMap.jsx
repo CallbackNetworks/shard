@@ -18,23 +18,47 @@ const LATE = 'var(--kt-status-failed, #fb7185)'
 // Closed is done or failed (ADR-0089): neither is work still to climb.
 const CLOSED = new Set(['done', 'failed'])
 
-// Where each mountain stands. Biggest first, on a golden-angle spiral, then pushed
-// apart until no two footprints overlap: deterministic, so the map does not move
-// between refreshes, and the largest project ends up in the middle.
+// The ground has axes, so where a mountain stands is a reading, not decoration:
+//   left → right  last activity, from RECENCY_DAYS ago (or longer) to today;
+//   back → front  progress, from nothing done to everything done.
+// "Front right" is recently active and nearly finished; "back left" is untouched.
+export const RECENCY_DAYS = 90
+export function axes(W, H) {
+  // Inset by a mountain's reach, so a summit on the edge keeps its slopes on screen.
+  const x0 = W * 0.15, x1 = W * 0.87, y0 = H * 0.2, y1 = H * 0.86
+  return {
+    x0, x1, y0, y1,
+    // `null` means no activity inside the window: the far left edge.
+    x: days => x0 + (1 - Math.min(days ?? RECENCY_DAYS, RECENCY_DAYS) / RECENCY_DAYS) * (x1 - x0),
+    y: progress => y0 + progress * (y1 - y0),
+  }
+}
+
+// Each mountain starts at its reading and is nudged only as far as it takes for
+// neighbours not to merge into one blob; the label carries the exact values, so
+// a few pixels of nudge never misstate them. Deterministic, so nothing moves
+// between refreshes.
 export function placeMountains(items, W, H) {
+  const ax = axes(W, H)
   const golden = Math.PI * (3 - Math.sqrt(5))
-  const spots = items.map((m, i) => {
-    const r = Math.sqrt(i) * m.sigma * 2.2
-    return { ...m, x: W / 2 + Math.cos(i * golden) * r, y: H / 2 + Math.sin(i * golden) * r * 0.75 }
-  })
-  for (let pass = 0; pass < 80; pass++) {
+  const spots = items.map((m, i) => ({
+    ...m,
+    // Two projects with identical readings would push along a zero vector; a
+    // sub-pixel offset per index picks a direction for them.
+    x: ax.x(m.lastActive) + Math.cos(i * golden) * 0.5,
+    y: ax.y(m.progress) + Math.sin(i * golden) * 0.5,
+  }))
+  const clamp = s => {
+    s.x = Math.max(ax.x0, Math.min(ax.x1, s.x))
+    s.y = Math.max(ax.y0, Math.min(ax.y1, s.y))
+  }
+  for (let pass = 0; pass < 120; pass++) {
     for (let a = 0; a < spots.length; a++) {
       for (let b = a + 1; b < spots.length; b++) {
         const A = spots[a], B = spots[b]
         const dx = B.x - A.x, dy = B.y - A.y
         const d = Math.hypot(dx, dy) || 0.01
-        // Far enough apart that a saddle forms between two summits instead of one blob.
-        const min = (A.sigma + B.sigma) * 1.55
+        const min = (A.sigma + B.sigma) * 1.2
         if (d < min) {
           const push = (min - d) / 2
           A.x -= (dx / d) * push; A.y -= (dy / d) * push
@@ -42,14 +66,9 @@ export function placeMountains(items, W, H) {
         }
       }
     }
+    spots.forEach(clamp)
   }
-  // Fit the whole range inside the frame with a margin of one footprint.
-  const xs = spots.flatMap(s => [s.x - s.sigma * 2.2, s.x + s.sigma * 2.2])
-  const ys = spots.flatMap(s => [s.y - s.sigma * 2.2, s.y + s.sigma * 2.2])
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
-  const k = Math.min(W / (maxX - minX), H / (maxY - minY))
-  const ox = (W - (maxX - minX) * k) / 2 - minX * k, oy = (H - (maxY - minY) * k) / 2 - minY * k
-  return spots.map(s => ({ ...s, x: s.x * k + ox, y: s.y * k + oy, sigma: s.sigma * k }))
+  return spots
 }
 
 // Marching squares over a sampled field. Each segment remembers which mountain owns
@@ -167,16 +186,13 @@ function TaskDot({ d, x, y, on, pickProps }) {
 
 const MONO = "'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace"
 
-// Ground position as map reference: easting left to right, northing back to front,
-// 0–100 across the frame, so a label can be read against the edge ticks.
-const gridRef = (x, y, W, H) => `E${(x / W * 100).toFixed(1).padStart(4, '0')} N${((1 - y / H) * 100).toFixed(1).padStart(4, '0')}`
-
 // A summit: a crosshair on the peak, a leader line, and a two-line monospaced
-// readout — name, then grid reference · tasks · recent activity.
-function PeakLabel({ p, x, y, W, H, lineOpacity, pickProps }) {
+// readout — name, then open/total · progress · last activity.
+function PeakLabel({ p, x, y, W, lineOpacity, pickProps }) {
   const bright = 0.4 + 0.6 * p.warmth
   const name = (p.name.length > 24 ? `${p.name.slice(0, 23)}…` : p.name).toUpperCase()
-  const data = `${gridRef(p.x, p.y, W, H)} · ${String(p.open).padStart(2, '0')}/${String(p.tasks.length).padStart(2, '0')} OPEN · ${String(p.heat).padStart(3, '0')} ACT`
+  const last = p.lastActive == null ? `IDLE ${RECENCY_DAYS}D+` : p.lastActive === 0 ? 'ACTIVE TODAY' : `LAST ${p.lastActive}D`
+  const data = `${String(p.open).padStart(2, '0')}/${String(p.tasks.length).padStart(2, '0')} OPEN · ${String(Math.round(p.progress * 100)).padStart(2, '0')}% DONE · ${last}`
   // A monospaced glyph is ~0.6em wide, so the readout's width is known before it
   // is drawn; one that would run off the right edge hangs to the left instead.
   const wide = Math.max(name.length * 6, data.length * 5.1) + 18
@@ -202,26 +218,31 @@ function PeakLabel({ p, x, y, W, H, lineOpacity, pickProps }) {
   )
 }
 
-// The ground graticule: faint crosses at every grid intersection and numbered
-// ticks along the front and left edges, drawn through `f` so the relief can lay
-// them on its tilted ground plane and its terraces can cover them.
+// The ground graticule: faint crosses at every grid intersection, and the two
+// axes numbered along the front and left edges — days since last activity and
+// percent done — drawn through `f` so the relief can lay them on its tilted
+// ground plane and its terraces can cover them.
 function Graticule({ f, W, H }) {
-  // Tenths of the frame, so the tick numbers are the grid reference's own units.
-  const xs = [], ys = []
-  for (let k = 1; k < 10; k++) { xs.push((W * k) / 10); ys.push((H * k) / 10) }
+  const ax = axes(W, H)
+  const days = [90, 75, 60, 45, 30, 15, 0]
+  const pcts = [0, 0.25, 0.5, 0.75, 1]
+  const xs = days.map(d => ax.x(d)), ys = pcts.map(p => ax.y(p))
   const cross = (x, y) => {
     const [cx, cy] = f(x, y)
     return `M${cx - 2.5},${cy}L${cx + 2.5},${cy}M${cx},${cy - 2.5}L${cx},${cy + 2.5}`
   }
   const tick = (a, b) => { const [x1, y1] = f(...a), [x2, y2] = f(...b); return `M${x1},${y1}L${x2},${y2}` }
-  const [fx0, fy0] = f(0, H), [fx1, fy1] = f(W, H), [bx0, by0] = f(0, 0)
+  const [fx0, fy0] = f(ax.x0, ax.y1), [fx1, fy1] = f(ax.x1, ax.y1), [bx0, by0] = f(ax.x0, ax.y0)
+  const [lx, ly] = f(ax.x1, ax.y1), [px0, py0] = f(ax.x0, ax.y0)
   return (
     <g fontFamily={MONO} fontSize={7.5} fill="rgba(var(--kt-ink-rgb), 0.35)" pointerEvents="none">
       <path d={xs.flatMap(x => ys.map(y => cross(x, y))).join('')} stroke="rgba(var(--kt-ink-rgb), 0.16)" strokeWidth={0.6} />
       <path d={`M${bx0},${by0}L${fx0},${fy0}L${fx1},${fy1}`} fill="none" stroke="rgba(var(--kt-ink-rgb), 0.18)" strokeWidth={0.6} />
-      <path d={xs.map(x => tick([x, H], [x, H - 8])).join('') + ys.map(y => tick([0, y], [8, y])).join('')} stroke="rgba(var(--kt-ink-rgb), 0.3)" strokeWidth={0.6} />
-      {xs.map(x => { const [tx, ty] = f(x, H); return <text key={`x${x}`} x={tx} y={ty + 10 < H - 2 ? ty + 10 : ty - 11} textAnchor="middle">{String(Math.round(x / W * 100)).padStart(2, '0')}</text> })}
-      {ys.map(y => { const [tx, ty] = f(0, y); return <text key={`y${y}`} x={tx + 11} y={ty + 2.5}>{String(Math.round((1 - y / H) * 100)).padStart(2, '0')}</text> })}
+      <path d={xs.map(x => tick([x, ax.y1], [x, ax.y1 - 8])).join('') + ys.map(y => tick([ax.x0, y], [ax.x0 + 8, y])).join('')} stroke="rgba(var(--kt-ink-rgb), 0.3)" strokeWidth={0.6} />
+      {xs.map((x, i) => { const [tx, ty] = f(x, ax.y1); return <text key={`x${i}`} x={tx} y={ty + 11} textAnchor="middle">{days[i] === 0 ? 'NOW' : `${days[i]}D`}</text> })}
+      {ys.map((y, i) => { const [tx, ty] = f(ax.x0, y); return <text key={`y${i}`} x={tx - 5} y={ty + 2.5} textAnchor="end">{`${Math.round(pcts[i] * 100)}%`}</text> })}
+      <text x={lx} y={ly + 22} textAnchor="end" fill="rgba(var(--kt-ink-rgb), 0.5)">LAST ACTIVITY →</text>
+      <text x={px0 - 5} y={py0 - 9} textAnchor="end" fill="rgba(var(--kt-ink-rgb), 0.5)">DONE ↓</text>
     </g>
   )
 }
@@ -261,18 +282,22 @@ const segPath = (segs, f, dx = 0) => segs.map(([ax, ay, bx, by]) => {
   return `M${(tear(x1, y1) + dx).toFixed(1)},${y1.toFixed(1)}L${(tear(x2, y2) + dx).toFixed(1)},${y2.toFixed(1)}`
 }).join('')
 
-// Each stroke is drawn three times: the line, and a red and a cyan ghost a pixel
-// either side of it — the misregistered colour fringe of a projected display.
+// Each stroke is drawn three times: the line, and a faint ghost a pixel and a half
+// either side — misregistration, in the line's own colour. Not red and cyan: on
+// this page red means failed and late (ADR-0088), and a fringe must not say so.
 const FRINGE = [
-  { dx: -1.6, color: 'rgb(255, 70, 90)', share: 0.6, cls: 'kt-fringe-r' },
-  { dx: 1.6, color: 'rgb(80, 220, 255)', share: 0.6, cls: 'kt-fringe-c' },
+  { dx: -1.6, color: 'var(--kt-ink, #f5f6f7)', share: 0.3, cls: 'kt-fringe-r' },
+  { dx: 1.6, color: 'var(--kt-ink, #f5f6f7)', share: 0.22, cls: 'kt-fringe-c' },
 ]
 
 function Strokes({ level, f, lineOpacity, peaks }) {
-  const width = level.index ? 0.55 : 0.3
   return level.strokes.map((st, k) => {
-    // Thinner lines read darker at the same opacity, so they carry more of it.
-    const opacity = Math.min(1, lineOpacity(peaks[st.owner]?.warmth ?? 0) * (0.35 + 0.65 * st.alpha) * (level.index ? 0.8 : 0.55))
+    // Heat is carried twice, by brightness and by weight, and the noise only
+    // shades the line by a fifth — less than the gap between a busy mountain and
+    // a quiet one — so the wear never reads as a change in heat.
+    const warmth = peaks[st.owner]?.warmth ?? 0
+    const width = (level.index ? 0.55 : 0.3) * (0.7 + 0.7 * warmth)
+    const opacity = Math.min(1, lineOpacity(warmth) * (0.8 + 0.2 * st.alpha) * (level.index ? 0.8 : 0.55))
     return (
       <g key={k}>
         {FRINGE.map(fr => (
@@ -295,7 +320,7 @@ function PlanView({ map, focus, pick, lineOpacity, W, H }) {
       {map.dots.map(d => (
         <TaskDot key={d.task.id} d={d} x={d.x} y={d.y} on={focus?.kind === 'task' && focus.task.id === d.task.id} pickProps={pick('task', d)} />
       ))}
-      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x} y={p.y} W={W} H={H} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x} y={p.y} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
 }
@@ -369,9 +394,30 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H }) {
           Math.hypot(ax - p.x / CELL, ay - p.y / CELL) < near)))?.z ?? 0
         const [x, y] = px(p.x, p.y, z)
         return { p, x, y }
-      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} H={H} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
+}
+
+// Past a handful the map stops being a landscape and becomes texture, so the
+// mountains with the most open work are drawn and the rest fold into one low
+// range that says how many it holds. Their tasks stay on the map, in it.
+export const MAX_MOUNTAINS = 8
+export function foldFoothills(projects) {
+  if (projects.length <= MAX_MOUNTAINS) return projects
+  const openOf = p => p.tasks.filter(t => !CLOSED.has(t.status)).length
+  const ranked = [...projects].sort((a, b) => openOf(b) - openOf(a) || b.tasks.length - a.tasks.length || a.name.localeCompare(b.name))
+  const kept = ranked.slice(0, MAX_MOUNTAINS - 1)
+  const rest = ranked.slice(MAX_MOUNTAINS - 1)
+  const recent = rest.map(p => p.lastActive).filter(d => d != null)
+  return [...kept, {
+    id: 'foothills',
+    name: `+${rest.length} other projects`,
+    tasks: rest.flatMap(p => p.tasks),
+    heat: rest.reduce((n, p) => n + p.heat, 0),
+    lastActive: recent.length ? Math.min(...recent) : null,
+    members: rest.map(p => p.name),
+  }]
 }
 
 /**
@@ -379,17 +425,19 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H }) {
  * count, and whose contour lines are as bright as the project is busy. Tasks sit on
  * its slopes — in progress near the summit, done at the foot — and can be inspected.
  *
- * `projects`: `[{ id, name, tasks: [{ id, title, status, due_date, progress_pct }], heat }]`
- * where `heat` is a recent activity count.
+ * `projects`: `[{ id, name, tasks: [{ id, title, status, due_date, progress_pct }], heat, lastActive }]`
+ * where `heat` is a recent activity count and `lastActive` the days since the
+ * project last changed (`null` when not within RECENCY_DAYS).
  */
-export default function ContourMap({ projects, width = 720, height = 420, emptyLabel = 'Nothing to map yet', initialView = 'relief' }) {
+export default function ContourMap({ projects, width = 720, height = 420, emptyLabel = 'Nothing to map yet', initialView = 'relief', extraViews = [] }) {
   const [focus, setFocus] = useState(null) // { kind: 'task' | 'peak', ... }
-  const [view, setView] = useState(initialView) // 'relief' (2.5D) | 'plan' (top-down)
+  const [view, setView] = useState(initialView) // 'relief' (2.5D) | 'plan' (top-down) | an extra view's key
   const W = width, H = height
 
   const map = useMemo(() => {
-    const live = projects.filter(p => p.tasks.length > 0)
-    if (live.length === 0) return null
+    const withTasks = projects.filter(p => p.tasks.length > 0)
+    if (withTasks.length === 0) return null
+    const live = foldFoothills(withTasks)
     // Two measures, so two projects of one size can still look different:
     //   width  = every task the project holds — its footprint, the whole of the work;
     //   height = the tasks still open — how much climbing is left.
@@ -399,15 +447,19 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
     const maxTasks = Math.max(...live.map(p => p.tasks.length))
     const maxOpen = Math.max(1, ...live.map(openOf))
     const maxHeat = Math.max(1, ...live.map(p => p.heat))
-    const base = Math.min(W, H) * (live.length === 1 ? 0.2 : 0.13)
+    // Fewer mountains get more room each; more share the ground.
+    const base = Math.min(W, H) * (live.length === 1 ? 0.2 : 0.13 * Math.sqrt(3 / Math.max(3, live.length)))
     const items = [...live]
       .sort((a, b) => b.tasks.length - a.tasks.length || a.name.localeCompare(b.name))
       .map(p => {
         const open = openOf(p)
+        const done = p.tasks.filter(t => t.status === 'done').length
         return {
           ...p,
           open,
-          peak: 0.12 + 0.88 * (open / maxOpen),
+          progress: done / p.tasks.length,
+          // The folded range stays low whatever it holds: it is the rest, not a summit.
+          peak: p.id === 'foothills' ? Math.min(0.3, 0.12 + 0.88 * (open / maxOpen)) : 0.12 + 0.88 * (open / maxOpen),
           sigma: base * (0.45 + 0.55 * Math.sqrt(p.tasks.length / maxTasks)),
           warmth: p.heat / maxHeat,
         }
@@ -513,6 +565,8 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
   }
 
   const overdue = isOverdue
+  // Another view of the same projects, offered beside the map rather than in its own panel.
+  const extra = extraViews.find(v => v.key === view)
 
   const pick = (kind, d) => ({ onMouseEnter: () => setFocus({ kind, ...d }), onClick: () => setFocus({ kind, ...d }) })
   const lineOpacity = warmth => COLD + (HOT - COLD) * warmth
@@ -520,7 +574,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: -6, marginBottom: 4 }}>
-        {[['relief', '2.5D'], ['plan', 'Map']].map(([key, label]) => (
+        {[['relief', '2.5D'], ['plan', 'Map'], ...extraViews.map(v => [v.key, v.label])].map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -537,62 +591,71 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           </button>
         ))}
       </div>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        width="100%"
-        role="img"
-        aria-label={map.peaks.map(p => `${p.name}: ${p.open} open of ${p.tasks.length} tasks, ${p.heat} recent updates`).join('; ')}
-        onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
-        className="kt-glitch-map"
-        style={{ display: 'block' }}
-      >
-        {view === 'plan'
-          ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
-          : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />}
-        <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
-      </svg>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 6, color: 'var(--kt-muted)', fontSize: 10, textTransform: 'uppercase' }}>
-        {[['in_progress', 'in progress · summit'], ['todo', 'todo'], ['failed', 'failed'], ['done', 'done · foot']].map(([k, label]) => (
-          <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <svg width="8" height="8" aria-hidden="true"><rect x={4 - DOT[k].size / 2} y={4 - DOT[k].size / 2} width={DOT[k].size} height={DOT[k].size} fill={DOT[k].fill} stroke={DOT[k].stroke} strokeWidth={0.7} /></svg>
-            {label}
-          </span>
-        ))}
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <svg width="8" height="8" aria-hidden="true"><rect x="2.5" y="2.5" width="3" height="3" fill="none" stroke={LATE} strokeWidth={0.7} /></svg>
-          overdue
-        </span>
-      </div>
-
-      {focus && (
-        <div
-          role="status"
-          style={{
-            position: 'absolute', left: 8, top: 8, maxWidth: 'min(320px, calc(100% - 16px))',
-            padding: '8px 10px', border: '1px solid var(--kt-line)', background: 'rgba(var(--kt-bg-rgb), 0.94)',
-            fontSize: 12, lineHeight: 1.45, pointerEvents: 'none',
-          }}
+      {extra ? extra.render() : (
+        <>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          role="img"
+          aria-label={map.peaks.map(p => `${p.name}: ${p.open} open of ${p.tasks.length} tasks, ${p.heat} recent updates`).join('; ')}
+          onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
+          className="kt-glitch-map"
+          style={{ display: 'block' }}
         >
-          {focus.kind === 'peak' ? (
-            <>
-              <b style={{ color: 'var(--kt-ink)' }}>{focus.name}</b>
-              <div style={{ color: 'var(--kt-muted)' }}>
-                {focus.open} open of {focus.tasks.length} tasks · {focus.heat} updates in 30 days
-              </div>
-            </>
-          ) : (
-            <>
-              <b style={{ color: 'var(--kt-ink)' }}>{focus.task.title}</b>
-              <div style={{ color: 'var(--kt-muted)' }}>
-                {focus.project} · {focus.status.replace('_', ' ')}
-                {focus.task.progress_pct != null && ` · ${focus.task.progress_pct}%`}
-                {focus.task.due_date && ` · due ${new Date(focus.task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`}
-                {overdue(focus.task) && <span style={{ color: 'var(--kt-status-failed, #fb7185)' }}> · overdue</span>}
-              </div>
-            </>
-          )}
+          {view === 'plan'
+            ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
+            : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />}
+          <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
+        </svg>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 6, color: 'var(--kt-muted)', fontSize: 10, textTransform: 'uppercase' }}>
+          {[['in_progress', 'in progress · summit'], ['todo', 'todo'], ['failed', 'failed'], ['done', 'done · foot']].map(([k, label]) => (
+            <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <svg width="8" height="8" aria-hidden="true"><rect x={4 - DOT[k].size / 2} y={4 - DOT[k].size / 2} width={DOT[k].size} height={DOT[k].size} fill={DOT[k].fill} stroke={DOT[k].stroke} strokeWidth={0.7} /></svg>
+              {label}
+            </span>
+          ))}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <svg width="8" height="8" aria-hidden="true"><rect x="2.5" y="2.5" width="3" height="3" fill="none" stroke={LATE} strokeWidth={0.7} /></svg>
+            overdue
+          </span>
         </div>
+
+        {focus && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute', left: 8, top: 8, maxWidth: 'min(320px, calc(100% - 16px))',
+              padding: '8px 10px', border: '1px solid var(--kt-line)', background: 'rgba(var(--kt-bg-rgb), 0.94)',
+              fontSize: 12, lineHeight: 1.45, pointerEvents: 'none',
+            }}
+          >
+            {focus.kind === 'peak' ? (
+              <>
+                <b style={{ color: 'var(--kt-ink)' }}>{focus.name}</b>
+                <div style={{ color: 'var(--kt-muted)' }}>
+                  {focus.open} open of {focus.tasks.length} tasks · {focus.heat} updates in 30 days
+                </div>
+                {focus.members && (
+                  <div style={{ color: 'var(--kt-muted)' }}>
+                    {focus.members.slice(0, 6).join(', ')}{focus.members.length > 6 && ` and ${focus.members.length - 6} more`}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <b style={{ color: 'var(--kt-ink)' }}>{focus.task.title}</b>
+                <div style={{ color: 'var(--kt-muted)' }}>
+                  {focus.project} · {focus.status.replace('_', ' ')}
+                  {focus.task.progress_pct != null && ` · ${focus.task.progress_pct}%`}
+                  {focus.task.due_date && ` · due ${new Date(focus.task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`}
+                  {overdue(focus.task) && <span style={{ color: 'var(--kt-status-failed, #fb7185)' }}> · overdue</span>}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        </>
       )}
     </div>
   )
