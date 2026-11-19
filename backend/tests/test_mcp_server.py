@@ -483,10 +483,16 @@ async def test_tool_exception_handling():
     an otherwise successful result — a failure a client could only detect by
     reading the prose. It now surfaces as an error (ADR-0077), the same
     distinction ADR-0051 drew for unrecognised webhook statuses.
+
+    It names the tool and not the exception: since mcp 2.2 an unexpected exception's
+    own text stays on the server, because it can carry internals (hosts, paths,
+    query fragments) a remote client has no business reading. A refusal the tool
+    means to send is a ToolError raised on purpose, and that keeps its message.
     """
-    with patch("app.mcp_server.server._get_summary", side_effect=Exception("connection refused")):
-        with pytest.raises(ToolError, match="connection refused"):
+    with patch("app.mcp_server.server._get_summary", side_effect=Exception("connection refused to 10.0.0.5")):
+        with pytest.raises(ToolError, match="get_summary") as err:
             await _call("get_summary")
+    assert "10.0.0.5" not in str(err.value)
 
 
 # ── HTTP helper: _post 204 ──────────────────────────────────────────
