@@ -4,6 +4,7 @@ import { isOverdue } from '../../utils/overdue'
 const LEVELS = 28            // contour lines between sea level and the highest summit
 const INDEX_EVERY = 5        // every fifth line is an index contour, drawn heavier
 const CELL = 8               // field resolution: coarse enough that contours turn corners
+const MARGIN = 160           // ground computed past each edge of the frame
 const HOT = 1, COLD = 0.4 // line opacity at the hottest and the quietest mountain
 
 // `r` is where on the slope a status sits (a fraction of the mountain's spread);
@@ -312,7 +313,7 @@ function Strokes({ level, f, lineOpacity, peaks, fringe = true }) {
 
 // Top-down: the contour lines themselves.
 function PlanView({ map, focus, pick, lineOpacity, W, H }) {
-  const f = (x, y) => [x * CELL, y * CELL]
+  const f = (x, y) => [x * CELL - MARGIN, y * CELL - MARGIN]
   return (
     <>
       <Graticule f={(x, y) => [x, y]} W={W} H={H} />
@@ -337,7 +338,7 @@ function spreadLabels(labels) {
   return placed
 }
 
-const RISE = 0.22       // the tallest summit stands this fraction of the frame high
+const RISE = 0.32       // the tallest summit stands this fraction of the frame high
 // The camera: `az` turns the ground about its centre, `tilt` is how steeply it is
 // looked down on (1 top-down, 0 edge-on). Dragging moves both, within limits that
 // keep the ground readable; a double-click returns here.
@@ -357,7 +358,7 @@ export function camera(W, H, { az, tilt }, lift) {
     const ry = dx * sin + dy * cos
     // One zoom for every heading: small enough that the ground's diagonal, which
     // is what spans the frame once it is turned, still fits inside it.
-    const k = (D / (D - ry)) * 0.84
+    const k = (D / (D - ry)) * 0.9
     return [W / 2 + rx * k, H * 0.58 + (ry * tilt - z * lift) * k]
   }
   // Nearness, for drawing order: larger is nearer the viewer.
@@ -375,8 +376,8 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
   const cam = camera(W, H, view3d, lift)
   const px = cam.project
   const height = (x, y) => {
-    const i = Math.max(0, Math.min(cols - 1, Math.round(x / CELL)))
-    const j = Math.max(0, Math.min(rows - 1, Math.round(y / CELL)))
+    const i = Math.max(0, Math.min(cols - 1, Math.round((x + MARGIN) / CELL)))
+    const j = Math.max(0, Math.min(rows - 1, Math.round((y + MARGIN) / CELL)))
     return field[j * cols + i]
   }
 
@@ -398,7 +399,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
     <>
       <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} />
       {levels.map(level => {
-        const f = (x, y) => px(x * CELL, y * CELL, level.z)
+        const f = (x, y) => px(x * CELL - MARGIN, y * CELL - MARGIN, level.z)
         const fill = level.rings.map(r => r.map((p, i) => {
           const [x, y] = f(p[0], p[1])
           return `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`
@@ -416,7 +417,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
         // it that nothing outlines.
         const near = (p.sigma * 0.6) / CELL
         const z = levels.findLast(lv => lv.strokes.some(st => st.segs.some(([ax, ay]) =>
-          Math.hypot(ax - p.x / CELL, ay - p.y / CELL) < near)))?.z ?? 0
+          Math.hypot(ax - (p.x + MARGIN) / CELL, ay - (p.y + MARGIN) / CELL) < near)))?.z ?? 0
         const [x, y] = px(p.x, p.y, z)
         return { p, x, y }
       })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
@@ -498,7 +499,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
     const maxOpen = Math.max(1, ...live.map(openOf))
     const maxHeat = Math.max(1, ...live.map(p => p.heat))
     // Fewer mountains get more room each; more share the ground.
-    const base = Math.min(W, H) * (live.length === 1 ? 0.2 : 0.13 * Math.sqrt(3 / Math.max(3, live.length)))
+    const base = Math.min(W, H) * (live.length === 1 ? 0.28 : 0.21 * Math.sqrt(3 / Math.max(3, live.length)))
     const items = [...live]
       .sort((a, b) => b.tasks.length - a.tasks.length || a.name.localeCompare(b.name))
       .map(p => {
@@ -540,13 +541,15 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
       return [main, ...shoulders]
     })
 
-    const cols = Math.ceil(W / CELL) + 1, rows = Math.ceil(H / CELL) + 1
+    // The ground runs a margin past the frame on every side, so a mountain near the
+    // edge slopes away out of view instead of being cut off at the border.
+    const cols = Math.ceil((W + 2 * MARGIN) / CELL) + 1, rows = Math.ceil((H + 2 * MARGIN) / CELL) + 1
     const field = new Float32Array(cols * rows)
     const owner = new Int16Array(cols * rows)
     const share = new Float32Array(peaks.length)
     for (let j = 0; j < rows; j++) {
       for (let i = 0; i < cols; i++) {
-        const x = i * CELL, y = j * CELL
+        const x = i * CELL - MARGIN, y = j * CELL - MARGIN
         share.fill(0)
         let sum = 0
         for (const c of parts) {
