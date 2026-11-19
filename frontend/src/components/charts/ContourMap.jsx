@@ -6,6 +6,8 @@ const INDEX_EVERY = 5        // every fifth line is an index contour, drawn heav
 const CELL = 8               // field resolution: coarse enough that contours turn corners
 const MARGIN = 160           // ground computed past each edge of the frame
 const HOT = 1, COLD = 0.4 // line opacity at the hottest and the quietest mountain
+const FOOTHILL = 0.55        // line opacity on ground that belongs to no project, below any COLD line once dimmed
+const TONE_STEPS = 24        // brightness steps between black and white: fine enough to read as a gradient
 
 // `r` is where on the slope a status sits (a fraction of the mountain's spread);
 // the rest is the mark: a small square, filled or open, and done shrinks to a point.
@@ -286,20 +288,13 @@ const FRINGE = [
   { dx: 1.6, color: 'var(--kt-ink, #f5f6f7)', share: 0.22, cls: 'kt-fringe-c' },
 ]
 
-function Strokes({ level, f, lineOpacity, peaks, fringe = true }) {
+function Strokes({ level, f, fringe = true }) {
   return level.strokes.map((st, k) => {
-    // Heat is carried twice, by brightness and by weight, and the noise only
-    // shades the line by a fifth — less than the gap between a busy mountain and
-    // a quiet one — so the wear never reads as a change in heat.
-    // Ground that belongs to no project (owner -1) is the range's foothills: drawn,
-    // so the map reads as one landscape, but at a fixed low weight that no
-    // project's heat goes down to.
-    const own = peaks[st.owner]
-    const warmth = own?.warmth ?? 0
-    const width = (level.index ? 0.55 : 0.3) * (own ? 0.7 + 0.7 * warmth : 1)
-    const opacity = own
-      ? Math.min(1, lineOpacity(warmth) * (0.8 + 0.2 * st.alpha) * (level.index ? 0.8 : 0.55))
-      : 0.3 * (0.8 + 0.2 * st.alpha) * (level.index ? 1.4 : 1)
+    // Heat is carried twice, by brightness and by weight (worked out per piece when
+    // the map is built); the noise only shades a line by a fifth, less than the gap
+    // between a busy summit and a quiet one, so wear never reads as a change in heat.
+    const width = (level.index ? 0.55 : 0.3) * st.weight
+    const opacity = Math.min(1, st.opacity * (level.index ? 0.8 : 0.55))
     return (
       <g key={k}>
         {fringe && FRINGE.map(fr => (
@@ -318,7 +313,7 @@ function PlanView({ map, focus, pick, lineOpacity, W, H }) {
   return (
     <>
       <Graticule f={(x, y) => [x, y]} W={W} H={H} />
-      {map.levels.map(level => <g key={level.l}><Strokes level={level} f={f} lineOpacity={lineOpacity} peaks={map.peaks} /></g>)}
+      {map.levels.map(level => <g key={level.l}><Strokes level={level} f={f} /></g>)}
       {map.dots.map(d => (
         <TaskDot key={d.task.id} d={d} x={d.x} y={d.y} on={focus?.kind === 'task' && focus.task.id === d.task.id} pickProps={pick('task', d)} />
       ))}
@@ -408,7 +403,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
         return (
           <g key={level.l}>
             <path d={fill} fill="var(--kt-bg, #0b0c0e)" fillOpacity={0.9} fillRule="nonzero" />
-            <Strokes level={level} f={f} lineOpacity={lineOpacity} peaks={peaks} fringe={!moving} />
+            <Strokes level={level} f={f} fringe={!moving} />
           </g>
         )
       })}
@@ -538,7 +533,11 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
     // edge slopes away out of view instead of being cut off at the border.
     const cols = Math.ceil((W + 2 * MARGIN) / CELL) + 1, rows = Math.ceil((H + 2 * MARGIN) / CELL) + 1
     const field = new Float32Array(cols * rows)
-    const owner = new Int16Array(cols * rows)
+    // Per cell: how warm the projects whose ground this is are (their heat, mixed by
+    // how much of the height each contributes), and how much of the height is
+    // theirs at all rather than foothills. Both vary smoothly, so brightness does too.
+    const warm = new Float32Array(cols * rows)
+    const owned = new Float32Array(cols * rows)
     const share = new Float32Array(peaks.length)
     for (let j = 0; j < rows; j++) {
       for (let i = 0; i < cols; i++) {
@@ -574,13 +573,15 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         const rim = Math.min(x + MARGIN, W + MARGIN - x, y + MARGIN, H + MARGIN - y) / (MARGIN * 0.9)
         const shore = rim >= 1 ? 1 : rim <= 0 ? 0 : rim * rim * (3 - 2 * rim)
         const hills = shore * highest * 0.32 * (0.5 * smooth(x / 110, y / 110) + 0.3 * smooth(x / 55 + 3, y / 55 - 2) + 0.2 * smooth(x / 27 - 5, y / 27 + 4))
-        let best = -1, bestV = 0
-        for (let k = 0; k < share.length; k++) if (share[k] > bestV) { bestV = share[k]; best = k }
-        if (bestV < (sum + hills) * 0.35) best = -1
+        let mix = 0
+        for (let k = 0; k < share.length; k++) mix += share[k] * peaks[k].warmth
+        const ratio = sum / (sum + hills || 1)
+        const t = Math.max(0, Math.min(1, (ratio - 0.3) / 0.45))
         // Rock: ridged noise cut into the slopes.
         const rock = ridged(x / 46, y / 46) * 0.6 + ridged(x / 19 + 7, y / 19 - 3) * 0.3 + ridged(x / 8 - 2, y / 8 + 5) * 0.1
         field[j * cols + i] = (sum + hills) * (0.84 + 0.3 * rock)
-        owner[j * cols + i] = best
+        warm[j * cols + i] = sum > 0 ? mix / sum : 0
+        owned[j * cols + i] = t * t * (3 - 2 * t)
       }
     }
     const top = Math.max(...field)
@@ -590,10 +591,20 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
     for (let i = 0; i < cols; i++) { sea[i] = 0; sea[(rows - 1) * cols + i] = 0 }
     for (let j = 0; j < rows; j++) { sea[j * cols] = 0; sea[j * cols + cols - 1] = 0 }
 
-    // Per level: the rings (closed, for the relief's fills) and the strokes, cut into
-    // pieces by owning mountain and by noise bucket. A piece keeps its owner's
-    // warmth and gets its own opacity, so a line fades, breaks and slips like a
-    // worn print instead of running solid.
+    // Sampled between cells, so a line's brightness changes along it without steps
+    // at cell edges.
+    const sample = (arr, gx, gy) => {
+      const i0 = Math.max(0, Math.min(cols - 2, Math.floor(gx))), j0 = Math.max(0, Math.min(rows - 2, Math.floor(gy)))
+      const fx = Math.max(0, Math.min(1, gx - i0)), fy = Math.max(0, Math.min(1, gy - j0))
+      const a = arr[j0 * cols + i0], b = arr[j0 * cols + i0 + 1], c = arr[(j0 + 1) * cols + i0], d = arr[(j0 + 1) * cols + i0 + 1]
+      return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy
+    }
+
+    // Per level: the rings (closed, for the relief's fills) and the strokes. Each
+    // piece of line takes its brightness and weight from the ground it crosses —
+    // a project's heat where the height is the project's, the foothills' low tone
+    // where it is not, and a blend between — then the noise shades it a little.
+    // Pieces that land on the same values share one path.
     const levels = []
     for (let l = 1; l <= LEVELS; l++) {
       const z = (l / (LEVELS + 1)) * top
@@ -603,10 +614,13 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
         const n = grain(mx, my, l)
         if (n.drop) continue
-        const ci = Math.min(cols - 1, Math.round(mx)), cj = Math.min(rows - 1, Math.round(my))
-        const k = owner[cj * cols + ci]
-        const key = `${k}:${n.bucket}`
-        if (!strokes.has(key)) strokes.set(key, { owner: k, alpha: (n.bucket + 0.5) / GRAIN_BUCKETS, segs: [] })
+        const w = sample(warm, mx, my), mine = sample(owned, mx, my)
+        const alpha = (n.bucket + 0.5) / GRAIN_BUCKETS
+        const opacity = (FOOTHILL + ((COLD + (HOT - COLD) * w) - FOOTHILL) * mine) * (0.8 + 0.2 * alpha)
+        const weight = 1 + ((0.7 + 0.7 * w) - 1) * mine
+        const qo = Math.round(opacity * TONE_STEPS), qw = Math.round(weight * 4)
+        const key = `${qo}:${qw}`
+        if (!strokes.has(key)) strokes.set(key, { opacity: qo / TONE_STEPS, weight: qw / 4, segs: [] })
         strokes.get(key).segs.push([a[0] + n.slip, a[1], b[0] + n.slip, b[1]])
       }
       levels.push({ l, z, index: l % INDEX_EVERY === 0, rings: stitch(segs), strokes: [...strokes.values()] })
