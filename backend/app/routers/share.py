@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -18,7 +18,7 @@ from app.models import (
     Comment,
     ShareChatLog,
 )
-from app.services import graph
+from app.services import analytics_admin, graph
 from app.services.activity import log_activity
 from app.services.llm import get_provider
 from app.services.pin_utils import check_pin, hash_pin, needs_rehash
@@ -112,33 +112,33 @@ def _serialize_comment(c: Comment):
     }
 
 
-ACTIVITY_DAYS = 14
+# What the share page draws as charts, computed by the same service the analytics page
+# reads (one answer per question), scoped to the shared projects. A visit is not work,
+# so share views stay out of every series as they stay out of the feed.
+_NOT_WORK = ("share.viewed",)
 
 
-def _activity_daily(db: Session, project_ids: list[str]) -> list[dict]:
-    """Activity rows per UTC day over the last ``ACTIVITY_DAYS`` days, oldest first,
-    with quiet days present as zero so the chart's x axis is the calendar."""
-    today = datetime.now(UTC).date()
-    first = today - timedelta(days=ACTIVITY_DAYS - 1)
-    counts = {first + timedelta(days=i): 0 for i in range(ACTIVITY_DAYS)}
-    if project_ids:
-        since = datetime.combine(first, datetime.min.time(), tzinfo=UTC)
-        rows = (
-            db.query(ActivityLog.created_at)
-            .filter(
-                ActivityLog.project_id.in_(project_ids),
-                ActivityLog.action != "share.viewed",
-                ActivityLog.created_at >= since,
-            )
-            .all()
-        )
-        for (created_at,) in rows:
-            if created_at is None:
-                continue
-            day = _as_utc(created_at).date()
-            if day in counts:
-                counts[day] += 1
-    return [{"date": d.isoformat(), "count": n} for d, n in counts.items()]
+def _share_analytics(db: Session, projects: list[dict]) -> dict:
+    # The page draws active projects only; a chart counting the others would disagree
+    # with every card beneath it.
+    projects = [p for p in projects if p["status"] == "active"]
+    ids = [p["id"] for p in projects]
+    if not ids:
+        return {"heatmap": [], "by_project": [], "status_trend": [], "burndown": [], "velocity": []}
+    series = analytics_admin.heatmap_by_project(db, ids, exclude_actions=_NOT_WORK)
+    return {
+        "heatmap": analytics_admin.heatmap(db, project_ids=ids, exclude_actions=_NOT_WORK),
+        "by_project": [{"id": p["id"], "name": p["name"], "days": series[p["id"]]} for p in projects],
+        "status_trend": analytics_admin.status_trend(db, days=30, project_ids=ids),
+        "burndown": [
+            {"project": p["name"], "cycle": p["active_cycle"]["name"], "days": analytics_admin.burndown(db, cid)}
+            for p in projects
+            if p["active_cycle"] and (cid := p["active_cycle"].get("id"))
+        ],
+        "velocity": [
+            {"project": p["name"], "cycles": v} for p in projects if (v := analytics_admin.velocity(db, p["id"]))
+        ],
+    }
 
 
 def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
@@ -166,6 +166,7 @@ def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
             ct_total = len(c_tasks)
             ct_done = sum(1 for t in c_tasks if t.status == "done")
             active_cycle = {
+                "id": c.id,
                 "name": c.name,
                 "total_tasks": ct_total,
                 "done_tasks": ct_done,
@@ -308,10 +309,6 @@ def _build_payload(
                 }
             )
 
-    # Per-day counts for the page's activity chart. The feed above is the newest 15 rows,
-    # which on a busy day is one afternoon, so the chart cannot be drawn from it.
-    activity_daily = _activity_daily(db, project_ids)
-
     all_tasks_flat = []
     for p_data in projects:
         all_tasks_flat.extend(p_data["tasks"])
@@ -332,7 +329,7 @@ def _build_payload(
         },
         "projects": projects,
         "recent_activity": recent_activity,
-        "activity_daily": activity_daily,
+        "analytics": _share_analytics(db, projects),
         "summary": {
             "total_projects": len(projects),
             "total_tasks": total_tasks,

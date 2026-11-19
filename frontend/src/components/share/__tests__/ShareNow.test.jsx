@@ -17,7 +17,6 @@ const task = (id, status, extra = {}) => ({ id, title: id, status, subtasks: [],
 describe('ShareNow', () => {
   it('lists work in progress across projects, late work first', () => {
     render(<ShareNow
-      daily={[]}
       projects={[
         { id: 'p1', name: 'Alpha', tasks: [task('later', 'in_progress', { due_date: day(5) }), task('finished', 'done')] },
         { id: 'p2', name: 'Beta', tasks: [task('late', 'in_progress', { due_date: day(-2) })] },
@@ -31,19 +30,10 @@ describe('ShareNow', () => {
 
   it('draws one status bar per project with its done count', () => {
     render(<ShareNow
-      daily={[]}
       projects={[{ id: 'p1', name: 'Alpha', tasks: [task('a', 'done'), task('b', 'todo'), task('c', 'in_progress')] }]}
     />)
     expect(screen.getByLabelText('1 done, 1 active, 0 failed, 1 todo')).toBeTruthy()
     expect(screen.getByText('1/3')).toBeTruthy()
-  })
-
-  it('totals the activity days', () => {
-    render(<ShareNow
-      projects={[{ id: 'p1', name: 'Alpha', tasks: [] }]}
-      daily={[{ date: '2026-11-18', count: 2 }, { date: '2026-11-19', count: 3 }]}
-    />)
-    expect(screen.getByRole('img', { name: '5 updates in the last 2 days' })).toBeTruthy()
   })
 })
 

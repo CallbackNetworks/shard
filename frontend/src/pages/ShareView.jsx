@@ -16,6 +16,7 @@ import ShareChatWidget from '../components/share/ShareChatWidget'
 import ShareFooter from '../components/share/ShareFooter'
 import ShareMarquee from '../components/share/ShareMarquee'
 import ShareNow from '../components/share/ShareNow'
+import ShareAnalytics, { hasAnalytics } from '../components/share/ShareAnalytics'
 import useBreakpoint from '../components/share/useBreakpoint'
 import EmptyState from '../components/shared/EmptyState'
 
@@ -76,6 +77,7 @@ export default function ShareView() {
     overdue_tasks: 0, overall_progress: 0, total_decisions: 0, accepted_decisions: 0,
   }
   const recentActivity = effectiveData?.recent_activity || []
+  const analytics = effectiveData?.analytics
   const meta = effectiveData?.meta || {}
   const color = identity?.color || 'var(--kt-hit, #f5f6f7)'
   // A nav entry whose section is not rendered is a button that does nothing when clicked.
@@ -85,6 +87,7 @@ export default function ShareView() {
   const navSections = SECTIONS.filter(s => {
     if (s.key === 'decisions') return summary.total_decisions > 0
     if (s.key === 'graph') return hasGraph
+    if (s.key === 'analytics') return hasAnalytics(analytics)
     return true
   })
 
@@ -144,7 +147,7 @@ export default function ShareView() {
 
           {/* What is moving right now, drawn: per-project status, the work in
               progress, and how busy the last two weeks were. */}
-          <ShareNow projects={projects} daily={effectiveData?.activity_daily || []} />
+          <ShareNow projects={projects} />
         </div>
 
         {/* Scroll navigation */}
@@ -155,6 +158,13 @@ export default function ShareView() {
           sections={navSections}
           onAction={() => setAskOpen(true)}
         />
+
+        {/* Section: Analytics — the analytics page's charts, scoped to this share */}
+        {hasAnalytics(analytics) && (
+          <div id="share-section-analytics" style={{ paddingTop: 8 }}>
+            <ShareAnalytics analytics={analytics} bp={bp} />
+          </div>
+        )}
 
         {/* Section: Projects */}
         <div id="share-section-projects" style={{ paddingTop: 8 }}>

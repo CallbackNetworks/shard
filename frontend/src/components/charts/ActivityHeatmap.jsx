@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import SvgTooltip from './SvgTooltip'
 
@@ -6,6 +6,13 @@ import SvgTooltip from './SvgTooltip'
 export default function ActivityHeatmap({ data }) {
   const { t } = useTranslation()
   const [hover, setHover] = useState(null)
+  const scrollRef = useRef(null)
+
+  // A year is wider than a phone and ends today; where it does not fit, open on today.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [data?.length])
 
   if (!data || data.length === 0) {
     return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.2)', fontSize: 13, padding: '24px 0' }}>{t('analytics.noActivityYet')}</div>
@@ -52,7 +59,7 @@ export default function ActivityHeatmap({ data }) {
   const totalH = 7 * (cellSize + gap) + labelH
 
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div ref={scrollRef} style={{ overflowX: 'auto' }}>
       <svg width={totalW} height={totalH + 16} style={{ display: 'block' }}>
         {/* Month labels */}
         {monthLabels.map((m, i) => (

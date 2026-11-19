@@ -163,3 +163,4 @@
 | [0159](0159-a-status-that-is-a-consequence-is-not-a-word-you-type.md) | 一個「後果」性質的狀態不是一個可以自己打上去的字：`superseded` 沒有邊撐著就拒絕，正式站 17 筆死結在畫面上修得掉 | Accepted | 2026-09-11 |
 | [0160](0160-a-key-a-component-asks-for-is-a-key-the-locales-have.md) | 元件要得到的 key 必須是語言檔真的有的 key：補上第三個方向的守衛，位置參數的英文預設值不再算數 | Accepted | 2026-09-11 |
 | [0161](0161-a-rule-lives-where-a-writer-would-look-for-it.md) | 規則要住在會去找它的人會看的地方：寫入不變量改成向型別登記、助理工具說明收成一份、六顆刪除鈕照既有規則走 | Accepted | 2026-09-11 |
+| [0162](0162-the-share-page-draws-the-analytics-it-already-had.md) | 分享頁畫出分析頁的圖，而且算的是同一份：分析計算三份收一份、地形圖、跑馬燈帶最新活動 | Accepted | 2026-11-19 |

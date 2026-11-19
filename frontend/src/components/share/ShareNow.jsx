@@ -11,10 +11,6 @@ const SEGMENTS = [
 ]
 const MAX_ACTIVE = 8
 
-// The server buckets by UTC calendar day; reading "2026-11-19" as midnight UTC
-// would name the previous day anywhere west of Greenwich.
-const dayLabel = date => formatDate(`${date}T12:00:00`)
-
 // Anything outside the four built-in states is still open work, so it is drawn as todo.
 function statusCounts(tasks) {
   const counts = { done: 0, in_progress: 0, failed: 0, todo: 0 }
@@ -102,38 +98,13 @@ function ProjectStatus({ projects }) {
   )
 }
 
-function ActivityDays({ daily }) {
-  const total = daily.reduce((n, d) => n + d.count, 0)
-  // Fourteen empty columns say nothing the zero beside them would not.
-  if (total === 0) return null
-  const peak = Math.max(1, ...daily.map(d => d.count))
-
-  return (
-    <div className={s.panel}>
-      <div className={s.heading}>Activity · {daily.length} days <b>{total}</b></div>
-      <div className={s.days} role="img" aria-label={`${total} updates in the last ${daily.length} days`}>
-        {daily.map(d => (
-          <span key={d.date} title={`${dayLabel(d.date)}: ${d.count}`}>
-            <span style={{ height: `${d.count === 0 ? 0 : Math.max(6, d.count / peak * 100)}%` }} />
-          </span>
-        ))}
-      </div>
-      <div className={s.axis}>
-        <span>{dayLabel(daily[0].date)}</span>
-        <span>today</span>
-      </div>
-    </div>
-  )
-}
-
-export default function ShareNow({ projects, daily }) {
+export default function ShareNow({ projects }) {
   if (projects.length === 0) return null
   return (
     <section className={s.now} aria-label="Current state">
       <ActiveWork projects={projects} />
       <div className={s.side}>
         <ProjectStatus projects={projects} />
-        <ActivityDays daily={daily} />
       </div>
     </section>
   )

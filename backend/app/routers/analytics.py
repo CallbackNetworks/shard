@@ -1,12 +1,10 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, Node
-from app.services import analytics_admin, graph
+from app.services import analytics_admin
 from app.services.usage_tracker import tracker
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -24,19 +22,12 @@ def get_heatmap(
     project_id: str | None = None,
     db: Session = Depends(get_db),
 ):
-    now = datetime.now(UTC)
-    end_dt = datetime.fromisoformat(end) if end else now
-    start_dt = datetime.fromisoformat(start) if start else end_dt - timedelta(days=365)
-
-    day_col = func.date(ActivityLog.created_at).label("day")
-    q = db.query(day_col, func.count(ActivityLog.id).label("count")).filter(
-        ActivityLog.created_at >= start_dt,
-        ActivityLog.created_at <= end_dt,
+    return analytics_admin.heatmap(
+        db,
+        start=datetime.fromisoformat(start) if start else None,
+        end=datetime.fromisoformat(end) if end else None,
+        project_ids=[project_id] if project_id else None,
     )
-    if project_id:
-        q = q.filter(ActivityLog.project_id == project_id)
-    rows = q.group_by(day_col).order_by(day_col).all()
-    return [{"date": str(r.day), "count": r.count} for r in rows]
 
 
 @router.get("/burndown")
@@ -46,25 +37,7 @@ def get_burndown(cycle_id: str, db: Session = Depends(get_db)):
 
 @router.get("/velocity")
 def get_velocity(project_id: str, db: Session = Depends(get_db)):
-    cycles = [c for c in graph.cycles_in_project(db, project_id) if c.status == "completed"]
-    cycles.sort(key=lambda c: (c.start_date is None, c.start_date))
-
-    result = []
-    for cycle in cycles:
-        c_tasks = graph.tasks_in_cycle(db, cycle.id)
-        task_ids = [t.id for t in c_tasks]
-        done_count = sum(1 for t in c_tasks if t.status == "done")
-        result.append(
-            {
-                "cycle_id": cycle.id,
-                "name": cycle.name,
-                "total_tasks": len(task_ids),
-                "completed_tasks": done_count,
-                "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
-                "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
-            }
-        )
-    return result
+    return analytics_admin.velocity(db, project_id)
 
 
 @router.get("/cycle-burndown")
@@ -118,17 +91,4 @@ def get_status_trend(
     days: int = Query(30, ge=1, le=365),
     db: Session = Depends(get_db),
 ):
-    now = datetime.now(UTC)
-    result = []
-    for i in range(days - 1, -1, -1):
-        day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
-        q = db.query(Node.status, func.count(Node.id)).filter(graph.task_type_filter(db), Node.created_at <= day)
-        if project_id:
-            q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
-        rows = q.group_by(Node.status).all()
-        entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
-        for status, count in rows:
-            if status in entry:
-                entry[status] = count
-        result.append(entry)
-    return result
+    return analytics_admin.status_trend(db, days=days, project_ids=[project_id] if project_id else None)

@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 // own table of contents, which is the only place a visitor learns it exists.
 const SECTIONS = [
   { key: 'overview', label: 'OVERVIEW' },
+  { key: 'analytics', label: 'ANALYTICS' },
   { key: 'projects', label: 'PROJECTS' },
   { key: 'graph', label: 'STRUCTURE' },
   { key: 'decisions', label: 'DECISIONS' },

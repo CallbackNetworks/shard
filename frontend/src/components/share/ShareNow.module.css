@@ -129,36 +129,6 @@
   margin-right: 5px;
 }
 
-.days {
-  display: grid;
-  grid-template-columns: repeat(14, minmax(0, 1fr));
-  align-items: end;
-  gap: 3px;
-  height: 56px;
-  border-bottom: 1px solid rgba(var(--kt-ink-rgb), 0.12);
-}
-.days > span {
-  display: flex;
-  align-items: flex-end;
-  height: 100%;
-}
-.days > span > span {
-  width: 100%;
-  background: var(--share-accent, var(--kt-hit));
-  opacity: 0.8;
-}
-.days > span:last-child > span {
-  opacity: 1;
-}
-.axis {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 5px;
-  color: var(--kt-muted);
-  font-size: 10px;
-  text-transform: uppercase;
-}
-
 @media (max-width: 720px) {
   .now {
     grid-template-columns: 1fr;

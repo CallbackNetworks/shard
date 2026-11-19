@@ -4,9 +4,9 @@
 half that answers *what should I do next* (critical path, burn-down, calibrated estimates)
 was internal-only, which is the half an agent planning work actually needs.
 
-Moved here rather than re-derived on the v1 side: `routers/external_api/analytics.py`
-already carries its own copy of velocity, and a second copy of anything here would be a
-second answer to a question that has one.
+Moved here rather than re-derived on the v1 side. The retrospective half (heatmap, status
+trend, velocity) used to be written out once per router; the public share page needed it
+too, and a third copy is a third answer to a question that has one.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -33,6 +33,92 @@ ESTIMATE_BUCKETS = [
 # median.
 MIN_CALIBRATION_SAMPLE = 5
 MIN_BUCKET_SAMPLE = 3
+
+
+def heatmap(
+    db: Session,
+    *,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    project_ids: list[str] | None = None,
+    exclude_actions: tuple[str, ...] = (),
+) -> list[dict]:
+    """Activity rows per day, default the last year. ``project_ids=None`` is unscoped."""
+    end = end or datetime.now(UTC)
+    start = start or end - timedelta(days=365)
+    day_col = func.date(ActivityLog.created_at).label("day")
+    q = db.query(day_col, func.count(ActivityLog.id).label("count")).filter(
+        ActivityLog.created_at >= start,
+        ActivityLog.created_at <= end,
+    )
+    if project_ids is not None:
+        q = q.filter(ActivityLog.project_id.in_(project_ids))
+    if exclude_actions:
+        q = q.filter(ActivityLog.action.notin_(exclude_actions))
+    rows = q.group_by(day_col).order_by(day_col).all()
+    return [{"date": str(r.day), "count": r.count} for r in rows]
+
+
+def heatmap_by_project(
+    db: Session, project_ids: list[str], *, days: int = 182, exclude_actions: tuple[str, ...] = ()
+) -> dict[str, list[dict]]:
+    """``heatmap`` split by project: one daily series per project id, quiet projects
+    included as empty lists so the caller can draw a flat line rather than nothing."""
+    start = datetime.now(UTC) - timedelta(days=days)
+    day_col = func.date(ActivityLog.created_at).label("day")
+    q = db.query(ActivityLog.project_id, day_col, func.count(ActivityLog.id).label("count")).filter(
+        ActivityLog.created_at >= start,
+        ActivityLog.project_id.in_(project_ids),
+    )
+    if exclude_actions:
+        q = q.filter(ActivityLog.action.notin_(exclude_actions))
+    out: dict[str, list[dict]] = {pid: [] for pid in project_ids}
+    for pid, day, count in q.group_by(ActivityLog.project_id, day_col).order_by(day_col).all():
+        out[pid].append({"date": str(day), "count": count})
+    return out
+
+
+def status_trend(db: Session, *, days: int = 30, project_ids: list[str] | None = None) -> list[dict]:
+    """Per day, how many tasks existed by then, split by their status now."""
+    task_ids = None
+    if project_ids is not None:
+        task_ids = set()
+        for pid in project_ids:
+            task_ids |= set(graph.contained_task_ids(db, pid))
+    now = datetime.now(UTC)
+    result = []
+    for i in range(days - 1, -1, -1):
+        day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
+        q = db.query(Node.status, func.count(Node.id)).filter(graph.task_type_filter(db), Node.created_at <= day)
+        if task_ids is not None:
+            q = q.filter(Node.id.in_(task_ids))
+        rows = q.group_by(Node.status).all()
+        entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
+        for status, count in rows:
+            if status in entry:
+                entry[status] = count
+        result.append(entry)
+    return result
+
+
+def velocity(db: Session, project_id: str) -> list[dict]:
+    """Completed tasks per completed cycle, oldest first."""
+    cycles = [c for c in graph.cycles_in_project(db, project_id) if c.status == "completed"]
+    cycles.sort(key=lambda c: (c.start_date is None, c.start_date))
+    result = []
+    for cycle in cycles:
+        c_tasks = graph.tasks_in_cycle(db, cycle.id)
+        result.append(
+            {
+                "cycle_id": cycle.id,
+                "name": cycle.name,
+                "total_tasks": len(c_tasks),
+                "completed_tasks": sum(1 for t in c_tasks if t.status == "done"),
+                "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
+                "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
+            }
+        )
+    return result
 
 
 def critical_path(db: Session, project_id: str):

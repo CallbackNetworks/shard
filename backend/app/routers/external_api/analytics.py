@@ -2,14 +2,13 @@
 External API v1 — Analytics endpoints.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ActivityLog, ApiKey, Node
+from app.models import ApiKey
 from app.routers.external_api.auth import (
     _auth_errors,
     _check_project_access,
@@ -18,7 +17,7 @@ from app.routers.external_api.auth import (
     _require_scope,
     _resolve_project_scope,
 )
-from app.services import analytics_admin, graph
+from app.services import analytics_admin
 
 sub_router = APIRouter()
 
@@ -56,21 +55,12 @@ def api_analytics_heatmap(
 ):
     _require_scope(api_key, "read")
     scoped_project_ids = _project_ids_in_scope(db, api_key)
-    now = datetime.now(UTC)
-    end_dt = datetime.fromisoformat(end) if end else now
-    start_dt = datetime.fromisoformat(start) if start else end_dt - timedelta(days=365)
-
-    day_col = func.date(ActivityLog.created_at).label("day")
-    q = db.query(
-        day_col,
-        func.count(ActivityLog.id).label("count"),
-    ).filter(ActivityLog.created_at >= start_dt, ActivityLog.created_at <= end_dt)
-    if scoped_project_ids is not None:
-        q = q.filter(ActivityLog.project_id.in_(scoped_project_ids))
-    elif project_id:
-        q = q.filter(ActivityLog.project_id == project_id)
-    rows = q.group_by(day_col).order_by(day_col).all()
-    return [{"date": str(r.day), "count": r.count} for r in rows]
+    return analytics_admin.heatmap(
+        db,
+        start=datetime.fromisoformat(start) if start else None,
+        end=datetime.fromisoformat(end) if end else None,
+        project_ids=scoped_project_ids if scoped_project_ids is not None else ([project_id] if project_id else None),
+    )
 
 
 @sub_router.get(
@@ -89,27 +79,11 @@ def api_analytics_status_trend(
 ):
     _require_scope(api_key, "read")
     scoped_project_ids = _project_ids_in_scope(db, api_key)
-    scoped_task_ids = None
-    if scoped_project_ids is not None:
-        scoped_task_ids = set()
-        for spid in scoped_project_ids:
-            scoped_task_ids |= set(graph.contained_task_ids(db, spid))
-    now = datetime.now(UTC)
-    result = []
-    for i in range(days - 1, -1, -1):
-        day = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59)
-        q = db.query(Node.status, func.count(Node.id)).filter(graph.task_type_filter(db), Node.created_at <= day)
-        if scoped_task_ids is not None:
-            q = q.filter(Node.id.in_(scoped_task_ids))
-        elif project_id:
-            q = q.filter(Node.id.in_(graph.contained_task_ids(db, project_id)))
-        rows = q.group_by(Node.status).all()
-        entry = {"date": day.strftime("%Y-%m-%d"), "todo": 0, "in_progress": 0, "done": 0, "failed": 0}
-        for s, count in rows:
-            if s in entry:
-                entry[s] = count
-        result.append(entry)
-    return result
+    return analytics_admin.status_trend(
+        db,
+        days=days,
+        project_ids=scoped_project_ids if scoped_project_ids is not None else ([project_id] if project_id else None),
+    )
 
 
 @sub_router.get(
@@ -127,24 +101,7 @@ def api_analytics_velocity(
 ):
     _require_scope(api_key, "read")
     pid = _resolve_project_scope(db, api_key, project_id, required=True)
-    cycles = [c for c in graph.cycles_in_project(db, pid) if c.status == "completed"]
-    cycles.sort(key=lambda c: (c.start_date is None, c.start_date))
-    result = []
-    for cycle in cycles:
-        c_tasks = graph.tasks_in_cycle(db, cycle.id)
-        task_ids = [t.id for t in c_tasks]
-        done_count = sum(1 for t in c_tasks if t.status == "done")
-        result.append(
-            {
-                "cycle_id": cycle.id,
-                "name": cycle.name,
-                "total_tasks": len(task_ids),
-                "completed_tasks": done_count,
-                "start_date": cycle.start_date.isoformat() if cycle.start_date else None,
-                "end_date": cycle.end_date.isoformat() if cycle.end_date else None,
-            }
-        )
-    return result
+    return analytics_admin.velocity(db, pid)
 
 
 # ── Planning analytics (ADR-0086) ────────────────────────────────────

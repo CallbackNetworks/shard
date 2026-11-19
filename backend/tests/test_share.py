@@ -40,20 +40,34 @@ def test_get_project_share_only_returns_that_project(client, db, sample_identity
     assert [p["id"] for p in data["projects"]] == [sample_project.id]
 
 
-def test_activity_daily_is_a_calendar_of_counts(client, db, sample_project):
+def test_share_analytics_counts_work_not_visits(client, db, sample_project):
     now = datetime.now(UTC)
-    for days_ago, action in [(0, "task.created"), (0, "task.done"), (3, "task.created"), (20, "task.created")]:
+    for days_ago, action in [(0, "task.created"), (0, "task.done"), (3, "task.created"), (400, "task.created")]:
         db.add(ActivityLog(action=action, project_id=sample_project.id, created_at=now - timedelta(days=days_ago)))
-    # A visit is not work: it stays out of the chart as it stays out of the feed.
     db.add(ActivityLog(action="share.viewed", project_id=sample_project.id, created_at=now))
     db.commit()
 
-    daily = client.get(f"/share/node/{sample_project.share_token}").json()["activity_daily"]
+    analytics = client.get(f"/share/node/{sample_project.share_token}").json()["analytics"]
 
-    assert len(daily) == 14
-    assert daily[-1] == {"date": now.date().isoformat(), "count": 2}
-    assert daily[-4]["count"] == 1
-    assert sum(d["count"] for d in daily) == 3
+    assert sum(d["count"] for d in analytics["heatmap"]) == 3
+    [series] = analytics["by_project"]
+    assert series["id"] == sample_project.id
+    assert sum(d["count"] for d in series["days"]) == 3
+    assert len(analytics["status_trend"]) == 30
+
+
+def test_share_analytics_agrees_with_the_analytics_page(client, db, sample_project):
+    make_task(db, project_id=sample_project.id, title="t1", status="done")
+    make_task(db, project_id=sample_project.id, title="t2", status="todo")
+    db.add(ActivityLog(action="task.created", project_id=sample_project.id))
+    db.commit()
+
+    shared = client.get(f"/share/node/{sample_project.share_token}").json()["analytics"]
+    page = client.get(f"/api/analytics/status-trend?project_id={sample_project.id}&days=30").json()
+    heat = client.get(f"/api/analytics/heatmap?project_id={sample_project.id}").json()
+
+    assert shared["status_trend"] == page
+    assert shared["heatmap"] == heat
 
 
 def test_get_share_invalid_token(client):
