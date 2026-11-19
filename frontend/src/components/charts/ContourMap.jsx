@@ -112,6 +112,20 @@ function smooth(x, y) {
   const a = hash(x0, y0), b = hash(x0 + 1, y0), c = hash(x0, y0 + 1), d = hash(x0 + 1, y0 + 1)
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
 }
+// Ground with no project on it, made to look like country rather than filler:
+// the coordinates are warped by one noise before another is read, so outlines
+// meander; ridged layers at two scales put spurs and gullies in it; and the
+// result is sharpened so valleys are broad and crests narrow. 0..~1.
+function wilds(x, y) {
+  const wx = x + (smooth(x / 95 + 11, y / 95 - 7) - 0.5) * 90
+  const wy = y + (smooth(x / 95 - 4, y / 95 + 13) - 0.5) * 90
+  const v = 0.42 * smooth(wx / 120, wy / 120)
+    + 0.3 * ridged(wx / 62 + 2, wy / 62 - 1)
+    + 0.18 * ridged(wx / 29 - 6, wy / 29 + 3)
+    + 0.1 * smooth(wx / 13 + 9, wy / 13 - 9)
+  return v ** 1.35
+}
+
 // Ridged noise: 1 on a crest, falling away sharply either side of it.
 function ridged(x, y) {
   return 1 - Math.abs(smooth(x, y) * 2 - 1)
@@ -572,7 +586,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         // contours close as a coastline rather than along the rim's straight edge.
         const rim = Math.min(x + MARGIN, W + MARGIN - x, y + MARGIN, H + MARGIN - y) / (MARGIN * 0.9)
         const shore = rim >= 1 ? 1 : rim <= 0 ? 0 : rim * rim * (3 - 2 * rim)
-        const hills = shore * highest * 0.32 * (0.5 * smooth(x / 110, y / 110) + 0.3 * smooth(x / 55 + 3, y / 55 - 2) + 0.2 * smooth(x / 27 - 5, y / 27 + 4))
+        const hills = shore * highest * 0.36 * wilds(x, y)
         let mix = 0
         for (let k = 0; k < share.length; k++) mix += share[k] * peaks[k].warmth
         const ratio = sum / (sum + hills || 1)
