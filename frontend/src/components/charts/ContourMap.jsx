@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { isOverdue } from '../../utils/overdue'
 
-const LEVELS = 12            // contour lines between sea level and the highest summit
-const INDEX_EVERY = 4        // every fourth line is an index contour, drawn heavier
+const LEVELS = 28            // contour lines between sea level and the highest summit
+const INDEX_EVERY = 5        // every fifth line is an index contour, drawn heavier
 const CELL = 8               // field resolution: coarse enough that contours turn corners
 const HOT = 1, COLD = 0.4 // line opacity at the hottest and the quietest mountain
 
@@ -15,6 +15,8 @@ const DOT = {
   done: { r: 1.25, size: 1.4, fill: 'rgba(var(--kt-ink-rgb), 0.4)', stroke: 'none' },
 }
 const LATE = 'var(--kt-status-failed, #fb7185)'
+// Closed is done or failed (ADR-0089): neither is work still to climb.
+const CLOSED = new Set(['done', 'failed'])
 
 // Where each mountain stands. Biggest first, on a golden-angle spiral, then pushed
 // apart until no two footprints overlap: deterministic, so the map does not move
@@ -166,7 +168,7 @@ const gridRef = (x, y, W, H) => `E${(x / W * 100).toFixed(1).padStart(4, '0')} N
 function PeakLabel({ p, x, y, W, H, lineOpacity, pickProps }) {
   const bright = 0.4 + 0.6 * p.warmth
   const name = (p.name.length > 24 ? `${p.name.slice(0, 23)}…` : p.name).toUpperCase()
-  const data = `${gridRef(p.x, p.y, W, H)} · ${String(p.tasks.length).padStart(2, '0')} TSK · ${String(p.heat).padStart(3, '0')} ACT`
+  const data = `${gridRef(p.x, p.y, W, H)} · ${String(p.open).padStart(2, '0')}/${String(p.tasks.length).padStart(2, '0')} OPEN · ${String(p.heat).padStart(3, '0')} ACT`
   // A monospaced glyph is ~0.6em wide, so the readout's width is known before it
   // is drawn; one that would run off the right edge hangs to the left instead.
   const wide = Math.max(name.length * 6, data.length * 5.1) + 18
@@ -380,14 +382,27 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
   const map = useMemo(() => {
     const live = projects.filter(p => p.tasks.length > 0)
     if (live.length === 0) return null
+    // Two measures, so two projects of one size can still look different:
+    //   width  = every task the project holds — its footprint, the whole of the work;
+    //   height = the tasks still open — how much climbing is left.
+    // A big project that is mostly done is broad and low; a new one is narrow and
+    // steep. A finished project is a low plain, not nothing: it still happened.
+    const openOf = p => p.tasks.filter(t => !CLOSED.has(t.status)).length
     const maxTasks = Math.max(...live.map(p => p.tasks.length))
+    const maxOpen = Math.max(1, ...live.map(openOf))
     const maxHeat = Math.max(1, ...live.map(p => p.heat))
     const base = Math.min(W, H) * (live.length === 1 ? 0.2 : 0.13)
     const items = [...live]
       .sort((a, b) => b.tasks.length - a.tasks.length || a.name.localeCompare(b.name))
       .map(p => {
-        const size = p.tasks.length / maxTasks
-        return { ...p, peak: 0.25 + 0.75 * size, sigma: base * (0.55 + 0.45 * Math.sqrt(size)), warmth: p.heat / maxHeat }
+        const open = openOf(p)
+        return {
+          ...p,
+          open,
+          peak: 0.12 + 0.88 * (open / maxOpen),
+          sigma: base * (0.45 + 0.55 * Math.sqrt(p.tasks.length / maxTasks)),
+          warmth: p.heat / maxHeat,
+        }
       })
     const peaks = placeMountains(items, W, H)
 
@@ -399,15 +414,15 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         const x = i * CELL, y = j * CELL
         let sum = 0, best = -1, bestV = 0
         peaks.forEach((p, k) => {
-          // A cone with a soft foot rather than a bell: summits come to a point.
-          const v = p.peak * Math.exp(-((Math.hypot(x - p.x, y - p.y) / p.sigma) ** 1.15) * 1.4)
+          // Between a cone and a bell: shoulders, not a needle.
+          const v = p.peak * Math.exp(-((Math.hypot(x - p.x, y - p.y) / p.sigma) ** 1.7) * 0.9)
           sum += v
           if (v > bestV) { bestV = v; best = k }
         })
         // Rock: ridged noise cut into the slopes, strongest mid-mountain and absent
         // on the plain, so the ground stays flat and the mountains go craggy.
         const rock = ridged(x / 46, y / 46) * 0.6 + ridged(x / 19 + 7, y / 19 - 3) * 0.3 + ridged(x / 8 - 2, y / 8 + 5) * 0.1
-        field[j * cols + i] = sum * (0.72 + 0.55 * rock) + (sum > 0.04 ? 0.05 * rock : 0)
+        field[j * cols + i] = sum * (0.84 + 0.3 * rock) + (sum > 0.04 ? 0.03 * rock : 0)
         owner[j * cols + i] = best
       }
     }
@@ -487,21 +502,15 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         role="img"
-        aria-label={map.peaks.map(p => `${p.name}: ${p.tasks.length} tasks, ${p.heat} recent updates`).join('; ')}
+        aria-label={map.peaks.map(p => `${p.name}: ${p.open} open of ${p.tasks.length} tasks, ${p.heat} recent updates`).join('; ')}
         onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
         className="kt-glitch-map"
         style={{ display: 'block' }}
       >
-        <defs>
-          <pattern id="kt-scanlines" width="4" height="3" patternUnits="userSpaceOnUse">
-            <rect width="4" height="1" fill="rgba(var(--kt-ink-rgb), 0.035)" />
-          </pattern>
-        </defs>
         {view === 'plan'
           ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
           : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />}
         <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
-        <rect width={W} height={H} fill="url(#kt-scanlines)" pointerEvents="none" />
       </svg>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 6, color: 'var(--kt-muted)', fontSize: 10, textTransform: 'uppercase' }}>
@@ -530,7 +539,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
             <>
               <b style={{ color: 'var(--kt-ink)' }}>{focus.name}</b>
               <div style={{ color: 'var(--kt-muted)' }}>
-                {focus.tasks.length} tasks · {focus.tasks.filter(t => t.status === 'done').length} done · {focus.heat} updates in 30 days
+                {focus.open} open of {focus.tasks.length} tasks · {focus.heat} updates in 30 days
               </div>
             </>
           ) : (

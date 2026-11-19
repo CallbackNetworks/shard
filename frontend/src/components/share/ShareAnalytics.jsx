@@ -31,8 +31,9 @@ export default function ShareAnalytics({ analytics, projects = [], bp }) {
   const { heatmap = [], by_project: byProject = [], status_trend: trend = [], burndown = [], velocity = [] } = analytics
   const yearTotal = heatmap.reduce((n, d) => n + d.count, 0)
 
-  // A mountain per project: its size is its task count, its brightness how busy the
-  // last 30 days were, read from the same per-project series the ridgeline draws.
+  // A mountain per project: its footprint is its task count, its height its open
+  // tasks, its brightness how busy the last 30 days were, read from the same
+  // per-project series the ridgeline draws.
   const since = Date.now() - 30 * 86400000
   const heatOf = id => (byProject.find(p => p.id === id)?.days || [])
     .reduce((n, d) => (new Date(`${d.date}T12:00:00`).getTime() >= since ? n + d.count : n), 0)
@@ -40,7 +41,7 @@ export default function ShareAnalytics({ analytics, projects = [], bp }) {
 
   return (
     <section className={s.grid} aria-label="Analytics">
-      <Panel title="Terrain · size = tasks, brightness = last 30 days" wide>
+      <Panel title="Terrain · width = all tasks, height = open tasks, brightness = last 30 days" wide>
         <ContourMap projects={mountains} width={mobile ? 380 : 720} height={mobile ? 340 : 420} />
       </Panel>
 

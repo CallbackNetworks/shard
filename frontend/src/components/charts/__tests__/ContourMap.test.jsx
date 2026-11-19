@@ -38,7 +38,7 @@ describe('ContourMap', () => {
       { id: 'p1', name: 'Alpha', heat: 5, tasks: [task('t1', 'done'), task('t2', 'in_progress')] },
       { id: 'p2', name: 'Beta', heat: 0, tasks: [task('t3', 'todo')] },
     ]} />)
-    expect(screen.getByRole('img', { name: 'Alpha: 2 tasks, 5 recent updates; Beta: 1 tasks, 0 recent updates' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'Alpha: 1 open of 2 tasks, 5 recent updates; Beta: 1 open of 1 tasks, 0 recent updates' })).toBeTruthy()
   })
 
   it('leaves a project with no tasks off the map', () => {
