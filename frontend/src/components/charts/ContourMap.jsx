@@ -285,7 +285,7 @@ function Frame({ W, H, peaks, levels, view }) {
         fill="none" stroke="rgba(var(--kt-ink-rgb), 0.45)" strokeWidth={1}
       />
       <text x={W - 6} y={H - 6} textAnchor="end" fontSize={8} fill="rgba(var(--kt-ink-rgb), 0.4)">
-        {`${view === 'plan' ? 'PLAN' : 'SHARDS · DRAG TO ORBIT'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
+        {`${view === 'plan' ? 'PLAN' : 'RELIEF · DRAG TO ORBIT'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
       </text>
     </g>
   )
@@ -363,154 +363,43 @@ function spreadLabels(labels) {
 // The camera: `az` turns the ground about its centre, `tilt` is how steeply it is
 // looked down on (1 top-down, 0 edge-on). Dragging moves both, within limits that
 // keep the ground readable; a double-click returns here.
-export const HOME_CAMERA = { az: 0, tilt: 0.62 }
-export const TILT_RANGE = [0.3, 0.72]
+export const HOME_CAMERA = { az: 0, tilt: 0.42 }
+export const TILT_RANGE = [0.25, 0.7]
 
-// Perspective projection of ground point (x, y) at height z. Distance shrinks
-// what is far, so the terrain reads as a solid rather than a stack of drawings.
+// Perspective projection of ground point (x, y) at height z. The eye is low and
+// the perspective strong, so the ground plane runs away to a horizon inside the
+// frame: the terrain stands on a plain that goes on past where anything is drawn.
 export function camera(W, H, { az, tilt }, lift) {
   const ax = axes(W, H)
   const cx = (ax.x0 + ax.x1) / 2, cy = (ax.y0 + ax.y1) / 2
   const cos = Math.cos(az), sin = Math.sin(az)
-  const D = W * 1.4
+  const D = W * 0.85
+  const zoom = 0.9
+  const base = H * 0.72
   const project = (x, y, z) => {
     const dx = x - cx, dy = y - cy
     const rx = dx * cos - dy * sin
     const ry = dx * sin + dy * cos
-    // One zoom for every heading: small enough that the ground's diagonal, which
-    // is what spans the frame once it is turned, still fits inside it.
-    const k = (D / (D - ry)) * 0.9
-    return [W / 2 + rx * k, H * 0.58 + (ry * tilt - z * lift) * k]
+    const k = (D / (D - ry)) * zoom
+    return [W / 2 + rx * k, base + (ry * tilt - z * lift) * k]
   }
-  // Nearness, for drawing order: larger is nearer the viewer.
+  // Nearness: larger is nearer the viewer; 0 is the middle of the ground.
   const depth = (x, y) => (x - cx) * sin + (y - cy) * cos
-  return { project, depth }
+  // Where the ground meets the sky: the limit of `project` as depth runs to -∞.
+  const horizon = base - D * zoom * tilt
+  return { project, depth, horizon, D, centre: [cx, cy] }
 }
 
-// The 3D view: every project is a shard — not a solid but a crust of loose
-// triangular flakes, like sugar frosting with nothing inside it. The flakes are
-// scattered over the outside of an irregular, leaning volume (the convex hull of
-// points thrown into it) and a few drift loose around it. Each flake turns its
-// own way and catches the light on its own, so most are dim and a few glint.
-// The volume's height is the work still open, its girth all the work it holds;
-// the busier the last 30 days, the brighter it glints. Everything is seeded per
-// shard, so the same share draws the same way.
-const LIGHT = (() => { const v = [-0.5, 0.3, 0.8], n = Math.hypot(...v); return v.map(c => c / n) })()
-const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const unit = v => { const n = Math.hypot(...v) || 1; return v.map(c => c / n) }
+// The 3D view: the contour terrain in perspective, on a plain that runs to the
+// horizon. Drawn on a canvas inside the SVG — tens of thousands of contour
+// segments are one stroke call per group there, where as SVG they were elements
+// to diff and repaint on every frame of a drag — with the task marks, labels and
+// axes as SVG on top, where they stay pointable.
+const RISE = 0.3          // the tallest summit stands this fraction of the frame high
+const GRID_STEP = 90      // the endless ground's grid spacing, in ground units
+const GRID_REACH = 12000  // how far out the grid is drawn before fog has taken it anyway
 
-// Incremental 3D convex hull for a handful of points. Returns outward-facing
-// triangles as index triples. Small n, so the quadratic walk is fine.
-export function convexHull(pts) {
-  const n = pts.length
-  if (n < 4) return []
-  const normal = (a, b, c) => cross3(sub(pts[b], pts[a]), sub(pts[c], pts[a]))
-  // A first tetrahedron that is not flat.
-  let d = -1
-  for (let i = 3; i < n && d < 0; i++) if (Math.abs(dot3(normal(0, 1, 2), sub(pts[i], pts[0]))) > 1e-6) d = i
-  if (d < 0) return []
-  const inside = [0, 1, 2, d].reduce((m, i) => m.map((c, k) => c + pts[i][k] / 4), [0, 0, 0])
-  const orient = f => (dot3(normal(...f), sub(inside, pts[f[0]])) > 0 ? [f[0], f[2], f[1]] : f)
-  let faces = [[0, 1, 2], [0, 1, d], [0, 2, d], [1, 2, d]].map(orient)
-  for (let p = 3; p < n; p++) {
-    if (p === d) continue
-    const sees = faces.map(f => dot3(normal(...f), sub(pts[p], pts[f[0]])) > 1e-6)
-    if (!sees.some(Boolean)) continue
-    const edges = new Map()
-    faces.forEach((f, i) => {
-      if (!sees[i]) return
-      for (const [u, v] of [[f[0], f[1]], [f[1], f[2]], [f[2], f[0]]]) {
-        const back = `${v},${u}`
-        if (edges.has(back)) edges.delete(back)
-        else edges.set(`${u},${v}`, [u, v])
-      }
-    })
-    faces = faces.filter((_, i) => !sees[i])
-    for (const [u, v] of edges.values()) faces.push(orient([u, v, p]))
-  }
-  return faces
-}
-
-function shardSolid(p, k, maxTasks, H, centre) {
-  const r = 16 + 36 * Math.sqrt(p.tasks.length / maxTasks)
-  const h = H * 0.34 * p.peak + 10
-  const lean = Math.min(1, Math.hypot(centre[0] - p.x, centre[1] - p.y) / 220) * 0.28
-  const toward = Math.atan2(centre[1] - p.y, centre[0] - p.x)
-  const shearX = Math.cos(toward) * lean, shearY = Math.sin(toward) * lean
-  const rnd = (i, j) => hash(k * 7.13 + i * 1.91, j * 3.7 + k)
-  // Bands up the volume: how high, how wide, how many points.
-  // No single tip: the top is a few points at slightly different heights, so the
-  // crown is a broken slant rather than a spire.
-  const bands = [[0, 0.9, 4], [0.45, 1.05, 3], [0.92, 0.5, 3]]
-  const pts = []
-  bands.forEach(([z, width, count], b) => {
-    for (let i = 0; i < count; i++) {
-      const a = (i / count) * Math.PI * 2 + rnd(b, i) * 1.6
-      const rr = r * width * (0.65 + 0.5 * rnd(i + 9, b))
-      const zz = h * Math.max(0, z + (rnd(b + 4, i + 2) - 0.5) * 0.12)
-      pts.push([p.x + Math.cos(a) * rr + shearX * zz, p.y + Math.sin(a) * rr * 0.8 + shearY * zz, zz])
-    }
-  })
-  // The highest point carries the label; it is just one of the crown's points.
-  const tip = pts.reduce((t, q) => (q[2] > t[2] ? q : t), pts[0])
-  const main = { pts, faces: convexHull(pts) }
-  return { r, h, tip, pts, main }
-}
-
-// Flakes for one shard, in world space. They lie on the hull's faces, flat to the
-// face like sugar on a crystal plane, each a near-equilateral triangle turned
-// about the face normal and tipped a little off it — the tip is what makes a
-// few of them catch the light. Faces are filled in proportion to their area,
-// densely enough that each plane reads as a plane, with gaps between flakes.
-// A few loose grains drift around the body.
-function frost(sol, k) {
-  const { pts, faces } = sol.main
-  const rnd = (i, j) => hash(k * 5.37 + i * 0.731, j * 2.17 - k)
-  const flakes = []
-  let i = 0
-  faces.forEach((f, fi) => {
-    const [a, b, c] = f.map(j => pts[j])
-    const n = unit(cross3(sub(b, a), sub(c, a)))
-    const area = Math.hypot(...cross3(sub(b, a), sub(c, a))) / 2
-    const t1 = unit(sub(b, a)), t2 = cross3(n, t1)
-    const count = Math.max(3, Math.round(area / 16))
-    for (let m = 0; m < count; m++, i++) {
-      let u = rnd(i, 1), w = rnd(i, 2)
-      if (u + w > 1) { u = 1 - u; w = 1 - w }
-      const at = [0, 1, 2].map(d => a[d] + (b[d] - a[d]) * u + (c[d] - a[d]) * w + n[d] * 0.6)
-      const size = 2.4 + 2.2 * rnd(i, 3)
-      const turn = rnd(i, 4) * Math.PI * 2
-      const tip = (rnd(i, 5) - 0.5) * 0.9
-      // The flake's own plane: the face's, tipped by `tip` about a direction in it.
-      const axis = t1.map((c1, d) => c1 * Math.cos(turn) + t2[d] * Math.sin(turn))
-      const side = cross3(n, axis)
-      const nn = unit(n.map((c0, d) => c0 * Math.cos(tip) + side[d] * Math.sin(tip)))
-      const e1 = axis, e2 = cross3(nn, axis)
-      const v = [0, 1, 2].map(q => {
-        const ang = (q / 3) * Math.PI * 2
-        return [0, 1, 2].map(d => at[d] + (e1[d] * Math.cos(ang) + e2[d] * Math.sin(ang)) * size)
-      })
-      flakes.push({ v, centre: at, n: nn, face: n, fi, i })
-    }
-  })
-  for (let g = 0; g < 10; g++, i++) {
-    const t = rnd(i, 6) * Math.PI * 2
-    const dist = sol.r * (1.2 + 0.6 * rnd(i, 7))
-    const z = sol.h * (0.1 + 0.85 * rnd(i, 8))
-    const at = [sol.p.x + Math.cos(t) * dist, sol.p.y + Math.sin(t) * dist * 0.8, z]
-    const size = 1.3 + 1.2 * rnd(i, 9)
-    const v = [0, 1, 2].map(q => {
-      const ang = (q / 3) * Math.PI * 2 + rnd(i, 10) * 6
-      return [at[0] + Math.cos(ang) * size, at[1] + Math.sin(ang) * size, at[2] + (q - 1) * size * 0.6]
-    })
-    flakes.push({ v, centre: at, n: unit(cross3(sub(v[1], v[0]), sub(v[2], v[0]))), face: null, fi: -1, i })
-  }
-  return flakes
-}
-
-function FlakeCanvas({ flakes, project, W, H }) {
+function ReliefCanvas({ map, cam, W, H, lift, moving }) {
   const ref = useRef(null)
   useEffect(() => {
     const canvas = ref.current
@@ -520,102 +409,121 @@ function FlakeCanvas({ flakes, project, W, H }) {
     if (canvas.width !== W * scale) { canvas.width = W * scale; canvas.height = H * scale }
     ctx.setTransform(scale, 0, 0, scale, 0, 0)
     ctx.clearRect(0, 0, W, H)
-    const ink = getComputedStyle(canvas).getPropertyValue('--kt-ink').trim() || '#f5f6f7'
-    ctx.fillStyle = ink
-    for (const { f, opacity } of flakes) {
-      ctx.globalAlpha = opacity
+    const css = getComputedStyle(canvas)
+    const ink = css.getPropertyValue('--kt-ink').trim() || '#f5f6f7'
+    const bg = css.getPropertyValue('--kt-bg').trim() || '#0b0c0e'
+    const [cx, cy] = cam.centre
+    const nearLimit = cam.D * 0.7
+
+    // Light from the far distance: a glow sitting on the horizon, fading toward
+    // the viewer, so the plain reads as lit from beyond its end.
+    const glow = ctx.createRadialGradient(W / 2, cam.horizon, 0, W / 2, cam.horizon, W * 0.75)
+    glow.addColorStop(0, ink); glow.addColorStop(1, 'transparent')
+    ctx.globalAlpha = 0.09
+    ctx.fillStyle = glow
+    ctx.fillRect(0, 0, W, H)
+    // The horizon itself is a soft band of that light, not a ruled line.
+    const band = ctx.createLinearGradient(0, cam.horizon - 14, 0, cam.horizon + 14)
+    band.addColorStop(0, 'transparent'); band.addColorStop(0.5, ink); band.addColorStop(1, 'transparent')
+    ctx.globalAlpha = 0.08
+    ctx.fillStyle = band
+    ctx.fillRect(0, cam.horizon - 14, W, 28)
+
+    // The endless ground: grid lines in both directions, drawn piece by piece so
+    // each piece fades with its distance and nothing behind the eye is drawn.
+    ctx.strokeStyle = ink
+    ctx.lineWidth = 0.5
+    const line = (from, to) => {
+      const steps = 80
+      let prev = null
+      for (let i = 0; i <= steps; i++) {
+        const x = from[0] + ((to[0] - from[0]) * i) / steps, y = from[1] + ((to[1] - from[1]) * i) / steps
+        const d = cam.depth(x, y)
+        if (d > nearLimit) { prev = null; continue }
+        const [sx, sy] = cam.project(x, y, 0)
+        if (prev) {
+          const fog = Math.max(0, 1 + Math.min(d, prev.d) / GRID_REACH)
+          ctx.globalAlpha = 0.14 * fog ** 2.2
+          ctx.beginPath(); ctx.moveTo(prev.sx, prev.sy); ctx.lineTo(sx, sy); ctx.stroke()
+        }
+        prev = { sx, sy, d }
+      }
+    }
+    for (let o = -GRID_REACH; o <= GRID_REACH; o += GRID_STEP) {
+      line([cx + o, cy - GRID_REACH], [cx + o, cy + GRID_REACH])
+      line([cx - GRID_REACH, cy + o], [cx + GRID_REACH, cy + o])
+    }
+
+    // The terrain, terrace by terrace from sea level up: each ring filled with the
+    // background so a higher one hides what is behind it, then its contours.
+    const at = (gx, gy, z) => cam.project(gx * CELL - MARGIN, gy * CELL - MARGIN, z * lift)
+    const levels = moving ? map.levels.filter(lv => lv.index) : map.levels
+    for (const level of levels) {
+      ctx.globalAlpha = 0.9
+      ctx.fillStyle = bg
       ctx.beginPath()
-      f.v.forEach((q, i) => {
-        const [x, y] = project(...q)
-        if (i) ctx.lineTo(tear(x, y), y)
-        else ctx.moveTo(tear(x, y), y)
-      })
-      ctx.closePath()
+      for (const ring of level.rings) {
+        ring.forEach((q, i) => { const [x, y] = at(q[0], q[1], level.z); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y) })
+        ctx.closePath()
+      }
       ctx.fill()
+      for (const st of level.strokes) {
+        const width = (level.index ? 0.55 : 0.3) * st.weight
+        const alpha = Math.min(1, st.opacity * (level.index ? 0.8 : 0.55))
+        const trace = dx => {
+          ctx.beginPath()
+          for (const [ax, ay, bx, by] of st.segs) {
+            const [x1, y1] = at(ax, ay, level.z), [x2, y2] = at(bx, by, level.z)
+            ctx.moveTo(tear(x1, y1) + dx, y1); ctx.lineTo(tear(x2, y2) + dx, y2)
+          }
+          ctx.stroke()
+        }
+        ctx.strokeStyle = ink
+        ctx.lineWidth = width
+        if (!moving) {
+          for (const fr of FRINGE) { ctx.globalAlpha = alpha * fr.share; trace(fr.dx) }
+        }
+        ctx.globalAlpha = alpha
+        trace(0)
+      }
     }
     ctx.globalAlpha = 1
   })
   return <canvas ref={ref} style={{ width: W, height: H, display: 'block' }} />
 }
 
-function ShardView({ map, focus, pick, W, H, view3d }) {
-  const { peaks, dots } = map
+function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
+  const { field, cols, rows, top, peaks, dots, levels } = map
+  const lift = (H * RISE) / top
   const cam = camera(W, H, view3d, 1)
-  const px = cam.project
-  const maxTasks = Math.max(...peaks.map(p => p.tasks.length))
-  const centre = [peaks.reduce((n, p) => n + p.x, 0) / peaks.length, peaks.reduce((n, p) => n + p.y, 0) / peaks.length]
-  const solids = useMemo(
-    () => peaks.map((p, k) => {
-      const sol = { p, k, ...shardSolid(p, k, maxTasks, H, centre) }
-      return { ...sol, flakes: frost(sol, k) }
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [peaks, maxTasks, H],
-  )
-  // The camera looks from the front and above: `toward` on the ground, `tilt`
-  // the sine of the elevation.
-  const flat = Math.sqrt(1 - view3d.tilt ** 2)
-  const eye = [Math.sin(view3d.az) * flat, Math.cos(view3d.az) * flat, view3d.tilt]
-  // Halfway between the light and the eye: a flake turned to it throws a glint.
-  const half = unit(LIGHT.map((c, i) => c + eye[i]))
-
-  // Every flake of every shard, farthest first, lit on its own.
-  // The face's light sets the tone, so each plane reads as one surface; the
-  // flake's own tip adds the glint. Flakes on faces turned away are behind the
-  // body and are not drawn. Farther flakes are dimmer.
-  const depths = solids.flatMap(sol => sol.flakes.map(f => cam.depth(f.centre[0], f.centre[1])))
-  const near = Math.max(...depths), far = Math.min(...depths)
-  const flakes = solids.flatMap(sol => sol.flakes.map(f => ({ sol, f })))
-    .filter(({ f }) => !f.face || dot3(f.face, eye) > 0)
-    .map(({ sol, f }) => {
-      const tone = f.face ? Math.max(0, dot3(f.face, LIGHT)) : 0.3
-      const glint = Math.max(0, dot3(f.n, half)) ** 40
-      const glow = sol.p.warmth
-      const depth = cam.depth(f.centre[0], f.centre[1])
-      const fade = 0.6 + 0.4 * ((depth - far) / (near - far || 1))
-      const opacity = Math.min(0.95, (0.12 + 0.5 * tone ** 1.6 + 0.9 * glint) * (0.5 + 0.5 * glow) * fade)
-      return { sol, f, opacity, depth }
-    })
-    .sort((a, b) => a.depth - b.depth)
-
-  // Task marks on the shard's own faces: in progress on the highest, done on the
-  // lowest, shown only on the side facing the viewer.
-  const marksOf = sol => {
-    const faces = sol.main.faces.map(f => {
-      const [a, b, c] = f.map(j => sol.main.pts[j])
-      const n = unit(cross3(sub(b, a), sub(c, a)))
-      return { at: [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3], seen: dot3(n, eye) > 0.05 }
-    }).sort((x, y) => y.at[2] - x.at[2])
-    const rank = { in_progress: 0, todo: 1, failed: 2, done: 3 }
-    const mine = dots.filter(d => d.project === sol.p.name).sort((x, y) => (rank[x.status] ?? 1) - (rank[y.status] ?? 1))
-    return mine.map((d, i) => ({ d, ...faces[Math.min(faces.length - 1, Math.floor((i / Math.max(1, mine.length)) * faces.length))] }))
-      .filter(m => m.seen)
+  const px = (x, y, z) => cam.project(x, y, z * lift)
+  const height = (x, y) => {
+    const i = Math.max(0, Math.min(cols - 1, Math.round((x + MARGIN) / CELL)))
+    const j = Math.max(0, Math.min(rows - 1, Math.round((y + MARGIN) / CELL)))
+    return field[j * cols + i]
   }
+  // Marks stand on the surface, nearest drawn last.
+  const pins = dots.map(d => ({ d, z: height(d.x, d.y) })).sort((a, b) => cam.depth(a.d.x, a.d.y) - cam.depth(b.d.x, b.d.y))
 
   return (
     <>
-      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} />
-      {/* Where each shard stands, marked on the ground against the axes. */}
-      {solids.map(sol => {
-        const [x, y] = px(sol.p.x, sol.p.y, 0)
-        return <path key={`f${sol.k}`} d={`M${x - 5},${y}L${x + 5},${y}M${x},${y - 3}L${x},${y + 3}`} stroke="var(--kt-ink)" strokeOpacity={0.3} strokeWidth={0.6} />
-      })}
-      {/* A thousand flakes are a thousand elements to diff and paint on every frame
-          of a drag as SVG; on a canvas they are one draw call each. The canvas sits
-          inside the SVG, so it scales with it and keeps its place in the stack:
-          over the ground, under the task marks and labels. */}
       <foreignObject x={0} y={0} width={W} height={H} pointerEvents="none">
-        <FlakeCanvas flakes={flakes} project={px} W={W} H={H} />
+        <ReliefCanvas map={map} cam={cam} W={W} H={H} lift={lift} moving={moving} />
       </foreignObject>
-      {solids.flatMap(sol => marksOf(sol).map(({ d, at }) => {
-        const [x, y] = px(...at)
+      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} part="axes" />
+      {pins.map(({ d, z }) => {
+        const [x, y] = px(d.x, d.y, z)
         const on = focus?.kind === 'task' && focus.task.id === d.task.id
-        return <TaskDot key={d.task.id} d={d} x={x} y={y} on={on} pickProps={pick('task', d)} />
-      }))}
-      {spreadLabels(solids.map(sol => {
-        const [x, y] = px(...sol.tip)
-        return { p: sol.p, x, y: y - 4 }
-      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={w => COLD + (HOT - COLD) * w} pickProps={pick('peak', p)} />)}
+        return <TaskDot key={d.task.id} d={d} x={x} y={y - 1.5} on={on} pickProps={pick('task', d)} />
+      })}
+      {spreadLabels(peaks.map(p => {
+        // On the highest ring actually drawn near this summit.
+        const near = (p.sigma * 0.6) / CELL
+        const z = levels.findLast(lv => lv.strokes.some(st => st.segs.some(([ax, ay]) =>
+          Math.hypot(ax - (p.x + MARGIN) / CELL, ay - (p.y + MARGIN) / CELL) < near)))?.z ?? 0
+        const [x, y] = px(p.x, p.y, z)
+        return { p, x, y }
+      })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
 }
@@ -887,7 +795,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         >
           {view === 'plan'
             ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
-            : <ShardView map={map} focus={focus} pick={pick} W={W} H={H} view3d={view3d} />}
+            : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} view3d={view3d} moving={!!drag} />}
           <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
         </svg>
 
