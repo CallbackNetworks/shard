@@ -38,18 +38,21 @@ export default defineConfig({
         name: 'Shard',
         short_name: 'Shard',
         description: 'Multi-identity task manager',
-        theme_color: '#07080f',
-        background_color: '#07080f',
+        theme_color: '#0b0c0e',
+        background_color: '#0b0c0e',
         display: 'standalone',
         start_url: '/',
         scope: '/',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // The link-preview card is fetched by crawlers, never by the app offline.
+        globIgnores: ['og-image.png'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/docs/, /^\/openapi\.json/, /^\/redoc/],
         navigateFallbackAllowlist: [/^\//, /^\/share/],
