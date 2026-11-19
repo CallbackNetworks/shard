@@ -4,7 +4,7 @@ import { isOverdue } from '../../utils/overdue'
 const LEVELS = 12            // contour lines between sea level and the highest summit
 const INDEX_EVERY = 4        // every fourth line is an index contour, drawn heavier
 const CELL = 8               // field resolution: coarse enough that contours turn corners
-const HOT = 0.95, COLD = 0.3 // line opacity at the hottest and the quietest mountain
+const HOT = 1, COLD = 0.4 // line opacity at the hottest and the quietest mountain
 
 const DOT = {
   in_progress: { r: 0.32, fill: 'var(--kt-ink)', stroke: 'none' },
@@ -95,8 +95,8 @@ function grain(x, y, level) {
   const drift = smooth(x / 5 + level * 3.1, y / 5 - level * 1.7)
   const speck = hash(x * 3.3 + level, y * 2.9 - level)
   const bucket = Math.min(GRAIN_BUCKETS - 1, Math.floor((0.15 + 0.85 * drift * (0.7 + 0.3 * speck)) * GRAIN_BUCKETS))
-  const drop = speck < 0.14
-  const slip = hash(x + level * 7, y) < 0.06 ? (hash(y, x) - 0.5) * 2.4 : 0
+  const drop = speck < 0.2
+  const slip = hash(x + level * 7, y) < 0.1 ? (hash(y, x) - 0.5) * 3.6 : 0
   return { bucket, drop, slip }
 }
 
@@ -166,7 +166,7 @@ const TEAR_BAND = 7
 function tear(x, y) {
   const band = Math.floor(y / TEAR_BAND)
   const h = hash(band * 1.31, 9.7)
-  return h < 0.09 ? x + (hash(band, 3.3) - 0.5) * 22 : x
+  return h < 0.16 ? x + (hash(band, 3.3) - 0.5) * 30 : x
 }
 
 const segPath = (segs, f, dx = 0) => segs.map(([ax, ay, bx, by]) => {
@@ -177,14 +177,15 @@ const segPath = (segs, f, dx = 0) => segs.map(([ax, ay, bx, by]) => {
 // Each stroke is drawn three times: the line, and a red and a cyan ghost a pixel
 // either side of it — the misregistered colour fringe of a projected display.
 const FRINGE = [
-  { dx: -1.1, color: 'rgb(255, 70, 90)', share: 0.45, cls: 'kt-fringe-r' },
-  { dx: 1.1, color: 'rgb(80, 220, 255)', share: 0.45, cls: 'kt-fringe-c' },
+  { dx: -1.6, color: 'rgb(255, 70, 90)', share: 0.6, cls: 'kt-fringe-r' },
+  { dx: 1.6, color: 'rgb(80, 220, 255)', share: 0.6, cls: 'kt-fringe-c' },
 ]
 
 function Strokes({ level, f, lineOpacity, peaks }) {
-  const width = level.index ? 1.3 : 0.75
+  const width = level.index ? 0.8 : 0.45
   return level.strokes.map((st, k) => {
-    const opacity = lineOpacity(peaks[st.owner]?.warmth ?? 0) * st.alpha * (level.index ? 1 : 0.7)
+    // Thinner lines read darker at the same opacity, so they carry more of it.
+    const opacity = Math.min(1, lineOpacity(peaks[st.owner]?.warmth ?? 0) * (0.35 + 0.65 * st.alpha) * (level.index ? 1.25 : 0.95))
     return (
       <g key={k}>
         {FRINGE.map(fr => (

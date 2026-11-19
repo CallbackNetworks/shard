@@ -526,13 +526,15 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 /* The terrain map's colour fringes (ContourMap) hold still most of the time and
    jump for a frame or two: a glitch is an interruption, not a vibration. */
 @keyframes ktFringeJump {
-  0%, 84%, 100% { transform: none; }
-  86% { transform: translateX(-2px); }
-  89% { transform: translateX(3px); }
-  92% { transform: translateX(-1px); }
+  0%, 30%, 36%, 72%, 100% { transform: none; }
+  31% { transform: translateX(2px); }
+  33% { transform: translate(-3px, 1px); }
+  74% { transform: translateX(-2px); }
+  77% { transform: translateX(4px); }
+  80% { transform: translate(-1px, -1px); }
 }
-.kt-glitch-map .kt-fringe-r { animation: ktFringeJump 4.3s steps(1) infinite; }
-.kt-glitch-map .kt-fringe-c { animation: ktFringeJump 4.3s steps(1) infinite reverse; }
+.kt-glitch-map .kt-fringe-r { animation: ktFringeJump 2.6s steps(1) infinite; }
+.kt-glitch-map .kt-fringe-c { animation: ktFringeJump 3.1s steps(1) infinite reverse; }
 .kt-share-marquee-track b {
   margin-right: 10px;
   color: var(--kt-ink);
