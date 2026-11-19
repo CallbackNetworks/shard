@@ -3,7 +3,7 @@ import { isOverdue } from '../../utils/overdue'
 
 const LEVELS = 12            // contour lines between sea level and the highest summit
 const INDEX_EVERY = 4        // every fourth line is an index contour, drawn heavier
-const CELL = 6               // field resolution in viewBox units
+const CELL = 8               // field resolution: coarse enough that contours turn corners
 const HOT = 0.95, COLD = 0.3 // line opacity at the hottest and the quietest mountain
 
 const DOT = {
@@ -85,14 +85,18 @@ function smooth(x, y) {
   const a = hash(x0, y0), b = hash(x0 + 1, y0), c = hash(x0, y0 + 1), d = hash(x0 + 1, y0 + 1)
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
 }
+// Ridged noise: 1 on a crest, falling away sharply either side of it.
+function ridged(x, y) {
+  return 1 - Math.abs(smooth(x, y) * 2 - 1)
+}
 // Per piece of line: an opacity that drifts slowly along it, the odd gap, and the
 // rarer piece knocked sideways — wear and misregistration, not static.
 function grain(x, y, level) {
   const drift = smooth(x / 5 + level * 3.1, y / 5 - level * 1.7)
   const speck = hash(x * 3.3 + level, y * 2.9 - level)
   const bucket = Math.min(GRAIN_BUCKETS - 1, Math.floor((0.15 + 0.85 * drift * (0.7 + 0.3 * speck)) * GRAIN_BUCKETS))
-  const drop = speck < 0.07
-  const slip = hash(x + level * 7, y) < 0.025 ? (hash(y, x) - 0.5) * 1.6 : 0
+  const drop = speck < 0.14
+  const slip = hash(x + level * 7, y) < 0.06 ? (hash(y, x) - 0.5) * 2.4 : 0
   return { bucket, drop, slip }
 }
 
@@ -133,8 +137,10 @@ function TaskDot({ d, x, y, on, pickProps }) {
   return (
     <g style={{ cursor: 'pointer' }} {...pickProps}>
       {/* A ring around the dot, not a recoloured dot: a late todo must not read as failed. */}
-      {isOverdue(d.task) && <circle cx={x} cy={y} r={on ? 7 : 5} fill="none" stroke="var(--kt-status-failed, #fb7185)" strokeWidth={1} />}
-      <circle cx={x} cy={y} r={on ? 4.5 : 2.6} fill={style.fill === 'none' ? 'var(--kt-bg, #0b0c0e)' : style.fill} stroke={style.stroke} strokeWidth={1}>
+      {isOverdue(d.task) && <circle cx={x} cy={y} r={on ? 5 : 3.2} fill="none" stroke="var(--kt-status-failed, #fb7185)" strokeWidth={0.8} />}
+      <circle cx={x} cy={y} r={on ? 3 : 1.5} fill={style.fill === 'none' ? 'var(--kt-bg, #0b0c0e)' : style.fill} stroke={style.stroke} strokeWidth={0.8} />
+      {/* The mark is small; the target under the pointer is not. */}
+      <circle cx={x} cy={y} r={7} fill="transparent">
         <title>{d.task.title}</title>
       </circle>
     </g>
@@ -153,23 +159,42 @@ function PeakLabel({ p, x, y, lineOpacity, pickProps }) {
   )
 }
 
-const segPath = (segs, f) => segs.map(([ax, ay, bx, by]) => {
+// Screen-space tears: a few thin horizontal bands of the picture are shifted
+// sideways, the way a signal drops a line. Chosen by band, so a tear cuts across
+// every contour it crosses at once.
+const TEAR_BAND = 7
+function tear(x, y) {
+  const band = Math.floor(y / TEAR_BAND)
+  const h = hash(band * 1.31, 9.7)
+  return h < 0.09 ? x + (hash(band, 3.3) - 0.5) * 22 : x
+}
+
+const segPath = (segs, f, dx = 0) => segs.map(([ax, ay, bx, by]) => {
   const [x1, y1] = f(ax, ay), [x2, y2] = f(bx, by)
-  return `M${x1.toFixed(1)},${y1.toFixed(1)}L${x2.toFixed(1)},${y2.toFixed(1)}`
+  return `M${(tear(x1, y1) + dx).toFixed(1)},${y1.toFixed(1)}L${(tear(x2, y2) + dx).toFixed(1)},${y2.toFixed(1)}`
 }).join('')
 
+// Each stroke is drawn three times: the line, and a red and a cyan ghost a pixel
+// either side of it — the misregistered colour fringe of a projected display.
+const FRINGE = [
+  { dx: -1.1, color: 'rgb(255, 70, 90)', share: 0.45, cls: 'kt-fringe-r' },
+  { dx: 1.1, color: 'rgb(80, 220, 255)', share: 0.45, cls: 'kt-fringe-c' },
+]
+
 function Strokes({ level, f, lineOpacity, peaks }) {
-  return level.strokes.map((st, k) => (
-    <path
-      key={k}
-      d={segPath(st.segs, f)}
-      fill="none"
-      stroke="var(--kt-ink, #f5f6f7)"
-      strokeOpacity={lineOpacity(peaks[st.owner]?.warmth ?? 0) * st.alpha * (level.index ? 1 : 0.7)}
-      strokeWidth={level.index ? 1.3 : 0.75}
-      strokeLinecap="round"
-    />
-  ))
+  const width = level.index ? 1.3 : 0.75
+  return level.strokes.map((st, k) => {
+    const opacity = lineOpacity(peaks[st.owner]?.warmth ?? 0) * st.alpha * (level.index ? 1 : 0.7)
+    return (
+      <g key={k}>
+        {FRINGE.map(fr => (
+          <path key={fr.cls} className={fr.cls} d={segPath(st.segs, f, fr.dx)} fill="none" stroke={fr.color}
+            strokeOpacity={opacity * fr.share} strokeWidth={width} strokeLinecap="butt" />
+        ))}
+        <path d={segPath(st.segs, f)} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={opacity} strokeWidth={width} strokeLinecap="butt" />
+      </g>
+    )
+  })
 }
 
 // Top-down: the contour lines themselves.
@@ -225,8 +250,8 @@ function ReliefView({ map, focus, pick, lineOpacity, H }) {
     const on = focus?.kind === 'task' && focus.task.id === d.task.id
     return (
       <g key={d.task.id}>
-        <line x1={x} y1={y} x2={x} y2={y - 9} stroke="rgba(var(--kt-ink-rgb), 0.5)" strokeWidth={0.8} />
-        <TaskDot d={d} x={x} y={y - 9} on={on} pickProps={pick('task', d)} />
+        <line x1={x} y1={y} x2={x} y2={y - 5} stroke="rgba(var(--kt-ink-rgb), 0.4)" strokeWidth={0.6} />
+        <TaskDot d={d} x={x} y={y - 5} on={on} pickProps={pick('task', d)} />
       </g>
     )
   }
@@ -248,8 +273,13 @@ function ReliefView({ map, focus, pick, lineOpacity, H }) {
       })}
       {pins.map(pin)}
       {spreadLabels(peaks.map(p => {
-        const [x, y] = px(p.x, p.y, height(p.x, p.y))
-        return { p, x, y: y - 14 }
+        // On the highest ring actually drawn near this summit, not on the spike above
+        // it that nothing outlines.
+        const near = (p.sigma * 0.6) / CELL
+        const z = levels.findLast(lv => lv.strokes.some(st => st.segs.some(([ax, ay]) =>
+          Math.hypot(ax - p.x / CELL, ay - p.y / CELL) < near)))?.z ?? 0
+        const [x, y] = px(p.x, p.y, z)
+        return { p, x, y: y - 6 }
       })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
@@ -290,11 +320,15 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         const x = i * CELL, y = j * CELL
         let sum = 0, best = -1, bestV = 0
         peaks.forEach((p, k) => {
-          const v = p.peak * Math.exp(-((x - p.x) ** 2 + (y - p.y) ** 2) / (2 * p.sigma ** 2))
+          // A cone with a soft foot rather than a bell: summits come to a point.
+          const v = p.peak * Math.exp(-((Math.hypot(x - p.x, y - p.y) / p.sigma) ** 1.15) * 1.4)
           sum += v
           if (v > bestV) { bestV = v; best = k }
         })
-        field[j * cols + i] = sum
+        // Rock: ridged noise cut into the slopes, strongest mid-mountain and absent
+        // on the plain, so the ground stays flat and the mountains go craggy.
+        const rock = ridged(x / 46, y / 46) * 0.6 + ridged(x / 19 + 7, y / 19 - 3) * 0.3 + ridged(x / 8 - 2, y / 8 + 5) * 0.1
+        field[j * cols + i] = sum * (0.72 + 0.55 * rock) + (sum > 0.04 ? 0.05 * rock : 0)
         owner[j * cols + i] = best
       }
     }
@@ -376,11 +410,18 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         role="img"
         aria-label={map.peaks.map(p => `${p.name}: ${p.tasks.length} tasks, ${p.heat} recent updates`).join('; ')}
         onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
+        className="kt-glitch-map"
         style={{ display: 'block' }}
       >
+        <defs>
+          <pattern id="kt-scanlines" width="4" height="3" patternUnits="userSpaceOnUse">
+            <rect width="4" height="1" fill="rgba(var(--kt-ink-rgb), 0.035)" />
+          </pattern>
+        </defs>
         {view === 'plan'
           ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} />
           : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} H={H} />}
+        <rect width={W} height={H} fill="url(#kt-scanlines)" pointerEvents="none" />
       </svg>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 6, color: 'var(--kt-muted)', fontSize: 10, textTransform: 'uppercase' }}>
