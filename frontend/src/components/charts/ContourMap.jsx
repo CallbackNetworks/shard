@@ -443,7 +443,7 @@ function shardSolid(p, k, maxTasks, H, centre) {
   // Bands up the volume: how high, how wide, how many points.
   // No single tip: the top is a few points at slightly different heights, so the
   // crown is a broken slant rather than a spire.
-  const bands = [[0, 0.85, 4], [0.3, 1.05, 3], [0.7, 0.8, 3], [0.95, 0.45, 3]]
+  const bands = [[0, 0.9, 4], [0.45, 1.05, 3], [0.92, 0.5, 3]]
   const pts = []
   bands.forEach(([z, width, count], b) => {
     for (let i = 0; i < count; i++) {
@@ -459,44 +459,53 @@ function shardSolid(p, k, maxTasks, H, centre) {
   return { r, h, tip, pts, main }
 }
 
-// Flakes for one shard, in world space: scattered over the hull's faces by area,
-// nudged off the surface, plus a loose halo. Each is a small triangle of three
-// random spokes from its centre, so no two face the same way.
+// Flakes for one shard, in world space. They lie on the hull's faces, flat to the
+// face like sugar on a crystal plane, each a near-equilateral triangle turned
+// about the face normal and tipped a little off it — the tip is what makes a
+// few of them catch the light. Faces are filled in proportion to their area,
+// densely enough that each plane reads as a plane, with gaps between flakes.
+// A few loose grains drift around the body.
 function frost(sol, k) {
   const { pts, faces } = sol.main
   const rnd = (i, j) => hash(k * 5.37 + i * 0.731, j * 2.17 - k)
-  const tris = faces.map(f => f.map(j => pts[j]))
-  const areas = tris.map(([a, b, c]) => Math.hypot(...cross3(sub(b, a), sub(c, a))) / 2)
-  const total = areas.reduce((n, x) => n + x, 0) || 1
-  const count = Math.round(130 + 3 * Math.sqrt(total))
   const flakes = []
-  const flake = (centre, size, i) => {
-    const spoke = j => {
-      const t = rnd(i, 10 + j) * Math.PI * 2, u = rnd(i, 20 + j) * 2 - 1, w = Math.sqrt(1 - u * u)
-      const len = size * (0.55 + 0.45 * rnd(i, 30 + j))
-      return [centre[0] + Math.cos(t) * w * len, centre[1] + Math.sin(t) * w * len, centre[2] + u * len]
-    }
-    const v = [spoke(0), spoke(1), spoke(2)]
-    flakes.push({ v, centre, n: unit(cross3(sub(v[1], v[0]), sub(v[2], v[0]))), i })
-  }
-  for (let i = 0; i < count; i++) {
-    // A face chosen in proportion to its area, then a point on it.
-    let pick = rnd(i, 1) * total, f = 0
-    while (f < areas.length - 1 && pick > areas[f]) pick -= areas[f++]
-    const [a, b, c] = tris[f]
-    let u = rnd(i, 2), w = rnd(i, 3)
-    if (u + w > 1) { u = 1 - u; w = 1 - w }
+  let i = 0
+  faces.forEach((f, fi) => {
+    const [a, b, c] = f.map(j => pts[j])
     const n = unit(cross3(sub(b, a), sub(c, a)))
-    const lift = (rnd(i, 4) - 0.35) * 3
-    const at = [0, 1, 2].map(d => a[d] + (b[d] - a[d]) * u + (c[d] - a[d]) * w + n[d] * lift)
-    flake(at, 2.2 + 3.2 * rnd(i, 5), i)
-  }
-  // Loose sugar around it.
-  for (let i = 0; i < 14; i++) {
-    const t = rnd(i + 500, 6) * Math.PI * 2
-    const dist = sol.r * (1.15 + 0.7 * rnd(i + 500, 7))
-    const z = sol.h * (0.1 + 0.9 * rnd(i + 500, 8))
-    flake([sol.p.x + Math.cos(t) * dist, sol.p.y + Math.sin(t) * dist * 0.8, z], 1.4 + 1.8 * rnd(i + 500, 9), i + 500)
+    const area = Math.hypot(...cross3(sub(b, a), sub(c, a))) / 2
+    const t1 = unit(sub(b, a)), t2 = cross3(n, t1)
+    const count = Math.max(3, Math.round(area / 16))
+    for (let m = 0; m < count; m++, i++) {
+      let u = rnd(i, 1), w = rnd(i, 2)
+      if (u + w > 1) { u = 1 - u; w = 1 - w }
+      const at = [0, 1, 2].map(d => a[d] + (b[d] - a[d]) * u + (c[d] - a[d]) * w + n[d] * 0.6)
+      const size = 2.4 + 2.2 * rnd(i, 3)
+      const turn = rnd(i, 4) * Math.PI * 2
+      const tip = (rnd(i, 5) - 0.5) * 0.9
+      // The flake's own plane: the face's, tipped by `tip` about a direction in it.
+      const axis = t1.map((c1, d) => c1 * Math.cos(turn) + t2[d] * Math.sin(turn))
+      const side = cross3(n, axis)
+      const nn = unit(n.map((c0, d) => c0 * Math.cos(tip) + side[d] * Math.sin(tip)))
+      const e1 = axis, e2 = cross3(nn, axis)
+      const v = [0, 1, 2].map(q => {
+        const ang = (q / 3) * Math.PI * 2
+        return [0, 1, 2].map(d => at[d] + (e1[d] * Math.cos(ang) + e2[d] * Math.sin(ang)) * size)
+      })
+      flakes.push({ v, centre: at, n: nn, face: n, fi, i })
+    }
+  })
+  for (let g = 0; g < 10; g++, i++) {
+    const t = rnd(i, 6) * Math.PI * 2
+    const dist = sol.r * (1.2 + 0.6 * rnd(i, 7))
+    const z = sol.h * (0.1 + 0.85 * rnd(i, 8))
+    const at = [sol.p.x + Math.cos(t) * dist, sol.p.y + Math.sin(t) * dist * 0.8, z]
+    const size = 1.3 + 1.2 * rnd(i, 9)
+    const v = [0, 1, 2].map(q => {
+      const ang = (q / 3) * Math.PI * 2 + rnd(i, 10) * 6
+      return [at[0] + Math.cos(ang) * size, at[1] + Math.sin(ang) * size, at[2] + (q - 1) * size * 0.6]
+    })
+    flakes.push({ v, centre: at, n: unit(cross3(sub(v[1], v[0]), sub(v[2], v[0]))), face: null, fi: -1, i })
   }
   return flakes
 }
@@ -551,13 +560,21 @@ function ShardView({ map, focus, pick, W, H, view3d }) {
   const half = unit(LIGHT.map((c, i) => c + eye[i]))
 
   // Every flake of every shard, farthest first, lit on its own.
+  // The face's light sets the tone, so each plane reads as one surface; the
+  // flake's own tip adds the glint. Flakes on faces turned away are behind the
+  // body and are not drawn. Farther flakes are dimmer.
+  const depths = solids.flatMap(sol => sol.flakes.map(f => cam.depth(f.centre[0], f.centre[1])))
+  const near = Math.max(...depths), far = Math.min(...depths)
   const flakes = solids.flatMap(sol => sol.flakes.map(f => ({ sol, f })))
+    .filter(({ f }) => !f.face || dot3(f.face, eye) > 0)
     .map(({ sol, f }) => {
-      const lit = Math.abs(dot3(f.n, LIGHT))
-      const glint = Math.abs(dot3(f.n, half)) ** 24
+      const tone = f.face ? Math.max(0, dot3(f.face, LIGHT)) : 0.3
+      const glint = Math.max(0, dot3(f.n, half)) ** 40
       const glow = sol.p.warmth
-      const opacity = Math.min(0.95, (0.1 + 0.34 * lit ** 2 + 0.85 * glint) * (0.55 + 0.45 * glow))
-      return { sol, f, opacity, depth: cam.depth(f.centre[0], f.centre[1]) }
+      const depth = cam.depth(f.centre[0], f.centre[1])
+      const fade = 0.6 + 0.4 * ((depth - far) / (near - far || 1))
+      const opacity = Math.min(0.95, (0.12 + 0.5 * tone ** 1.6 + 0.9 * glint) * (0.5 + 0.5 * glow) * fade)
+      return { sol, f, opacity, depth }
     })
     .sort((a, b) => a.depth - b.depth)
 
