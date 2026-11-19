@@ -90,6 +90,13 @@ function smooth(x, y) {
   const a = hash(x0, y0), b = hash(x0 + 1, y0), c = hash(x0, y0 + 1), d = hash(x0 + 1, y0 + 1)
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
 }
+// A stable number in [0, 1) from a string, so a project's silhouette is its own.
+function idSeed(id) {
+  let h = 2166136261
+  for (const ch of String(id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  return (h >>> 0) / 4294967296
+}
+
 // Ridged noise: 1 on a crest, falling away sharply either side of it.
 function ridged(x, y) {
   return 1 - Math.abs(smooth(x, y) * 2 - 1)
@@ -304,8 +311,8 @@ function spreadLabels(labels) {
   return placed
 }
 
-const TILT = 0.55       // how flat the ground plane is drawn: 1 is top-down, 0 edge-on
-const RISE = 0.3        // the tallest summit stands this fraction of the frame high
+const TILT = 0.62       // how flat the ground plane is drawn: 1 is top-down, 0 edge-on
+const RISE = 0.22       // the tallest summit stands this fraction of the frame high
 
 // In relief: every contour ring lifted to its own height, stacked from sea level
 // up like terraces. Each ring is filled with the background, so a higher terrace
@@ -406,19 +413,50 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
       })
     const peaks = placeMountains(items, W, H)
 
+    // A mountain is a range, not a spire: a main summit stretched along a heading
+    // and three lower shoulders off it, all seeded from the project's id so the
+    // same project keeps the same silhouette. The main summit carries the measure
+    // (its height the open tasks, its spread every task); the shoulders follow it.
+    const parts = peaks.flatMap((p, k) => {
+      const seed = idSeed(p.id)
+      const heading = seed * Math.PI * 2
+      const main = { k, x: p.x, y: p.y, h: p.peak, sa: p.sigma * 1.35, sb: p.sigma * 0.8, heading }
+      const shoulders = [0, 1, 2].map(i => {
+        const a = heading + (i - 1) * 2.1 + (hash(seed * 50, i) - 0.5) * 0.8
+        const d = p.sigma * (0.7 + 0.35 * hash(i, seed * 90))
+        return {
+          k,
+          x: p.x + Math.cos(a) * d,
+          y: p.y + Math.sin(a) * d,
+          h: p.peak * (0.45 + 0.3 * hash(seed * 13, i * 7)),
+          sa: p.sigma * 0.75,
+          sb: p.sigma * 0.5,
+          heading: a,
+        }
+      })
+      return [main, ...shoulders]
+    })
+
     const cols = Math.ceil(W / CELL) + 1, rows = Math.ceil(H / CELL) + 1
     const field = new Float32Array(cols * rows)
     const owner = new Int16Array(cols * rows)
+    const share = new Float32Array(peaks.length)
     for (let j = 0; j < rows; j++) {
       for (let i = 0; i < cols; i++) {
         const x = i * CELL, y = j * CELL
-        let sum = 0, best = -1, bestV = 0
-        peaks.forEach((p, k) => {
+        share.fill(0)
+        let sum = 0
+        for (const c of parts) {
+          const dx = x - c.x, dy = y - c.y
+          const cos = Math.cos(c.heading), sin = Math.sin(c.heading)
+          const u = (dx * cos + dy * sin) / c.sa, v = (-dx * sin + dy * cos) / c.sb
           // Between a cone and a bell: shoulders, not a needle.
-          const v = p.peak * Math.exp(-((Math.hypot(x - p.x, y - p.y) / p.sigma) ** 1.7) * 0.9)
-          sum += v
-          if (v > bestV) { bestV = v; best = k }
-        })
+          const h = c.h * Math.exp(-((u * u + v * v) ** 0.85) * 0.9)
+          sum += h
+          share[c.k] += h
+        }
+        let best = -1, bestV = 0
+        for (let k = 0; k < share.length; k++) if (share[k] > bestV) { bestV = share[k]; best = k }
         // Rock: ridged noise cut into the slopes, strongest mid-mountain and absent
         // on the plain, so the ground stays flat and the mountains go craggy.
         const rock = ridged(x / 46, y / 46) * 0.6 + ridged(x / 19 + 7, y / 19 - 3) * 0.3 + ridged(x / 8 - 2, y / 8 + 5) * 0.1
