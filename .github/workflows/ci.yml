@@ -67,7 +67,14 @@ jobs:
         run: |
           set -u
           cutoff=$(date -u -d '3 hours ago' +%s)
-          older() { [ "$(date -u -d "$1" +%s)" -lt "$cutoff" ]; }
+          # A timestamp `date` cannot read must say so, not quietly count as "new": the
+          # network sweep below fed it docker's `2026-11-19 01:51:35 -0800 PST` form,
+          # which it rejects, so every network compared as young and none was ever
+          # removed — until the address pool ran out again (2026-11-19).
+          older() {
+            t=$(date -u -d "$1" +%s 2>/dev/null) || { echo "::warning::unreadable timestamp '$1'"; return 1; }
+            [ "$t" -lt "$cutoff" ]
+          }
 
           for c in $(docker ps -aq --filter 'name=^ci-'); do
             name=$(docker inspect -f '{{.Name}}' "$c" | sed 's|^/||')
@@ -82,7 +89,8 @@ jobs:
           # Named rather than `network prune`: this host runs a dozen unrelated stacks
           # whose idle networks are not this workflow's to reclaim.
           for n in $(docker network ls --format '{{.Name}}' | grep -E '^ci-' || true); do
-            if older "$(docker network inspect -f '{{.Created}}' "$n")"; then
+            # RFC 3339 in UTC, which `date -d` reads; the default rendering it does not.
+            if older "$(docker network inspect -f '{{.Created.UTC.Format "2006-01-02T15:04:05Z"}}' "$n")"; then
               docker network rm "$n" >/dev/null 2>&1 && echo "removed stale network $n" || true
             fi
           done
