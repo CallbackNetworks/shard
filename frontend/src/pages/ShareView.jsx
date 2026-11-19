@@ -162,7 +162,7 @@ export default function ShareView() {
         {/* Section: Analytics — the analytics page's charts, scoped to this share */}
         {hasAnalytics(analytics) && (
           <div id="share-section-analytics" style={{ paddingTop: 8 }}>
-            <ShareAnalytics analytics={analytics} bp={bp} />
+            <ShareAnalytics analytics={analytics} projects={projects} bp={bp} />
           </div>
         )}
 

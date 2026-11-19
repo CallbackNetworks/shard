@@ -1,4 +1,5 @@
 import TerrainChart from '../charts/TerrainChart'
+import ContourMap from '../charts/ContourMap'
 import ActivityHeatmap from '../charts/ActivityHeatmap'
 import StatusTrendChart from '../charts/StatusTrendChart'
 import BurndownChart from '../charts/BurndownChart'
@@ -25,13 +26,24 @@ function Panel({ title, sub, wide, children }) {
 
 // The analytics page's charts, drawn from the share payload rather than fetched:
 // a guest has no session, and the numbers come from the same service either way.
-export default function ShareAnalytics({ analytics, bp }) {
+export default function ShareAnalytics({ analytics, projects = [], bp }) {
   const mobile = bp === 'mobile'
   const { heatmap = [], by_project: byProject = [], status_trend: trend = [], burndown = [], velocity = [] } = analytics
   const yearTotal = heatmap.reduce((n, d) => n + d.count, 0)
 
+  // A mountain per project: its size is its task count, its brightness how busy the
+  // last 30 days were, read from the same per-project series the ridgeline draws.
+  const since = Date.now() - 30 * 86400000
+  const heatOf = id => (byProject.find(p => p.id === id)?.days || [])
+    .reduce((n, d) => (new Date(`${d.date}T12:00:00`).getTime() >= since ? n + d.count : n), 0)
+  const mountains = projects.map(p => ({ id: p.id, name: p.name, tasks: p.tasks || [], heat: heatOf(p.id) }))
+
   return (
     <section className={s.grid} aria-label="Analytics">
+      <Panel title="Terrain · size = tasks, brightness = last 30 days" wide>
+        <ContourMap projects={mountains} width={mobile ? 380 : 720} height={mobile ? 420 : 420} />
+      </Panel>
+
       {byProject.length > 0 && (
         <Panel title={`Activity terrain · ${mobile ? 13 : 26} weeks`} wide>
           <TerrainChart series={byProject} weeks={mobile ? 13 : 26} width={mobile ? 380 : 720} />
