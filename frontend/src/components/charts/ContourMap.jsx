@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isOverdue } from '../../utils/overdue'
 
 const LEVELS = 20            // contour lines between sea level and the highest summit
 const INDEX_EVERY = 4        // every fourth line is an index contour, drawn heavier
 const CELL = 5               // field resolution: fine enough that small hills draw round, not as diamonds
-const MARGIN = 160           // ground computed past each edge of the frame
+const TILE = 300             // the endless terrain is computed and cached in tiles this many units square
+const MAX_TILES = 64         // a view never asks for more tiles than this at once
 const TASK_SPACING = 30      // ground distance between neighbouring task marks
 const WORLD_MAX = 2.4        // the ground grows with the work up to this many frames across
 // A mountain's spread for a number of tasks: wide enough that its tasks, laid out
@@ -310,7 +311,7 @@ function Graticule({ f, W, H, part = 'all' }) {
 
 // Corner brackets and a readout, in screen space: the frame of the instrument,
 // not part of the ground.
-function Frame({ W, H, peaks, levels, view }) {
+function Frame({ W, H, peaks, view }) {
   const c = 12
   const corners = [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]]
   const tasks = peaks.reduce((n, p) => n + p.tasks.length, 0)
@@ -322,7 +323,7 @@ function Frame({ W, H, peaks, levels, view }) {
         fill="none" stroke="rgba(var(--kt-ink-rgb), 0.45)" strokeWidth={1}
       />
       <text x={W - 6} y={H - 6} textAnchor="end" fontSize={8} fill="rgba(var(--kt-ink-rgb), 0.4)">
-        {`${view === 'plan' ? 'PLAN' : 'RELIEF · DRAG MOVE · WHEEL ZOOM · SHIFT TURN'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
+        {`${view === 'plan' ? 'PLAN · DRAG MOVE · WHEEL ZOOM' : 'RELIEF · DRAG MOVE · WHEEL ZOOM · SHIFT TURN'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${LEVELS}`}
       </text>
     </g>
   )
@@ -338,11 +339,6 @@ function tear(x, y) {
   return h < 0.035 ? x + (hash(band, 3.3) - 0.5) * 10 : x
 }
 
-const segPath = (segs, f, dx = 0) => segs.map(([ax, ay, bx, by]) => {
-  const [x1, y1] = f(ax, ay), [x2, y2] = f(bx, by)
-  return `M${(tear(x1, y1) + dx).toFixed(1)},${y1.toFixed(1)}L${(tear(x2, y2) + dx).toFixed(1)},${y2.toFixed(1)}`
-}).join('')
-
 // Each stroke is drawn three times: the line, and a faint ghost a pixel and a half
 // either side — misregistration, in the line's own colour. Not red and cyan: on
 // this page red means failed and late (ADR-0088), and a fringe must not say so.
@@ -351,43 +347,8 @@ const FRINGE = [
   { dx: 1.6, color: 'var(--kt-ink, #f5f6f7)', share: 0.22, cls: 'kt-fringe-c' },
 ]
 
-function Strokes({ level, f, fringe = true }) {
-  return level.strokes.map((st, k) => {
-    // Heat is carried twice, by brightness and by weight (worked out per piece when
-    // the map is built); the noise only shades a line by a fifth, less than the gap
-    // between a busy summit and a quiet one, so wear never reads as a change in heat.
-    const width = (level.index ? 0.55 : 0.3) * st.weight
-    const opacity = Math.min(1, st.opacity * (level.index ? 0.8 : 0.55))
-    return (
-      <g key={k}>
-        {fringe && FRINGE.map(fr => (
-          <path key={fr.cls} className={fr.cls} d={segPath(st.segs, f, fr.dx)} fill="none" stroke={fr.color}
-            strokeOpacity={opacity * fr.share} strokeWidth={width} strokeLinecap="butt" />
-        ))}
-        <path d={segPath(st.segs, f)} fill="none" stroke="var(--kt-ink, #f5f6f7)" strokeOpacity={opacity} strokeWidth={width} strokeLinecap="round" />
-      </g>
-    )
-  })
-}
 
 // Top-down: the contour lines themselves.
-function PlanView({ map, focus, pick, lineOpacity, W }) {
-  // The ground may be larger than the frame; the plan shows all of it, scaled to fit.
-  const { GW, GH, fit } = map.world
-  const g = (x, y) => [x * fit, y * fit]
-  const f = (x, y) => g(x * CELL - MARGIN, y * CELL - MARGIN)
-  return (
-    <>
-      <Graticule f={g} W={GW} H={GH} />
-      <g className="kt-terrain-breathe">{map.levels.map(level => <g key={level.l}><Strokes level={level} f={f} /></g>)}</g>
-      {map.dots.map(d => (
-        <TaskDot key={d.task.id} d={d} x={d.x * fit} y={d.y * fit} on={focus?.kind === 'task' && focus.task.id === d.task.id} pickProps={pick('task', d)} />
-      ))}
-      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x * fit} y={p.y * fit} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
-    </>
-  )
-}
-
 // Summits seen from the side line up along the horizon, so their names can land on
 // top of each other. Nearer labels keep their place; a farther one steps up clear.
 function spreadLabels(labels) {
@@ -408,17 +369,20 @@ function spreadLabels(labels) {
 // `zoom` scales the view and `pan` is the ground point it looks at, relative to
 // the middle of the axes.
 export const HOME_CAMERA = { az: 0, tilt: 0.9, zoom: 1, pan: [0, 0] }
+// The plan is the same ground looked straight down on, without perspective.
+export const HOME_PLAN = { az: 0, tilt: 1, zoom: 1, pan: [0, 0], ortho: true }
 export const TILT_RANGE = [0.45, 0.98]
 export const ZOOM_RANGE = [0.6, 5]
 
 // Perspective projection of ground point (x, y) at height z, and its inverse on
 // the ground plane, which panning and zooming need to keep the point under the
 // pointer under the pointer.
-export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0] }, lift, world = { GW: W, GH: H, fit: 1 }) {
+export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0], ortho = false }, lift, world = { GW: W, GH: H, fit: 1 }) {
   const ax = axes(world.GW, world.GH)
   const cx = (ax.x0 + ax.x1) / 2 + pan[0], cy = (ax.y0 + ax.y1) / 2 + pan[1]
   const cos = Math.cos(az), sin = Math.sin(az)
-  const D = W * 1.6
+  // An orthographic camera is a perspective one whose eye is infinitely far away.
+  const D = ortho ? Infinity : W * 1.6
   // `fit` shrinks a ground larger than the frame so all of it is in view at zoom 1.
   const scale = 0.9 * zoom * world.fit
   const base = H * 0.55
@@ -426,13 +390,13 @@ export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0] }, lift, world =
     const dx = x - cx, dy = y - cy
     const rx = dx * cos - dy * sin
     const ry = dx * sin + dy * cos
-    const k = (D / (D - ry)) * scale
+    const k = ortho ? scale : (D / (D - ry)) * scale
     return [W / 2 + rx * k, base + (ry * tilt - z * lift) * k]
   }
   const toGround = (sx, sy) => {
     const v = sy - base
-    const ry = (v * D) / (tilt * D * scale + v)
-    const k = (D / (D - ry)) * scale
+    const ry = ortho ? v / (tilt * scale) : (v * D) / (tilt * D * scale + v)
+    const k = ortho ? scale : (D / (D - ry)) * scale
     const rx = (sx - W / 2) / k
     return [cx + rx * cos + ry * sin, cy - rx * sin + ry * cos]
   }
@@ -449,10 +413,8 @@ export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0] }, lift, world =
 // to diff and repaint on every frame of a drag — with the task marks, labels and
 // axes as SVG on top, where they stay pointable.
 const RISE = 0.3          // the tallest summit stands this fraction of the frame high
-const GRID_STEP = 90      // the endless ground's grid spacing, in ground units
-const GRID_REACH = 5000   // how far out the grid is drawn before fog has taken it anyway
 
-function ReliefCanvas({ map, cam, camKey, W, H, lift, moving }) {
+function ReliefCanvas({ map, cam, camKey, W, H, lift, moving, tile }) {
   const ref = useRef(null)
   useEffect(() => {
     const canvas = ref.current
@@ -466,105 +428,102 @@ function ReliefCanvas({ map, cam, camKey, W, H, lift, moving }) {
     const ink = css.getPropertyValue('--kt-ink').trim() || '#f5f6f7'
     const bg = css.getPropertyValue('--kt-bg').trim() || '#0b0c0e'
     const [cx, cy] = cam.centre
-    const nearLimit = cam.D * 0.7
 
-    // Light from the far distance: a glow sitting on the horizon, fading toward
-    // the viewer, so the plain reads as lit from beyond its end.
-    const glow = ctx.createRadialGradient(W / 2, cam.horizon, 0, W / 2, cam.horizon, W * 0.75)
-    glow.addColorStop(0, ink); glow.addColorStop(1, 'transparent')
-    ctx.globalAlpha = 0.09
-    ctx.fillStyle = glow
-    ctx.fillRect(0, 0, W, H)
-    // The horizon itself is a soft band of that light, not a ruled line.
-    const band = ctx.createLinearGradient(0, cam.horizon - 14, 0, cam.horizon + 14)
-    band.addColorStop(0, 'transparent'); band.addColorStop(0.5, ink); band.addColorStop(1, 'transparent')
-    ctx.globalAlpha = 0.08
-    ctx.fillStyle = band
-    ctx.fillRect(0, cam.horizon - 14, W, 28)
-
-    // The endless ground: grid lines in both directions, drawn piece by piece so
-    // each piece fades with its distance and nothing behind the eye is drawn.
-    ctx.strokeStyle = ink
-    ctx.lineWidth = 0.5
-    const line = (from, to) => {
-      const steps = 80
-      let prev = null
-      for (let i = 0; i <= steps; i++) {
-        const x = from[0] + ((to[0] - from[0]) * i) / steps, y = from[1] + ((to[1] - from[1]) * i) / steps
-        const d = cam.depth(x, y)
-        if (d > nearLimit) { prev = null; continue }
-        const [sx, sy] = cam.project(x, y, 0)
-        if (prev) {
-          const fog = Math.max(0, 1 + Math.min(d, prev.d) / GRID_REACH)
-          ctx.globalAlpha = 0.14 * fog ** 2.2
-          ctx.beginPath(); ctx.moveTo(prev.sx, prev.sy); ctx.lineTo(sx, sy); ctx.stroke()
-        }
-        prev = { sx, sy, d }
-      }
-    }
-    for (let o = -GRID_REACH; o <= GRID_REACH; o += GRID_STEP) {
-      line([cx + o, cy - GRID_REACH], [cx + o, cy + GRID_REACH])
-      line([cx - GRID_REACH, cy + o], [cx + GRID_REACH, cy + o])
+    // Light from the far distance: a glow on the horizon, when there is one near
+    // the frame — never for the plan, whose eye is infinitely far and has none.
+    if (Number.isFinite(cam.horizon) && cam.horizon > -W * 0.75) {
+      const glow = ctx.createRadialGradient(W / 2, cam.horizon, 0, W / 2, cam.horizon, W * 0.75)
+      glow.addColorStop(0, ink); glow.addColorStop(1, 'transparent')
+      ctx.globalAlpha = 0.09
+      ctx.fillStyle = glow
+      ctx.fillRect(0, 0, W, H)
+      // The horizon itself is a soft band of that light, not a ruled line.
+      const band = ctx.createLinearGradient(0, cam.horizon - 14, 0, cam.horizon + 14)
+      band.addColorStop(0, 'transparent'); band.addColorStop(0.5, ink); band.addColorStop(1, 'transparent')
+      ctx.globalAlpha = 0.08
+      ctx.fillStyle = band
+      ctx.fillRect(0, cam.horizon - 14, W, 28)
     }
 
-    // The terrain, terrace by terrace from sea level up: each ring filled with the
-    // background so a higher one hides what is behind it, then its contours.
-    const at = (gx, gy, z) => cam.project(gx * CELL - MARGIN, gy * CELL - MARGIN, z * lift)
-    const levels = moving ? map.levels.filter(lv => lv.index) : map.levels
-    for (const level of levels) {
-      ctx.globalAlpha = 0.9
-      ctx.fillStyle = bg
-      ctx.beginPath()
-      for (const ring of level.rings) {
-        ring.forEach((q, i) => { const [x, y] = at(q[0], q[1], level.z); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y) })
-        ctx.closePath()
-      }
-      ctx.fill()
-      for (const st of level.strokes) {
-        const width = (level.index ? 0.55 : 0.3) * st.weight
-        const alpha = Math.min(1, st.opacity * (level.index ? 0.8 : 0.55))
-        const trace = dx => {
-          ctx.beginPath()
-          for (const [ax, ay, bx, by] of st.segs) {
-            const [x1, y1] = at(ax, ay, level.z), [x2, y2] = at(bx, by, level.z)
-            ctx.moveTo(tear(x1, y1) + dx, y1); ctx.lineTo(tear(x2, y2) + dx, y2)
+    // The terrain, from whichever tiles the view can see: the ground under the four
+    // corners of the frame, widened by a tile. Far away under a low camera that can
+    // be a lot of ground, so the count is capped, nearest the centre first.
+    // Above the horizon there is no ground to find, so the frame's top corners are
+    // read just below it instead.
+    const floorY = Number.isFinite(cam.horizon) ? cam.horizon + 30 : -Infinity
+    const corners = [[0, 0], [W, 0], [0, H], [W, H]].map(([sx, sy]) => cam.toGround(sx, Math.max(sy, floorY)))
+    const xs = corners.map(c => c[0]), ys = corners.map(c => c[1])
+    const tx0 = Math.floor(Math.min(...xs) / TILE) - 1, tx1 = Math.floor(Math.max(...xs) / TILE) + 1
+    const ty0 = Math.floor(Math.min(...ys) / TILE) - 1, ty1 = Math.floor(Math.max(...ys) / TILE) + 1
+    const want = []
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) want.push([tx, ty])
+    const mid = [cx / TILE, cy / TILE]
+    want.sort((a, b) => Math.hypot(a[0] + 0.5 - mid[0], a[1] + 0.5 - mid[1]) - Math.hypot(b[0] + 0.5 - mid[0], b[1] + 0.5 - mid[1]))
+    const tiles = want.slice(0, MAX_TILES).map(([tx, ty]) => tile(tx, ty))
+
+    // Terrace by terrace from sea level up, across every tile at once: each closed
+    // ring filled with the background so a higher one hides what is behind it,
+    // then its contours.
+    for (let li = 0; li < LEVELS; li++) {
+      const index = (li + 1) % INDEX_EVERY === 0
+      if (moving && !index) continue
+      const z = ((li + 1) / (LEVELS + 1)) * map.top * lift
+      if (lift > 0) {
+        ctx.globalAlpha = 0.9
+        ctx.fillStyle = bg
+        ctx.beginPath()
+        for (const t of tiles) {
+          for (const ring of t[li].rings) {
+            ring.forEach((q, i) => { const [x, y] = cam.project(q[0], q[1], z); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y) })
+            ctx.closePath()
           }
-          ctx.stroke()
         }
-        ctx.strokeStyle = ink
-        ctx.lineWidth = width
-        if (!moving) {
-          for (const fr of FRINGE) { ctx.globalAlpha = alpha * fr.share; trace(fr.dx) }
+        ctx.fill()
+      }
+      for (const t of tiles) {
+        for (const st of t[li].strokes) {
+          const width = (index ? 0.55 : 0.3) * st.weight
+          const alpha = Math.min(1, st.opacity * (index ? 0.8 : 0.55))
+          const trace = dx => {
+            ctx.beginPath()
+            for (const [ax, ay, bx, by] of st.segs) {
+              const [x1, y1] = cam.project(ax, ay, z), [x2, y2] = cam.project(bx, by, z)
+              ctx.moveTo(tear(x1, y1) + dx, y1); ctx.lineTo(tear(x2, y2) + dx, y2)
+            }
+            ctx.stroke()
+          }
+          ctx.strokeStyle = ink
+          ctx.lineWidth = width
+          if (!moving) {
+            for (const fr of FRINGE) { ctx.globalAlpha = alpha * fr.share; trace(fr.dx) }
+          }
+          ctx.globalAlpha = alpha
+          trace(0)
         }
-        ctx.globalAlpha = alpha
-        trace(0)
       }
     }
     ctx.globalAlpha = 1
     // Redrawn when the terrain or the camera changes, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, camKey, W, H, lift, moving])
+  }, [map, camKey, W, H, lift, moving, tile])
   return <canvas ref={ref} className="kt-terrain-breathe" style={{ width: W, height: H, display: 'block' }} />
 }
 
-function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
-  const { field, cols, rows, top, peaks, dots, levels } = map
-  // Heights scale with the ground, so a larger world is not a flatter one.
-  const lift = (map.world.GH * RISE) / top
+function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving, tile }) {
+  const { surface, top, peaks, dots } = map
+  // Heights scale with the ground, so a larger world is not a flatter one. The plan
+  // looks straight down and lifts nothing.
+  const lift = view3d.ortho ? 0 : (map.world.GH * RISE) / top
   const cam = camera(W, H, view3d, 1, map.world)
   const px = (x, y, z) => cam.project(x, y, z * lift)
-  const height = (x, y) => {
-    const i = Math.max(0, Math.min(cols - 1, Math.round((x + MARGIN) / CELL)))
-    const j = Math.max(0, Math.min(rows - 1, Math.round((y + MARGIN) / CELL)))
-    return field[j * cols + i]
-  }
+  const step = top / (LEVELS + 1)
   // Marks stand on the surface, nearest drawn last.
-  const pins = dots.map(d => ({ d, z: height(d.x, d.y) })).sort((a, b) => cam.depth(a.d.x, a.d.y) - cam.depth(b.d.x, b.d.y))
+  const pins = dots.map(d => ({ d, z: surface(d.x, d.y)[0] })).sort((a, b) => cam.depth(a.d.x, a.d.y) - cam.depth(b.d.x, b.d.y))
 
   return (
     <>
       <foreignObject x={0} y={0} width={W} height={H} pointerEvents="none">
-        <ReliefCanvas map={map} cam={cam} camKey={JSON.stringify(view3d)} W={W} H={H} lift={lift} moving={moving} />
+        <ReliefCanvas map={map} cam={cam} camKey={JSON.stringify(view3d)} W={W} H={H} lift={lift} moving={moving} tile={tile} />
       </foreignObject>
       <Graticule f={(x, y) => px(x, y, 0)} W={map.world.GW} H={map.world.GH} part="axes" />
       {pins.map(({ d, z }) => {
@@ -573,15 +532,74 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
         return <TaskDot key={d.task.id} d={d} x={x} y={y - 1.5} on={on} pickProps={pick('task', d)} />
       })}
       {spreadLabels(peaks.map(p => {
-        // On the highest ring actually drawn near this summit.
-        const near = (p.sigma * 0.6) / CELL
-        const z = levels.findLast(lv => lv.strokes.some(st => st.segs.some(([ax, ay]) =>
-          Math.hypot(ax - (p.x + MARGIN) / CELL, ay - (p.y + MARGIN) / CELL) < near)))?.z ?? 0
+        // On the highest contour at or below the summit.
+        const z = Math.floor(surface(p.x, p.y)[0] / step) * step
         const [x, y] = px(p.x, p.y, z)
         return { p, x, y }
       })).map(({ p, x, y }) => <PeakLabel key={p.id} p={p} x={x} y={y} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
+}
+
+// One square of the endless terrain, from the map's surface function: the field
+// sampled on the global CELL lattice with a two-cell pad, blurred (the pad makes
+// the blur exact at the edges, so neighbouring tiles share their border values and
+// contours run across the seam unbroken), then traced at the map's fixed contour
+// heights. Rings that close inside the tile are kept for the relief's fills.
+export function buildTile(map, tx, ty) {
+  const n = TILE / CELL, P = 2, size = n + 1 + 2 * P
+  const x0 = tx * TILE, y0 = ty * TILE
+  const raw = new Float32Array(size * size), warmA = new Float32Array(size * size), ownA = new Float32Array(size * size)
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const [h, w, o] = map.surface(x0 + (i - P) * CELL, y0 + (j - P) * CELL)
+      raw[j * size + i] = h; warmA[j * size + i] = w; ownA[j * size + i] = o
+    }
+  }
+  // Two passes of a 3×3 box blur: the ridged layers fold the surface along their
+  // crests, and contours traced across a fold turn corners no terrain draws.
+  blur(raw, size, size)
+  blur(raw, size, size)
+  const m = n + 1
+  const inner = (arr) => {
+    const out = new Float32Array(m * m)
+    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) out[j * m + i] = arr[(j + P) * size + i + P]
+    return out
+  }
+  const field = inner(raw), warm = inner(warmA), owned = inner(ownA)
+  const sample = (arr, gx, gy) => {
+    const i0 = Math.max(0, Math.min(m - 2, Math.floor(gx))), j0 = Math.max(0, Math.min(m - 2, Math.floor(gy)))
+    const fx = Math.max(0, Math.min(1, gx - i0)), fy = Math.max(0, Math.min(1, gy - j0))
+    const a = arr[j0 * m + i0], b = arr[j0 * m + i0 + 1], c = arr[(j0 + 1) * m + i0], d = arr[(j0 + 1) * m + i0 + 1]
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy
+  }
+  const gx0 = x0 / CELL, gy0 = y0 / CELL
+  const W = (gx) => x0 + gx * CELL, Hy = (gy) => y0 + gy * CELL
+  const levels = []
+  for (let l = 1; l <= LEVELS; l++) {
+    const z = (l / (LEVELS + 1)) * map.top
+    const segs = contours(field, m, m, z)
+    const strokes = new Map()
+    for (const [a, b] of segs) {
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
+      // Grain is read on the global lattice, so the wear does not restart at a seam.
+      const g = grain(gx0 + mx, gy0 + my, l)
+      if (g.drop) continue
+      const w = sample(warm, mx, my), mine = sample(owned, mx, my)
+      const alpha = (g.bucket + 0.5) / GRAIN_BUCKETS
+      const opacity = (FOOTHILL + ((COLD + (HOT - COLD) * w) - FOOTHILL) * mine) * (0.8 + 0.2 * alpha)
+      const weight = 1 + ((0.7 + 0.7 * w) - 1) * mine
+      const qo = Math.round(opacity * TONE_STEPS), qw = Math.round(weight * 4)
+      const key = `${qo}:${qw}`
+      if (!strokes.has(key)) strokes.set(key, { opacity: qo / TONE_STEPS, weight: qw / 4, segs: [] })
+      strokes.get(key).segs.push([W(a[0] + g.slip), Hy(a[1]), W(b[0] + g.slip), Hy(b[1])])
+    }
+    const rings = stitch(segs)
+      .filter(r => Math.hypot(r[0][0] - r[r.length - 1][0], r[0][1] - r[r.length - 1][1]) < 1e-6)
+      .map(r => r.map(([gx, gy]) => [W(gx), Hy(gy)]))
+    levels.push({ l, z, index: l % INDEX_EVERY === 0, rings, strokes: [...strokes.values()] })
+  }
+  return levels
 }
 
 // Everything the terrain is computed from, as one string: equal strings mean the
@@ -624,7 +642,10 @@ export function foldFoothills(projects) {
 export default function ContourMap({ projects, width = 720, height = 420, emptyLabel = 'Nothing to map yet', initialView = 'relief', extraViews = [] }) {
   const [focus, setFocus] = useState(null) // { kind: 'task' | 'peak', ... }
   const [view, setView] = useState(initialView) // 'relief' (3D) | 'plan' (top-down) | an extra view's key
-  const [view3d, setView3d] = useState(HOME_CAMERA)
+  // One camera per view, so switching between them keeps where each was looking.
+  const [cams, setCams] = useState({ relief: HOME_CAMERA, plan: HOME_PLAN })
+  const view3d = cams[view] || HOME_CAMERA
+  const setView3d = next => setCams(c => ({ ...c, [view]: typeof next === 'function' ? next(c[view]) : next }))
   const [drag, setDrag] = useState(null) // the gesture in progress, if any
   const frame = useRef(0)
   const pointers = useRef(new Map())
@@ -660,7 +681,8 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
       if (pts.length === 2) {
         setDrag({ mode: 'pinch', d0: Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]), mid: [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2], from: view3d })
       } else {
-        setDrag({ mode: e.shiftKey || e.button === 2 ? 'orbit' : 'pan', at: local(e), from: view3d })
+        // The plan has no heading or tilt to change: every drag on it pans.
+        setDrag({ mode: (e.shiftKey || e.button === 2) && view === 'relief' ? 'orbit' : 'pan', at: local(e), from: view3d })
       }
     },
     onPointerMove: e => {
@@ -691,14 +713,14 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
       if (pointers.current.size === 0) setDrag(null)
     },
     onContextMenu: e => e.preventDefault(),
-    onDoubleClick: () => setView3d(HOME_CAMERA),
+    onDoubleClick: () => setView3d(view === 'plan' ? HOME_PLAN : HOME_CAMERA),
   }
 
   // The wheel zooms about the pointer. Attached by hand: React's wheel listener is
   // passive, and without preventDefault the page would scroll as well.
   useEffect(() => {
     const el = svgRef.current
-    if (!el || view !== 'relief') return
+    if (!el || (view !== 'relief' && view !== 'plan')) return
     const onWheel = e => {
       e.preventDefault()
       const at = local(e)
@@ -761,107 +783,54 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
     const ridges = chain.slice(1).map((B, n) => ({ A: chain[n], B }))
     const highest = Math.max(...peaks.map(p => p.peak))
 
-    // The ground runs a margin past the frame on every side, so a mountain near the
-    // edge slopes away out of view instead of being cut off at the border.
-    const cols = Math.ceil((GW + 2 * MARGIN) / CELL) + 1, rows = Math.ceil((GH + 2 * MARGIN) / CELL) + 1
-    const field = new Float32Array(cols * rows)
-    // Per cell: how warm the projects whose ground this is are (their heat, mixed by
-    // how much of the height each contributes), and how much of the height is
-    // theirs at all rather than foothills. Both vary smoothly, so brightness does too.
-    const warm = new Float32Array(cols * rows)
-    const owned = new Float32Array(cols * rows)
+    // The terrain is a function of position, defined everywhere: the projects'
+    // summits and ridges where they stand, and foothills and valleys without end
+    // around them. Nothing is computed here but its shape; the views ask for the
+    // tiles they can see (buildTile), so the ground goes on as far as anyone pans.
+    // Each sample also carries how warm the projects whose ground it is are (their
+    // heat, mixed by how much of the height each contributes) and how much of the
+    // height is theirs at all rather than foothills, so brightness varies smoothly.
+    const heads = summits.map(c => ({ ...c, cos: Math.cos(c.heading), sin: Math.sin(c.heading) }))
     const share = new Float32Array(peaks.length)
-    for (let j = 0; j < rows; j++) {
-      for (let i = 0; i < cols; i++) {
-        const x = i * CELL - MARGIN, y = j * CELL - MARGIN
-        share.fill(0)
-        let sum = 0
-        for (const c of summits) {
-          const dx = x - c.x, dy = y - c.y
-          const cos = Math.cos(c.heading), sin = Math.sin(c.heading)
-          const u = (dx * cos + dy * sin) / c.sa, v = (-dx * sin + dy * cos) / c.sb
-          // Between a cone and a bell: shoulders, not a needle.
-          const h = c.h * Math.exp(-((u * u + v * v) ** 0.85) * 0.9)
-          sum += h
-          share[c.k] += h
-        }
-        for (const { A, B } of ridges) {
-          const ex = B.x - A.x, ey = B.y - A.y
-          const len2 = ex * ex + ey * ey || 1
-          const t = Math.max(0, Math.min(1, ((x - A.x) * ex + (y - A.y) * ey) / len2))
-          const d = Math.hypot(x - (A.x + ex * t), y - (A.y + ey * t))
-          const w = (A.sigma + (B.sigma - A.sigma) * t) * 0.55
-          // Highest at the summits it joins, lowest midway: a saddle.
-          const crest = (A.peak + (B.peak - A.peak) * t) * 0.5 * (1 - 0.45 * Math.sin(Math.PI * t))
-          const h = crest * Math.exp(-((d / w) ** 2))
-          sum += h
-          share[A.k] += h * (1 - t)
-          share[B.k] += h * t
-        }
-        // The rest of the ground is foothills and valleys, never a flat plain, so
-        // the whole map is terrain. It belongs to no project and is drawn dark.
-        // Fading to nothing toward the rim of the computed ground, so the lowest
-        // contours close as a coastline rather than along the rim's straight edge.
-        const rim = Math.min(x + MARGIN, GW + MARGIN - x, y + MARGIN, GH + MARGIN - y) / (MARGIN * 0.9)
-        const shore = rim >= 1 ? 1 : rim <= 0 ? 0 : rim * rim * (3 - 2 * rim)
-        const hills = shore * highest * 0.36 * wilds(x, y)
-        let mix = 0
-        for (let k = 0; k < share.length; k++) mix += share[k] * peaks[k].warmth
-        const ratio = sum / (sum + hills || 1)
-        const t = Math.max(0, Math.min(1, (ratio - 0.3) / 0.45))
-        // Rock: ridged noise cut into the slopes.
-        const rock = ridged(x / 46, y / 46) * 0.6 + ridged(x / 19 + 7, y / 19 - 3) * 0.3 + ridged(x / 8 - 2, y / 8 + 5) * 0.1
-        field[j * cols + i] = (sum + hills) * (0.84 + 0.3 * rock)
-        warm[j * cols + i] = sum > 0 ? mix / sum : 0
-        owned[j * cols + i] = t * t * (3 - 2 * t)
+    const surface = (x, y) => {
+      share.fill(0)
+      let sum = 0
+      for (const c of heads) {
+        const dx = x - c.x, dy = y - c.y
+        const u = (dx * c.cos + dy * c.sin) / c.sa, v = (-dx * c.sin + dy * c.cos) / c.sb
+        // Between a cone and a bell: shoulders, not a needle.
+        const h = c.h * Math.exp(-((u * u + v * v) ** 0.85) * 0.9)
+        sum += h
+        share[c.k] += h
       }
-    }
-    // Two passes of a 3×3 box blur before contouring: the ridged layers fold the
-    // surface along their crests, and contours traced across a fold turn hard
-    // corners that no real terrain draws.
-    blur(field, cols, rows)
-    blur(field, cols, rows)
-    const top = Math.max(...field)
-
-    // Contours are traced on a copy whose rim is sea level, so every ring closes.
-    const sea = Float32Array.from(field)
-    for (let i = 0; i < cols; i++) { sea[i] = 0; sea[(rows - 1) * cols + i] = 0 }
-    for (let j = 0; j < rows; j++) { sea[j * cols] = 0; sea[j * cols + cols - 1] = 0 }
-
-    // Sampled between cells, so a line's brightness changes along it without steps
-    // at cell edges.
-    const sample = (arr, gx, gy) => {
-      const i0 = Math.max(0, Math.min(cols - 2, Math.floor(gx))), j0 = Math.max(0, Math.min(rows - 2, Math.floor(gy)))
-      const fx = Math.max(0, Math.min(1, gx - i0)), fy = Math.max(0, Math.min(1, gy - j0))
-      const a = arr[j0 * cols + i0], b = arr[j0 * cols + i0 + 1], c = arr[(j0 + 1) * cols + i0], d = arr[(j0 + 1) * cols + i0 + 1]
-      return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy
-    }
-
-    // Per level: the rings (closed, for the relief's fills) and the strokes. Each
-    // piece of line takes its brightness and weight from the ground it crosses —
-    // a project's heat where the height is the project's, the foothills' low tone
-    // where it is not, and a blend between — then the noise shades it a little.
-    // Pieces that land on the same values share one path.
-    const levels = []
-    for (let l = 1; l <= LEVELS; l++) {
-      const z = (l / (LEVELS + 1)) * top
-      const segs = contours(sea, cols, rows, z)
-      const strokes = new Map()
-      for (const [a, b] of segs) {
-        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
-        const n = grain(mx, my, l)
-        if (n.drop) continue
-        const w = sample(warm, mx, my), mine = sample(owned, mx, my)
-        const alpha = (n.bucket + 0.5) / GRAIN_BUCKETS
-        const opacity = (FOOTHILL + ((COLD + (HOT - COLD) * w) - FOOTHILL) * mine) * (0.8 + 0.2 * alpha)
-        const weight = 1 + ((0.7 + 0.7 * w) - 1) * mine
-        const qo = Math.round(opacity * TONE_STEPS), qw = Math.round(weight * 4)
-        const key = `${qo}:${qw}`
-        if (!strokes.has(key)) strokes.set(key, { opacity: qo / TONE_STEPS, weight: qw / 4, segs: [] })
-        strokes.get(key).segs.push([a[0] + n.slip, a[1], b[0] + n.slip, b[1]])
+      for (const { A, B } of ridges) {
+        const ex = B.x - A.x, ey = B.y - A.y
+        const len2 = ex * ex + ey * ey || 1
+        const t = Math.max(0, Math.min(1, ((x - A.x) * ex + (y - A.y) * ey) / len2))
+        const d = Math.hypot(x - (A.x + ex * t), y - (A.y + ey * t))
+        const w = (A.sigma + (B.sigma - A.sigma) * t) * 0.55
+        // Highest at the summits it joins, lowest midway: a saddle.
+        const crest = (A.peak + (B.peak - A.peak) * t) * 0.5 * (1 - 0.45 * Math.sin(Math.PI * t))
+        const h = crest * Math.exp(-((d / w) ** 2))
+        sum += h
+        share[A.k] += h * (1 - t)
+        share[B.k] += h * t
       }
-      levels.push({ l, z, index: l % INDEX_EVERY === 0, rings: stitch(segs), strokes: [...strokes.values()] })
+      // Foothills and valleys, never a flat plain; they belong to no project.
+      const hills = highest * 0.36 * wilds(x, y)
+      let mix = 0
+      for (let k = 0; k < share.length; k++) mix += share[k] * peaks[k].warmth
+      const ratio = sum / (sum + hills || 1)
+      const t = Math.max(0, Math.min(1, (ratio - 0.3) / 0.45))
+      // Rock: ridged noise cut into the slopes.
+      const rock = ridged(x / 46, y / 46) * 0.6 + ridged(x / 19 + 7, y / 19 - 3) * 0.3 + ridged(x / 8 - 2, y / 8 + 5) * 0.1
+      return [(sum + hills) * (0.84 + 0.3 * rock), sum > 0 ? mix / sum : 0, t * t * (3 - 2 * t)]
     }
+    // Contour heights are fixed for the whole map, so tiles agree where they meet:
+    // spaced up to the highest point near the mountains.
+    let top = 0
+    for (let y = -TILE; y <= GH + TILE; y += 8) for (let x = -TILE; x <= GW + TILE; x += 8) top = Math.max(top, surface(x, y)[0])
+    top *= 0.97
 
     // Tasks on the slopes, as a sunflower spiral from the summit outward: each
     // point sits at the same distance from its neighbours whatever the count, in
@@ -875,13 +844,24 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         const a = i * golden + p.x * 0.013
         return { task: t, project: p.name, status: t.status in DOT ? t.status : 'todo', x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }
       }))
-    return { peaks, levels, dots, field, cols, rows, top, world: { GW, GH, fit: 1 / S } }
+    return { peaks, dots, surface, top, world: { GW, GH, fit: 1 / S } }
     // Keyed on what the map is drawn from, not on the array's identity: the share
     // page refetches every 30 seconds and hands over a fresh array each time, and
     // rebuilding the terrain for unchanged data cost a visitor about a second and a
     // half of script every half minute for as long as the page stayed open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terrainKey(projects), W, H])
+
+  // Tiles of the endless terrain, built when a view first needs them and kept for
+  // as long as the map is the same map.
+  // A fresh cache per map: `map` is not read, it is what the cache belongs to.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const tileCache = useMemo(() => new Map(), [map])
+  const tile = useCallback((tx, ty) => {
+    const key = `${tx},${ty}`
+    if (!tileCache.has(key)) tileCache.set(key, buildTile(map, tx, ty))
+    return tileCache.get(key)
+  }, [map, tileCache])
 
   if (!map) {
     return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.28)', fontSize: 12, padding: '18px 0' }}>{emptyLabel}</div>
@@ -924,13 +904,11 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
           ref={svgRef}
           className="kt-glitch-map"
-          style={{ display: 'block', cursor: view === 'relief' ? (drag ? 'grabbing' : 'grab') : undefined, touchAction: 'pan-y', userSelect: 'none', WebkitUserSelect: 'none' }}
-          {...(view === 'relief' ? orbit : {})}
+          style={{ display: 'block', cursor: drag ? 'grabbing' : 'grab', touchAction: 'pan-y', userSelect: 'none', WebkitUserSelect: 'none' }}
+          {...orbit}
         >
-          {view === 'plan'
-            ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} />
-            : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} view3d={view3d} moving={!!drag} />}
-          <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
+          <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} view3d={view3d} moving={!!drag} tile={tile} />
+          <Frame W={W} H={H} peaks={map.peaks} view={view} />
         </svg>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 6, color: 'var(--kt-muted)', fontSize: 10, textTransform: 'uppercase' }}>

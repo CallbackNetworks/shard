@@ -49,8 +49,9 @@ the back left is untouched. Tasks are small squares on the slopes, spiralling ou
 summit, and every task gets the same patch of ground — a project's size is its number
 of tasks, not its share of the largest. A task that has changed lately is brighter and
 breathes; one nobody has touched holds still. Point at one, or at a summit, to see
-what it is. **Map** draws it as contour lines from above; **3D** draws
-the same terrain in perspective from nearly overhead. Drag it to move around, use the wheel (or pinch, on a
+what it is. The ground has no edge: foothills and valleys go on in every direction
+as far as you move. **Map** draws it as contour lines from above; **3D** draws
+the same terrain in perspective from nearly overhead. Drag either to move around, use the wheel (or pinch, on a
 phone) to zoom in on a crowded corner, and shift-drag to turn and tilt it; double-click
 puts it back;
 **Timeline** shows when each project was busy. Past eight projects the smallest fold

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import ContourMap, { axes, camera, foldFoothills, footprint, liveliness, HOME_CAMERA, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
+import ContourMap, { axes, buildTile, camera, foldFoothills, footprint, HOME_PLAN, liveliness, HOME_CAMERA, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
 
 const task = (id, status) => ({ id, title: id, status })
 const W = 720, H = 420
@@ -49,6 +49,28 @@ describe('liveliness', () => {
   })
 })
 
+describe('buildTile', () => {
+  // A smooth hilly surface with no project on it.
+  const map = { top: 1, surface: (x, y) => [0.5 + 0.4 * Math.sin(x / 70) * Math.cos(y / 55), 0, 0] }
+  const edgePoints = (levels, x) => levels.flatMap(lv => lv.strokes.flatMap(st => st.segs.flatMap(([ax, ay, bx, by]) => [[ax, ay], [bx, by]])))
+    .filter(([px]) => Math.abs(px - x) < 1e-6).map(([, py]) => py.toFixed(4)).sort()
+
+  it('traces every contour level of the map', () => {
+    expect(buildTile(map, 0, 0)).toHaveLength(20)
+  })
+
+  it('meets its neighbour at the seam, so contours run across unbroken', () => {
+    const left = edgePoints(buildTile(map, 0, 0), 300)
+    const right = new Set(edgePoints(buildTile(map, 1, 0), 300))
+    expect(left.length).toBeGreaterThan(10)
+    // Not every one: the wear drops or slips a few pieces of line on purpose, and a
+    // piece lost on one side of the seam has no partner on the other. A broken seam
+    // would match almost none.
+    const matched = left.filter(y => right.has(y)).length
+    expect(matched / left.length).toBeGreaterThan(0.9)
+  })
+})
+
 describe('camera', () => {
   const ax = axes(W, H)
   const mid = [(ax.x0 + ax.x1) / 2, (ax.y0 + ax.y1) / 2]
@@ -91,6 +113,14 @@ describe('camera', () => {
       return cam.project(mid[0] + 50, mid[1], 0)[0] - cam.project(mid[0] - 50, mid[1], 0)[0]
     }
     expect(span(2)).toBeCloseTo(span(1) * 2, 6)
+  })
+
+  it('looks straight down without perspective for the plan', () => {
+    const cam = camera(W, H, HOME_PLAN, 1)
+    const span = y => cam.project(mid[0] + 50, y, 0)[0] - cam.project(mid[0] - 50, y, 0)[0]
+    expect(span(ax.y1)).toBeCloseTo(span(ax.y0), 6)
+    const [gx, gy] = cam.toGround(...cam.project(mid[0] + 20, mid[1] + 10, 0))
+    expect(gx).toBeCloseTo(mid[0] + 20, 6); expect(gy).toBeCloseTo(mid[1] + 10, 6)
   })
 
   it('orders depth so a turned map still paints its near side last', () => {
@@ -175,11 +205,10 @@ describe('ContourMap', () => {
       projects={[{ id: 'p1', name: 'Alpha', heat: 5, lastActive: 0, tasks: [task('t1', 'done'), task('t2', 'in_progress')] }]}
       extraViews={[{ key: 'other', label: 'Other', render: () => <p>another view</p> }]}
     />)
-    // 3D draws the terrain in perspective on a canvas; the plan draws it as SVG lines.
-    const relief = () => container.querySelectorAll('canvas').length
-    expect(relief()).toBe(1)
+    // Both views draw the same endless terrain on a canvas; only the camera differs.
+    expect(container.querySelectorAll('canvas').length).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: 'Map' }))
-    expect(relief()).toBe(0)
+    expect(container.querySelectorAll('canvas').length).toBe(1)
     expect(screen.getByRole('button', { name: '3D' }).getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByRole('button', { name: 'Map' }).getAttribute('aria-pressed')).toBe('true')
     // Every task is still on the map in either view.
