@@ -45,6 +45,27 @@ describe('camera', () => {
     expect(y1).toBeLessThan(y0)
   })
 
+  it('finds the ground point under a screen point, at any heading, zoom and pan', () => {
+    for (const view of [HOME_CAMERA, { az: 0.7, tilt: 0.6, zoom: 2.4, pan: [40, -25] }]) {
+      const cam = camera(W, H, view, 1)
+      const [sx, sy] = cam.project(mid[0] + 60, mid[1] - 35, 0)
+      const [gx, gy] = cam.toGround(sx, sy)
+      expect(gx).toBeCloseTo(mid[0] + 60, 6); expect(gy).toBeCloseTo(mid[1] - 35, 6)
+    }
+  })
+
+  it('starts high enough that the horizon is above the frame', () => {
+    expect(camera(W, H, HOME_CAMERA, 1).horizon).toBeLessThan(0)
+  })
+
+  it('zooming in draws the same ground larger', () => {
+    const span = zoom => {
+      const cam = camera(W, H, { ...HOME_CAMERA, zoom }, 1)
+      return cam.project(mid[0] + 50, mid[1], 0)[0] - cam.project(mid[0] - 50, mid[1], 0)[0]
+    }
+    expect(span(2)).toBeCloseTo(span(1) * 2, 6)
+  })
+
   it('orders depth so a turned map still paints its near side last', () => {
     const turned = camera(W, H, { ...HOME_CAMERA, az: Math.PI }, 1)
     // Half a turn: the back edge is now the near one.

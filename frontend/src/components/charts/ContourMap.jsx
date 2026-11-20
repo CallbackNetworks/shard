@@ -285,7 +285,7 @@ function Frame({ W, H, peaks, levels, view }) {
         fill="none" stroke="rgba(var(--kt-ink-rgb), 0.45)" strokeWidth={1}
       />
       <text x={W - 6} y={H - 6} textAnchor="end" fontSize={8} fill="rgba(var(--kt-ink-rgb), 0.4)">
-        {`${view === 'plan' ? 'PLAN' : 'RELIEF · DRAG TO ORBIT'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
+        {`${view === 'plan' ? 'PLAN' : 'RELIEF · DRAG MOVE · WHEEL ZOOM · SHIFT TURN'} · SITES ${String(peaks.length).padStart(2, '0')} · TSK ${String(tasks).padStart(3, '0')} · ACT/30D ${String(act).padStart(4, '0')} · LVL ${levels.length}`}
       </text>
     </g>
   )
@@ -363,31 +363,43 @@ function spreadLabels(labels) {
 // The camera: `az` turns the ground about its centre, `tilt` is how steeply it is
 // looked down on (1 top-down, 0 edge-on). Dragging moves both, within limits that
 // keep the ground readable; a double-click returns here.
-export const HOME_CAMERA = { az: 0, tilt: 0.42 }
-export const TILT_RANGE = [0.25, 0.7]
+// The camera starts nearly overhead, so the terrain fills the frame instead of
+// sharing it with a sky; perspective stays, gently, so it still reads as ground.
+// `zoom` scales the view and `pan` is the ground point it looks at, relative to
+// the middle of the axes.
+export const HOME_CAMERA = { az: 0, tilt: 0.9, zoom: 1, pan: [0, 0] }
+export const TILT_RANGE = [0.45, 0.98]
+export const ZOOM_RANGE = [0.6, 5]
 
-// Perspective projection of ground point (x, y) at height z. The eye is low and
-// the perspective strong, so the ground plane runs away to a horizon inside the
-// frame: the terrain stands on a plain that goes on past where anything is drawn.
-export function camera(W, H, { az, tilt }, lift) {
+// Perspective projection of ground point (x, y) at height z, and its inverse on
+// the ground plane, which panning and zooming need to keep the point under the
+// pointer under the pointer.
+export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0] }, lift) {
   const ax = axes(W, H)
-  const cx = (ax.x0 + ax.x1) / 2, cy = (ax.y0 + ax.y1) / 2
+  const cx = (ax.x0 + ax.x1) / 2 + pan[0], cy = (ax.y0 + ax.y1) / 2 + pan[1]
   const cos = Math.cos(az), sin = Math.sin(az)
-  const D = W * 0.85
-  const zoom = 0.9
-  const base = H * 0.72
+  const D = W * 1.6
+  const scale = 0.9 * zoom
+  const base = H * 0.55
   const project = (x, y, z) => {
     const dx = x - cx, dy = y - cy
     const rx = dx * cos - dy * sin
     const ry = dx * sin + dy * cos
-    const k = (D / (D - ry)) * zoom
+    const k = (D / (D - ry)) * scale
     return [W / 2 + rx * k, base + (ry * tilt - z * lift) * k]
   }
-  // Nearness: larger is nearer the viewer; 0 is the middle of the ground.
+  const toGround = (sx, sy) => {
+    const v = sy - base
+    const ry = (v * D) / (tilt * D * scale + v)
+    const k = (D / (D - ry)) * scale
+    const rx = (sx - W / 2) / k
+    return [cx + rx * cos + ry * sin, cy - rx * sin + ry * cos]
+  }
+  // Nearness: larger is nearer the viewer; 0 is the point looked at.
   const depth = (x, y) => (x - cx) * sin + (y - cy) * cos
-  // Where the ground meets the sky: the limit of `project` as depth runs to -∞.
-  const horizon = base - D * zoom * tilt
-  return { project, depth, horizon, D, centre: [cx, cy] }
+  // Where the ground meets the sky — above the frame at the home tilt.
+  const horizon = base - D * scale * tilt
+  return { project, toGround, depth, horizon, D, centre: [cx, cy] }
 }
 
 // The 3D view: the contour terrain in perspective, on a plain that runs to the
@@ -562,30 +574,88 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
   const [focus, setFocus] = useState(null) // { kind: 'task' | 'peak', ... }
   const [view, setView] = useState(initialView) // 'relief' (3D) | 'plan' (top-down) | an extra view's key
   const [view3d, setView3d] = useState(HOME_CAMERA)
-  const [drag, setDrag] = useState(null) // { x, y, from } while the pointer is orbiting
+  const [drag, setDrag] = useState(null) // the gesture in progress, if any
   const frame = useRef(0)
+  const pointers = useRef(new Map())
+  const svgRef = useRef(null)
 
-  // Drag to orbit: sideways turns the ground, up and down changes how steeply it
-  // is seen. A finger only turns it, so a vertical swipe still scrolls the page.
+  // Pointer positions in the SVG's own units, which is what the camera works in.
+  const local = e => {
+    const r = svgRef.current.getBoundingClientRect()
+    return [((e.clientX - r.left) / r.width) * width, ((e.clientY - r.top) / r.height) * height]
+  }
+  const clampZoom = z => Math.max(ZOOM_RANGE[0], Math.min(ZOOM_RANGE[1], z))
+  // Move `cam` so the ground point that was under `before` (screen) ends up under
+  // `after`: the rule for both dragging and zooming about the pointer.
+  const keepUnder = (from, next, before, after) => {
+    const g0 = camera(width, height, from, 1).toGround(...before)
+    const g1 = camera(width, height, next, 1).toGround(...after)
+    return { ...next, pan: [next.pan[0] + g0[0] - g1[0], next.pan[1] + g0[1] - g1[1]] }
+  }
+  const schedule = next => {
+    cancelAnimationFrame(frame.current)
+    frame.current = requestAnimationFrame(() => setView3d(next))
+  }
+
+  // Drag moves the ground under the pointer; shift-drag (or a right-button drag)
+  // turns and tilts it; two fingers pinch to zoom and move together to pan. One
+  // finger moving vertically is left to the page, so the map never traps a scroll.
   const orbit = {
     onPointerDown: e => {
-      if (e.button !== 0) return
-      setDrag({ x: e.clientX, y: e.clientY, from: view3d, touch: e.pointerType === 'touch' })
+      if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return
+      pointers.current.set(e.pointerId, local(e))
       e.currentTarget.setPointerCapture?.(e.pointerId)
+      const pts = [...pointers.current.values()]
+      if (pts.length === 2) {
+        setDrag({ mode: 'pinch', d0: Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]), mid: [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2], from: view3d })
+      } else {
+        setDrag({ mode: e.shiftKey || e.button === 2 ? 'orbit' : 'pan', at: local(e), from: view3d })
+      }
     },
     onPointerMove: e => {
-      if (!drag) return
-      const dx = e.clientX - drag.x, dy = e.clientY - drag.y
-      cancelAnimationFrame(frame.current)
-      frame.current = requestAnimationFrame(() => setView3d({
-        az: drag.from.az + dx * 0.008,
-        tilt: drag.touch ? drag.from.tilt : Math.max(TILT_RANGE[0], Math.min(TILT_RANGE[1], drag.from.tilt - dy * 0.004)),
-      }))
+      if (!drag || !pointers.current.has(e.pointerId)) return
+      pointers.current.set(e.pointerId, local(e))
+      const pts = [...pointers.current.values()]
+      if (drag.mode === 'pinch' && pts.length === 2) {
+        const d = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1])
+        const mid = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2]
+        schedule(keepUnder(drag.from, { ...drag.from, zoom: clampZoom(drag.from.zoom * (d / (drag.d0 || 1))) }, drag.mid, mid))
+      } else if (drag.mode === 'orbit') {
+        const [x, y] = local(e)
+        schedule({
+          ...drag.from,
+          az: drag.from.az + (x - drag.at[0]) * 0.008,
+          tilt: Math.max(TILT_RANGE[0], Math.min(TILT_RANGE[1], drag.from.tilt - (y - drag.at[1]) * 0.004)),
+        })
+      } else if (drag.mode === 'pan') {
+        schedule(keepUnder(drag.from, drag.from, drag.at, local(e)))
+      }
     },
-    onPointerUp: () => setDrag(null),
-    onPointerCancel: () => setDrag(null),
+    onPointerUp: e => {
+      pointers.current.delete(e.pointerId)
+      if (pointers.current.size === 0) setDrag(null)
+    },
+    onPointerCancel: e => {
+      pointers.current.delete(e.pointerId)
+      if (pointers.current.size === 0) setDrag(null)
+    },
+    onContextMenu: e => e.preventDefault(),
     onDoubleClick: () => setView3d(HOME_CAMERA),
   }
+
+  // The wheel zooms about the pointer. Attached by hand: React's wheel listener is
+  // passive, and without preventDefault the page would scroll as well.
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el || view !== 'relief') return
+    const onWheel = e => {
+      e.preventDefault()
+      const at = local(e)
+      setView3d(v => keepUnder(v, { ...v, zoom: clampZoom(v.zoom * Math.exp(-e.deltaY * 0.0008)) }, at, at))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  })
   const W = width, H = height
 
   const map = useMemo(() => {
@@ -789,6 +859,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           role="img"
           aria-label={map.peaks.map(p => `${p.name}: ${p.open} open of ${p.tasks.length} tasks, ${p.heat} recent updates`).join('; ')}
           onClick={e => { if (e.target === e.currentTarget) setFocus(null) }}
+          ref={svgRef}
           className="kt-glitch-map"
           style={{ display: 'block', cursor: view === 'relief' ? (drag ? 'grabbing' : 'grab') : undefined, touchAction: 'pan-y', userSelect: 'none', WebkitUserSelect: 'none' }}
           {...(view === 'relief' ? orbit : {})}

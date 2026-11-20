@@ -47,9 +47,9 @@ reading, not decoration — left to right is how long since the project last cha
 is done. So a mountain at the front right is recent and nearly finished, and one at
 the back left is untouched. Tasks are small squares on the slopes; point at one, or at
 a summit, to see what it is. **Map** draws it as contour lines from above; **3D** draws
-the same terrain in perspective, standing on a plain that runs away to a lit horizon.
-Drag the 3D view to turn it or change how steeply you look down on it, double-click to
-put it back;
+the same terrain in perspective from nearly overhead. Drag it to move around, use the wheel (or pinch, on a
+phone) to zoom in on a crowded corner, and shift-drag to turn and tilt it; double-click
+puts it back;
 **Timeline** shows when each project was busy. Past eight projects the smallest fold
 into one low range labelled with how many it holds.
 
