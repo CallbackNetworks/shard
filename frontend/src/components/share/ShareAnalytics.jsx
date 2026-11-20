@@ -1,7 +1,7 @@
 import TerrainChart from '../charts/TerrainChart'
 import ContourMap from '../charts/ContourMap'
-import ActivityHeatmap from '../charts/ActivityHeatmap'
-import StatusTrendChart from '../charts/StatusTrendChart'
+import ActivityStrip from '../charts/ActivityStrip'
+import StatusFlow from '../charts/StatusFlow'
 import BurndownChart from '../charts/BurndownChart'
 import VelocityChart from '../charts/VelocityChart'
 import now from './ShareNow.module.css'
@@ -86,14 +86,14 @@ export default function ShareAnalytics({ analytics, projects = [], bp }) {
       </Panel>
 
       {heatmap.length > 0 && (
-        <Panel title="Activity · 12 months" sub={yearTotal} wide>
-          <ActivityHeatmap data={heatmap} />
+        <Panel title="Activity" sub={yearTotal} wide>
+          <ActivityStrip data={heatmap} width={mobile ? 380 : 720} />
         </Panel>
       )}
 
       {trend.length > 0 && (
-        <Panel title="Status trend · 30 days">
-          <StatusTrendChart data={trend} />
+        <Panel title="Status flow · 30 days" wide>
+          <StatusFlow data={trend} width={mobile ? 380 : 720} />
         </Panel>
       )}
 
