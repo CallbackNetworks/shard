@@ -8,18 +8,15 @@ const TODAY = new Date('2026-11-19T12:00:00Z')
 const day = n => new Date(TODAY.getTime() - n * 86400000).toISOString().slice(0, 10)
 
 describe('stripWeeks', () => {
-  it('starts shortly before the first activity instead of a year back', () => {
-    const { weeks } = stripWeeks([{ date: day(60), count: 3 }], TODAY)
+  it('draws a whole year when the width allows small cells', () => {
+    expect(stripWeeks(720, TODAY).weeks).toBeGreaterThanOrEqual(53)
+  })
+
+  it('shows fewer, recent weeks on a narrow screen instead of shrinking cells away', () => {
+    const { weeks, end } = stripWeeks(380, TODAY)
+    expect(weeks).toBeLessThan(40)
     expect(weeks).toBeGreaterThanOrEqual(13)
-    expect(weeks).toBeLessThan(15)
-  })
-
-  it('never reaches back more than a year', () => {
-    expect(stripWeeks([{ date: day(900), count: 1 }], TODAY).weeks).toBeLessThanOrEqual(54)
-  })
-
-  it('reaches back far enough to fill the width it is given', () => {
-    expect(stripWeeks([{ date: day(3), count: 1 }], TODAY, 25).weeks).toBeGreaterThanOrEqual(25)
+    expect(end.toISOString().slice(0, 10)).toBe('2026-11-19')
   })
 })
 

@@ -452,7 +452,7 @@ const RISE = 0.3          // the tallest summit stands this fraction of the fram
 const GRID_STEP = 90      // the endless ground's grid spacing, in ground units
 const GRID_REACH = 5000   // how far out the grid is drawn before fog has taken it anyway
 
-function ReliefCanvas({ map, cam, W, H, lift, moving }) {
+function ReliefCanvas({ map, cam, camKey, W, H, lift, moving }) {
   const ref = useRef(null)
   useEffect(() => {
     const canvas = ref.current
@@ -541,7 +541,9 @@ function ReliefCanvas({ map, cam, W, H, lift, moving }) {
       }
     }
     ctx.globalAlpha = 1
-  })
+    // Redrawn when the terrain or the camera changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, camKey, W, H, lift, moving])
   return <canvas ref={ref} className="kt-terrain-breathe" style={{ width: W, height: H, display: 'block' }} />
 }
 
@@ -562,7 +564,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
   return (
     <>
       <foreignObject x={0} y={0} width={W} height={H} pointerEvents="none">
-        <ReliefCanvas map={map} cam={cam} W={W} H={H} lift={lift} moving={moving} />
+        <ReliefCanvas map={map} cam={cam} camKey={JSON.stringify(view3d)} W={W} H={H} lift={lift} moving={moving} />
       </foreignObject>
       <Graticule f={(x, y) => px(x, y, 0)} W={map.world.GW} H={map.world.GH} part="axes" />
       {pins.map(({ d, z }) => {
@@ -581,6 +583,13 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
     </>
   )
 }
+
+// Everything the terrain is computed from, as one string: equal strings mean the
+// same map, so a refetch that changed nothing recomputes nothing.
+export const terrainKey = projects => projects.map(p => [
+  p.id, p.name, p.heat, p.lastActive,
+  p.tasks.map(t => `${t.id}:${t.status}:${t.due_date || ''}:${t.updated_at || ''}:${t.recent_updates || 0}`).join(','),
+].join('|')).join(';')
 
 // Past a handful the map stops being a landscape and becomes texture, so the
 // mountains with the most open work are drawn and the rest fold into one low
@@ -867,7 +876,12 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         return { task: t, project: p.name, status: t.status in DOT ? t.status : 'todo', x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }
       }))
     return { peaks, levels, dots, field, cols, rows, top, world: { GW, GH, fit: 1 / S } }
-  }, [projects, W, H])
+    // Keyed on what the map is drawn from, not on the array's identity: the share
+    // page refetches every 30 seconds and hands over a fresh array each time, and
+    // rebuilding the terrain for unchanged data cost a visitor about a second and a
+    // half of script every half minute for as long as the page stayed open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terrainKey(projects), W, H])
 
   if (!map) {
     return <div style={{ color: 'rgba(var(--kt-ink-rgb), 0.28)', fontSize: 12, padding: '18px 0' }}>{emptyLabel}</div>
