@@ -4,12 +4,13 @@ import json
 import logging
 import os
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -152,6 +153,25 @@ def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
     stats = graph.container_subtree_stats(db, p.id)
     total, done = stats.total_tasks, stats.done_tasks
 
+    # How often each task has changed lately, for the terrain map: a task that keeps
+    # changing breathes on the page, one nobody has touched holds still. Counted in
+    # one query per project, from the same log the feed reads, visits excluded.
+    since = datetime.now(UTC) - timedelta(days=30)
+    recent_updates = (
+        dict(
+            db.query(ActivityLog.task_id, func.count(ActivityLog.id))
+            .filter(
+                ActivityLog.task_id.in_(task_ids),
+                ActivityLog.action.notin_(_NOT_WORK),
+                ActivityLog.created_at >= since,
+            )
+            .group_by(ActivityLog.task_id)
+            .all()
+        )
+        if task_ids
+        else {}
+    )
+
     project_labels = []
     seen_labels = set()
     for lbl in graph.labels_in_project(db, p.id):
@@ -210,6 +230,8 @@ def _serialize_project(p: graph.ProjectView, db: Session, include_notes: bool):
                 "progress_pct": t.progress_pct,
                 "time_estimate": t.time_estimate,
                 "time_spent": t.time_spent,
+                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+                "recent_updates": recent_updates.get(t.id, 0),
                 "labels": t_labels,
                 "subtask_count": len(t_subtasks),
                 "subtasks": subtask_details,

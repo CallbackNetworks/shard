@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import ContourMap, { axes, camera, foldFoothills, HOME_CAMERA, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
+import ContourMap, { axes, camera, foldFoothills, footprint, liveliness, HOME_CAMERA, MAX_MOUNTAINS, placeMountains, RECENCY_DAYS } from '../ContourMap'
 
 const task = (id, status) => ({ id, title: id, status })
 const W = 720, H = 420
@@ -19,6 +19,33 @@ describe('axes', () => {
   it('puts nothing done at the back and everything done at the front', () => {
     expect(ax.y(0)).toBe(ax.y0)
     expect(ax.y(1)).toBe(ax.y1)
+  })
+})
+
+describe('footprint', () => {
+  it('grows with the absolute number of tasks, not with a share of the largest', () => {
+    expect(footprint(44)).toBeGreaterThan(footprint(11))
+    // Area per task stays the same, so four times the tasks is twice the spread above the floor.
+    expect(footprint(44) - footprint(0)).toBeCloseTo(2 * (footprint(11) - footprint(0)), 6)
+  })
+})
+
+describe('liveliness', () => {
+  const now = Date.parse('2026-11-19T12:00:00Z')
+  const day = d => new Date(now - d * 86400000).toISOString()
+
+  it('is high for a task that keeps changing and nothing for one never touched', () => {
+    expect(liveliness({ recent_updates: 6, updated_at: day(20) }, now)).toBe(1)
+    expect(liveliness({ recent_updates: 0, updated_at: null }, now)).toBe(0)
+  })
+
+  it('fades with the time since the last change', () => {
+    const today = liveliness({ updated_at: day(0) }, now)
+    const week = liveliness({ updated_at: day(7) }, now)
+    const month = liveliness({ updated_at: day(30) }, now)
+    expect(today).toBeGreaterThan(week)
+    expect(week).toBeGreaterThan(month)
+    expect(month).toBeLessThan(0.08)
   })
 })
 

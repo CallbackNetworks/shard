@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { isOverdue } from '../../utils/overdue'
 
-const LEVELS = 28            // contour lines between sea level and the highest summit
-const INDEX_EVERY = 5        // every fifth line is an index contour, drawn heavier
+const LEVELS = 20            // contour lines between sea level and the highest summit
+const INDEX_EVERY = 4        // every fourth line is an index contour, drawn heavier
 const CELL = 5               // field resolution: fine enough that small hills draw round, not as diamonds
 const MARGIN = 160           // ground computed past each edge of the frame
+const TASK_SPACING = 30      // ground distance between neighbouring task marks
+const WORLD_MAX = 2.4        // the ground grows with the work up to this many frames across
+// A mountain's spread for a number of tasks: wide enough that its tasks, laid out
+// TASK_SPACING apart, fit inside its slopes, plus a floor so one task is still a hill.
+export const footprint = n => 26 + TASK_SPACING * 0.6 * Math.sqrt(n)
 const HOT = 1, COLD = 0.4 // line opacity at the hottest and the quietest mountain
 const FOOTHILL = 0.55        // line opacity on ground that belongs to no project, below any COLD line once dimmed
 const TONE_STEPS = 24        // brightness steps between black and white: fine enough to read as a gradient
@@ -186,24 +191,56 @@ function stitch(segs) {
   return rings
 }
 
+// How alive a task is, 0..1: how often it changed in the last 30 days, or how
+// recently it changed at all, whichever says more. Feeds a mark's brightness and
+// how it breathes, so the parts of the map being worked on are the ones that move.
+export function liveliness(task, now = Date.now()) {
+  const often = Math.min(1, (task.recent_updates || 0) / 6)
+  const age = task.updated_at ? (now - new Date(task.updated_at).getTime()) / 86400000 : Infinity
+  const lately = Number.isFinite(age) ? Math.exp(-Math.max(0, age) / 7) * 0.85 : 0
+  return Math.max(often, lately)
+}
+
 function TaskDot({ d, x, y, on, pickProps }) {
   const style = DOT[d.status]
+  const life = liveliness(d.task)
+  const base = 0.35 + 0.65 * life
+  // A lively mark breathes deeper and quicker; a still one does not breathe at all.
+  // The phase comes from the task id, so neighbours do not pulse in step.
+  const id = String(d.task.id)
+  const breathing = life > 0.08 ? {
+    className: 'kt-breathe',
+    style: {
+      '--breath-period': `${(6.5 - 3.8 * life).toFixed(2)}s`,
+      '--breath-lo': (1 - 0.65 * life).toFixed(2),
+      animationDelay: `-${(hash(id.length + id.charCodeAt(id.length - 1), id.charCodeAt(0) || 1) * 6).toFixed(2)}s`,
+    },
+  } : {}
   return (
     <g style={{ cursor: 'pointer' }} {...pickProps}>
-      {/* Late is the outline turning red, not a recoloured fill: a late todo must not read as failed. */}
-      <rect
-        x={x - (on ? 3 : style.size / 2)} y={y - (on ? 3 : style.size / 2)}
-        width={on ? 6 : style.size} height={on ? 6 : style.size}
-        fill={style.fill}
-        stroke={isOverdue(d.task) ? LATE : style.stroke}
-        strokeWidth={0.7}
-      />
+      <g {...breathing}>
+        {/* Late is the outline turning red, not a recoloured fill: a late todo must not read as failed. */}
+        <rect
+          x={x - (on ? 3 : style.size / 2)} y={y - (on ? 3 : style.size / 2)}
+          width={on ? 6 : style.size} height={on ? 6 : style.size}
+          fill={style.fill}
+          fillOpacity={on ? 1 : base}
+          stroke={isOverdue(d.task) ? LATE : style.stroke}
+          strokeOpacity={on ? 1 : Math.max(base, 0.6)}
+          strokeWidth={0.7}
+        />
+      </g>
       {/* The mark is small; the target under the pointer is not. */}
-      <circle cx={x} cy={y} r={7} fill="transparent">
+      <circle cx={x} cy={y} r={8} fill="transparent">
         <title>{d.task.title}</title>
       </circle>
     </g>
   )
+}
+
+const relativeDays = iso => {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  return d <= 0 ? 'today' : `${d}d ago`
 }
 
 const MONO = "'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace"
@@ -334,16 +371,19 @@ function Strokes({ level, f, fringe = true }) {
 }
 
 // Top-down: the contour lines themselves.
-function PlanView({ map, focus, pick, lineOpacity, W, H }) {
-  const f = (x, y) => [x * CELL - MARGIN, y * CELL - MARGIN]
+function PlanView({ map, focus, pick, lineOpacity, W }) {
+  // The ground may be larger than the frame; the plan shows all of it, scaled to fit.
+  const { GW, GH, fit } = map.world
+  const g = (x, y) => [x * fit, y * fit]
+  const f = (x, y) => g(x * CELL - MARGIN, y * CELL - MARGIN)
   return (
     <>
-      <Graticule f={(x, y) => [x, y]} W={W} H={H} />
-      {map.levels.map(level => <g key={level.l}><Strokes level={level} f={f} /></g>)}
+      <Graticule f={g} W={GW} H={GH} />
+      <g className="kt-terrain-breathe">{map.levels.map(level => <g key={level.l}><Strokes level={level} f={f} /></g>)}</g>
       {map.dots.map(d => (
-        <TaskDot key={d.task.id} d={d} x={d.x} y={d.y} on={focus?.kind === 'task' && focus.task.id === d.task.id} pickProps={pick('task', d)} />
+        <TaskDot key={d.task.id} d={d} x={d.x * fit} y={d.y * fit} on={focus?.kind === 'task' && focus.task.id === d.task.id} pickProps={pick('task', d)} />
       ))}
-      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x} y={p.y} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
+      {map.peaks.map(p => <PeakLabel key={p.id} p={p} x={p.x * fit} y={p.y * fit} W={W} lineOpacity={lineOpacity} pickProps={pick('peak', p)} />)}
     </>
   )
 }
@@ -354,7 +394,7 @@ function spreadLabels(labels) {
   const placed = []
   for (const l of [...labels].sort((a, b) => b.y - a.y)) {
     let y = l.y
-    for (const q of placed) if (Math.abs(q.x - l.x) < 200 && Math.abs(q.y - y) < 26) y = q.y - 26
+    for (const q of placed) if (Math.abs(q.x - l.x) < 240 && Math.abs(q.y - y) < 32) y = q.y - 32
     placed.push({ ...l, y })
   }
   return placed
@@ -374,12 +414,13 @@ export const ZOOM_RANGE = [0.6, 5]
 // Perspective projection of ground point (x, y) at height z, and its inverse on
 // the ground plane, which panning and zooming need to keep the point under the
 // pointer under the pointer.
-export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0] }, lift) {
-  const ax = axes(W, H)
+export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0] }, lift, world = { GW: W, GH: H, fit: 1 }) {
+  const ax = axes(world.GW, world.GH)
   const cx = (ax.x0 + ax.x1) / 2 + pan[0], cy = (ax.y0 + ax.y1) / 2 + pan[1]
   const cos = Math.cos(az), sin = Math.sin(az)
   const D = W * 1.6
-  const scale = 0.9 * zoom
+  // `fit` shrinks a ground larger than the frame so all of it is in view at zoom 1.
+  const scale = 0.9 * zoom * world.fit
   const base = H * 0.55
   const project = (x, y, z) => {
     const dx = x - cx, dy = y - cy
@@ -409,7 +450,7 @@ export function camera(W, H, { az, tilt, zoom = 1, pan = [0, 0] }, lift) {
 // axes as SVG on top, where they stay pointable.
 const RISE = 0.3          // the tallest summit stands this fraction of the frame high
 const GRID_STEP = 90      // the endless ground's grid spacing, in ground units
-const GRID_REACH = 12000  // how far out the grid is drawn before fog has taken it anyway
+const GRID_REACH = 5000   // how far out the grid is drawn before fog has taken it anyway
 
 function ReliefCanvas({ map, cam, W, H, lift, moving }) {
   const ref = useRef(null)
@@ -501,13 +542,14 @@ function ReliefCanvas({ map, cam, W, H, lift, moving }) {
     }
     ctx.globalAlpha = 1
   })
-  return <canvas ref={ref} style={{ width: W, height: H, display: 'block' }} />
+  return <canvas ref={ref} className="kt-terrain-breathe" style={{ width: W, height: H, display: 'block' }} />
 }
 
 function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
   const { field, cols, rows, top, peaks, dots, levels } = map
-  const lift = (H * RISE) / top
-  const cam = camera(W, H, view3d, 1)
+  // Heights scale with the ground, so a larger world is not a flatter one.
+  const lift = (map.world.GH * RISE) / top
+  const cam = camera(W, H, view3d, 1, map.world)
   const px = (x, y, z) => cam.project(x, y, z * lift)
   const height = (x, y) => {
     const i = Math.max(0, Math.min(cols - 1, Math.round((x + MARGIN) / CELL)))
@@ -522,7 +564,7 @@ function ReliefView({ map, focus, pick, lineOpacity, W, H, view3d, moving }) {
       <foreignObject x={0} y={0} width={W} height={H} pointerEvents="none">
         <ReliefCanvas map={map} cam={cam} W={W} H={H} lift={lift} moving={moving} />
       </foreignObject>
-      <Graticule f={(x, y) => px(x, y, 0)} W={W} H={H} part="axes" />
+      <Graticule f={(x, y) => px(x, y, 0)} W={map.world.GW} H={map.world.GH} part="axes" />
       {pins.map(({ d, z }) => {
         const [x, y] = px(d.x, d.y, z)
         const on = focus?.kind === 'task' && focus.task.id === d.task.id
@@ -588,8 +630,8 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
   // Move `cam` so the ground point that was under `before` (screen) ends up under
   // `after`: the rule for both dragging and zooming about the pointer.
   const keepUnder = (from, next, before, after) => {
-    const g0 = camera(width, height, from, 1).toGround(...before)
-    const g1 = camera(width, height, next, 1).toGround(...after)
+    const g0 = camera(width, height, from, 1, map.world).toGround(...before)
+    const g1 = camera(width, height, next, 1, map.world).toGround(...after)
     return { ...next, pan: [next.pan[0] + g0[0] - g1[0], next.pan[1] + g0[1] - g1[1]] }
   }
   const schedule = next => {
@@ -668,11 +710,8 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
     // A big project that is mostly done is broad and low; a new one is narrow and
     // steep. A finished project is a low plain, not nothing: it still happened.
     const openOf = p => p.tasks.filter(t => !CLOSED.has(t.status)).length
-    const maxTasks = Math.max(...live.map(p => p.tasks.length))
     const maxOpen = Math.max(1, ...live.map(openOf))
     const maxHeat = Math.max(1, ...live.map(p => p.heat))
-    // Fewer mountains get more room each; more share the ground.
-    const base = Math.min(W, H) * (live.length === 1 ? 0.28 : 0.21 * Math.sqrt(3 / Math.max(3, live.length)))
     const items = [...live]
       .sort((a, b) => b.tasks.length - a.tasks.length || a.name.localeCompare(b.name))
       .map(p => {
@@ -684,11 +723,20 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           progress: done / p.tasks.length,
           // The folded range stays low whatever it holds: it is the rest, not a summit.
           peak: p.id === 'foothills' ? Math.min(0.3, 0.12 + 0.88 * (open / maxOpen)) : 0.12 + 0.88 * (open / maxOpen),
-          sigma: base * (0.45 + 0.55 * Math.sqrt(p.tasks.length / maxTasks)),
+          // Absolute, not relative to the largest: every task is given the same patch
+          // of ground, so a project's footprint grows with its work and its tasks
+          // never crowd however many there are.
+          sigma: footprint(p.tasks.length),
           warmth: p.heat / maxHeat,
         }
       })
-    const peaks = placeMountains(items, W, H)
+    // The ground is as large as the work on it: the frame's area, grown until the
+    // mountains' footprints fit with room between them. The 3D view starts zoomed
+    // out by the same factor, so everything is in sight before anyone zooms in.
+    const need = items.reduce((n, p) => n + Math.PI * (p.sigma * 1.5) ** 2, 0)
+    const S = Math.max(1, Math.min(WORLD_MAX, Math.sqrt(need / (0.42 * W * H))))
+    const GW = W * S, GH = H * S
+    const peaks = placeMountains(items, GW, GH)
 
     // One range, not separate mountains. The summits are strung along a spine in
     // the order of the horizontal axis — so the range runs from long-idle work to
@@ -706,7 +754,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
 
     // The ground runs a margin past the frame on every side, so a mountain near the
     // edge slopes away out of view instead of being cut off at the border.
-    const cols = Math.ceil((W + 2 * MARGIN) / CELL) + 1, rows = Math.ceil((H + 2 * MARGIN) / CELL) + 1
+    const cols = Math.ceil((GW + 2 * MARGIN) / CELL) + 1, rows = Math.ceil((GH + 2 * MARGIN) / CELL) + 1
     const field = new Float32Array(cols * rows)
     // Per cell: how warm the projects whose ground this is are (their heat, mixed by
     // how much of the height each contributes), and how much of the height is
@@ -745,7 +793,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
         // the whole map is terrain. It belongs to no project and is drawn dark.
         // Fading to nothing toward the rim of the computed ground, so the lowest
         // contours close as a coastline rather than along the rim's straight edge.
-        const rim = Math.min(x + MARGIN, W + MARGIN - x, y + MARGIN, H + MARGIN - y) / (MARGIN * 0.9)
+        const rim = Math.min(x + MARGIN, GW + MARGIN - x, y + MARGIN, GH + MARGIN - y) / (MARGIN * 0.9)
         const shore = rim >= 1 ? 1 : rim <= 0 ? 0 : rim * rim * (3 - 2 * rim)
         const hills = shore * highest * 0.36 * wilds(x, y)
         let mix = 0
@@ -806,18 +854,19 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
       levels.push({ l, z, index: l % INDEX_EVERY === 0, rings: stitch(segs), strokes: [...strokes.values()] })
     }
 
-    // Tasks on the slopes: a ring per status, spread evenly around the summit.
-    const dots = peaks.flatMap(p => {
-      const groups = {}
-      for (const t of p.tasks) (groups[t.status in DOT ? t.status : 'todo'] ||= []).push(t)
-      return Object.entries(groups).flatMap(([status, list]) =>
-        list.map((t, i) => {
-          const angle = (i / list.length) * Math.PI * 2 + p.x * 0.01 + DOT[status].r
-          const r = p.sigma * DOT[status].r
-          return { task: t, project: p.name, status, x: p.x + Math.cos(angle) * r, y: p.y + Math.sin(angle) * r * 0.8 }
-        }))
-    })
-    return { peaks, levels, dots, field, cols, rows, top }
+    // Tasks on the slopes, as a sunflower spiral from the summit outward: each
+    // point sits at the same distance from its neighbours whatever the count, in
+    // status order — in progress at the top, then todo, failed, and done at the foot.
+    const golden = Math.PI * (3 - Math.sqrt(5))
+    const rank = { in_progress: 0, todo: 1, failed: 2, done: 3 }
+    const dots = peaks.flatMap(p => [...p.tasks]
+      .sort((a, b) => (rank[a.status] ?? 1) - (rank[b.status] ?? 1))
+      .map((t, i) => {
+        const r = TASK_SPACING * 0.62 * Math.sqrt(i + 0.8)
+        const a = i * golden + p.x * 0.013
+        return { task: t, project: p.name, status: t.status in DOT ? t.status : 'todo', x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }
+      }))
+    return { peaks, levels, dots, field, cols, rows, top, world: { GW, GH, fit: 1 / S } }
   }, [projects, W, H])
 
   if (!map) {
@@ -865,7 +914,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
           {...(view === 'relief' ? orbit : {})}
         >
           {view === 'plan'
-            ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} />
+            ? <PlanView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} />
             : <ReliefView map={map} focus={focus} pick={pick} lineOpacity={lineOpacity} W={W} H={H} view3d={view3d} moving={!!drag} />}
           <Frame W={W} H={H} peaks={map.peaks} levels={map.levels} view={view} />
         </svg>
@@ -881,6 +930,7 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
             <svg width="8" height="8" aria-hidden="true"><rect x="2.5" y="2.5" width="3" height="3" fill="none" stroke={LATE} strokeWidth={0.7} /></svg>
             overdue
           </span>
+          <span>· brighter and breathing = changed lately</span>
         </div>
 
         {focus && (
@@ -911,6 +961,8 @@ export default function ContourMap({ projects, width = 720, height = 420, emptyL
                   {focus.project} · {focus.status.replace('_', ' ')}
                   {focus.task.progress_pct != null && ` · ${focus.task.progress_pct}%`}
                   {focus.task.due_date && ` · due ${new Date(focus.task.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`}
+                {focus.task.updated_at && ` · changed ${relativeDays(focus.task.updated_at)}`}
+                {focus.task.recent_updates > 0 && ` · ${focus.task.recent_updates} updates in 30 days`}
                   {overdue(focus.task) && <span style={{ color: 'var(--kt-status-failed, #fb7185)' }}> · overdue</span>}
                 </div>
               </>

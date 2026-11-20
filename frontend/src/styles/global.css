@@ -533,6 +533,15 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   77% { transform: translateX(4px); }
   80% { transform: translate(-1px, -1px); }
 }
+/* Breathing (ContourMap): a slow rise and fall of opacity. A task mark sets its own
+   period and depth from how lately it changed; the terrain breathes slowly and
+   shallowly as a whole. Opacity only, so the browser composites it without a repaint. */
+@keyframes ktBreathe {
+  0%, 100% { opacity: var(--breath-lo, 0.6); }
+  50% { opacity: 1; }
+}
+.kt-breathe { animation: ktBreathe var(--breath-period, 4s) ease-in-out infinite; }
+.kt-terrain-breathe { --breath-lo: 0.8; animation: ktBreathe 9s ease-in-out infinite; }
 .kt-glitch-map .kt-fringe-r { animation: ktFringeJump 2.6s steps(1) infinite; }
 .kt-glitch-map .kt-fringe-c { animation: ktFringeJump 3.1s steps(1) infinite reverse; }
 .kt-share-marquee-track b {
@@ -4334,6 +4343,8 @@ select[style*="border-radius"],
   :root:not([data-motion="full"]) .kt-ticker-track,
   :root:not([data-motion="full"]) .kt-alert-strip-track,
   :root:not([data-motion="full"]) .kt-share-marquee-track,
+  :root:not([data-motion="full"]) .kt-breathe,
+  :root:not([data-motion="full"]) .kt-terrain-breathe,
   :root:not([data-motion="full"]) .kt-glitch-map .kt-fringe-r,
   :root:not([data-motion="full"]) .kt-glitch-map .kt-fringe-c {
     animation: none !important;
@@ -4355,6 +4366,8 @@ select[style*="border-radius"],
 :root[data-motion="reduced"] .kt-ticker-track,
 :root[data-motion="reduced"] .kt-alert-strip-track,
 :root[data-motion="reduced"] .kt-share-marquee-track,
+:root[data-motion="reduced"] .kt-breathe,
+:root[data-motion="reduced"] .kt-terrain-breathe,
 :root[data-motion="reduced"] .kt-glitch-map .kt-fringe-r,
 :root[data-motion="reduced"] .kt-glitch-map .kt-fringe-c,
 :root[data-motion="reduced"] .kt-route-shell {

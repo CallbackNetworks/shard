@@ -70,6 +70,32 @@ def test_share_analytics_agrees_with_the_analytics_page(client, db, sample_proje
     assert shared["heatmap"] == heat
 
 
+def test_a_task_says_how_often_it_changed_lately(client, db, sample_project):
+    busy = make_task(db, project_id=sample_project.id, title="busy", status="in_progress")
+    quiet = make_task(db, project_id=sample_project.id, title="quiet", status="todo")
+    now = datetime.now(UTC)
+    for days_ago in (1, 2, 40):
+        db.add(
+            ActivityLog(
+                action="task.updated",
+                project_id=sample_project.id,
+                task_id=busy.id,
+                created_at=now - timedelta(days=days_ago),
+            )
+        )
+    # A visit is not a change.
+    db.add(ActivityLog(action="share.viewed", project_id=sample_project.id, task_id=quiet.id, created_at=now))
+    db.commit()
+
+    tasks = {
+        t["title"]: t for t in client.get(f"/share/node/{sample_project.share_token}").json()["projects"][0]["tasks"]
+    }
+
+    assert tasks["busy"]["recent_updates"] == 2
+    assert tasks["quiet"]["recent_updates"] == 0
+    assert tasks["busy"]["updated_at"]
+
+
 def test_get_share_invalid_token(client):
     resp = client.get("/share/node/nonexistent-token")
     assert resp.status_code == 404

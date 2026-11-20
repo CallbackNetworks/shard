@@ -45,8 +45,11 @@ foothills between them belong to no project. Where it stands is a
 reading, not decoration — left to right is how long since the project last changed
 (90 days or more at the far left, today at the right), back to front is how much of it
 is done. So a mountain at the front right is recent and nearly finished, and one at
-the back left is untouched. Tasks are small squares on the slopes; point at one, or at
-a summit, to see what it is. **Map** draws it as contour lines from above; **3D** draws
+the back left is untouched. Tasks are small squares on the slopes, spiralling out from the
+summit, and every task gets the same patch of ground — a project's size is its number
+of tasks, not its share of the largest. A task that has changed lately is brighter and
+breathes; one nobody has touched holds still. Point at one, or at a summit, to see
+what it is. **Map** draws it as contour lines from above; **3D** draws
 the same terrain in perspective from nearly overhead. Drag it to move around, use the wheel (or pinch, on a
 phone) to zoom in on a crowded corner, and shift-drag to turn and tilt it; double-click
 puts it back;
